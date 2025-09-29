@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!-- Basic metadata -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Custom Browser Homepage</title>
+  <meta name="description" content="Minimal, Apple-style browser homepage template with search and quick links." />
+  
+  <!-- External stylesheet -->
+  <link rel="stylesheet" href="main.css">
+</head>
+<body>
+  <!-- Page wrapper -->
+  <div class="container">
+
+    <!-- Center card holding search box -->
+    <div class="card">
+      <form id="searchForm" class="search-box" onsubmit="return doSearch()">
+        <!-- Search input -->
+        <input 
+          id="searchInput" 
+          type="search" 
+          placeholder="Search or type a URL" 
+          autocomplete="off" 
+        />
+        <!-- Search button -->
+        <button type="submit" class="icon">Search</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    /* ====== Open a given URL in a new tab ====== */
+    function openUrl(url){
+      window.open(url, '_blank'); // Always open in a new tab
+    }
+
+    /* ====== Search handling ====== */
+    function doSearch(){
+      const q = document.getElementById('searchInput').value.trim();
+      if(!q) return false; // Ignore empty input
+
+      // If input looks like a URL → open directly
+      if (/^https?:\/\//i.test(q) || /^www\./i.test(q) || /\.[a-z]{2,}$/i.test(q)){
+        let url = q;
+        if(!/^https?:\/\//i.test(url)) url = 'https://' + url; // Ensure https:// prefix
+        window.open(url, '_blank');
+      } 
+      // Otherwise → perform Google search
+      else {
+        window.open("https://www.google.com/search?q=" + encodeURIComponent(q), '_blank');
+      }
+      return false; // Prevent normal form submission
+    }
+
+    /* ====== Placeholder for future widgets/links ====== */
+    // renderLinks(); // Uncomment if you add custom links later
+  </script>
+</body>
+</html>

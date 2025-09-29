@@ -1,0 +1,26 @@
+{
+  "name": "ink",
+  "version": "1.0.0",
+  "description": "productivity web browser",
+  "homepage": "https://github.com/Milad-exe/The-Ink-Browser#readme",
+  "bugs": {
+    "url": "https://github.com/Milad-exe/The-Ink-Browser/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Milad-exe/The-Ink-Browser.git"
+  },
+  "license": "ISC",
+  "author": "Milad Rakhshbahar",
+  "type": "commonjs",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "test": "jest"
+  },
+  "dependencies": {
+    "electron": "^38.1.2"
+  }
+}
