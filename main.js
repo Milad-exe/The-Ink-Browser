@@ -73,3 +73,15 @@ ipcMain.handle("switchTab", async (event, index) => {
 ipcMain.handle("loadUrl", async (event, index, url) => {
   inkInstance.tabs.loadUrl(index, url)
 });
+
+ipcMain.handle("goBack", async (event, index) => {
+  inkInstance.tabs.goBack(index)
+});
+
+ipcMain.handle("goForward", async (event, index) => {
+  inkInstance.tabs.goForward(index)
+});
+
+ipcMain.handle("reload", async (event, index) => {
+  inkInstance.tabs.reload(index)
+});

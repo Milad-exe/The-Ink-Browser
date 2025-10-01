@@ -2,11 +2,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const addBtn = document.getElementById("new-tab-btn");
     const tabBar = document.getElementById("tab-bar");
     const searchBar = document.getElementById("searchBar");
+    const backBtn = document.getElementById("back-btn");
+    const forwardBtn = document.getElementById("forward-btn");
+    const reloadBtn = document.getElementById("reload-btn");
     
     let tabs = new Map();
     let tabCounter = 0;
     let initialTabCreated = false;
     let activeTabIndex = 0;
+
+    // Navigation button event listeners
+    backBtn.addEventListener("click", () => {
+        window.tab.goBack(activeTabIndex);
+    });
+
+    forwardBtn.addEventListener("click", () => {
+        window.tab.goForward(activeTabIndex);
+    });
+
+    reloadBtn.addEventListener("click", () => {
+        window.tab.reload(activeTabIndex);
+    });
 
     searchBar.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
@@ -60,6 +76,13 @@ document.addEventListener("DOMContentLoaded", () => {
             updateSearchBarUrl(data.url);
         }
         updateTabTitle(data.index, data.title || data.url, data.favicon);
+    });
+
+    window.tab.onNavigationUpdated((event, data) => {
+        console.log('Navigation updated:', data);
+        if (data.index === activeTabIndex) {
+            updateNavigationButtons(data.canGoBack, data.canGoForward);
+        }
     });
 
     function createTabButton(index, title) {
@@ -225,6 +248,17 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener('resize', () => {
         setTimeout(() => updateTabWidths(tabs.size), 100);
     });
+
+    function updateNavigationButtons(canGoBack, canGoForward) {
+        backBtn.disabled = !canGoBack;
+        forwardBtn.disabled = !canGoForward;
+        
+        // Add visual styling for disabled state
+        backBtn.style.opacity = canGoBack ? '1' : '0.5';
+        forwardBtn.style.opacity = canGoForward ? '1' : '0.5';
+        backBtn.style.cursor = canGoBack ? 'pointer' : 'not-allowed';
+        forwardBtn.style.cursor = canGoForward ? 'pointer' : 'not-allowed';
+    }
 
     setTimeout(() => {
         if (tabs.size > 0) {
