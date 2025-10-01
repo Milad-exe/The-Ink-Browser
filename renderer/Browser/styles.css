@@ -163,6 +163,18 @@ html, body {
   transform: scale(0.96);
 }
 
+#utility-bar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: transparent !important;
+  transform: none !important;
+}
+
+#utility-bar button:disabled:hover {
+  background: transparent !important;
+  color: #424242 !important;
+}
+
 #searchBar {
   flex: 1;
   height: 28px;
