@@ -4,11 +4,10 @@ class Tabs {
     constructor(mainWindow) {
         this.mainWindow = mainWindow
         this.TabMap = new Map()
-        this.tabUrls = new Map() // Track URLs for each tab
+        this.tabUrls = new Map()
         this.activeTabIndex = 0
         this.nextTabIndex = 0
         
-        // Listen for window resize to update tab bounds
         this.mainWindow.on('resize', () => {
             this.resizeAllTabs()
         })
@@ -22,7 +21,6 @@ class Tabs {
         this.mainWindow.contentView.addChildView(tab)
         tab.webContents.loadFile('renderer/NewTab/index.html')
         
-        // Set initial bounds
         const bounds = this.getTabBounds()
         tab.setBounds(bounds)
 
@@ -78,6 +76,14 @@ class Tabs {
                 this.sendTabUpdate(tabIndex, tab, currentUrl, tab.webContents.getTitle(), favicon)
             }
         })
+        
+        tab.webContents.on('did-finish-load', () => {
+            this.sendNavigationUpdate(tabIndex)
+        })
+        
+        tab.webContents.on('did-stop-loading', () => {
+            this.sendNavigationUpdate(tabIndex)
+        })
     }
 
     sendTabUpdate(tabIndex, tab, url, title, favicon) {
@@ -90,12 +96,16 @@ class Tabs {
     }
     
     sendNavigationUpdate(tabIndex) {
-        if (tabIndex === this.activeTabIndex) {
-            this.mainWindow.webContents.send('navigation-updated', {
-                index: tabIndex,
-                canGoBack: this.canGoBack(tabIndex),
-                canGoForward: this.canGoForward(tabIndex)
-            })
+        if (this.TabMap.has(tabIndex) && tabIndex === this.activeTabIndex) {
+            try {
+                this.mainWindow.webContents.send('navigation-updated', {
+                    index: tabIndex,
+                    canGoBack: this.canGoBack(tabIndex),
+                    canGoForward: this.canGoForward(tabIndex)
+                })
+            } catch (error) {
+                console.log('Error sending navigation update:', error)
+            }
         }
     }
     
@@ -116,7 +126,6 @@ class Tabs {
                 totalTabs: this.TabMap.size
             })
             
-            // Send navigation state for the newly active tab
             this.sendNavigationUpdate(index)
         }
     }
@@ -126,6 +135,9 @@ class Tabs {
             const tab = this.TabMap.get(index)
             tab.webContents.loadURL(url)
             this.tabUrls.set(index, url)
+            setTimeout(() => {
+                this.sendNavigationUpdate(index)
+            }, 200)
         }
     }
     
@@ -157,6 +169,9 @@ class Tabs {
             const tab = this.TabMap.get(index)
             if (tab.webContents.navigationHistory.canGoBack()) {
                 tab.webContents.navigationHistory.goBack()
+                setTimeout(() => {
+                    this.sendNavigationUpdate(index)
+                }, 100)
             }
         }
     }
@@ -166,6 +181,9 @@ class Tabs {
             const tab = this.TabMap.get(index)
             if (tab.webContents.navigationHistory.canGoForward()) {
                 tab.webContents.navigationHistory.goForward()
+                setTimeout(() => {
+                    this.sendNavigationUpdate(index)
+                }, 100)
             }
         }
     }
@@ -174,6 +192,9 @@ class Tabs {
         if (this.TabMap.has(index)) {
             const tab = this.TabMap.get(index)
             tab.webContents.reload()
+            setTimeout(() => {
+                this.sendNavigationUpdate(index)
+            }, 100)
         }
     }
     
