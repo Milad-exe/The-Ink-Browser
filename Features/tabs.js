@@ -155,8 +155,8 @@ class Tabs {
     goBack(index) {
         if (this.TabMap.has(index)) {
             const tab = this.TabMap.get(index)
-            if (tab.webContents.canGoBack()) {
-                tab.webContents.goBack()
+            if (tab.webContents.navigationHistory.canGoBack()) {
+                tab.webContents.navigationHistory.goBack()
             }
         }
     }
@@ -164,8 +164,8 @@ class Tabs {
     goForward(index) {
         if (this.TabMap.has(index)) {
             const tab = this.TabMap.get(index)
-            if (tab.webContents.canGoForward()) {
-                tab.webContents.goForward()
+            if (tab.webContents.navigationHistory.canGoForward()) {
+                tab.webContents.navigationHistory.goForward()
             }
         }
     }
@@ -180,7 +180,7 @@ class Tabs {
     canGoBack(index) {
         if (this.TabMap.has(index)) {
             const tab = this.TabMap.get(index)
-            return tab.webContents.canGoBack()
+            return tab.webContents.navigationHistory.canGoBack()
         }
         return false
     }
@@ -188,7 +188,7 @@ class Tabs {
     canGoForward(index) {
         if (this.TabMap.has(index)) {
             const tab = this.TabMap.get(index)
-            return tab.webContents.canGoForward()
+            return tab.webContents.navigationHistory.canGoForward()
         }
         return false
     }
