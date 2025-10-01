@@ -52,6 +52,7 @@ class Tabs {
             if (!url.startsWith('file://')) {
                 this.tabUrls.set(tabIndex, url)
                 this.sendTabUpdate(tabIndex, tab, url)
+                this.sendNavigationUpdate(tabIndex)
             }
         })
         
@@ -59,6 +60,7 @@ class Tabs {
             if (!url.startsWith('file://')) {
                 this.tabUrls.set(tabIndex, url)
                 this.sendTabUpdate(tabIndex, tab, url)
+                this.sendNavigationUpdate(tabIndex)
             }
         })
         
@@ -87,6 +89,16 @@ class Tabs {
         })
     }
     
+    sendNavigationUpdate(tabIndex) {
+        if (tabIndex === this.activeTabIndex) {
+            this.mainWindow.webContents.send('navigation-updated', {
+                index: tabIndex,
+                canGoBack: this.canGoBack(tabIndex),
+                canGoForward: this.canGoForward(tabIndex)
+            })
+        }
+    }
+    
     showTab(index) {
         this.TabMap.forEach((tab, i) => {
             tab.setVisible(false)
@@ -103,6 +115,9 @@ class Tabs {
                 url: currentUrl === 'newtab' ? '' : currentUrl,
                 totalTabs: this.TabMap.size
             })
+            
+            // Send navigation state for the newly active tab
+            this.sendNavigationUpdate(index)
         }
     }
     
@@ -135,6 +150,47 @@ class Tabs {
     
     getTotalTabs() {
         return this.TabMap.size
+    }
+    
+    goBack(index) {
+        if (this.TabMap.has(index)) {
+            const tab = this.TabMap.get(index)
+            if (tab.webContents.canGoBack()) {
+                tab.webContents.goBack()
+            }
+        }
+    }
+    
+    goForward(index) {
+        if (this.TabMap.has(index)) {
+            const tab = this.TabMap.get(index)
+            if (tab.webContents.canGoForward()) {
+                tab.webContents.goForward()
+            }
+        }
+    }
+    
+    reload(index) {
+        if (this.TabMap.has(index)) {
+            const tab = this.TabMap.get(index)
+            tab.webContents.reload()
+        }
+    }
+    
+    canGoBack(index) {
+        if (this.TabMap.has(index)) {
+            const tab = this.TabMap.get(index)
+            return tab.webContents.canGoBack()
+        }
+        return false
+    }
+    
+    canGoForward(index) {
+        if (this.TabMap.has(index)) {
+            const tab = this.TabMap.get(index)
+            return tab.webContents.canGoForward()
+        }
+        return false
     }
     
     resizeAllTabs() {
