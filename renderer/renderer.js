@@ -11,7 +11,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let initialTabCreated = false;
     let activeTabIndex = 0;
 
-    // Navigation button event listeners
     backBtn.addEventListener("click", () => {
         window.tab.goBack(activeTabIndex);
     });
@@ -253,7 +252,6 @@ document.addEventListener("DOMContentLoaded", () => {
         backBtn.disabled = !canGoBack;
         forwardBtn.disabled = !canGoForward;
         
-        // Add visual styling for disabled state
         backBtn.style.opacity = canGoBack ? '1' : '0.5';
         forwardBtn.style.opacity = canGoForward ? '1' : '0.5';
         backBtn.style.cursor = canGoBack ? 'pointer' : 'not-allowed';
