@@ -37,6 +37,11 @@ class Tabs {
         })
         
         this.showTab(tabIndex)
+
+
+        tab.webContents.on('did-finish-load', () => {
+            tab.webContents.insertCSS('html{filter:grayscale(100%)}');
+        });
     }
     
     getTabBounds() {
