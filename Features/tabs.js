@@ -1,8 +1,10 @@
 const { WebContentsView, BrowserWindow }  = require('electron');
+const History = require("./history");
 
 class Tabs {
-    constructor(mainWindow) {
+    constructor(mainWindow, History) {
         this.mainWindow = mainWindow
+        this.history = History
         this.TabMap = new Map()
         this.tabUrls = new Map()
         this.activeTabIndex = 0
@@ -56,6 +58,7 @@ class Tabs {
                 this.tabUrls.set(tabIndex, url)
                 this.sendTabUpdate(tabIndex, tab, url)
                 this.sendNavigationUpdate(tabIndex)
+                this.addToHistory(url, tab.webContents.getTitle())
             }
         })
         
@@ -64,6 +67,7 @@ class Tabs {
                 this.tabUrls.set(tabIndex, url)
                 this.sendTabUpdate(tabIndex, tab, url)
                 this.sendNavigationUpdate(tabIndex)
+                this.addToHistory(url, tab.webContents.getTitle())
             }
         })
         
@@ -111,6 +115,14 @@ class Tabs {
             } catch (error) {
                 console.log('Error sending navigation update:', error)
             }
+        }
+    }
+    
+    addToHistory(url, title) {
+        if (this.history && url && !url.startsWith('file://')) {
+            this.history.addToHistory(url, title || url).catch(error => {
+                console.error('Failed to add to history:', error)
+            })
         }
     }
     
