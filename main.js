@@ -1,12 +1,14 @@
 const { BrowserWindow, app, ipcMain }  = require('electron');
 const path = require("path");
-const Tabs = require("./Features/tabs")
+const Tabs = require("./Features/tabs");
+const History = require("./Features/history");
 
 //the actual browser
 class Ink {
     constructor() {
         this.mainWindow = null;
         this.tabs = null;
+        this.history = null;
 
         this.Init();
     }
@@ -26,7 +28,8 @@ class Ink {
 
             this.mainWindow.loadFile('renderer/Browser/index.html')
             
-            this.tabs = new Tabs(this.mainWindow)
+            this.history = new History()
+            this.tabs = new Tabs(this.mainWindow, this.history)
             
             // Create initial tab when window is ready
             this.mainWindow.webContents.once('did-finish-load', () => {
