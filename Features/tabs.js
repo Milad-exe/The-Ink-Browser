@@ -1,6 +1,7 @@
 const { WebContentsView, BrowserWindow }  = require('electron');
 const path = require('path');
 const History = require("./history");
+const { app } = require('electron/main');
 
 class Tabs {
     constructor(mainWindow, History) {
@@ -180,6 +181,10 @@ class Tabs {
             if (this.activeTabIndex === index && this.TabMap.size > 0) {
                 const remainingTabs = Array.from(this.TabMap.keys())
                 this.showTab(remainingTabs[0])
+            }
+
+            if(index === 1){
+                app.quit();
             }
         }
     }
