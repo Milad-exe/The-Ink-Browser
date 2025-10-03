@@ -5,11 +5,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const backBtn = document.getElementById("back-btn");
     const forwardBtn = document.getElementById("forward-btn");
     const reloadBtn = document.getElementById("reload-btn");
+    const menuBtn = document.getElementById("menu-btn")
     
     let tabs = new Map();
     let tabCounter = 0;
     let initialTabCreated = false;
     let activeTabIndex = 0;
+    let menuOpen = false;
+
+    window.addEventListener("click", (e) => {
+        if (menuOpen) {
+            window.electronAPI.windowClick({ x: e.clientX, y: e.clientY });
+        }
+    });
+
+    window.menu.onClosed((event, data) => {
+        menuOpen = false;
+    });
+
+    
 
     backBtn.addEventListener("click", () => {
         window.tab.goBack(activeTabIndex);
@@ -32,6 +46,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    menuBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        window.menu.open();
+        menuOpen = true;
+    })
+
     function loadUrlInActiveTab(url) {
         let formattedUrl = url;
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -42,7 +62,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
         
-        console.log('Loading URL in active tab:', formattedUrl);
         window.tab.loadUrl(activeTabIndex, formattedUrl);
     }
 
@@ -51,26 +70,22 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     window.tab.onTabCreated((event, data) => {
-        console.log('Tab created:', data);
         createTabButton(data.index, data.title);
         setTimeout(() => updateTabWidths(data.totalTabs), 10);
     });
 
     window.tab.onTabRemoved((event, data) => {
-        console.log('Tab removed:', data);
         removeTabButton(data.index);
         setTimeout(() => updateTabWidths(data.totalTabs), 10);
     });
 
     window.tab.onTabSwitched((event, data) => {
-        console.log('Tab switched:', data);
         activeTabIndex = data.index;
         setActiveTab(data.index);
         updateSearchBarUrl(data.url || "");
     });
 
     window.tab.onUrlUpdated((event, data) => {
-        console.log('Tab URL updated:', data);
         if (data.index === activeTabIndex) {
             updateSearchBarUrl(data.url);
         }
@@ -78,7 +93,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     window.tab.onNavigationUpdated((event, data) => {
-        console.log('Navigation updated:', data);
         if (data.index === activeTabIndex) {
             updateNavigationButtons(data.canGoBack, data.canGoForward);
         }
@@ -115,8 +129,6 @@ document.addEventListener("DOMContentLoaded", () => {
         tabBar.appendChild(tabButton);
         tabs.set(index, tabButton);
         
-        console.log('Created tab button:', index, 'Total tabs in UI:', tabs.size);
-        
         setActiveTab(index);
     }
 
@@ -125,7 +137,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (tabButton) {
             tabButton.remove();
             tabs.delete(index);
-            console.log('Removed tab button:', index, 'Remaining tabs:', tabs.size);
         }
     }
 
@@ -135,7 +146,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const activeTab = tabs.get(index);
         if (activeTab) {
             activeTab.classList.add('active');
-            console.log('Set active tab:', index);
         }
         activeTabIndex = index;
     }
@@ -171,11 +181,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (faviconUrl && faviconUrl !== '') {
             faviconElement.src = faviconUrl;
             faviconElement.alt = '';
-            
-            faviconElement.onload = () => {
-                console.log('Favicon loaded:', faviconUrl);
-            };
-            
             faviconElement.onerror = () => {
                 setDomainFavicon(faviconElement, faviconUrl);
             };
@@ -220,15 +225,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const idealTabWidth = Math.floor(tabBarWidth / actualTabCount);
             const minTabWidth = 28; // Minimum width before scrolling is started
             
-            console.log('Tab bar width:', tabBarWidth, 'Using tab count:', actualTabCount, 'Width per tab:', idealTabWidth);
-            
             if (idealTabWidth >= minTabWidth) {
                 tabs.forEach((tab, index) => {
                     tab.style.width = `${idealTabWidth}px`;
                     tab.style.minWidth = `${idealTabWidth}px`;
                     tab.style.maxWidth = `${idealTabWidth}px`;
                     tab.style.flexShrink = '0';
-                    console.log('Set tab', index, 'width to', idealTabWidth);
                 });
                 tabBar.style.overflowX = 'hidden';
             } else {
@@ -237,7 +239,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     tab.style.minWidth = `${minTabWidth}px`;
                     tab.style.maxWidth = `${minTabWidth}px`;
                     tab.style.flexShrink = '0';
-                    console.log('Set tab', index, 'width to minimum', minTabWidth);
                 });
                 tabBar.style.overflowX = 'auto';
             }

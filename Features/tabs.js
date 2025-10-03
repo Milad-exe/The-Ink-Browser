@@ -1,4 +1,5 @@
 const { WebContentsView, BrowserWindow }  = require('electron');
+const path = require('path');
 const History = require("./history");
 
 class Tabs {
@@ -19,7 +20,13 @@ class Tabs {
         const tabIndex = this.nextTabIndex
         this.nextTabIndex++
         
-        const tab = new WebContentsView()
+        const tab = new WebContentsView({
+            webPreferences: {
+                preload: path.join(__dirname, '../preload.js'),
+                contextIsolation: true,
+                nodeIntegration: false
+            }
+        })
         this.mainWindow.contentView.addChildView(tab)
         tab.webContents.loadFile('renderer/NewTab/index.html')
         

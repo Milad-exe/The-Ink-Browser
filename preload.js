@@ -1,7 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld(
-    
     //TAB FUNCTIONS
     "tab", {
         add: () => ipcRenderer.invoke("addTab"),
@@ -20,3 +19,14 @@ contextBridge.exposeInMainWorld(
         onNavigationUpdated: (callback) => ipcRenderer.on('navigation-updated', callback)
     }
 );
+
+contextBridge.exposeInMainWorld(
+    "menu", {
+        open: () => ipcRenderer.invoke('open'),
+        onClosed: (callback) => ipcRenderer.on('menu-closed', callback)
+    }
+);
+
+contextBridge.exposeInMainWorld("electronAPI", {
+  windowClick: (pos) => ipcRenderer.send("window-click", pos)
+});

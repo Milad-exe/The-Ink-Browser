@@ -14,13 +14,10 @@ class History {
         try {
             const userDataPath = app.getPath('userData');
             this.file = path.join(userDataPath, 'browsing-history.json');
-            console.log('History file path:', this.file);
-            console.log('userData path:', userDataPath);
         } catch (error) {
             console.error('Error getting userData path:', error);
             // Fallback to current directory if app.getPath fails
             this.file = path.join(process.cwd(), 'browsing-history.json');
-            console.log('Using fallback path:', this.file);
         }
     }
 
@@ -34,16 +31,12 @@ class History {
             return true;
         }
 
-        console.log('Checking if history file exists:', this.file);
         const exists = await this.historyFileExists();
-        console.log('History file exists:', exists);
         
         if(!exists){
-            console.log('Creating new history file...');
             let text = '{ "History" : []}';
             try {
                 await fs.writeFile(this.file, text, { encoding: 'utf8' });
-                console.log('History file created successfully');
             } catch (writeError) {
                 console.error('Error creating history file:', writeError);
                 return false;
@@ -58,10 +51,8 @@ class History {
         await this.ensureFileExists();
         
         try {
-            console.log('Reading history file...');
             const data = await fs.readFile(this.file, 'utf8');
             const jsonData = JSON.parse(data);
-            console.log('History loaded:', jsonData);
             return jsonData;
         } catch (error) {
             console.error("Error reading JSON file:", error);
@@ -88,7 +79,6 @@ class History {
             }
             
             await fs.writeFile(this.file, JSON.stringify(historyData, null, 2), { encoding: 'utf8' });
-            console.log('Added to history:', newEntry);
         } catch (error) {
             console.error('Error adding to history:', error);
         }
