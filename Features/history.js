@@ -16,7 +16,6 @@ class History {
             this.file = path.join(userDataPath, 'browsing-history.json');
         } catch (error) {
             console.error('Error getting userData path:', error);
-            // Fallback to current directory if app.getPath fails
             this.file = path.join(process.cwd(), 'browsing-history.json');
         }
     }
@@ -34,7 +33,7 @@ class History {
         const exists = await this.historyFileExists();
         
         if(!exists){
-            let text = '{ "History" : []}';
+            let text = '[]';
             try {
                 await fs.writeFile(this.file, text, { encoding: 'utf8' });
             } catch (writeError) {
@@ -56,7 +55,7 @@ class History {
             return jsonData;
         } catch (error) {
             console.error("Error reading JSON file:", error);
-            return { History: [] };
+            return [];
         }
     }
 
@@ -71,16 +70,33 @@ class History {
                 timestamp: new Date().toISOString()
             };
             
-            historyData.History.unshift(newEntry); // Add to beginning
+            historyData.unshift(newEntry);
             
-            // Keep only last 1000 entries
-            if (historyData.History.length > 1000) {
-                historyData.History = historyData.History.slice(0, 1000);
+            if (historyData.length > 1000) {
+                historyData = historyData.slice(0, 1000);
             }
             
             await fs.writeFile(this.file, JSON.stringify(historyData, null, 2), { encoding: 'utf8' });
         } catch (error) {
             console.error('Error adding to history:', error);
+        }
+    }
+
+    async removeFromHistory(url, timestamp) {
+        await this.ensureFileExists();
+        
+        try {
+            const historyData = await this.loadHistory();
+            
+            const filteredHistory = historyData.filter(entry => 
+                !(entry.url === url && entry.timestamp === timestamp)
+            );
+            
+            await fs.writeFile(this.file, JSON.stringify(filteredHistory, null, 2), { encoding: 'utf8' });
+            return true;
+        } catch (error) {
+            console.error('Error removing from history:', error);
+            return false;
         }
     }
 
