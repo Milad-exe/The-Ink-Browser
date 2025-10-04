@@ -21,7 +21,7 @@ class Ink {
             minWidth: 800,
             minHeight: 600,
             webPreferences: {
-                preload: path.join(__dirname, "preload.js"),
+                preload: path.join(__dirname, "./preload/preload.js"),
             }
         })
 
@@ -85,7 +85,13 @@ ipcMain.handle("reload", async (event, index) => {
 });
 
 ipcMain.handle("open", async (event, index) => {
-  inkInstance.menu = new WebContentsView()
+  inkInstance.menu = new WebContentsView({
+    webPreferences: {
+      preload: path.join(__dirname, "./preload/menu-preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
   inkInstance.mainWindow.contentView.addChildView(inkInstance.menu)
   inkInstance.menu.webContents.loadFile('renderer/Menu/index.html')
 
@@ -123,3 +129,49 @@ ipcMain.on("window-click", (event, pos) => {
     }
   }
 });
+
+ipcMain.handle("history-get", async () => {
+  console.log('history-get IPC handler called');
+  try {
+    const result = await inkInstance.history.loadHistory();
+    console.log('History loaded:', result);
+    return result;
+  } catch (error) {
+    console.error('Error in history-get handler:', error);
+    return { History: [] };
+  }
+})
+
+ipcMain.handle("open-history-tab", async () => {
+  console.log('open-history-tab IPC received');
+  try {
+    inkInstance.tabs.CreateTabWithPage('renderer/History/index.html', 'history', 'History')
+    console.log('History tab created successfully');
+  } catch (error) {
+    console.error('Error creating history tab:', error);
+  }
+})
+
+ipcMain.handle("remove-history-entry", async (event, url, timestamp) => {
+  console.log('remove-history-entry IPC received:', { url, timestamp });
+  try {
+    const result = await inkInstance.history.removeFromHistory(url, timestamp);
+    console.log('History entry removal result:', result);
+    return result;
+  } catch (error) {
+    console.error('Error in remove-history-entry handler:', error);
+    return false;
+  }
+})
+
+ipcMain.handle("close-menu", async () => {
+  if (inkInstance.menu) {
+    try {
+      inkInstance.mainWindow.contentView.removeChildView(inkInstance.menu);
+      inkInstance.menu = null;
+      inkInstance.mainWindow.webContents.send('menu-closed');
+    } catch (error) {
+      console.error('Error closing menu:', error);
+    }
+  }
+})

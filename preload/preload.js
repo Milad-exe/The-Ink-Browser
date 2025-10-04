@@ -1,7 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld(
-    //TAB FUNCTIONS
     "tab", {
         add: () => ipcRenderer.invoke("addTab"),
         remove: (index) => ipcRenderer.invoke("removeTab", index),
@@ -11,7 +10,6 @@ contextBridge.exposeInMainWorld(
         goForward: (index) => ipcRenderer.invoke("goForward", index),
         reload: (index) => ipcRenderer.invoke("reload", index),
         
-        // Listen for tab events from main process
         onTabCreated: (callback) => ipcRenderer.on('tab-created', callback),
         onTabRemoved: (callback) => ipcRenderer.on('tab-removed', callback),
         onTabSwitched: (callback) => ipcRenderer.on('tab-switched', callback),
@@ -23,10 +21,18 @@ contextBridge.exposeInMainWorld(
 contextBridge.exposeInMainWorld(
     "menu", {
         open: () => ipcRenderer.invoke('open'),
+        close: () => ipcRenderer.invoke('close-menu'),
         onClosed: (callback) => ipcRenderer.on('menu-closed', callback)
     }
 );
 
+contextBridge.exposeInMainWorld(
+    "browserHistory", {
+        get: () => ipcRenderer.invoke('history-get'),
+        remove: (url, timestamp) => ipcRenderer.invoke('remove-history-entry', url, timestamp)
+    }
+);
+
 contextBridge.exposeInMainWorld("electronAPI", {
-  windowClick: (pos) => ipcRenderer.send("window-click", pos)
+  windowClick: (pos) => ipcRenderer.send("window-click", pos),
 });

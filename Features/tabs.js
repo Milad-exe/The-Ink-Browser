@@ -23,7 +23,7 @@ class Tabs {
         
         const tab = new WebContentsView({
             webPreferences: {
-                preload: path.join(__dirname, '../preload.js'),
+                preload: path.join(__dirname, '../preload/preload.js'),
                 contextIsolation: true,
                 nodeIntegration: false
             }
@@ -53,6 +53,43 @@ class Tabs {
             tab.webContents.insertCSS('html{filter:grayscale(100%)}');
         });
     }
+
+    CreateTabWithPage(pagePath, pageType, pageTitle) {
+        const tabIndex = this.nextTabIndex
+        this.nextTabIndex++
+        
+        const tab = new WebContentsView({
+            webPreferences: {
+                preload: path.join(__dirname, '../preload/preload.js'),
+                contextIsolation: true,
+                nodeIntegration: false
+            }
+        })
+        this.mainWindow.contentView.addChildView(tab)
+        tab.webContents.loadFile(pagePath)
+        
+        const bounds = this.getTabBounds()
+        tab.setBounds(bounds)
+
+        this.TabMap.set(tabIndex, tab)
+        this.tabUrls.set(tabIndex, pageType)
+        this.activeTabIndex = tabIndex
+        
+        this.setupTabListeners(tabIndex, tab)
+        
+        this.mainWindow.webContents.send('tab-created', {
+            index: tabIndex,
+            title: pageTitle,
+            totalTabs: this.TabMap.size
+        })
+        
+        this.showTab(tabIndex)
+
+        tab.webContents.on('did-finish-load', () => {
+            tab.webContents.insertCSS('html{filter:grayscale(100%)}');
+        });
+        
+    }
     
     getTabBounds() {
         const width = this.mainWindow.getContentBounds().width
@@ -81,14 +118,14 @@ class Tabs {
         
         tab.webContents.on('page-title-updated', (event, title) => {
             const currentUrl = this.tabUrls.get(tabIndex) || ''
-            if (currentUrl !== 'newtab' && !currentUrl.startsWith('file://')) {
+            if (currentUrl !== 'newtab' && currentUrl !== 'history' && !currentUrl.startsWith('file://')) {
                 this.sendTabUpdate(tabIndex, tab, currentUrl, title)
             }
         })
 
         tab.webContents.on('page-favicon-updated', (event, favicons) => {
             const currentUrl = this.tabUrls.get(tabIndex) || ''
-            if (currentUrl !== 'newtab' && !currentUrl.startsWith('file://')) {
+            if (currentUrl !== 'newtab' && currentUrl !== 'history' && !currentUrl.startsWith('file://')) {
                 const favicon = favicons && favicons.length > 0 ? favicons[0] : null
                 this.sendTabUpdate(tabIndex, tab, currentUrl, tab.webContents.getTitle(), favicon)
             }
@@ -147,7 +184,7 @@ class Tabs {
             
             this.mainWindow.webContents.send('tab-switched', {
                 index: index,
-                url: currentUrl === 'newtab' ? '' : currentUrl,
+                url: (currentUrl === 'newtab' || currentUrl === 'history') ? '' : currentUrl,
                 totalTabs: this.TabMap.size
             })
             
@@ -249,8 +286,6 @@ class Tabs {
         this.TabMap.forEach((tab, index) => {
             tab.setBounds(bounds)
         })
-        
-        console.log('Resized all tabs to:', bounds)
     }
 }
 
