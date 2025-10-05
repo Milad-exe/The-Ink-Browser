@@ -131,10 +131,8 @@ ipcMain.on("window-click", (event, pos) => {
 });
 
 ipcMain.handle("history-get", async () => {
-  console.log('history-get IPC handler called');
   try {
     const result = await inkInstance.history.loadHistory();
-    console.log('History loaded:', result);
     return result;
   } catch (error) {
     console.error('Error in history-get handler:', error);
@@ -143,20 +141,16 @@ ipcMain.handle("history-get", async () => {
 })
 
 ipcMain.handle("open-history-tab", async () => {
-  console.log('open-history-tab IPC received');
   try {
     inkInstance.tabs.CreateTabWithPage('renderer/History/index.html', 'history', 'History')
-    console.log('History tab created successfully');
   } catch (error) {
     console.error('Error creating history tab:', error);
   }
 })
 
 ipcMain.handle("remove-history-entry", async (event, url, timestamp) => {
-  console.log('remove-history-entry IPC received:', { url, timestamp });
   try {
     const result = await inkInstance.history.removeFromHistory(url, timestamp);
-    console.log('History entry removal result:', result);
     return result;
   } catch (error) {
     console.error('Error in remove-history-entry handler:', error);
