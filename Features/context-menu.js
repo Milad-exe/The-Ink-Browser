@@ -1,7 +1,9 @@
 const { WebContentsView}  = require('electron');
 
 class ContextMenu {
-    constructor(tab, params) {
+    constructor(tab, params, tabManager) {
+        this.tab = tab;
+        this.tabManager = tabManager;
         this.contextTemplate = [
             {
                 label: "Reload",
@@ -36,7 +38,10 @@ class ContextMenu {
                     label: `Search Google for "${params.selectionText}"`,
                     click: () => {
                         const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`;
-                        require("electron").shell.openExternal(searchUrl);
+                        // Open in new tab
+                        this.tabManager.CreateTab();
+                        const newTabIndex = this.tabManager.activeTabIndex;
+                        this.tabManager.loadUrl(newTabIndex, searchUrl);
                     },
                 }
             );
@@ -85,8 +90,14 @@ class ContextMenu {
             this.contextTemplate.push(
                 { type: "separator" },
                 {
-                    label: "Open Link in Browser",
-                    click: () => require("electron").shell.openExternal(params.linkURL),
+                    label: "Open Link in New Tab",
+                    click: () => {
+                        // Create a new tab and load the link
+                        this.tabManager.CreateTab();
+                        // Get the newly created tab and load the URL
+                        const newTabIndex = this.tabManager.activeTabIndex;
+                        this.tabManager.loadUrl(newTabIndex, params.linkURL);
+                    },
                 },
                 {
                     label: "Copy Link Address",
@@ -101,8 +112,13 @@ class ContextMenu {
             this.contextTemplate.push(
                 { type: "separator" },
                 {
-                    label: "Open Image in Browser",
-                    click: () => require("electron").shell.openExternal(params.srcURL),
+                    label: "Open Image in New Tab",
+                    click: () => {
+                        // Create a new tab and load the image
+                        this.tabManager.CreateTab();
+                        const newTabIndex = this.tabManager.activeTabIndex;
+                        this.tabManager.loadUrl(newTabIndex, params.srcURL);
+                    },
                 },
                 {
                     label: "Copy Image Address",
