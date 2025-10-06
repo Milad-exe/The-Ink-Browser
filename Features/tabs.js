@@ -36,7 +36,7 @@ class Tabs {
         UserAgent.setupTabHeaders(tab)
         
         tab.webContents.on("context-menu", (event, params) => { 
-            const contextMenuInstance = new contextMenu(tab, params);
+            const contextMenuInstance = new contextMenu(tab, params, this);
             const menu = Menu.buildFromTemplate(contextMenuInstance.getTemplate());
             menu.popup({ window: this.mainWindow });
         })
