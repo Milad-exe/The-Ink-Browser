@@ -2,6 +2,7 @@ const { WebContentsView, BrowserWindow, Menu}  = require('electron');
 const path = require('path');
 const History = require("./history");
 const UserAgent = require("./user-agent");
+const contextMenu = require("./context-menu");
 const { app } = require('electron/main');
 
 class Tabs {
@@ -35,8 +36,8 @@ class Tabs {
         UserAgent.setupTabHeaders(tab)
         
         tab.webContents.on("context-menu", (event, params) => { 
-            this.createContextMenuTemplate(tab, params);
-            const menu = Menu.buildFromTemplate(this.contextTemplate);
+            const contextMenuInstance = new contextMenu(tab, params);
+            const menu = Menu.buildFromTemplate(contextMenuInstance.getTemplate());
             menu.popup({ window: this.mainWindow });
         })
 
@@ -61,99 +62,6 @@ class Tabs {
         tab.webContents.on('did-finish-load', () => {
             tab.webContents.insertCSS('html{filter:grayscale(100%)}');
         });
-    }
-
-    createContextMenuTemplate(tab, params){
-        this.contextTemplate = [
-            {
-            label: "Reload",
-            click: () => tab.webContents.reload(),
-            },
-            {
-            label: "Inspect Element",
-            click: () => tab.webContents.inspectElement(params.x, params.y),
-            },
-            { type: "separator" },
-
-            ...(params.selectionText
-            ? [
-                {
-                    label: "Copy",
-                    role: "copy",
-                    enabled: params.editFlags.canCopy,
-                },
-                {
-                    label: "Search Google for “" + params.selectionText + "”",
-                    click: () =>
-                    require("electron").shell.openExternal(
-                        `https://www.google.com/search?q=${encodeURIComponent(
-                        params.selectionText
-                        )}`
-                    ),
-                },
-                ]
-            : []),
-            ...(params.isEditable
-            ? [
-                {
-                    label: "Undo",
-                    role: "undo",
-                    enabled: params.editFlags.canUndo,
-                },
-                {
-                    label: "Redo",
-                    role: "redo",
-                    enabled: params.editFlags.canRedo,
-                },
-                { type: "separator" },
-                {
-                    label: "Cut",
-                    role: "cut",
-                    enabled: params.editFlags.canCut,
-                },
-                {
-                    label: "Copy",
-                    role: "copy",
-                    enabled: params.editFlags.canCopy,
-                },
-                {
-                    label: "Paste",
-                    role: "paste",
-                    enabled: params.editFlags.canPaste,
-                },
-                {
-                    label: "Select All",
-                    role: "selectAll",
-                },
-                ]
-            : []),
-            ...(params.linkURL
-            ? [
-                { type: "separator" },
-                {
-                    label: "Open Link in Browser",
-                    click: () => require("electron").shell.openExternal(params.linkURL),
-                },
-                {
-                    label: "Copy Link Address",
-                    click: () => require("electron").clipboard.writeText(params.linkURL),
-                },
-                ]
-            : []),
-            ...(params.srcURL
-            ? [
-                { type: "separator" },
-                {
-                    label: "Open Image in Browser",
-                    click: () => require("electron").shell.openExternal(params.srcURL),
-                },
-                {
-                    label: "Copy Image Address",
-                    click: () => require("electron").clipboard.writeText(params.srcURL),
-                },
-                ]
-            : [])
-        ];
     }
 
     CreateTabWithPage(pagePath, pageType, pageTitle) {
