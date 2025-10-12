@@ -93,6 +93,35 @@ class Shortcuts {
             }
         });
 
+        this.registerShortcut('CmdOrCtrl+Z', () => {
+            const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+            if (activeTab && activeTab.webContents.isFocused()) {
+                activeTab.webContents.undo();
+            } else if (this.mainWindow.webContents.isFocused()) {
+                this.mainWindow.webContents.undo();
+            }
+        });
+
+        if (process.platform === 'darwin') {
+            this.registerShortcut('CmdOrCtrl+Shift+Z', () => {
+                const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+                if (activeTab && activeTab.webContents.isFocused()) {
+                    activeTab.webContents.redo();
+                } else if (this.mainWindow.webContents.isFocused()) {
+                    this.mainWindow.webContents.redo();
+                }
+            });
+        } else {
+            this.registerShortcut('CmdOrCtrl+Y', () => {
+                const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+                if (activeTab && activeTab.webContents.isFocused()) {
+                    activeTab.webContents.redo();
+                } else if (this.mainWindow.webContents.isFocused()) {
+                    this.mainWindow.webContents.redo();
+                }
+            });
+        }
+
         this.registerShortcut('CmdOrCtrl+Plus', () => {
             this.zoomIn();
         });
