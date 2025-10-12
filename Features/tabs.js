@@ -3,12 +3,16 @@ const path = require('path');
 const History = require("./history");
 const UserAgent = require("./user-agent");
 const contextMenu = require("./context-menu");
+const NavigationHistory = require("./navigation-history");
+const FindDialog = require("./find-dialog");
 const { app } = require('electron/main');
 
 class Tabs {
     constructor(mainWindow, History) {
         this.mainWindow = mainWindow
         this.history = History
+        this.navigationHistory = new NavigationHistory()
+        this.findDialog = new FindDialog(mainWindow)
         this.TabMap = new Map()
         this.tabUrls = new Map()
         this.activeTabIndex = 0
@@ -47,6 +51,9 @@ class Tabs {
         this.TabMap.set(tabIndex, tab)
         this.tabUrls.set(tabIndex, 'newtab')
         this.activeTabIndex = tabIndex
+        this.navigationHistory.initializeTab(tabIndex, 'newtab')
+        
+        const initialHistory = this.navigationHistory.getHistory(tabIndex);
         
         this.setupTabListeners(tabIndex, tab)
         
@@ -58,6 +65,7 @@ class Tabs {
         
         this.showTab(tabIndex)
 
+        this.sendTabUpdate(tabIndex, tab, '', 'New Tab')
 
         tab.webContents.on('did-finish-load', () => {
             tab.webContents.insertCSS('html{filter:grayscale(100%)}');
@@ -86,6 +94,9 @@ class Tabs {
         this.TabMap.set(tabIndex, tab)
         this.tabUrls.set(tabIndex, pageType)
         this.activeTabIndex = tabIndex
+        this.navigationHistory.initializeTab(tabIndex, pageType)
+        
+        const initialHistory = this.navigationHistory.getHistory(tabIndex);
         
         this.setupTabListeners(tabIndex, tab)
         
@@ -110,23 +121,53 @@ class Tabs {
     }
     
     setupTabListeners(tabIndex, tab) {
+        let isNavigatingProgrammatically = false;
+        let lastAddedUrl = null;
+        
         tab.webContents.on('did-navigate', (event, url) => {
-            if (!url.startsWith('file://')) {
-                this.tabUrls.set(tabIndex, url)
-                this.sendTabUpdate(tabIndex, tab, url)
+            if (!url.startsWith('file://') && !isNavigatingProgrammatically) {
+                if (lastAddedUrl !== url) {
+                    this.tabUrls.set(tabIndex, url)
+                    this.navigationHistory.addEntry(tabIndex, url)
+                    lastAddedUrl = url;
+                    
+                    this.sendTabUpdate(tabIndex, tab, url)
+                    this.sendNavigationUpdate(tabIndex)
+                    this.addToHistory(url, tab.webContents.getTitle())
+                }
+            } else if (url.startsWith('file://')) {
+                this.tabUrls.set(tabIndex, 'newtab')
+                lastAddedUrl = 'newtab';
+                this.sendTabUpdate(tabIndex, tab, '', 'New Tab')
                 this.sendNavigationUpdate(tabIndex)
-                this.addToHistory(url, tab.webContents.getTitle())
             }
+            
+            isNavigatingProgrammatically = false;
         })
         
         tab.webContents.on('did-navigate-in-page', (event, url) => {
-            if (!url.startsWith('file://')) {
-                this.tabUrls.set(tabIndex, url)
-                this.sendTabUpdate(tabIndex, tab, url)
-                this.sendNavigationUpdate(tabIndex)
-                this.addToHistory(url, tab.webContents.getTitle())
+            if (!url.startsWith('file://') && !isNavigatingProgrammatically) {
+                const currentUrl = this.tabUrls.get(tabIndex);
+                if (currentUrl !== url && lastAddedUrl !== url) {
+                    this.tabUrls.set(tabIndex, url)
+                    this.navigationHistory.addEntry(tabIndex, url)
+                    lastAddedUrl = url;
+                    
+                    this.sendTabUpdate(tabIndex, tab, url)
+                    this.sendNavigationUpdate(tabIndex)
+                    this.addToHistory(url, tab.webContents.getTitle())
+                }
             }
         })
+        
+        tab._isNavigatingProgrammatically = () => isNavigatingProgrammatically;
+        tab._setNavigatingProgrammatically = (value) => { isNavigatingProgrammatically = value; };
+
+        tab.webContents.on('found-in-page', (event, result) => {
+            if (this.findDialog) {
+                this.findDialog.handleFindResult(result);
+            }
+        });
         
         tab.webContents.on('page-title-updated', (event, title) => {
             const currentUrl = this.tabUrls.get(tabIndex) || ''
@@ -153,10 +194,18 @@ class Tabs {
     }
 
     sendTabUpdate(tabIndex, tab, url, title, favicon) {
+        let displayUrl = url;
+        let displayTitle = title || tab.webContents.getTitle();
+        
+        if (url === 'newtab' || url.startsWith('file://')) {
+            displayUrl = '';
+            displayTitle = 'New Tab';
+        }
+        
         this.mainWindow.webContents.send('url-updated', {
             index: tabIndex,
-            url: url,
-            title: title || tab.webContents.getTitle(),
+            url: displayUrl,
+            title: displayTitle,
             favicon: favicon
         })
     }
@@ -170,7 +219,7 @@ class Tabs {
                     canGoForward: this.canGoForward(tabIndex)
                 })
             } catch (error) {
-                console.log('Error sending navigation update:', error)
+                
             }
         }
     }
@@ -178,7 +227,7 @@ class Tabs {
     addToHistory(url, title) {
         if (this.history && url && !url.startsWith('file://')) {
             this.history.addToHistory(url, title || url).catch(error => {
-                console.error('Failed to add to history:', error)
+                
             })
         }
     }
@@ -209,6 +258,9 @@ class Tabs {
             const tab = this.TabMap.get(index)
             tab.webContents.loadURL(url)
             this.tabUrls.set(index, url)
+            
+            this.navigationHistory.addEntry(index, url)
+            
             setTimeout(() => {
                 this.sendNavigationUpdate(index)
             }, 200)
@@ -221,6 +273,8 @@ class Tabs {
             this.mainWindow.contentView.removeChildView(tab)
             this.TabMap.delete(index)
             this.tabUrls.delete(index)
+            
+            this.navigationHistory.removeTab(index)
             
             this.mainWindow.webContents.send('tab-removed', {
                 index: index,
@@ -243,27 +297,55 @@ class Tabs {
     }
     
     goBack(index) {
+        const startTime = performance.now();
+        
         if (this.TabMap.has(index)) {
             const tab = this.TabMap.get(index)
-            if (tab.webContents.navigationHistory.canGoBack()) {
-                tab.webContents.navigationHistory.goBack()
-                setTimeout(() => {
-                    this.sendNavigationUpdate(index)
-                }, 100)
+            const currentUrl = this.tabUrls.get(index);
+            const historyBefore = this.navigationHistory.getHistory(index);
+            const previousUrl = this.navigationHistory.goBack(index)
+            const historyAfter = this.navigationHistory.getHistory(index);
+
+            if (previousUrl && previousUrl !== 'newtab') {
+                tab._setNavigatingProgrammatically(true);
+                tab.webContents.loadURL(previousUrl)
+                this.tabUrls.set(index, previousUrl)
+            } else if (previousUrl === 'newtab') {
+                tab._setNavigatingProgrammatically(true);
+                tab.webContents.loadFile('renderer/NewTab/index.html')
+                this.tabUrls.set(index, 'newtab')
+            } else {
+                tab.webContents.loadFile('renderer/NewTab/index.html')
+                this.tabUrls.set(index, 'newtab')
             }
-        }
+            this.sendNavigationUpdate(index)
+            const endTime = performance.now();
+        } else {}
     }
     
     goForward(index) {
+        const startTime = performance.now();
+        
         if (this.TabMap.has(index)) {
             const tab = this.TabMap.get(index)
-            if (tab.webContents.navigationHistory.canGoForward()) {
-                tab.webContents.navigationHistory.goForward()
-                setTimeout(() => {
-                    this.sendNavigationUpdate(index)
-                }, 100)
+            const currentUrl = this.tabUrls.get(index);
+            
+            const historyBefore = this.navigationHistory.getHistory(index);
+            const nextUrl = this.navigationHistory.goForward(index);
+            const historyAfter = this.navigationHistory.getHistory(index);
+            
+            if (nextUrl && nextUrl !== 'newtab') {
+                tab._setNavigatingProgrammatically(true);
+                tab.webContents.loadURL(nextUrl)
+                this.tabUrls.set(index, nextUrl)
+            } else if (nextUrl === 'newtab') {
+                tab._setNavigatingProgrammatically(true);
+                tab.webContents.loadFile('renderer/NewTab/index.html')
+                this.tabUrls.set(index, 'newtab')
             }
-        }
+            this.sendNavigationUpdate(index)
+            const endTime = performance.now();
+        } else {}
     }
     
     reload(index) {
@@ -278,16 +360,16 @@ class Tabs {
     
     canGoBack(index) {
         if (this.TabMap.has(index)) {
-            const tab = this.TabMap.get(index)
-            return tab.webContents.navigationHistory.canGoBack()
+            const canGoBack = this.navigationHistory.canGoBack(index);
+            return canGoBack;
         }
         return false
     }
     
     canGoForward(index) {
         if (this.TabMap.has(index)) {
-            const tab = this.TabMap.get(index)
-            return tab.webContents.navigationHistory.canGoForward()
+            const canGoForward = this.navigationHistory.canGoForward(index);
+            return canGoForward;
         }
         return false
     }
