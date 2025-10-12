@@ -15,14 +15,12 @@ class History {
             const userDataPath = app.getPath('userData');
             this.file = path.join(userDataPath, 'browsing-history.json');
         } catch (error) {
-            console.error('Error getting userData path:', error);
             this.file = path.join(process.cwd(), 'browsing-history.json');
         }
     }
 
     async ensureFileExists() {
         if (!this.file) {
-            console.error('File path not initialized');
             return false;
         }
 
@@ -37,7 +35,6 @@ class History {
             try {
                 await fs.writeFile(this.file, text, { encoding: 'utf8' });
             } catch (writeError) {
-                console.error('Error creating history file:', writeError);
                 return false;
             }
         }
@@ -54,7 +51,6 @@ class History {
             const jsonData = JSON.parse(data);
             return jsonData;
         } catch (error) {
-            console.error("Error reading JSON file:", error);
             return [];
         }
     }
@@ -78,7 +74,7 @@ class History {
             
             await fs.writeFile(this.file, JSON.stringify(historyData, null, 2), { encoding: 'utf8' });
         } catch (error) {
-            console.error('Error adding to history:', error);
+            
         }
     }
 
@@ -95,7 +91,6 @@ class History {
             await fs.writeFile(this.file, JSON.stringify(filteredHistory, null, 2), { encoding: 'utf8' });
             return true;
         } catch (error) {
-            console.error('Error removing from history:', error);
             return false;
         }
     }

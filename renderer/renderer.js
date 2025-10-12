@@ -23,6 +23,10 @@ document.addEventListener("DOMContentLoaded", () => {
         menuOpen = false;
     });
 
+    window.electronAPI.onShowFindInPage(() => {
+        
+    });
+
     
 
     backBtn.addEventListener("click", () => {

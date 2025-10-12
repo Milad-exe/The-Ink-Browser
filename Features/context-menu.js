@@ -38,7 +38,6 @@ class ContextMenu {
                     label: `Search Google for "${params.selectionText}"`,
                     click: () => {
                         const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`;
-                        // Open in new tab
                         this.tabManager.CreateTab();
                         const newTabIndex = this.tabManager.activeTabIndex;
                         this.tabManager.loadUrl(newTabIndex, searchUrl);
@@ -92,9 +91,7 @@ class ContextMenu {
                 {
                     label: "Open Link in New Tab",
                     click: () => {
-                        // Create a new tab and load the link
                         this.tabManager.CreateTab();
-                        // Get the newly created tab and load the URL
                         const newTabIndex = this.tabManager.activeTabIndex;
                         this.tabManager.loadUrl(newTabIndex, params.linkURL);
                     },
@@ -114,7 +111,6 @@ class ContextMenu {
                 {
                     label: "Open Image in New Tab",
                     click: () => {
-                        // Create a new tab and load the image
                         this.tabManager.CreateTab();
                         const newTabIndex = this.tabManager.activeTabIndex;
                         this.tabManager.loadUrl(newTabIndex, params.srcURL);

@@ -35,4 +35,6 @@ contextBridge.exposeInMainWorld(
 
 contextBridge.exposeInMainWorld("electronAPI", {
   windowClick: (pos) => ipcRenderer.send("window-click", pos),
+  
+  onShowFindInPage: (callback) => ipcRenderer.on('show-find-in-page', callback)
 });
