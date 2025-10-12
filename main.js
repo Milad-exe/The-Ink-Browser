@@ -2,13 +2,14 @@ const { BrowserWindow, app, ipcMain, WebContentsView}  = require('electron');
 const path = require("path");
 const Tabs = require("./Features/tabs");
 const History = require("./Features/history");
+const Shortcuts = require("./Features/shortcuts");
 
-//the actual browser
 class Ink {
   constructor() {
       this.mainWindow = null;
       this.tabs = null;
       this.history = null;
+      this.shortcuts = null;
       this.Init();
       this.menu = null;
   }
@@ -29,9 +30,11 @@ class Ink {
         
         this.history = new History()
         this.tabs = new Tabs(this.mainWindow, this.history)
+        this.shortcuts = new Shortcuts(this.mainWindow, this.tabs)
         
         this.mainWindow.webContents.once('did-finish-load', () => {
           this.tabs.CreateTab()
+          this.shortcuts.registerAllShortcuts()
         })
     }
 
@@ -49,6 +52,9 @@ class Ink {
 
     })
     app.on('window-all-closed', () => {
+        if (inkInstance.shortcuts) {
+          inkInstance.shortcuts.unregisterAllShortcuts();
+        }
         if (process.platform !== 'darwin') app.quit()
     })
   }  
@@ -168,4 +174,8 @@ ipcMain.handle("close-menu", async () => {
       console.error('Error closing menu:', error);
     }
   }
+})
+
+ipcMain.on('focus-address-bar', () => {
+  inkInstance.mainWindow.webContents.send('focus-address-bar');
 })
