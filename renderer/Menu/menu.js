@@ -17,10 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         await window.electronAPI.openHistoryTab();
                         await window.electronAPI.closeMenu();
                     } catch (error) {
-                        console.error('Error opening history tab:', error);
                     }
                     break;
                 case 'New Window':
+                    await window.electronAPI.newWindow();
                     await window.electronAPI.closeMenu();
                     break;
                 case 'Bookmarks':

@@ -1,122 +1,123 @@
-const { BrowserWindow, app, ipcMain, WebContentsView}  = require('electron');
+const { BrowserWindow, app, ipcMain, WebContentsView, Menu}  = require('electron');
 const path = require("path");
-const Tabs = require("./Features/tabs");
-const History = require("./Features/history");
-const Shortcuts = require("./Features/shortcuts");
+const WindowManager = require("./Features/window-manager");
 
 class Ink {
   constructor() {
-      this.mainWindow = null;
-      this.tabs = null;
-      this.history = null;
-      this.shortcuts = null;
+      this.windowManager = new WindowManager();
       this.Init();
-      this.menu = null;
   }
 
   Init(){
     const createWindow = () => {
-        this.mainWindow = new BrowserWindow({
-            width: 800,
-            height: 600,
-            minWidth: 800,
-            minHeight: 600,
-            webPreferences: {
-                preload: path.join(__dirname, "./preload/preload.js"),
-            }
-        })
-
-        this.mainWindow.loadFile('renderer/Browser/index.html')
-        
-        this.history = new History()
-        this.tabs = new Tabs(this.mainWindow, this.history)
-        this.shortcuts = new Shortcuts(this.mainWindow, this.tabs)
-        
-        this.mainWindow.webContents.once('did-finish-load', () => {
-          this.tabs.CreateTab()
-          this.shortcuts.registerAllShortcuts()
-        })
+        return this.windowManager.createWindow();
     }
 
     app.whenReady().then(() => {
-      createWindow()
+      Menu.setApplicationMenu(null);
+      
+      createWindow();
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
-          createWindow()
+          createWindow();
         }
-      })
+      });
+    });
 
-      if(this.tabs.TabMap.size == 0){
-        this.tabs.CreateTab()
-      }
-
-    })
     app.on('window-all-closed', () => {
-        if (inkInstance.shortcuts) {
-          inkInstance.shortcuts.unregisterAllShortcuts();
+        if (process.platform !== 'darwin') {
+            app.quit();
         }
-        if (process.platform !== 'darwin') app.quit()
-    })
+    });
   }  
 }
 
 const inkInstance = new Ink();
 
-ipcMain.handle("addTab", async () => {
-  inkInstance.tabs.CreateTab()
+ipcMain.handle("addTab", async (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    windowData.tabs.CreateTab();
+  }
 });
 
 ipcMain.handle("removeTab", async (event, index) => {
-  inkInstance.tabs.removeTab(index)
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    windowData.tabs.removeTab(index);
+  }
 });
 
 ipcMain.handle("switchTab", async (event, index) => {
-  inkInstance.tabs.showTab(index)
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    windowData.tabs.showTab(index);
+  }
 });
 
 ipcMain.handle("loadUrl", async (event, index, url) => {
-  inkInstance.tabs.loadUrl(index, url)
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    windowData.tabs.loadUrl(index, url);
+  }
 });
 
 ipcMain.handle("goBack", async (event, index) => {
-  inkInstance.tabs.goBack(index)
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    windowData.tabs.goBack(index);
+  }
 });
 
 ipcMain.handle("goForward", async (event, index) => {
-  inkInstance.tabs.goForward(index)
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    windowData.tabs.goForward(index);
+  }
 });
 
 ipcMain.handle("reload", async (event, index) => {
-  inkInstance.tabs.reload(index)
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    windowData.tabs.reload(index);
+  }
+});
+
+ipcMain.handle("newWindow", async () => {
+  inkInstance.windowManager.createWindow();
 });
 
 ipcMain.handle("open", async (event, index) => {
-  inkInstance.menu = new WebContentsView({
-    webPreferences: {
-      preload: path.join(__dirname, "./preload/menu-preload.js"),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  })
-  inkInstance.mainWindow.contentView.addChildView(inkInstance.menu)
-  inkInstance.menu.webContents.loadFile('renderer/Menu/index.html')
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    windowData.menu = new WebContentsView({
+      webPreferences: {
+        preload: path.join(__dirname, "./preload/menu-preload.js"),
+        contextIsolation: true,
+        nodeIntegration: false
+      }
+    });
+    windowData.window.contentView.addChildView(windowData.menu);
+    windowData.menu.webContents.loadFile('renderer/Menu/index.html');
 
-  const browserWidth = inkInstance.mainWindow.getBounds().width;
-  const width = 160;
-  const windowXPos = browserWidth - 12 - width;
-  inkInstance.menu.setBounds({
-    height: 200,
-    width: width,
-    x:windowXPos,
-    y:40
-  })
+    const browserWidth = windowData.window.getBounds().width;
+    const width = 160;
+    const windowXPos = browserWidth - 12 - width;
+    windowData.menu.setBounds({
+      height: 200,
+      width: width,
+      x: windowXPos,
+      y: 40
+    });
+  }
 });
 
 
 ipcMain.on("window-click", (event, pos) => {
-  if (inkInstance.menu) {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData && windowData.menu) {
     try {
-      const bounds = inkInstance.menu.getBounds();
+      const bounds = windowData.menu.getBounds();
 
       const isOutsideBounds = pos.x < bounds.x ||
         pos.x > bounds.x + bounds.width ||
@@ -124,58 +125,65 @@ ipcMain.on("window-click", (event, pos) => {
         pos.y > bounds.y + bounds.height;
         
       if (isOutsideBounds) {
-        inkInstance.mainWindow.contentView.removeChildView(inkInstance.menu);
-        inkInstance.menu = null;
-        inkInstance.mainWindow.webContents.send('menu-closed');
+        windowData.window.contentView.removeChildView(windowData.menu);
+        windowData.menu = null;
+        windowData.window.webContents.send('menu-closed');
       }
     } catch (error) {
       console.error('Error handling menu click:', error);
-      inkInstance.menu = null;
-      inkInstance.mainWindow.webContents.send('menu-closed');
+      windowData.menu = null;
+      windowData.window.webContents.send('menu-closed');
     }
   }
 });
 
 ipcMain.handle("history-get", async () => {
   try {
-    const result = await inkInstance.history.loadHistory();
+    const result = await inkInstance.windowManager.history.loadHistory();
     return result;
   } catch (error) {
     console.error('Error in history-get handler:', error);
     return { History: [] };
   }
-})
+});
 
-ipcMain.handle("open-history-tab", async () => {
-  try {
-    inkInstance.tabs.CreateTabWithPage('renderer/History/index.html', 'history', 'History')
-  } catch (error) {
-    console.error('Error creating history tab:', error);
+ipcMain.handle("open-history-tab", async (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    try {
+      windowData.tabs.CreateTabWithPage('renderer/History/index.html', 'history', 'History');
+    } catch (error) {
+      console.error('Error creating history tab:', error);
+    }
   }
-})
+});
 
 ipcMain.handle("remove-history-entry", async (event, url, timestamp) => {
   try {
-    const result = await inkInstance.history.removeFromHistory(url, timestamp);
+    const result = await inkInstance.windowManager.history.removeFromHistory(url, timestamp);
     return result;
   } catch (error) {
     console.error('Error in remove-history-entry handler:', error);
     return false;
   }
-})
+});
 
-ipcMain.handle("close-menu", async () => {
-  if (inkInstance.menu) {
+ipcMain.handle("close-menu", async (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData && windowData.menu) {
     try {
-      inkInstance.mainWindow.contentView.removeChildView(inkInstance.menu);
-      inkInstance.menu = null;
-      inkInstance.mainWindow.webContents.send('menu-closed');
+      windowData.window.contentView.removeChildView(windowData.menu);
+      windowData.menu = null;
+      windowData.window.webContents.send('menu-closed');
     } catch (error) {
       console.error('Error closing menu:', error);
     }
   }
-})
+});
 
-ipcMain.on('focus-address-bar', () => {
-  inkInstance.mainWindow.webContents.send('focus-address-bar');
-})
+ipcMain.on('focus-address-bar', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    windowData.window.webContents.send('focus-address-bar');
+  }
+});
