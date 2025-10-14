@@ -4,7 +4,7 @@ const History = require("./history");
 const UserAgent = require("./user-agent");
 const contextMenu = require("./context-menu");
 const NavigationHistory = require("./navigation-history");
-const FindDialog = require("./find-dialog");
+const FindDialogManager = require("./find-dialog");
 const { app } = require('electron/main');
 
 class Tabs {
@@ -12,15 +12,69 @@ class Tabs {
         this.mainWindow = mainWindow
         this.history = History
         this.navigationHistory = new NavigationHistory()
-        this.findDialog = new FindDialog(mainWindow)
+        this.findDialog = FindDialogManager.getInstance().createDialog(mainWindow)
+        this.shortcuts = null
         this.TabMap = new Map()
         this.tabUrls = new Map()
         this.activeTabIndex = 0
         this.nextTabIndex = 0
+        this.allowClose = false
+        this.closePreventionActive = false
         
         this.mainWindow.on('resize', () => {
             this.resizeAllTabs()
         })
+        
+        this.mainWindow.on('close', (event) => {
+            if (this.TabMap.size > 0 && !this.allowClose) {
+                event.preventDefault();
+                
+                setImmediate(() => {
+                    if (!this.mainWindow.isDestroyed()) {
+                        this.mainWindow.focus();
+                        
+                        if (this.TabMap.has(this.activeTabIndex)) {
+                            const activeTab = this.TabMap.get(this.activeTabIndex);
+                            if (activeTab && activeTab.webContents) {
+                                activeTab.webContents.focus();
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+        });
+        
+        this.mainWindow.on('closed', () => {
+        });
+        
+        this.mainWindow.on('before-quit', (event) => {
+        });
+        
+        const originalClose = this.mainWindow.close.bind(this.mainWindow);
+        const originalDestroy = this.mainWindow.destroy.bind(this.mainWindow);
+        
+        this.mainWindow.close = () => {
+            if (this.TabMap.size > 0 && !this.allowClose) {
+                return;
+            }
+            
+            const result = originalClose();
+            this.allowClose = false;
+            return result;
+        };
+        
+        this.mainWindow.destroy = () => {
+            if (this.TabMap.size > 0 && !this.allowClose) {
+                return;
+            }
+            
+            return originalDestroy();
+        };
+    }
+
+    setShortcuts(shortcuts) {
+        this.shortcuts = shortcuts;
     }
 
     CreateTab(){
@@ -123,6 +177,10 @@ class Tabs {
     setupTabListeners(tabIndex, tab) {
         let isNavigatingProgrammatically = false;
         let lastAddedUrl = null;
+        
+        if (this.shortcuts) {
+            this.shortcuts.onTabCreated(tab);
+        }
         
         tab.webContents.on('did-navigate', (event, url) => {
             if (!url.startsWith('file://') && !isNavigatingProgrammatically) {
@@ -285,9 +343,44 @@ class Tabs {
                 const remainingTabs = Array.from(this.TabMap.keys())
                 this.showTab(remainingTabs[0])
             }
-
-            if(index === 1){
-                app.quit();
+            
+            if (this.TabMap.size === 0) {
+                this.allowClose = true;
+                this.mainWindow.close();
+            }
+        }
+    }
+    
+    removeTabWithTargetFocus(index, targetTabIndex) {
+        if (this.TabMap.has(index)) {
+            const tab = this.TabMap.get(index);
+            this.mainWindow.contentView.removeChildView(tab);
+            this.TabMap.delete(index);
+            this.tabUrls.delete(index);
+            
+            this.navigationHistory.removeTab(index);
+            
+            this.mainWindow.webContents.send('tab-removed', {
+                index: index,
+                totalTabs: this.TabMap.size
+            });
+            
+            if (this.TabMap.size === 0) {
+                this.allowClose = true;
+                this.mainWindow.close();
+            } else {
+                if (targetTabIndex !== null && this.TabMap.has(targetTabIndex)) {
+                    this.showTab(targetTabIndex);
+                } else {
+                    const remainingTabs = Array.from(this.TabMap.keys());
+                    this.showTab(remainingTabs[0]);
+                }
+                
+                setTimeout(() => {
+                    if (!this.mainWindow.isDestroyed()) {
+                        this.mainWindow.focus();
+                    }
+                }, 20);
             }
         }
     }

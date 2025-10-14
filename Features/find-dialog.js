@@ -1,16 +1,107 @@
 const { BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
+class FindDialogManager {
+    constructor() {
+        this.dialogs = new Map();
+        this.setupGlobalIPC();
+    }
+
+    static getInstance() {
+        if (!FindDialogManager.instance) {
+            FindDialogManager.instance = new FindDialogManager();
+        }
+        return FindDialogManager.instance;
+    }
+
+    createDialog(parentWindow) {
+        const windowId = parentWindow.webContents.id;
+        if (!this.dialogs.has(windowId)) {
+            this.dialogs.set(windowId, new FindDialog(parentWindow, this));
+        }
+        return this.dialogs.get(windowId);
+    }
+
+    removeDialog(windowId) {
+        this.dialogs.delete(windowId);
+    }
+
+    setupGlobalIPC() {
+        ipcMain.handle('find-search', (event, searchTerm) => {
+            const dialog = this.getDialogForEvent(event);
+            if (dialog) {
+                dialog.handleSearch(searchTerm);
+            }
+        });
+
+        ipcMain.handle('find-next', (event) => {
+            const dialog = this.getDialogForEvent(event);
+            if (dialog) {
+                dialog.handleNext();
+            }
+        });
+
+        ipcMain.handle('find-previous', (event) => {
+            const dialog = this.getDialogForEvent(event);
+            if (dialog) {
+                dialog.handlePrevious();
+            }
+        });
+
+        ipcMain.handle('find-clear', (event) => {
+            const dialog = this.getDialogForEvent(event);
+            if (dialog) {
+                dialog.handleClear();
+            }
+        });
+
+        ipcMain.handle('find-close', (event) => {
+            const dialog = this.getDialogForEvent(event);
+            if (dialog) {
+                dialog.close();
+            }
+        });
+    }
+
+    getDialogForEvent(event) {
+        for (const [windowId, dialog] of this.dialogs) {
+            if (dialog.findWindow && dialog.findWindow.webContents === event.sender) {
+                return dialog;
+            }
+        }
+        return null;
+    }
+}
+
 class FindDialog {
-    constructor(parentWindow) {
+    constructor(parentWindow, manager) {
         this.parentWindow = parentWindow;
+        this.manager = manager;
         this.findWindow = null;
         this.activeTab = null;
         this.currentSearchTerm = '';
-        this.setupIPC();
+        this.parentWindowId = parentWindow.webContents.id;
+        this.isDestroyed = false;
+        
+        this.parentWindow.on('closed', () => {
+            this.isDestroyed = true;
+            this.cleanup();
+            this.manager.removeDialog(this.parentWindowId);
+        });
+    }
+
+    cleanup() {
+        if (this.findWindow && !this.findWindow.isDestroyed()) {
+            this.findWindow.close();
+        }
+        this.findWindow = null;
+        this.activeTab = null;
+        this.parentWindow = null;
     }
 
     show(activeTab) {
+        if (this.isDestroyed) return;
+        
         this.activeTab = activeTab;
         
         if (this.findWindow) {
@@ -35,14 +126,16 @@ class FindDialog {
 
         this.findWindow.loadFile('renderer/FindDialog/index.html');
 
-        const parentBounds = this.parentWindow.getBounds();
-        const x = parentBounds.x + parentBounds.width - 300;
-        const y = parentBounds.y + 60;
-        this.findWindow.setPosition(x, y);
+        if (!this.isDestroyed && this.parentWindow && !this.parentWindow.isDestroyed()) {
+            const parentBounds = this.parentWindow.getBounds();
+            const x = parentBounds.x + parentBounds.width - 300;
+            const y = parentBounds.y + 60;
+            this.findWindow.setPosition(x, y);
+        }
 
         this.findWindow.on('closed', () => {
             this.findWindow = null;
-            if (this.activeTab) {
+            if (this.activeTab && !this.activeTab.isDestroyed()) {
                 this.activeTab.webContents.stopFindInPage('clearSelection');
             }
         });
@@ -55,47 +148,46 @@ class FindDialog {
     }
 
     close() {
-        if (this.findWindow) {
+        if (this.findWindow && !this.findWindow.isDestroyed()) {
             this.findWindow.close();
         }
     }
 
-    setupIPC() {
-        ipcMain.handle('find-search', (event, searchTerm) => {
-            this.currentSearchTerm = searchTerm;
-            if (this.activeTab && searchTerm) {
-                this.activeTab.webContents.findInPage(searchTerm, { findNext: false });
-            }
-        });
+    handleSearch(searchTerm) {
+        if (this.isDestroyed) return;
+        this.currentSearchTerm = searchTerm;
+        if (this.activeTab && searchTerm && !this.activeTab.isDestroyed()) {
+            this.activeTab.webContents.findInPage(searchTerm, { findNext: false });
+        }
+    }
 
-        ipcMain.handle('find-next', () => {
-            if (this.activeTab && this.currentSearchTerm) {
-                this.activeTab.webContents.findInPage(this.currentSearchTerm, { findNext: true });
-            }
-        });
+    handleNext() {
+        if (this.isDestroyed) return;
+        if (this.activeTab && this.currentSearchTerm && !this.activeTab.isDestroyed()) {
+            this.activeTab.webContents.findInPage(this.currentSearchTerm, { findNext: true });
+        }
+    }
 
-        ipcMain.handle('find-previous', () => {
-            if (this.activeTab && this.currentSearchTerm) {
-                this.activeTab.webContents.findInPage(this.currentSearchTerm, { findNext: true, forward: false });
-            }
-        });
+    handlePrevious() {
+        if (this.isDestroyed) return;
+        if (this.activeTab && this.currentSearchTerm && !this.activeTab.isDestroyed()) {
+            this.activeTab.webContents.findInPage(this.currentSearchTerm, { findNext: true, forward: false });
+        }
+    }
 
-        ipcMain.handle('find-clear', () => {
-            if (this.activeTab) {
-                this.activeTab.webContents.stopFindInPage('clearSelection');
-            }
-        });
-
-        ipcMain.handle('find-close', () => {
-            this.close();
-        });
+    handleClear() {
+        if (this.isDestroyed) return;
+        if (this.activeTab && !this.activeTab.isDestroyed()) {
+            this.activeTab.webContents.stopFindInPage('clearSelection');
+        }
     }
 
     handleFindResult(result) {
-        if (this.findWindow) {
+        if (this.isDestroyed) return;
+        if (this.findWindow && !this.findWindow.isDestroyed()) {
             this.findWindow.webContents.send('find-matches-updated', result.activeMatchOrdinal, result.matches);
         }
     }
 }
 
-module.exports = FindDialog;
+module.exports = FindDialogManager;
