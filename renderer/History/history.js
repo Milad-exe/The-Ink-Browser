@@ -7,22 +7,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await window.menu.close();
             }
         } catch (error) {
-            console.log('Menu close API not available or menu already closed');
         }
     });
 
     try {
-        console.log('Loading history...');
         const historyData = await window.browserHistory.get();
-        console.log('History data received:', historyData);
         
         if (historyData && Array.isArray(historyData) && historyData.length > 0) {
-            console.log('Found', historyData.length, 'history entries');
             historyData.forEach(entry => {
                 createHistoryEntry(containerDiv, entry);
             });
         } else {
-            console.log('No history entries found');
             const noHistoryMsg = document.createElement('p');
             noHistoryMsg.textContent = 'No browsing history found.';
             noHistoryMsg.style.textAlign = 'center';
@@ -30,7 +25,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             containerDiv.appendChild(noHistoryMsg);
         }
     } catch (error) {
-        console.error('Error loading history:', error);
         const errorMsg = document.createElement('p');
         errorMsg.textContent = 'Error loading history: ' + error.message;
         errorMsg.style.textAlign = 'center';
@@ -71,12 +65,8 @@ function createHistoryEntry(container, entry) {
             const success = await window.browserHistory.remove(entry.url, entry.timestamp);
             if (success) {
                 entryDiv.remove();
-                console.log('History entry removed successfully');
-            } else {
-                console.error('Failed to remove history entry');
             }
         } catch (error) {
-            console.error('Error removing history entry:', error);
         }
     });
     

@@ -1,10 +1,60 @@
 const { globalShortcut, BrowserWindow } = require('electron');
 
 class Shortcuts {
-    constructor(mainWindow, tabManager) {
+    constructor(mainWindow, tabManager, windowManager = null) {
         this.mainWindow = mainWindow;
         this.tabManager = tabManager;
-        this.registeredShortcuts = [];
+        this.windowManager = windowManager;
+        this.shortcuts = new Map();
+        this.processing = false;
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        this.mainWindow.webContents.on('before-input-event', (event, input) => {
+            this.handleInput(event, input);
+        });
+
+        this.setupAllTabListeners();
+    }
+
+    setupAllTabListeners() {
+        this.tabManager.TabMap.forEach((tab) => {
+            this.setupTabListener(tab);
+        });
+    }
+
+    setupTabListener(tab) {
+        if (!tab._shortcutListenerSetup) {
+            tab.webContents.on('before-input-event', (event, input) => {
+                this.handleInput(event, input);
+            });
+            tab._shortcutListenerSetup = true;
+        }
+    }
+
+    onTabCreated(tab) {
+        this.setupTabListener(tab);
+    }
+
+    handleInput(event, input) {
+        for (const [accelerator, callback] of this.shortcuts) {
+            if (this.matchesAccelerator(input, accelerator)) {
+                event.preventDefault();
+                
+                if (this.processing) {
+                    return;
+                }
+                this.processing = true;
+                
+                setImmediate(() => {
+                    this.processing = false;
+                });
+                
+                callback();
+                break;
+            }
+        }
     }
 
     registerAllShortcuts() {
@@ -12,6 +62,7 @@ class Shortcuts {
         this.registerNavigationShortcuts();
         this.registerPageShortcuts();
         this.registerDeveloperShortcuts();
+        this.registerApplicationShortcuts();
     }
 
     registerTabShortcuts() {
@@ -19,38 +70,59 @@ class Shortcuts {
             this.tabManager.CreateTab();
         });
 
+        this.registerShortcut('CmdOrCtrl+N', () => {
+            if (this.windowManager) {
+                this.windowManager.createWindow();
+            }
+        });
+
+        this.registerShortcut('CmdOrCtrl+Shift+N', () => {
+            if (this.windowManager) {
+                this.windowManager.createWindow();
+            }
+        });
+
         this.registerShortcut('CmdOrCtrl+W', () => {
             const currentTabIndex = this.tabManager.activeTabIndex;
+            const totalTabs = this.tabManager.TabMap.size;
             
-            const tabIndexes = Array.from(this.tabManager.TabMap.keys()).sort((a, b) => a - b);
-            const userTabIndexes = tabIndexes.filter(index => {
-                const url = this.tabManager.tabUrls.get(index);
-                return url !== undefined;
-            });
-            
-            const currentPosition = userTabIndexes.indexOf(currentTabIndex);
-            
-            let targetTabIndex = null;
-            if (userTabIndexes.length > 1) {
-                if (currentPosition > 0) {
-                    targetTabIndex = userTabIndexes[currentPosition - 1];
-                } else if (currentPosition === 0 && userTabIndexes.length > 1) {
-                    targetTabIndex = userTabIndexes[1];
+            if (totalTabs > 1) {
+                const allTabIndexes = Array.from(this.tabManager.TabMap.keys()).sort((a, b) => a - b);
+                const currentPosition = allTabIndexes.indexOf(currentTabIndex);
+                let targetTabIndex = null;
+                
+                if (currentPosition !== -1) {
+                    if (currentPosition < allTabIndexes.length - 1) {
+                        targetTabIndex = allTabIndexes[currentPosition + 1];
+                    } else if (currentPosition > 0) {
+                        targetTabIndex = allTabIndexes[currentPosition - 1];
+                    }
                 }
+                
+                this.tabManager.removeTabWithTargetFocus(currentTabIndex, targetTabIndex);
+            } else {
+                this.tabManager.removeTab(currentTabIndex);
             }
             
-            this.tabManager.removeTab(currentTabIndex);
-            
-            if (targetTabIndex !== null) {
-                this.tabManager.showTab(targetTabIndex);
-            }
+            setTimeout(() => {
+                if (!this.mainWindow.isDestroyed() && this.mainWindow.isVisible()) {
+                    this.mainWindow.focus();
+                    this.mainWindow.show();
+                    
+                    if (this.tabManager.TabMap.has(this.tabManager.activeTabIndex)) {
+                        const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+                        if (activeTab && activeTab.webContents) {
+                            activeTab.webContents.focus();
+                        }
+                    }
+                }
+            }, 10);
         });
 
         this.registerShortcut('CmdOrCtrl+Tab', () => {
             this.switchToNextTab();
         });
 
-        // Switch to previous tab
         this.registerShortcut('CmdOrCtrl+Shift+Tab', () => {
             this.switchToPreviousTab();
         });
@@ -155,15 +227,71 @@ class Shortcuts {
         });
     }
 
-    registerShortcut(accelerator, callback) {
-        try {
-            const ret = globalShortcut.register(accelerator, callback);
-            if (ret) {
-                this.registeredShortcuts.push(accelerator);
+    registerApplicationShortcuts() {
+        const { app } = require('electron');
+        
+        this.registerShortcut('CmdOrCtrl+Q', () => {
+            if (this.windowManager) {
+                const windows = this.windowManager.getAllWindows();
+                windows.forEach(windowData => {
+                    if (windowData.tabs) {
+                        windowData.tabs.allowClose = true;
+                    }
+                });
+                
+                this.windowManager.closeAllWindows();
             }
-        } catch (error) {
             
+            app.quit();
+        });
+    }
+
+    registerShortcut(accelerator, callback) {
+        this.shortcuts.set(accelerator, callback);
+    }
+
+    matchesAccelerator(input, accelerator) {
+        const parts = accelerator.toLowerCase().split('+');
+        const key = parts[parts.length - 1];
+        const modifiers = parts.slice(0, -1);
+
+        let keyMatches = false;
+        if (input.key.toLowerCase() === key) {
+            keyMatches = true;
+        } else if (key === 'tab' && input.key === 'Tab') {
+            keyMatches = true;
+        } else if (key.match(/^[0-9]$/) && input.key === key) {
+            keyMatches = true;
+        } else if (key === 'left' && input.key === 'ArrowLeft') {
+            keyMatches = true;
+        } else if (key === 'right' && input.key === 'ArrowRight') {
+            keyMatches = true;
+        } else if (key === 'plus' && (input.key === '+' || input.key === '=')) {
+            keyMatches = true;
+        } else if (key === '-' && (input.key === '-' || input.key === '_')) {
+            keyMatches = true;
         }
+
+        if (!keyMatches) return false;
+
+        const hasCmdOrCtrl = modifiers.includes('cmdorctrl');
+        const hasShift = modifiers.includes('shift');
+        const hasAlt = modifiers.includes('alt');
+
+        const platform = process.platform;
+        const expectMeta = hasCmdOrCtrl && platform === 'darwin';
+        const expectCtrl = hasCmdOrCtrl && platform !== 'darwin';
+
+        return (
+            (!expectMeta || input.meta) &&
+            (!expectCtrl || input.control) &&
+            (!hasShift || input.shift) &&
+            (!hasAlt || input.alt) &&
+            (expectMeta ? input.meta === true : input.meta === false) &&
+            (expectCtrl ? input.control === true : input.control === false) &&
+            (hasShift ? input.shift === true : input.shift === false) &&
+            (hasAlt ? input.alt === true : input.alt === false)
+        );
     }
 
     switchToNextTab() {
@@ -195,7 +323,6 @@ class Shortcuts {
     }
 
     switchToTabByNumber(number) {
-        // Get all tab indices sorted by creation order (visual order)
         const tabIndexes = Array.from(this.tabManager.TabMap.keys()).sort((a, b) => a - b);
         
         const userTabIndexes = tabIndexes.filter(index => {
@@ -237,18 +364,15 @@ class Shortcuts {
     }
 
     unregisterAllShortcuts() {
-        this.registeredShortcuts.forEach(shortcut => {
-            globalShortcut.unregister(shortcut);
-        });
-        this.registeredShortcuts = [];
+        this.shortcuts.clear();
     }
 
     isShortcutRegistered(accelerator) {
-        return globalShortcut.isRegistered(accelerator);
+        return this.shortcuts.has(accelerator);
     }
 
     getRegisteredShortcuts() {
-        return [...this.registeredShortcuts];
+        return Array.from(this.shortcuts.keys());
     }
 }
 
