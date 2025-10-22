@@ -74,6 +74,10 @@ class WindowManager {
         return Array.from(this.windows.values());
     }
 
+    getWindowById(id) {
+        return this.windows.get(id) || null;
+    }
+
     getWindowCount() {
         return this.windows.size;
     }
