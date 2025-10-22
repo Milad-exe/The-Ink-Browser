@@ -187,3 +187,106 @@ ipcMain.on('focus-address-bar', (event) => {
     windowData.window.webContents.send('focus-address-bar');
   }
 });
+
+// Drag and drop handlers
+ipcMain.handle('getTabUrl', async (event, index) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    return windowData.tabs.tabUrls.get(index) || '';
+  }
+  return '';
+});
+
+ipcMain.handle('get-this-window-id', async (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  return windowData ? windowData.id : null;
+});
+
+ipcMain.handle('get-window-at-point', async (event, screenX, screenY) => {
+  const all = inkInstance.windowManager.getAllWindows();
+  const matchingWindows = [];
+  
+  for (const w of all) {
+    const b = w.window.getBounds();
+    if (screenX >= b.x && screenX <= b.x + b.width && screenY >= b.y && screenY <= b.y + b.height) {
+      matchingWindows.push(w);
+    }
+  }
+  
+  if (matchingWindows.length === 0) return null;
+  if (matchingWindows.length === 1) return { id: matchingWindows[0].id };
+  
+  const allBrowserWindows = BrowserWindow.getAllWindows();
+  
+  for (let i = allBrowserWindows.length - 1; i >= 0; i--) {
+    const bw = allBrowserWindows[i];
+    const match = matchingWindows.find(w => w.window === bw);
+    if (match && bw.isVisible() && !bw.isMinimized()) {
+      return { id: match.id };
+    }
+  }
+  
+  return { id: matchingWindows[0].id };
+});
+
+ipcMain.handle('move-tab-to-window', async (event, fromWindowId, tabIndex, targetWindowId, url) => {
+  const sourceWindow = inkInstance.windowManager.getWindowById(fromWindowId);
+  const targetWindow = inkInstance.windowManager.getWindowById(targetWindowId);
+  
+  if (!sourceWindow || !targetWindow) return false;
+  
+  try {
+    // Create new tab in target window with same URL
+    if (!url || url === 'newtab') {
+      targetWindow.tabs.CreateTab();
+    } else {
+      const newIndex = targetWindow.tabs.CreateTab();
+      targetWindow.tabs.loadUrl(newIndex, url);
+    }
+    
+    // Remove from source window
+    sourceWindow.tabs.removeTab(tabIndex);
+    
+    return true;
+  } catch (err) {
+    console.error('move-tab-to-window error:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('detach-to-new-window', async (event, tabIndex, screenX, screenY, url) => {
+  const sourceWindow = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!sourceWindow) return false;
+  
+  try {
+    // Create new window at drop position
+    const newWindow = inkInstance.windowManager.createWindow(800, 600);
+    
+    // Position it near the drop point
+    newWindow.window.setBounds({
+      x: Math.max(0, Math.floor(screenX - 400)),
+      y: Math.max(0, Math.floor(screenY - 300)),
+      width: 800,
+      height: 600
+    });
+    
+    // Wait for window to load, then set URL if needed
+    if (url && url !== 'newtab') {
+      newWindow.window.webContents.once('did-finish-load', () => {
+        // The window creates its own initial tab, just load the URL into it
+        const firstTabIndex = Array.from(newWindow.tabs.TabMap.keys())[0];
+        if (firstTabIndex !== undefined) {
+          newWindow.tabs.loadUrl(firstTabIndex, url);
+        }
+      });
+    }
+    
+    // Remove from source window
+    sourceWindow.tabs.removeTab(tabIndex);
+    
+    return true;
+  } catch (err) {
+    console.error('detach-to-new-window error:', err);
+    return false;
+  }
+});

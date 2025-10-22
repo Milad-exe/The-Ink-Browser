@@ -110,6 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const tabButton = document.createElement('div');
         tabButton.className = 'tab-button';
         tabButton.dataset.index = index;
+        tabButton.draggable = true;
         
         const tabTitle = document.createElement('span');
         tabTitle.className = 'tab-title';
@@ -128,6 +129,32 @@ document.addEventListener("DOMContentLoaded", () => {
         
         tabButton.addEventListener('click', () => {
             window.tab.switch(parseInt(index));
+        });
+
+        // Simple drag implementation
+        tabButton.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', String(index));
+            e.dataTransfer.effectAllowed = 'move';
+            tabButton.classList.add('dragging');
+        });
+
+        tabButton.addEventListener('dragend', async (e) => {
+            tabButton.classList.remove('dragging');
+            
+            // Check if dropped outside current window
+            const targetWindow = await window.dragdrop.getWindowAtPoint(e.screenX, e.screenY);
+            const thisWindowId = await window.dragdrop.getThisWindowId();
+            
+            if (!targetWindow) {
+                // Dropped outside any window - detach to new window
+                const url = await window.tab.getTabUrl(index);
+                await window.dragdrop.detachToNewWindow(index, e.screenX, e.screenY, url);
+            } else if (targetWindow.id !== thisWindowId) {
+                // Dropped on another window - move tab there
+                const url = await window.tab.getTabUrl(index);
+                await window.dragdrop.moveTabToWindow(thisWindowId, index, targetWindow.id, url);
+            }
+            // else: dropped in same window - already handled by dragover
         });
         
         tabBar.appendChild(tabButton);
@@ -252,6 +279,37 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener('resize', () => {
         setTimeout(() => updateTabWidths(tabs.size), 100);
     });
+
+    // In-window reordering
+    tabBar.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        const draggingTab = document.querySelector('.dragging');
+        if (!draggingTab) return;
+        
+        const afterElement = getDragAfterElement(tabBar, e.clientX);
+        if (afterElement == null) {
+            tabBar.appendChild(draggingTab);
+        } else {
+            tabBar.insertBefore(draggingTab, afterElement);
+        }
+    });
+
+    function getDragAfterElement(container, x) {
+        const draggableElements = [...container.querySelectorAll('.tab-button:not(.dragging)')];
+        
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = x - box.left - box.width / 2;
+            
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
 
     function updateNavigationButtons(canGoBack, canGoForward) {
         backBtn.disabled = !canGoBack;
