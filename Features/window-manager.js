@@ -1,8 +1,9 @@
-const { BrowserWindow } = require('electron');
+const { BrowserWindow, Menu}  = require('electron');
 const path = require("path");
 const Tabs = require("./tabs");
 const History = require("./history");
 const Shortcuts = require("./shortcuts");
+const contextMenu = require("./window-context-menu");
 
 class WindowManager {
     constructor() {
@@ -30,7 +31,33 @@ class WindowManager {
         const shortcuts = new Shortcuts(window, tabs, this);
         
         tabs.setShortcuts(shortcuts);
-        
+
+    window.webContents.on("context-menu", async (event, params) => {
+            // Determine the element under the cursor to enrich params for context decisions
+            try {
+                const contextInfo = await window.webContents.executeJavaScript(
+                    `(() => { 
+                        const elementFromPoint = document.elementFromPoint(${params.x}, ${params.y}); // Get the element at the context menu position
+                        const tabElement = elementFromPoint ? elementFromPoint.closest('.tab-button') : null; // Check if it's within a tab button
+                            const idx = tabElement && tabElement.dataset ? parseInt(tabElement.dataset.index) : null;
+                            return { targetElementId: elementFromPoint ? (elementFromPoint.id || '') : '', isTabButton: !!tabElement, tabIndex: idx }; // Return the info
+                    })()`
+                );
+                params.targetElementId = contextInfo.targetElementId;
+                params.isTabButton = contextInfo.isTabButton;
+                    params.tabIndex = contextInfo.tabIndex;
+            } catch (_) {}
+
+            const contextMenuInstance = new contextMenu(window, params, this);
+
+            if (contextMenuInstance.getTemplate().length === 0) {
+                return;
+            }
+
+            const menu = Menu.buildFromTemplate(contextMenuInstance.getTemplate());
+            menu.popup({ window });
+        })
+
         const windowData = {
             id: windowId,
             window: window,

@@ -2,7 +2,7 @@ const { WebContentsView, BrowserWindow, Menu}  = require('electron');
 const path = require('path');
 const History = require("./history");
 const UserAgent = require("./user-agent");
-const contextMenu = require("./context-menu");
+const contextMenu = require("./tab-context-menu");
 const NavigationHistory = require("./navigation-history");
 const FindDialogManager = require("./find-dialog");
 const { app } = require('electron/main');
@@ -473,6 +473,18 @@ class Tabs {
         this.TabMap.forEach((tab, index) => {
             tab.setBounds(bounds)
         })
+    }
+
+    muteTab(index) {
+        if (this.TabMap.has(index)) {
+            const tab = this.TabMap.get(index);
+            const isMuted = tab.webContents.isAudioMuted();
+            tab.webContents.setAudioMuted(!isMuted);
+        }
+    }
+
+    pinTab(index) {
+        
     }
 }
 
