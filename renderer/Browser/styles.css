@@ -55,6 +55,7 @@ html, body {
   flex-shrink: 0;
   position: relative;
   box-sizing: border-box;
+  order: 1; /* unpinned default after pinned */
 }
 
 .tab-button:hover {
@@ -268,3 +269,38 @@ body {
   max-width: 100vw;
 }
 
+.tab-button.pinned {
+  order: 0; /* keep pinned tabs to the left */
+  background: rgba(255, 255, 255, 0.95);
+  color: #1d1d1f;
+  padding: 0 4px;
+  justify-content: center; /* center favicon */
+  border-right: 0.5px solid #d6d6d6;
+}
+
+/* Pinned tabs are compact: hide title and close button, show only favicon */
+.tab-button.pinned .tab-title,
+.tab-button.pinned .tab-close {
+  display: none;
+}
+
+/* Optional: subtle indicator ring for pinned when no favicon */
+.tab-button.pinned .tab-favicon.default {
+  background: #e9eefb;
+  border-color: #c7d6fb;
+  color: #3b5bcc;
+}
+
+/* When only pinned tabs exist, allow titles/close to show and align like regular tabs */
+#tab-bar.only-pinned .tab-button.pinned {
+  justify-content: flex-start;
+  padding: 0 8px;
+}
+
+#tab-bar.only-pinned .tab-button.pinned .tab-title {
+  display: block;
+}
+
+#tab-bar.only-pinned .tab-button.pinned .tab-close {
+  display: flex;
+}

@@ -13,6 +13,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let activeTabIndex = 0;
     let menuOpen = false;
 
+    // Helper to trigger pinning of the current active tab from DevTools/tests
+    window.pinActiveTab = () => window.tab.pin(activeTabIndex);
+
     window.addEventListener("click", (e) => {
         if (menuOpen) {
             window.electronAPI.windowClick({ x: e.clientX, y: e.clientY });
@@ -102,6 +105,20 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    window.tabsUI?.onPinTab((index) => {
+        console.log('[RENDERER] pin-tab received index', index);
+        const btn = document.querySelector(`#tab-bar .tab-button[data-index="${index}"]`);
+        if (!btn) {
+            console.warn('[RENDERER] Tab button not found for index', index);
+            return;
+        }
+        const isPinned = btn.classList.toggle('pinned');
+        btn.dataset.pinned = isPinned ? '1' : '';
+        console.log('[RENDERER] Toggled pinned class. Now pinned?', isPinned);
+        // Recompute widths so pinned tabs get compact size and others redistribute space
+        updateTabWidths(tabs.size);
+    });
+
     function createTabButton(index, title) {
         if (tabs.has(index)) {
             return;
@@ -153,6 +170,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Dropped on another window - move tab there
                 const url = await window.tab.getTabUrl(index);
                 await window.dragdrop.moveTabToWindow(thisWindowId, index, targetWindow.id, url);
+            } else {
+                // Dropped in same window - commit DOM order to main for persistence
+                const ordered = Array.from(tabBar.querySelectorAll('.tab-button')).map(el => parseInt(el.dataset.index));
+                if (ordered.length) {
+                    window.tab.reorder(ordered);
+                }
             }
             // else: dropped in same window - already handled by dragover
         });
@@ -193,6 +216,8 @@ document.addEventListener("DOMContentLoaded", () => {
             
             if (titleSpan) {
                 titleSpan.textContent = title || `Tab ${index + 1}`;
+                // Provide tooltip for pinned tabs where title is hidden
+                tabButton.title = titleSpan.textContent;
             }
             
             if (faviconUrl && faviconUrl !== '') {
@@ -246,26 +271,58 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function updateTabWidths(totalTabs) {
         const actualTabCount = tabs.size;
-        
-        if (actualTabCount === 0) {
-            return;
-        }
-        
+        if (actualTabCount === 0) return;
+
         requestAnimationFrame(() => {
             const tabBarWidth = tabBar.offsetWidth;
-            const idealTabWidth = Math.floor(tabBarWidth / actualTabCount);
-            const minTabWidth = 28; // Minimum width before scrolling is started
-            
-            if (idealTabWidth >= minTabWidth) {
-                tabs.forEach((tab, index) => {
-                    tab.style.width = `${idealTabWidth}px`;
-                    tab.style.minWidth = `${idealTabWidth}px`;
-                    tab.style.maxWidth = `${idealTabWidth}px`;
+            const pinnedWidth = 36; // compact width for pinned tabs
+            const minTabWidth = 28; // minimum width for regular tabs before scrolling
+
+            const allTabs = Array.from(tabs.values());
+            const pinnedTabs = allTabs.filter(t => t.classList.contains('pinned'));
+            const unpinnedTabs = allTabs.filter(t => !t.classList.contains('pinned'));
+
+            const unpinnedCount = unpinnedTabs.length;
+
+            // Case: all tabs are pinned -> let them expand to fill the bar evenly
+            if (unpinnedCount === 0 && pinnedTabs.length > 0) {
+                tabBar.classList.add('only-pinned');
+                const widthPer = Math.floor(tabBarWidth / pinnedTabs.length);
+                const finalWidth = Math.max(widthPer, pinnedWidth);
+                pinnedTabs.forEach(tab => {
+                    tab.style.width = `${finalWidth}px`;
+                    tab.style.minWidth = `${finalWidth}px`;
+                    tab.style.maxWidth = `${finalWidth}px`;
+                    tab.style.flexShrink = '0';
+                });
+                tabBar.style.overflowX = 'hidden';
+                return;
+            }
+
+            // Mixed case: pinned + unpinned
+            tabBar.classList.remove('only-pinned');
+
+            // First, pin compact widths
+            pinnedTabs.forEach(tab => {
+                tab.style.width = `${pinnedWidth}px`;
+                tab.style.minWidth = `${pinnedWidth}px`;
+                tab.style.maxWidth = `${pinnedWidth}px`;
+                tab.style.flexShrink = '0';
+            });
+
+            const remainingWidth = tabBarWidth - (pinnedTabs.length * pinnedWidth);
+            const idealUnpinnedWidth = Math.floor(Math.max(0, remainingWidth) / Math.max(1, unpinnedCount));
+
+            if (idealUnpinnedWidth >= minTabWidth) {
+                unpinnedTabs.forEach(tab => {
+                    tab.style.width = `${idealUnpinnedWidth}px`;
+                    tab.style.minWidth = `${idealUnpinnedWidth}px`;
+                    tab.style.maxWidth = `${idealUnpinnedWidth}px`;
                     tab.style.flexShrink = '0';
                 });
                 tabBar.style.overflowX = 'hidden';
             } else {
-                tabs.forEach((tab, index) => {
+                unpinnedTabs.forEach(tab => {
                     tab.style.width = `${minTabWidth}px`;
                     tab.style.minWidth = `${minTabWidth}px`;
                     tab.style.maxWidth = `${minTabWidth}px`;

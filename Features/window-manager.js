@@ -1,6 +1,7 @@
 const { BrowserWindow, Menu}  = require('electron');
 const path = require("path");
 const Tabs = require("./tabs");
+const Persistence = require("./persistence");
 const History = require("./history");
 const Shortcuts = require("./shortcuts");
 const contextMenu = require("./window-context-menu");
@@ -10,6 +11,8 @@ class WindowManager {
         this.windows = new Map();
         this.history = new History();
         this.nextWindowId = 0;
+        this.persistence = new Persistence();
+        this._restored = false;
     }
 
     createWindow(width = 800, height = 600) {
@@ -27,7 +30,7 @@ class WindowManager {
 
         window.loadFile('renderer/Browser/index.html');
         
-        const tabs = new Tabs(window, this.history);
+    const tabs = new Tabs(window, this.history, this.persistence);
         const shortcuts = new Shortcuts(window, tabs, this);
         
         tabs.setShortcuts(shortcuts);
@@ -39,17 +42,15 @@ class WindowManager {
                     `(() => { 
                         const elementFromPoint = document.elementFromPoint(${params.x}, ${params.y}); // Get the element at the context menu position
                         const tabElement = elementFromPoint ? elementFromPoint.closest('.tab-button') : null; // Check if it's within a tab button
-                            const idx = tabElement && tabElement.dataset ? parseInt(tabElement.dataset.index) : null;
-                            return { targetElementId: elementFromPoint ? (elementFromPoint.id || '') : '', isTabButton: !!tabElement, tabIndex: idx }; // Return the info
+                        return { targetElementId: elementFromPoint ? (elementFromPoint.id || '') : '', isTabButton: !!tabElement }; // Return the info
                     })()`
                 );
                 params.targetElementId = contextInfo.targetElementId;
                 params.isTabButton = contextInfo.isTabButton;
-                    params.tabIndex = contextInfo.tabIndex;
             } catch (_) {}
 
             const contextMenuInstance = new contextMenu(window, params, this);
-
+            
             if (contextMenuInstance.getTemplate().length === 0) {
                 return;
             }
@@ -69,7 +70,39 @@ class WindowManager {
         this.windows.set(windowId, windowData);
 
         window.webContents.once('did-finish-load', () => {
-            tabs.CreateTab();
+            // Restore only once into the first opened window (if any state exists)
+            const state = (!this._restored && this.persistence.hasState()) ? this.persistence.loadState() : null;
+            if (state && state.tabs && state.tabs.length > 0) {
+                try {
+                    // Create in saved order
+                    state.tabs.forEach((t) => {
+                        if (t.url && t.url !== 'newtab') {
+                            const idx = tabs.CreateTab();
+                            tabs.loadUrl(idx, t.url);
+                        } else {
+                            tabs.CreateTab();
+                        }
+                    });
+                    // Apply pinned flags by their creation order indices
+                    const indices = Array.from(tabs.TabMap.keys()).sort((a,b)=>a-b);
+                    state.tabs.forEach((t, i) => {
+                        const idx = indices[i];
+                        if (t.pinned) tabs.pinTab(idx);
+                    });
+                    // Focus saved active if valid
+                    if (typeof state.activeIndex === 'number') {
+                        const indices2 = Array.from(tabs.TabMap.keys()).sort((a,b)=>a-b);
+                        const focusIdx = indices2[state.activeIndex] ?? indices2[0];
+                        if (typeof focusIdx === 'number') tabs.showTab(focusIdx);
+                    }
+                } catch {
+                    // Fallback: at least one tab
+                    if (tabs.getTotalTabs() === 0) tabs.CreateTab();
+                }
+                this._restored = true;
+            } else {
+                tabs.CreateTab();
+            }
             shortcuts.registerAllShortcuts();
         });
 

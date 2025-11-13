@@ -8,9 +8,10 @@ const FindDialogManager = require("./find-dialog");
 const { app } = require('electron/main');
 
 class Tabs {
-    constructor(mainWindow, History) {
+    constructor(mainWindow, History, Persistence) {
         this.mainWindow = mainWindow
         this.history = History
+        this.persistence = Persistence || null
         this.navigationHistory = new NavigationHistory()
         this.findDialog = FindDialogManager.getInstance().createDialog(mainWindow)
         this.shortcuts = null
@@ -20,6 +21,8 @@ class Tabs {
         this.nextTabIndex = 0
         this.allowClose = false
         this.closePreventionActive = false
+    this.pinnedTabs = new Set()
+        this.tabOrder = []
         
         this.mainWindow.on('resize', () => {
             this.resizeAllTabs()
@@ -102,8 +105,9 @@ class Tabs {
         const bounds = this.getTabBounds()
         tab.setBounds(bounds)
 
-        this.TabMap.set(tabIndex, tab)
+    this.TabMap.set(tabIndex, tab)
         this.tabUrls.set(tabIndex, 'newtab')
+    this.tabOrder.push(tabIndex)
         this.activeTabIndex = tabIndex
         this.navigationHistory.initializeTab(tabIndex, 'newtab')
         
@@ -117,13 +121,15 @@ class Tabs {
             totalTabs: this.TabMap.size
         })
         
-        this.showTab(tabIndex)
+    this.showTab(tabIndex)
+    this._saveStateDebounced()
 
         this.sendTabUpdate(tabIndex, tab, '', 'New Tab')
 
         tab.webContents.on('did-finish-load', () => {
             tab.webContents.insertCSS('html{filter:grayscale(100%)}');
         });
+            return tabIndex
     }
 
     CreateTabWithPage(pagePath, pageType, pageTitle) {
@@ -145,8 +151,9 @@ class Tabs {
         const bounds = this.getTabBounds()
         tab.setBounds(bounds)
 
-        this.TabMap.set(tabIndex, tab)
+    this.TabMap.set(tabIndex, tab)
         this.tabUrls.set(tabIndex, pageType)
+    this.tabOrder.push(tabIndex)
         this.activeTabIndex = tabIndex
         this.navigationHistory.initializeTab(tabIndex, pageType)
         
@@ -164,7 +171,9 @@ class Tabs {
 
         tab.webContents.on('did-finish-load', () => {
             tab.webContents.insertCSS('html{filter:grayscale(100%)}');
+            this._saveStateDebounced()
         });
+            return tabIndex
         
     }
     
@@ -331,6 +340,9 @@ class Tabs {
             this.mainWindow.contentView.removeChildView(tab)
             this.TabMap.delete(index)
             this.tabUrls.delete(index)
+            // Clean up pinned state if needed
+            this.pinnedTabs.delete(index)
+            this.tabOrder = this.tabOrder.filter(i => i !== index)
             
             this.navigationHistory.removeTab(index)
             
@@ -348,6 +360,7 @@ class Tabs {
                 this.allowClose = true;
                 this.mainWindow.close();
             }
+            this._saveStateDebounced()
         }
     }
     
@@ -357,6 +370,8 @@ class Tabs {
             this.mainWindow.contentView.removeChildView(tab);
             this.TabMap.delete(index);
             this.tabUrls.delete(index);
+            this.pinnedTabs.delete(index)
+            this.tabOrder = this.tabOrder.filter(i => i !== index)
             
             this.navigationHistory.removeTab(index);
             
@@ -382,6 +397,7 @@ class Tabs {
                     }
                 }, 20);
             }
+            this._saveStateDebounced()
         }
     }
     
@@ -484,7 +500,62 @@ class Tabs {
     }
 
     pinTab(index) {
-        
+        console.log('[MAIN] pinTab sending event for index', index);
+        const isPinned = this.pinnedTabs.has(index)
+        if (!isPinned) {
+            const totalTabs = this.TabMap.size
+            const futurePinned = this.pinnedTabs.size + 1
+            const futureUnpinned = totalTabs - futurePinned
+            if (futureUnpinned <= 0) {
+                // Auto-create a new unpinned tab; then return focus to the original tab
+                this.CreateTab()
+                // Leave focus on the newly created tab so subsequent pin acts on it
+                // Proceed to pin the originally requested tab index
+                console.log('[MAIN] pinTab auto-created new tab to preserve one unpinned')
+            }
+            this.pinnedTabs.add(index)
+        } else {
+            this.pinnedTabs.delete(index)
+        }
+        this.mainWindow.webContents.send('pin-tab', { index });
+        this._saveStateDebounced()
+    }
+
+    reorderTabs(newOrder) {
+        if (!Array.isArray(newOrder)) return;
+        const allKeys = new Set(this.TabMap.keys());
+        const ok = newOrder.every(k => allKeys.has(k)) && newOrder.length === allKeys.size;
+        if (!ok) return;
+        this.tabOrder = [...newOrder];
+        this._saveStateDebounced();
+    }
+
+    _buildSerializableState() {
+        const includeAll = !!(this.persistence && this.persistence.getPersistMode());
+        const order = this.tabOrder.length ? this.tabOrder : Array.from(this.TabMap.keys());
+        const selected = includeAll ? order : order.filter(idx => this.pinnedTabs.has(idx));
+        const tabs = selected.map((idx) => {
+            const tab = this.TabMap.get(idx);
+            const url = this.tabUrls.get(idx) || 'newtab';
+            let title = 'New Tab';
+            try { title = tab.webContents.getTitle() || title; } catch {}
+            return {
+                url,
+                title,
+                pinned: this.pinnedTabs.has(idx)
+            };
+        });
+        // Map active to its ordinal in current order
+        const activeOrdinal = Math.max(0, order.indexOf(this.activeTabIndex));
+        return { tabs, activeIndex: activeOrdinal, persistAllTabs: includeAll };
+    }
+
+    _saveStateDebounced() {
+        if (!this.persistence) return;
+        clearTimeout(this._saveTimer);
+        this._saveTimer = setTimeout(() => {
+            try { this.persistence.saveState(this._buildSerializableState()); } catch {}
+        }, 200);
     }
 }
 

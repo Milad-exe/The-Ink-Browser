@@ -10,7 +10,9 @@ contextBridge.exposeInMainWorld(
         goForward: (index) => ipcRenderer.invoke("goForward", index),
         reload: (index) => ipcRenderer.invoke("reload", index),
         getTabUrl: (index) => ipcRenderer.invoke("getTabUrl", index),
-        
+        getButton: (index) => ipcRenderer.invoke("getTabButton", index),
+        pin: (index) => ipcRenderer.invoke("pinTab", index),
+    reorder: (order) => ipcRenderer.invoke('reorderTabs', order),
         onTabCreated: (callback) => ipcRenderer.on('tab-created', callback),
         onTabRemoved: (callback) => ipcRenderer.on('tab-removed', callback),
         onTabSwitched: (callback) => ipcRenderer.on('tab-switched', callback),
@@ -18,6 +20,17 @@ contextBridge.exposeInMainWorld(
         onNavigationUpdated: (callback) => ipcRenderer.on('navigation-updated', callback)
     }
 );
+
+// Bridge for UI events emitted from main (via Tabs.pinTab -> 'pin-tab')
+contextBridge.exposeInMainWorld('tabsUI', {
+    onPinTab: (handler) => ipcRenderer.on('pin-tab', (_e, { index }) => handler(index)),
+});
+
+// Persistence controls
+contextBridge.exposeInMainWorld('persist', {
+    getMode: () => ipcRenderer.invoke('getPersistMode'),
+    setMode: (enabled) => ipcRenderer.invoke('setPersistMode', enabled),
+});
 
 contextBridge.exposeInMainWorld(
     "dragdrop", {
