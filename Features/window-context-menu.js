@@ -127,7 +127,7 @@ class ContextMenu {
                             const windowData = this.windowManager.getWindowByWebContents(this.window.webContents);
                             if (windowData && windowData.tabs) {
                                 const activeIndex = windowData.tabs.activeTabIndex;
-                                windowData.tabs.pin(activeIndex);
+                                windowData.tabs.pinTab(activeIndex);
                             }
                         } catch (e) {
                         }

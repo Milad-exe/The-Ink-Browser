@@ -290,3 +290,38 @@ ipcMain.handle('detach-to-new-window', async (event, tabIndex, screenX, screenY,
     return false;
   }
 });
+
+ipcMain.handle('pinTab', (event, index) => {
+  console.log('[MAIN] handle pinTab', index);
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData && windowData.tabs) {
+    windowData.tabs.pinTab(index);
+    return true;
+  }
+  return false;
+});
+
+// Persistency mode controls
+ipcMain.handle('getPersistMode', (event) => {
+  return inkInstance.windowManager.persistence.getPersistMode();
+});
+
+ipcMain.handle('setPersistMode', (event, enabled) => {
+  inkInstance.windowManager.persistence.setPersistMode(!!enabled);
+  // Trigger a save from the active window if present
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData && windowData.tabs) {
+    try { windowData.tabs._saveStateDebounced(); } catch {}
+  }
+  return true;
+});
+
+// Reorder tabs within a window
+ipcMain.handle('reorderTabs', (event, order) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData && windowData.tabs) {
+    windowData.tabs.reorderTabs(order);
+    return true;
+  }
+  return false;
+});
