@@ -230,19 +230,24 @@ class Shortcuts {
     registerApplicationShortcuts() {
         const { app } = require('electron');
         
+        // Quit the app directly (mark all tabs allowClose so their close guards don't block)
         this.registerShortcut('CmdOrCtrl+Q', () => {
             if (this.windowManager) {
-                const windows = this.windowManager.getAllWindows();
-                windows.forEach(windowData => {
-                    if (windowData.tabs) {
-                        windowData.tabs.allowClose = true;
-                    }
+                this.windowManager.getAllWindows().forEach(windowData => {
+                    if (windowData.tabs) windowData.tabs.allowClose = true;
                 });
-                
+            }
+            app.quit();
+        });
+
+        // Close all windows but keep the app running (mac-style window close)
+        this.registerShortcut('CmdOrCtrl+Shift+Q', () => {
+            if (this.windowManager) {
+                this.windowManager.getAllWindows().forEach(windowData => {
+                    if (windowData.tabs) windowData.tabs.allowClose = true;
+                });
                 this.windowManager.closeAllWindows();
             }
-            
-            app.quit();
         });
     }
 

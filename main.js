@@ -24,6 +24,18 @@ class Ink {
       });
     });
 
+    // Ensure we persist primary window state and allow windows to close on quit
+    app.on('before-quit', () => {
+      try {
+        // Persist from primary window synchronously to avoid last-window overwrite issues
+        this.windowManager.savePrimaryState();
+      } catch {}
+      try {
+        const all = this.windowManager.getAllWindows();
+        all.forEach(w => { if (w && w.tabs) w.tabs.allowClose = true; });
+      } catch {}
+    });
+
     app.on('window-all-closed', () => {
         if (process.platform !== 'darwin') {
             app.quit();

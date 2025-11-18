@@ -13,6 +13,8 @@ class WindowManager {
         this.nextWindowId = 0;
         this.persistence = new Persistence();
         this._restored = false;
+        // Track most recently focused BrowserWindow
+        this.lastFocusedWindowId = null;
     }
 
     createWindow(width = 800, height = 600) {
@@ -29,6 +31,11 @@ class WindowManager {
         });
 
         window.loadFile('renderer/Browser/index.html');
+
+        // Track focus order: most recently focused is considered primary for persistence
+        window.on('focus', () => {
+            this.lastFocusedWindowId = windowId;
+        });
         
     const tabs = new Tabs(window, this.history, this.persistence);
         const shortcuts = new Shortcuts(window, tabs, this);
@@ -111,6 +118,31 @@ class WindowManager {
                 shortcuts.unregisterAllShortcuts();
             }
             this.windows.delete(windowId);
+
+            // If other windows remain, move focus to the most recently focused one (or any)
+            if (this.windows.size > 0) {
+                // Micro-UX tweak: only bring a window forward if one of ours isn't already focused
+                const focused = BrowserWindow.getFocusedWindow();
+                if (!focused) {
+                    const next = this.getMostRecentlyFocusedWindow() || this.getPrimaryWindow() || Array.from(this.windows.values())[0];
+                    if (next && next.window && !next.window.isDestroyed()) {
+                        try {
+                            next.window.show();
+                            next.window.focus();
+                            // Ensure the active tab's webContents receives focus
+                            setTimeout(() => {
+                                try {
+                                    const activeIdx = next.tabs.activeTabIndex;
+                                    const activeTab = next.tabs.TabMap.get(activeIdx);
+                                    if (activeTab && activeTab.webContents) {
+                                        activeTab.webContents.focus();
+                                    }
+                                } catch {}
+                            }, 20);
+                        } catch {}
+                    }
+                }
+            }
         });
 
         window.webContents.setWindowOpenHandler(({ url }) => {
@@ -140,6 +172,37 @@ class WindowManager {
 
     getWindowCount() {
         return this.windows.size;
+    }
+
+    // Most recently focused window, if still open
+    getMostRecentlyFocusedWindow() {
+        if (this.lastFocusedWindowId !== null) {
+            const win = this.windows.get(this.lastFocusedWindowId);
+            if (win) return win;
+        }
+        return null;
+    }
+
+    // Primary window for persistence is the most recently focused; fallback to oldest
+    getPrimaryWindow() {
+        const recent = this.getMostRecentlyFocusedWindow();
+        if (recent) return recent;
+        if (this.windows.size === 0) return null;
+        const entries = Array.from(this.windows.entries()).sort((a, b) => a[0] - b[0]);
+        return entries[0][1] || null;
+    }
+
+    // Save the current state from the primary window (synchronously) into persistence
+    savePrimaryState() {
+        try {
+            const primary = this.getPrimaryWindow();
+            if (!primary || !primary.tabs) return false;
+            const state = primary.tabs._buildSerializableState();
+            this.persistence.saveState(state);
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
 
     closeAllWindows() {
