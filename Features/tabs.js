@@ -76,6 +76,33 @@ class Tabs {
         };
     }
 
+    _computeDisplayTitleFor(index, fallbackTitle) {
+        try {
+            const urlType = this.tabUrls.get(index) || '';
+            if (urlType === 'newtab' || (typeof urlType === 'string' && urlType.startsWith('file://'))) {
+                return 'New Tab';
+            }
+            if (urlType === 'history') {
+                return 'History';
+            }
+            const tab = this.TabMap.get(index);
+            if (fallbackTitle) return fallbackTitle;
+            const t = tab && tab.webContents ? tab.webContents.getTitle() : '';
+            return t || 'New Tab';
+        } catch {
+            return 'New Tab';
+        }
+    }
+
+    _updateWindowTitle(index, explicitTitle) {
+        try {
+            const title = explicitTitle || this._computeDisplayTitleFor(index);
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.setTitle(title);
+            }
+        } catch {}
+    }
+
     setShortcuts(shortcuts) {
         this.shortcuts = shortcuts;
     }
@@ -179,8 +206,10 @@ class Tabs {
     
     getTabBounds() {
         const width = this.mainWindow.getContentBounds().width
-        const height = this.mainWindow.getContentBounds().height - 70
-        return { x: 0, y: 70, width: width, height: height }
+        // utility-bar (40px) + tab-bar (32px) = 72px total vertical offset
+        const yOffset = 72
+        const height = this.mainWindow.getContentBounds().height - yOffset
+        return { x: 0, y: yOffset, width: width, height: height }
     }
     
     setupTabListeners(tabIndex, tab) {
@@ -275,6 +304,11 @@ class Tabs {
             title: displayTitle,
             favicon: favicon
         })
+
+        // Keep the window title in sync with the active tab
+        if (tabIndex === this.activeTabIndex) {
+            this._updateWindowTitle(tabIndex, displayTitle);
+        }
     }
     
     sendNavigationUpdate(tabIndex) {
@@ -317,6 +351,9 @@ class Tabs {
             })
             
             this.sendNavigationUpdate(index)
+
+            // Update window title to reflect the newly active tab
+            this._updateWindowTitle(index)
         }
     }
     
