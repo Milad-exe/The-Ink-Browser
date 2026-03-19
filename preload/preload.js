@@ -52,9 +52,20 @@ contextBridge.exposeInMainWorld(
 contextBridge.exposeInMainWorld(
     "browserHistory", {
         get: () => ipcRenderer.invoke('history-get'),
+        search: (query, limit) => ipcRenderer.invoke('history-search', query, limit),
         remove: (url, timestamp) => ipcRenderer.invoke('remove-history-entry', url, timestamp)
     }
 );
+
+// Suggestions overlay controls from the main renderer
+contextBridge.exposeInMainWorld('suggestions', {
+    open: (bounds, items, activeIndex) => ipcRenderer.invoke('suggestions-open', { bounds, items, activeIndex }),
+    update: (bounds, items, activeIndex) => ipcRenderer.invoke('suggestions-update', { bounds, items, activeIndex }),
+    close: () => ipcRenderer.invoke('suggestions-close'),
+        onSelected: (handler) => ipcRenderer.on('suggestion-selected', (_e, item) => handler(item)),
+        onPointerDown: (handler) => ipcRenderer.on('suggestions-pointer-down', (_e) => handler()),
+        onCreated: (handler) => ipcRenderer.on('suggestions-created', (_e) => handler())
+});
 
 contextBridge.exposeInMainWorld("electronAPI", {
   windowClick: (pos) => ipcRenderer.send("window-click", pos),

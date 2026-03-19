@@ -1,4 +1,4 @@
-const { WebContentsView, BrowserWindow, Menu}  = require('electron');
+const { WebContentsView, BrowserWindow, Menu, shell }  = require('electron');
 const path = require('path');
 const History = require("./history");
 const UserAgent = require("./user-agent");
@@ -215,6 +215,17 @@ class Tabs {
     setupTabListeners(tabIndex, tab) {
         let isNavigatingProgrammatically = false;
         let lastAddedUrl = null;
+        const shouldOpenExternally = (targetUrl) => {
+            try {
+                const u = new URL(targetUrl);
+                const host = u.hostname || '';
+                const path = u.pathname || '';
+                // Open Google/YouTube sign-in flows externally (blocked in embedded browsers)
+                if (host.endsWith('accounts.google.com')) return true;
+                if (host.endsWith('youtube.com') && /signin|ServiceLogin/i.test(path)) return true;
+            } catch {}
+            return false;
+        };
         
         if (this.shortcuts) {
             this.shortcuts.onTabCreated(tab);
@@ -240,6 +251,26 @@ class Tabs {
             
             isNavigatingProgrammatically = false;
         })
+
+        // Intercept sign-in flows that get blocked and open in external browser instead
+        tab.webContents.setWindowOpenHandler(({ url }) => {
+            if (shouldOpenExternally(url)) {
+                shell.openExternal(url);
+                return { action: 'deny' };
+            }
+            return { action: 'allow' };
+        });
+        tab.webContents.on('will-redirect', (e, url) => {
+            if (shouldOpenExternally(url)) { e.preventDefault(); shell.openExternal(url); }
+        });
+        tab.webContents.on('will-navigate', (e, url) => {
+            if (shouldOpenExternally(url)) { e.preventDefault(); shell.openExternal(url); }
+        });
+        tab.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+            if (validatedURL && shouldOpenExternally(validatedURL)) {
+                shell.openExternal(validatedURL);
+            }
+        });
         
         tab.webContents.on('did-navigate-in-page', (event, url) => {
             if (!url.startsWith('file://') && !isNavigatingProgrammatically) {
