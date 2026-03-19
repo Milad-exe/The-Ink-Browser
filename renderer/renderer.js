@@ -3,6 +3,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const tabBar = document.getElementById("tab-bar");
     const tabsContainer = document.getElementById("tabs-container");
     const searchBar = document.getElementById("searchBar");
+    // Overlay-based suggestions: compute bounds for overlay
+    function getSuggestionsBounds() {
+        const rect = searchBar.getBoundingClientRect();
+        return { left: rect.left, top: rect.bottom + 4, width: rect.width };
+    }
     const backBtn = document.getElementById("back-btn");
     const forwardBtn = document.getElementById("forward-btn");
     const reloadBtn = document.getElementById("reload-btn");
@@ -26,8 +31,172 @@ document.addEventListener("DOMContentLoaded", () => {
     forwardBtn.addEventListener("click", () => { window.tab.goForward(activeTabIndex); });
     reloadBtn.addEventListener("click", () => { window.tab.reload(activeTabIndex); });
 
+    // Suggestions state
+    let currentSuggestions = [];
+    let activeSuggestionIndex = -1;
+    let suggestionsOpen = false;
+    let overlayPointerDown = false;
+
+    // Debounce helper
+    const debounce = (fn, delay = 150) => {
+        let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+    };
+
+    // Position suggestions below the address bar
+    function positionSuggestions() {
+        if (!currentSuggestions.length) return;
+        const b = getSuggestionsBounds();
+        window.suggestions.update(b, currentSuggestions, activeSuggestionIndex);
+    }
+
+    function hideSuggestions() {
+        window.suggestions.close();
+        suggestionsOpen = false;
+        currentSuggestions = [];
+        activeSuggestionIndex = -1;
+    }
+
+    function renderSuggestions(list) {
+        currentSuggestions = list;
+        activeSuggestionIndex = list.length ? 0 : -1;
+        if (!list.length) { hideSuggestions(); return; }
+        const b = getSuggestionsBounds();
+        // mark open immediately so blur handlers don't close the overlay
+        suggestionsOpen = true;
+        // try to keep the input focused before opening so blur races are less likely
+        try { window.focus(); searchBar.focus(); } catch (e) {}
+        // open overlay and then ensure focus returns to the input after a short delay
+        window.suggestions.open(b, currentSuggestions, activeSuggestionIndex).then(() => {
+            try { setTimeout(() => { try { window.focus(); searchBar.focus(); } catch {} }, 45); } catch {}
+        }).catch(() => { /* keep suggestionsOpen true until closed explicitly */ });
+    }
+
+    function setActiveSuggestion(newIndex) {
+        if (!currentSuggestions.length) return;
+        if (newIndex < 0) newIndex = currentSuggestions.length - 1;
+        if (newIndex >= currentSuggestions.length) newIndex = 0;
+        activeSuggestionIndex = newIndex;
+        // Push updated active index to overlay
+        const b = getSuggestionsBounds();
+        window.suggestions.update(b, currentSuggestions, activeSuggestionIndex);
+    }
+
+    function handleSuggestionSelect(index) {
+        const item = currentSuggestions[index];
+        if (!item) return;
+        if (item.type === 'history' && item.url) {
+            searchBar.value = item.url;
+            loadUrlInActiveTab(item.url);
+            hideSuggestions();
+        } else if ((item.type === 'google' || item.type === 'action') && item.query) {
+            searchBar.value = item.query;
+            loadUrlInActiveTab(item.query);
+            hideSuggestions();
+        }
+    }
+
+    async function getHistorySuggestions(q, limit = 5) {
+        try {
+            // Prefer main-process filtered search for performance and consistent logic
+            const entries = await (window.browserHistory.search ? window.browserHistory.search(q, limit * 3) : window.browserHistory.get());
+            if (!Array.isArray(entries) || !q) return [];
+            const results = [];
+            const seen = new Set();
+            function normalize(u) {
+                try {
+                    const nu = new URL(u);
+                    return (nu.hostname + nu.pathname).toLowerCase().replace(/\/$/, '');
+                } catch { return u.toLowerCase(); }
+            }
+            for (const e of entries) {
+                const url = e.url || '';
+                if (!url) continue;
+                const key = normalize(url);
+                if (seen.has(key)) continue;
+                seen.add(key);
+                // provide a favicon URL using Google's favicon service as a best-effort
+                let favicon = null;
+                try { const h = new URL(url).hostname; favicon = `https://www.google.com/s2/favicons?domain=${h}`; } catch {}
+                results.push({ type: 'history', title: e.title || url, url, favicon });
+                if (results.length >= limit) break;
+            }
+            return results;
+        } catch {
+            return [];
+        }
+    }
+
+    async function getGoogleSuggestions(q, limit = 6) {
+        if (!q) return [];
+        try {
+            const url = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(q)}`;
+            const res = await fetch(url, { cache: 'no-store' });
+            const data = await res.json();
+            const arr = Array.isArray(data) && Array.isArray(data[1]) ? data[1] : [];
+            return arr.slice(0, limit).map(s => ({ type: 'google', query: s }));
+        } catch {
+            return [];
+        }
+    }
+
+    const updateSuggestions = debounce(async () => {
+        const q = searchBar.value.trim();
+        if (!q) { hideSuggestions(); return; }
+        // Always include the direct search action first
+        const base = [{ type: 'action', query: q }];
+        // Render immediately to make UI feel responsive
+        renderSuggestions(base);
+        try { searchBar.focus(); } catch {}
+        try {
+            const [hist, goog] = await Promise.all([
+                getHistorySuggestions(q, 5),
+                getGoogleSuggestions(q, 6)
+            ]);
+            // Merge: action, then history, then google
+            const merged = [...base, ...hist];
+            const seenQueries = new Set(merged.filter(x => x.query).map(x => x.query));
+            for (const g of goog) { if (!seenQueries.has(g.query)) merged.push(g); }
+            renderSuggestions(merged);
+        } catch (_) {
+            // keep base rendered
+        }
+    }, 120);
+
+    searchBar.addEventListener('input', () => {
+        updateSuggestions();
+    });
+
+    searchBar.addEventListener('focus', () => {
+        if (searchBar.value.trim()) updateSuggestions();
+    });
+
+    searchBar.addEventListener('blur', () => {
+        // Delay hiding slightly to allow click on suggestion via mousedown.
+        // If suggestions overlay is open, don't auto-hide here — overlay selection will close it.
+        setTimeout(() => {
+            if (suggestionsOpen || overlayPointerDown) return;
+            hideSuggestions();
+        }, 400);
+    });
+
+    // If overlay view was just created, restore focus quickly to prevent initial caret loss
+    window.suggestions.onCreated(() => {
+        try { window.focus(); searchBar.focus(); } catch (e) {}
+    });
+
     searchBar.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
+        const haveSuggestions = currentSuggestions.length > 0;
+        if (haveSuggestions) {
+            if (e.key === 'ArrowDown') { e.preventDefault(); setActiveSuggestion(activeSuggestionIndex + 1); return; }
+            if (e.key === 'ArrowUp') { e.preventDefault(); setActiveSuggestion(activeSuggestionIndex - 1); return; }
+            if (e.key === 'Escape') { e.preventDefault(); hideSuggestions(); return; }
+            if (e.key === 'Enter') {
+                if (activeSuggestionIndex >= 0 && currentSuggestions[activeSuggestionIndex]) {
+                    e.preventDefault(); handleSuggestionSelect(activeSuggestionIndex); return;
+                }
+            }
+        }
+        if (e.key === 'Enter') {
             const url = searchBar.value.trim();
             if (url) loadUrlInActiveTab(url);
         }
@@ -272,6 +441,34 @@ document.addEventListener("DOMContentLoaded", () => {
         backBtn.style.opacity = canGoBack ? '1' : '0.5'; forwardBtn.style.opacity = canGoForward ? '1' : '0.5';
         backBtn.style.cursor = canGoBack ? 'pointer' : 'not-allowed'; forwardBtn.style.cursor = canGoForward ? 'pointer' : 'not-allowed';
     }
+
+    // Keep dropdown aligned on resize/scroll
+    window.addEventListener('resize', positionSuggestions);
+    window.addEventListener('scroll', positionSuggestions, true);
+
+    // Hide suggestions on navigation updates or url programmatic updates
+    const _origUpdateSearchBarUrl = updateSearchBarUrl;
+    updateSearchBarUrl = (url) => { _origUpdateSearchBarUrl(url); hideSuggestions(); };
+
+    // Handle selection coming from overlay click
+    window.suggestions.onSelected((item) => {
+        if (!item) return;
+        if (item.type === 'history' && item.url) {
+            searchBar.value = item.url;
+            loadUrlInActiveTab(item.url);
+        } else if ((item.type === 'google' || item.type === 'action') && item.query) {
+            searchBar.value = item.query;
+            loadUrlInActiveTab(item.query);
+        }
+        hideSuggestions();
+    });
+
+    // Overlay pointer-down: when overlay receives mousedown we get notified
+    window.suggestions.onPointerDown(() => {
+        overlayPointerDown = true;
+        // Clear shortly after — allow time for click/select to be processed
+        setTimeout(() => { overlayPointerDown = false; }, 350);
+    });
 
     setTimeout(() => { if (tabs.size > 0) { updateTabWidths(tabs.size); updateScrollShadows(); } }, 100);
 });

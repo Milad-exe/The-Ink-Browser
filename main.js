@@ -149,13 +149,178 @@ ipcMain.on("window-click", (event, pos) => {
   }
 });
 
+  // Suggestions Overlay IPC
+  ipcMain.handle('suggestions-open', async (event, payload) => {
+    const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+    if (!windowData) return false;
+    const { bounds, items = [], activeIndex = -1 } = payload || {};
+    try {
+      if (!windowData.suggestions) {
+        windowData.suggestions = new WebContentsView({
+          webPreferences: {
+            preload: path.join(__dirname, './preload/suggestions-preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false
+          }
+        });
+        windowData.window.contentView.addChildView(windowData.suggestions);
+        // Notify the renderer immediately that the overlay view was created so it can restore focus
+        try { windowData.window.webContents.send('suggestions-created'); } catch (e) {}
+        windowData.suggestions.webContents.loadFile('renderer/Suggestions/index.html');
+        await new Promise(res => windowData.suggestions.webContents.once('did-finish-load', res));
+      }
+      const h = Math.min(280, Math.max(40, (items.length || 1) * 36));
+      windowData.suggestions.setBounds({ x: Math.max(0, Math.floor(bounds.left)), y: Math.max(0, Math.floor(bounds.top)), width: Math.floor(bounds.width), height: h });
+      windowData.suggestions.webContents.send('suggestions-data', { items, activeIndex });
+      return true;
+    } catch (err) {
+      console.error('suggestions-open error:', err);
+      return false;
+    }
+  });
+
+  ipcMain.handle('suggestions-update', async (event, payload) => {
+    const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+    if (!windowData || !windowData.suggestions) return false;
+    const { bounds, items = [], activeIndex = -1 } = payload || {};
+    try {
+      const h = Math.min(280, Math.max(40, (items.length || 1) * 36));
+      if (bounds && typeof bounds.left === 'number') {
+        windowData.suggestions.setBounds({ x: Math.max(0, Math.floor(bounds.left)), y: Math.max(0, Math.floor(bounds.top)), width: Math.floor(bounds.width), height: h });
+      }
+      windowData.suggestions.webContents.send('suggestions-data', { items, activeIndex });
+      return true;
+    } catch (err) {
+      console.error('suggestions-update error:', err);
+      return false;
+    }
+  });
+
+  ipcMain.handle('suggestions-close', async (event) => {
+    const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+    if (!windowData || !windowData.suggestions) return false;
+    try {
+      windowData.window.contentView.removeChildView(windowData.suggestions);
+      windowData.suggestions = null;
+      return true;
+    } catch (err) {
+      console.error('suggestions-close error:', err);
+      return false;
+    }
+  });
+
+  ipcMain.handle('suggestions-select', async (event, item) => {
+    const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+    if (!windowData) return false;
+    try {
+      // Forward selection to the main renderer process to handle navigation
+      windowData.window.webContents.send('suggestion-selected', item);
+      // Close overlay
+      if (windowData.suggestions) {
+        windowData.window.contentView.removeChildView(windowData.suggestions);
+        windowData.suggestions = null;
+      }
+      return true;
+    } catch (err) {
+      console.error('suggestions-select error:', err);
+      return false;
+    }
+  });
+
+  // Pointer-down from overlay: forward to owning main renderer so it can suppress hide-on-blur briefly
+  ipcMain.handle('suggestions-pointer-down', (event) => {
+    try {
+      // Find which window owns this overlay (event.sender is overlay webContents)
+      const all = inkInstance.windowManager.getAllWindows();
+      for (const w of all) {
+        if (w.suggestions && w.suggestions.webContents && w.suggestions.webContents === event.sender) {
+          try { w.window.webContents.send('suggestions-pointer-down'); } catch {}
+          break;
+        }
+      }
+    } catch (err) {
+      console.error('suggestions-pointer-down handling error:', err);
+    }
+    return true;
+  });
+
 ipcMain.handle("history-get", async () => {
   try {
     const result = await inkInstance.windowManager.history.loadHistory();
     return result;
   } catch (error) {
     console.error('Error in history-get handler:', error);
-    return { History: [] };
+    return [];
+  }
+});
+
+ipcMain.handle("history-search", async (event, query, limit = 50) => {
+  try {
+    const items = await inkInstance.windowManager.history.loadHistory();
+    if (!query || !query.trim()) return [];
+    const q = query.trim().toLowerCase();
+    // Basic filtering by title or url containing the query
+    let filtered = (Array.isArray(items) ? items : []).filter(e => {
+      const t = (e.title || '').toLowerCase();
+      const u = (e.url || '').toLowerCase();
+      return t.includes(q) || u.includes(q);
+    });
+
+    // Exclude likely search-result pages (e.g. Google/Bing/DuckDuckGo result URLs)
+    const isLikelySearchResult = (rawUrl) => {
+      if (!rawUrl) return false;
+      try {
+        const u = new URL(rawUrl);
+        const host = (u.hostname || '').toLowerCase();
+        const path = (u.pathname || '').toLowerCase();
+        const params = u.searchParams;
+
+        // Common search engine hosts
+        const isGoogle = host.includes('google.');
+        const isBing = host.includes('bing.com');
+        const isDuck = host.includes('duckduckgo.com');
+
+        // Google uses /search and /url with q=, Bing uses /search, DuckDuckGo uses /?q=
+        if ((isGoogle && (path.startsWith('/search') || path.startsWith('/url') || params.has('q'))) ||
+            (isBing && (path.startsWith('/search') || params.has('q'))) ||
+            (isDuck && params.has('q'))) {
+          return true;
+        }
+
+        // Generic heuristic: if the path contains 'search' and there's a 'q' param, treat as search
+        if (path.includes('/search') && params.has('q')) return true;
+
+        // Some search-result redirect links include 'q=' in query; avoid showing raw search target pages
+        if (u.search && u.search.toLowerCase().includes('q=')) return true;
+      } catch (err) {
+        return false;
+      }
+      return false;
+    };
+
+    filtered = filtered.filter(e => !isLikelySearchResult(e.url));
+    // simple relevance: title match > url match, startsWith bonus, recency bonus
+    const score = (e) => {
+      const t = (e.title || '').toLowerCase();
+      const u = (e.url || '').toLowerCase();
+      let s = 0;
+      if (t === q || u === q) s += 100;
+      if (t.includes(q)) s += 50;
+      if (u.includes(q)) s += 25;
+      if (t.startsWith(q)) s += 25;
+      if (u.startsWith(q)) s += 10;
+      const ts = Date.parse(e.timestamp || e.date || 0);
+      if (!isNaN(ts)) {
+        const days = (Date.now() - ts) / (1000*60*60*24);
+        if (days < 1) s += 10; else if (days < 7) s += 5;
+      }
+      return s;
+    };
+    filtered.sort((a,b) => score(b) - score(a));
+    return filtered.slice(0, limit);
+  } catch (error) {
+    console.error('Error in history-search handler:', error);
+    return [];
   }
 });
 

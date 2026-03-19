@@ -59,7 +59,32 @@ class History {
         await this.ensureFileExists();
         
         try {
-            const historyData = await this.loadHistory();
+            let historyData = await this.loadHistory();
+            // Skip saving likely search-result pages (e.g. google.com/search?q=...)
+            const isLikelySearchResult = (rawUrl) => {
+                if (!rawUrl) return false;
+                try {
+                    const u = new URL(rawUrl);
+                    const host = (u.hostname || '').toLowerCase();
+                    const path = (u.pathname || '').toLowerCase();
+                    const params = u.searchParams;
+                    const isGoogle = host.includes('google.');
+                    const isBing = host.includes('bing.com');
+                    const isDuck = host.includes('duckduckgo.com');
+                    if ((isGoogle && (path.startsWith('/search') || path.startsWith('/url') || params.has('q'))) ||
+                        (isBing && (path.startsWith('/search') || params.has('q'))) ||
+                        (isDuck && params.has('q'))) {
+                        return true;
+                    }
+                    if (path.includes('/search') && params.has('q')) return true;
+                    if (u.search && u.search.toLowerCase().includes('q=')) return true;
+                } catch (err) {
+                    return false;
+                }
+                return false;
+            };
+
+            if (isLikelySearchResult(url)) return;
             const newEntry = {
                 url: url,
                 title: title,

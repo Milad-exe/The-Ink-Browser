@@ -33,6 +33,53 @@ html, body {
   -ms-overflow-style: none; 
 }
 
+/* Search suggestions dropdown */
+#search-suggestions {
+  position: fixed;
+  max-height: 280px;
+  overflow-y: auto;
+  width: 480px; /* will be updated to match input width at runtime */
+  background: #fff;
+  border: 0.5px solid #d1d1d1;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  z-index: 9999;
+  display: none;
+}
+
+#search-suggestions .suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #1d1d1f;
+  cursor: pointer;
+  border-bottom: 0.5px solid #f0f0f0;
+}
+
+#search-suggestions .suggestion-item:last-child {
+  border-bottom: none;
+}
+
+#search-suggestions .suggestion-item:hover,
+#search-suggestions .suggestion-item.active {
+  background: #f4f7ff;
+}
+
+#search-suggestions .type-pill {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid #e1e1e1;
+  color: #555;
+  background: #fafafa;
+}
+
+#search-suggestions .secondary {
+  color: #6b6b6b;
+}
+
 #tab-bar::-webkit-scrollbar {
   display: none;
 }
