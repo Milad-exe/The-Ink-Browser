@@ -9,12 +9,26 @@ const contextMenu = require("./window-context-menu");
 class WindowManager {
     constructor() {
         this.windows = new Map();
-        this.history = new History();
+        this._history = null;
         this.nextWindowId = 0;
-        this.persistence = new Persistence();
+        this._persistence = null;
         this._restored = false;
         // Track most recently focused BrowserWindow
         this.lastFocusedWindowId = null;
+    }
+
+    get history() {
+        if (!this._history) {
+            this._history = new History();
+        }
+        return this._history;
+    }
+
+    get persistence() {
+        if (!this._persistence) {
+            this._persistence = new Persistence();
+        }
+        return this._persistence;
     }
 
     createWindow(width = 800, height = 600) {

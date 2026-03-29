@@ -69,6 +69,22 @@ contextBridge.exposeInMainWorld('suggestions', {
 
 contextBridge.exposeInMainWorld("electronAPI", {
   windowClick: (pos) => ipcRenderer.send("window-click", pos),
-  
+
   onShowFindInPage: (callback) => ipcRenderer.on('show-find-in-page', callback)
+});
+
+contextBridge.exposeInMainWorld("bruno", {
+    open: () => ipcRenderer.invoke('bruno-open'),
+    close: () => ipcRenderer.invoke('bruno-close'),
+    selectDirectory: () => ipcRenderer.invoke('bruno-select-directory'),
+    exportCollection: (path) => ipcRenderer.invoke('bruno-export-collection', path),
+    importCollection: (path) => ipcRenderer.invoke('bruno-import-collection', path),
+    listCollections: () => ipcRenderer.invoke('bruno-list-collections'),
+    deleteCollectionFile: (path) => ipcRenderer.invoke('bruno-delete-collection-file', path),
+    loadCollectionFile: (path) => ipcRenderer.invoke('bruno-load-collection-file', path),
+    saveCollectionFile: (path, data) => ipcRenderer.invoke('bruno-save-collection-file', path, data),
+    gitInit: (path) => ipcRenderer.invoke('bruno-git-init', path),
+    isGitRepo: (path) => ipcRenderer.invoke('bruno-is-git-repo', path),
+    gitStatus: (path) => ipcRenderer.invoke('bruno-git-status', path),
+    createGitignore: (path) => ipcRenderer.invoke('bruno-create-gitignore', path)
 });

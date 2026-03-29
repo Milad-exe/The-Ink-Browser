@@ -502,3 +502,200 @@ ipcMain.handle('reorderTabs', (event, order) => {
   }
   return false;
 });
+
+// Bruno API Client IPC Handlers
+const fs = require('fs');
+const { dialog } = require('electron');
+
+ipcMain.handle('bruno-open', async (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return false;
+
+  try {
+    if (!windowData.bruno) {
+      windowData.bruno = new WebContentsView({
+        webPreferences: {
+          preload: path.join(__dirname, './preload/bruno-preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false
+        }
+      });
+      windowData.window.contentView.addChildView(windowData.bruno);
+      windowData.bruno.webContents.loadFile('renderer/Bruno/index.html');
+      await new Promise(res => windowData.bruno.webContents.once('did-finish-load', res));
+    }
+
+    // Position Bruno to not overlap tab bar and utility bar
+    // Utility bar: 44px, Tab bar: 36px (total: 80px from top)
+    const bounds = windowData.window.getBounds();
+    const topOffset = 80;
+
+    windowData.bruno.setBounds({
+      x: 0,
+      y: topOffset,
+      width: bounds.width,
+      height: bounds.height - topOffset
+    });
+    return true;
+  } catch (error) {
+    console.error('Error opening Bruno:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('bruno-close', async (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData && windowData.bruno) {
+    try {
+      windowData.window.contentView.removeChildView(windowData.bruno);
+      windowData.bruno = null;
+      return true;
+    } catch (error) {
+      console.error('Error closing Bruno:', error);
+      return false;
+    }
+  }
+  return false;
+});
+
+ipcMain.handle('bruno-select-directory', async (event) => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory']
+    });
+    return result.canceled ? null : result.filePaths[0];
+  } catch (error) {
+    console.error('Error selecting directory:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('bruno-list-collections', async (event) => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory']
+    });
+    if (result.canceled) return [];
+
+    const dir = result.filePaths[0];
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+    return files.map(f => ({ name: f.replace('.json', ''), path: path.join(dir, f) }));
+  } catch (error) {
+    console.error('Error listing collections:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('bruno-load-collection-file', async (event, filePath) => {
+  try {
+    const data = fs.readFileSync(filePath, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error loading collection:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('bruno-save-collection-file', async (event, filePath, data) => {
+  try {
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    return true;
+  } catch (error) {
+    console.error('Error saving collection:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('bruno-export-collection', async (event, collectionPath) => {
+  try {
+    const result = await dialog.showSaveDialog({
+      defaultPath: 'collection.json',
+      filters: [{ name: 'JSON Files', extensions: ['json'] }]
+    });
+
+    if (result.canceled) return false;
+
+    const data = fs.readFileSync(collectionPath, 'utf-8');
+    fs.writeFileSync(result.filePath, data);
+    return true;
+  } catch (error) {
+    console.error('Error exporting collection:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('bruno-import-collection', async (event) => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'JSON Files', extensions: ['json'] }]
+    });
+
+    if (result.canceled) return null;
+
+    const data = fs.readFileSync(result.filePaths[0], 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error importing collection:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('bruno-delete-collection-file', async (event, filePath) => {
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error deleting collection:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('bruno-git-init', async (event, dirPath) => {
+  try {
+    const { execSync } = require('child_process');
+    execSync('git init', { cwd: dirPath });
+    return true;
+  } catch (error) {
+    console.error('Error initializing git:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('bruno-is-git-repo', async (event, dirPath) => {
+  try {
+    return fs.existsSync(path.join(dirPath, '.git'));
+  } catch (error) {
+    return false;
+  }
+});
+
+ipcMain.handle('bruno-git-status', async (event, dirPath) => {
+  try {
+    const { execSync } = require('child_process');
+    const status = execSync('git status --short', { cwd: dirPath }).toString();
+    return status;
+  } catch (error) {
+    console.error('Error getting git status:', error);
+    return '';
+  }
+});
+
+ipcMain.handle('bruno-create-gitignore', async (event, dirPath) => {
+  try {
+    const gitignorePath = path.join(dirPath, '.gitignore');
+    const content = 'node_modules/\n.env\n*.log\n.DS_Store\n.vscode/\n';
+    fs.writeFileSync(gitignorePath, content);
+    return true;
+  } catch (error) {
+    console.error('Error creating .gitignore:', error);
+    return false;
+  }
+});
