@@ -202,6 +202,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    const brunoBtn = document.getElementById("bruno-btn");
+    brunoBtn.addEventListener("click", () => {
+        window.bruno.open();
+    });
+
     menuBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         window.menu.open();

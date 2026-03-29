@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bruno - API Client</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="bruno-container">
+    <!-- Left Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h2 id="collection-title">Collections</h2>
+        <button id="new-request-btn" class="btn-icon">+</button>
+      </div>
+      <div id="requests-list" class="collections-list">
+        <div class="empty-state">No collection open</div>
+      </div>
+    </div>
+
+    <!-- Main Area -->
+    <div class="main-area">
+      <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);">
+        <button id="open-collection-btn" class="btn-small">Open Collection</button>
+        <button id="bruno-close-btn" class="btn-icon">✕</button>
+      </div>
+
+      <div class="request-builder">
+        <div class="rb-row">
+          <select id="request-method">
+            <option>GET</option>
+            <option>POST</option>
+            <option>PUT</option>
+            <option>PATCH</option>
+            <option>DELETE</option>
+          </select>
+          <input type="text" id="request-url" placeholder="https://api.example.com">
+          <button id="send-btn" class="btn-send">Send</button>
+        </div>
+      </div>
+
+      <div class="request-tabs">
+        <button class="req-tab active" data-tab="body">Body</button>
+        <button class="req-tab" data-tab="params">Params</button>
+        <button class="req-tab" data-tab="headers">Headers</button>
+        <button class="req-tab" data-tab="auth">Auth</button>
+        <button class="req-tab" data-tab="script">Script</button>
+        <button class="req-tab" data-tab="assert">Assert</button>
+        <button class="req-tab" data-tab="docs">Docs</button>
+      </div>
+
+      <div class="content-and-response">
+        <div class="tab-content-area">
+          <div class="tab-pane active" id="body-pane"><textarea id="body-textarea"></textarea></div>
+          <div class="tab-pane" id="params-pane"><textarea></textarea></div>
+          <div class="tab-pane" id="headers-pane"><textarea></textarea></div>
+          <div class="tab-pane" id="auth-pane"><div style="padding: 16px;"><select><option>None</option><option>Basic</option><option>Bearer</option></select></div></div>
+          <div class="tab-pane" id="script-pane"><textarea></textarea></div>
+          <div class="tab-pane" id="assert-pane"><textarea></textarea></div>
+          <div class="tab-pane" id="docs-pane"><textarea></textarea></div>
+        </div>
+
+        <div class="response-panel">
+          <div class="response-header">Response</div>
+          <div class="response-status" id="response-status">Ready</div>
+          <pre id="response-body" class="response-body">Ready to send</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-new-request" class="modal hidden">
+    <div class="modal-content">
+      <h3>New Request</h3>
+      <input type="text" id="request-name-input" class="modal-input" placeholder="Request name">
+      <div style="margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end;">
+        <button id="modal-cancel">Cancel</button>
+        <button id="modal-create">Create</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

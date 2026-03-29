@@ -1,11 +1,10 @@
-const { WebContentsView, BrowserWindow, Menu, shell }  = require('electron');
+const { WebContentsView, BrowserWindow, Menu, shell, app }  = require('electron');
 const path = require('path');
 const History = require("./history");
 const UserAgent = require("./user-agent");
 const contextMenu = require("./tab-context-menu");
 const NavigationHistory = require("./navigation-history");
 const FindDialogManager = require("./find-dialog");
-const { app } = require('electron/main');
 
 class Tabs {
     constructor(mainWindow, History, Persistence) {
