@@ -6,7 +6,6 @@ class Shortcuts {
         this.tabManager = tabManager;
         this.windowManager = windowManager;
         this.shortcuts = new Map();
-        this.processing = false;
         this.setupEventListeners();
     }
 
@@ -37,20 +36,25 @@ class Shortcuts {
         this.setupTabListener(tab);
     }
 
+    registerWebContents(wc) {
+        if (wc._inkShortcutHandler) return;
+        const handler = (event, input) => this.handleInput(event, input);
+        wc._inkShortcutHandler = handler;
+        wc.on('before-input-event', handler);
+    }
+
+    unregisterWebContents(wc) {
+        if (wc._inkShortcutHandler) {
+            wc.removeListener('before-input-event', wc._inkShortcutHandler);
+            wc._inkShortcutHandler = null;
+        }
+    }
+
     handleInput(event, input) {
+        if (input.type !== 'keyDown') return;
         for (const [accelerator, callback] of this.shortcuts) {
             if (this.matchesAccelerator(input, accelerator)) {
                 event.preventDefault();
-                
-                if (this.processing) {
-                    return;
-                }
-                this.processing = true;
-                
-                setImmediate(() => {
-                    this.processing = false;
-                });
-                
                 callback();
                 break;
             }

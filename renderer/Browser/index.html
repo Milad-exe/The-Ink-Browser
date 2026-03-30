@@ -4,26 +4,60 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Ink Browser</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  
+  <!-- Top Navigation Bar -->
   <div id="utility-bar">
-    <button id="back-btn">◀</button>
-    <button id="forward-btn">▶</button>
-  <input id="searchBar" placeholder="Search or enter website name">
-    <button id="reload-btn">↻</button>
-    <button id="bookmark-btn">★</button>
-    <button id="bruno-btn">🔌</button>
-    <button id="menu-btn">☰</button>
-  </div>
-    <div id="tab-bar">
-    <div id="tabs-container"></div>
-    <div id="tab-actions">
-      <button id="new-tab-btn" aria-label="New tab">＋</button>
+    <div class="nav-start">
+      <img class="browser-logo" src="../assets/logo.svg" alt="Ink" width="22" height="22">
+    </div>
+
+    <div class="nav-buttons">
+      <button id="back-btn" class="nav-btn" title="Back">‹</button>
+      <button id="forward-btn" class="nav-btn" title="Forward">›</button>
+      <button id="reload-btn" class="nav-btn" title="Reload">↻</button>
+    </div>
+
+    <div class="omnibox-wrapper">
+      <div class="omnibox">
+        <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="10.5" cy="10.5" r="6.5"/>
+          <line x1="15.5" y1="15.5" x2="21" y2="21"/>
+        </svg>
+        <input id="searchBar" placeholder="Search or enter URL" type="text">
+      </div>
+    </div>
+
+    <div class="trailing-icons">
+      <button id="bookmark-btn" class="icon-btn" title="Bookmark">★</button>
+      <button id="bruno-btn" class="icon-btn" title="Bruno API Client">⚡</button>
+      <button id="menu-btn" class="icon-btn menu-btn" title="Menu">
+        <svg viewBox="0 0 16 12" width="16" height="12" fill="currentColor">
+          <rect y="0" width="16" height="1.5" rx="0.75"/>
+          <rect y="5.25" width="16" height="1.5" rx="0.75"/>
+          <rect y="10.5" width="16" height="1.5" rx="0.75"/>
+        </svg>
+      </button>
     </div>
   </div>
+
+  <!-- Tab Bar -->
+  <div id="tab-bar">
+    <button id="tab-scroll-left" class="tab-scroll-btn" aria-label="Scroll tabs left">‹</button>
+    <div id="tabs-container"></div>
+    <button id="tab-scroll-right" class="tab-scroll-btn" aria-label="Scroll tabs right">›</button>
+    <div id="tab-actions">
+      <button id="new-tab-btn" class="tab-add" aria-label="New tab">+</button>
+    </div>
+  </div>
+
+  <!-- Content Area -->
   <div id="content-area"></div>
+
   <script src="../renderer.js"></script>
 </body>
 </html>
