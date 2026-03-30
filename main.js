@@ -104,6 +104,20 @@ ipcMain.handle("newWindow", async () => {
   inkInstance.windowManager.createWindow();
 });
 
+function closeWindowMenu(windowData) {
+  if (!windowData || !windowData.menu) return;
+  try { windowData.window.contentView.removeChildView(windowData.menu); } catch {}
+  windowData.menu = null;
+  try { windowData.window.webContents.send('menu-closed'); } catch {}
+  // Clean up any focus listeners attached when menu opened
+  if (windowData._menuFocusListeners) {
+    for (const [wc, fn] of windowData._menuFocusListeners) {
+      try { wc.removeListener('focus', fn); } catch {}
+    }
+    windowData._menuFocusListeners = null;
+  }
+}
+
 ipcMain.handle("open", async (event, index) => {
   const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
   if (windowData) {
@@ -120,12 +134,22 @@ ipcMain.handle("open", async (event, index) => {
     const browserWidth = windowData.window.getBounds().width;
     const width = 160;
     const windowXPos = browserWidth - 12 - width;
-    windowData.menu.setBounds({
-      height: 200,
-      width: width,
-      x: windowXPos,
-      y: 40
-    });
+    windowData.menu.setBounds({ height: 200, width, x: windowXPos, y: 40 });
+
+    // Close menu when focus shifts to any tab or Bruno (clicks outside browser chrome)
+    const closeOnFocus = () => closeWindowMenu(windowData);
+    const listeners = [];
+    if (windowData.tabs) {
+      windowData.tabs.TabMap.forEach(tab => {
+        tab.webContents.once('focus', closeOnFocus);
+        listeners.push([tab.webContents, closeOnFocus]);
+      });
+    }
+    if (windowData.bruno) {
+      windowData.bruno.webContents.once('focus', closeOnFocus);
+      listeners.push([windowData.bruno.webContents, closeOnFocus]);
+    }
+    windowData._menuFocusListeners = listeners;
   }
 });
 
@@ -135,21 +159,11 @@ ipcMain.on("window-click", (event, pos) => {
   if (windowData && windowData.menu) {
     try {
       const bounds = windowData.menu.getBounds();
-
-      const isOutsideBounds = pos.x < bounds.x ||
-        pos.x > bounds.x + bounds.width ||
-        pos.y < bounds.y ||
-        pos.y > bounds.y + bounds.height;
-        
-      if (isOutsideBounds) {
-        windowData.window.contentView.removeChildView(windowData.menu);
-        windowData.menu = null;
-        windowData.window.webContents.send('menu-closed');
-      }
-    } catch (error) {
-      console.error('Error handling menu click:', error);
-      windowData.menu = null;
-      windowData.window.webContents.send('menu-closed');
+      const isOutsideBounds = pos.x < bounds.x || pos.x > bounds.x + bounds.width ||
+        pos.y < bounds.y || pos.y > bounds.y + bounds.height;
+      if (isOutsideBounds) closeWindowMenu(windowData);
+    } catch {
+      closeWindowMenu(windowData);
     }
   }
 });
@@ -352,15 +366,7 @@ ipcMain.handle("remove-history-entry", async (event, url, timestamp) => {
 
 ipcMain.handle("close-menu", async (event) => {
   const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
-  if (windowData && windowData.menu) {
-    try {
-      windowData.window.contentView.removeChildView(windowData.menu);
-      windowData.menu = null;
-      windowData.window.webContents.send('menu-closed');
-    } catch (error) {
-      console.error('Error closing menu:', error);
-    }
-  }
+  closeWindowMenu(windowData);
 });
 
 ipcMain.on('focus-address-bar', (event) => {
