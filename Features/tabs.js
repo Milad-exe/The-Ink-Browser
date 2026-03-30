@@ -204,11 +204,12 @@ class Tabs {
     }
     
     getTabBounds() {
-        const width = this.mainWindow.getContentBounds().width
-        // utility-bar (40px) + tab-bar (32px) = 72px total vertical offset
-        const yOffset = 72
-        const height = this.mainWindow.getContentBounds().height - yOffset
-        return { x: 0, y: yOffset, width: width, height: height }
+        const contentBounds = this.mainWindow.getContentBounds()
+        // utility-bar (56px) + tab-bar (48px) = 104px total vertical offset
+        const yOffset = 104
+        const width = contentBounds.width - (this.brunoWidth || 0)
+        const height = contentBounds.height - yOffset
+        return { x: 0, y: yOffset, width, height }
     }
     
     setupTabListeners(tabIndex, tab) {

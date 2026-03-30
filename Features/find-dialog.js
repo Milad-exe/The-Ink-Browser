@@ -135,7 +135,7 @@ class FindDialog {
 
         this.findWindow.on('closed', () => {
             this.findWindow = null;
-            if (this.activeTab && !this.activeTab.isDestroyed()) {
+            if (this.activeTab && !this.activeTab.webContents.isDestroyed()) {
                 this.activeTab.webContents.stopFindInPage('clearSelection');
             }
         });
@@ -156,28 +156,28 @@ class FindDialog {
     handleSearch(searchTerm) {
         if (this.isDestroyed) return;
         this.currentSearchTerm = searchTerm;
-        if (this.activeTab && searchTerm && !this.activeTab.isDestroyed()) {
+        if (this.activeTab && searchTerm && !this.activeTab.webContents.isDestroyed()) {
             this.activeTab.webContents.findInPage(searchTerm, { findNext: false });
         }
     }
 
     handleNext() {
         if (this.isDestroyed) return;
-        if (this.activeTab && this.currentSearchTerm && !this.activeTab.isDestroyed()) {
+        if (this.activeTab && this.currentSearchTerm && !this.activeTab.webContents.isDestroyed()) {
             this.activeTab.webContents.findInPage(this.currentSearchTerm, { findNext: true });
         }
     }
 
     handlePrevious() {
         if (this.isDestroyed) return;
-        if (this.activeTab && this.currentSearchTerm && !this.activeTab.isDestroyed()) {
+        if (this.activeTab && this.currentSearchTerm && !this.activeTab.webContents.isDestroyed()) {
             this.activeTab.webContents.findInPage(this.currentSearchTerm, { findNext: true, forward: false });
         }
     }
 
     handleClear() {
         if (this.isDestroyed) return;
-        if (this.activeTab && !this.activeTab.isDestroyed()) {
+        if (this.activeTab && !this.activeTab.webContents.isDestroyed()) {
             this.activeTab.webContents.stopFindInPage('clearSelection');
         }
     }

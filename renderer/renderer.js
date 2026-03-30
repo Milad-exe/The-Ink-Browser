@@ -203,8 +203,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     const brunoBtn = document.getElementById("bruno-btn");
+    let brunoOpen = false;
     brunoBtn.addEventListener("click", () => {
-        window.bruno.open();
+        if (brunoOpen) {
+            window.bruno.close();
+            brunoOpen = false;
+            brunoBtn.classList.remove('active');
+        } else {
+            window.bruno.open();
+            brunoOpen = true;
+            brunoBtn.classList.add('active');
+        }
     });
 
     menuBtn.addEventListener("click", (e) => {
@@ -440,6 +449,36 @@ document.addEventListener("DOMContentLoaded", () => {
         if (right > 2) tabBar.classList.add('scrollable-right'); else tabBar.classList.remove('scrollable-right');
     }
     tabsContainer.addEventListener('scroll', updateScrollShadows);
+
+    // Tab bar scroll arrows
+    const tabScrollLeft = document.getElementById('tab-scroll-left');
+    const tabScrollRight = document.getElementById('tab-scroll-right');
+    let tabScrollInterval = null;
+
+    function scrollTabsBy(amount) {
+        tabsContainer.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+
+    function startTabScroll(amount) {
+        scrollTabsBy(amount);
+        tabScrollInterval = setInterval(() => scrollTabsBy(amount), 200);
+    }
+
+    function stopTabScroll() {
+        clearInterval(tabScrollInterval);
+        tabScrollInterval = null;
+    }
+
+    tabScrollLeft.addEventListener('mousedown', () => startTabScroll(-160));
+    tabScrollRight.addEventListener('mousedown', () => startTabScroll(160));
+    tabScrollLeft.addEventListener('click', () => scrollTabsBy(-160));
+    tabScrollRight.addEventListener('click', () => scrollTabsBy(160));
+    document.addEventListener('mouseup', stopTabScroll);
+
+    tabsContainer.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        tabsContainer.scrollBy({ left: e.deltaY !== 0 ? e.deltaY : e.deltaX, behavior: 'smooth' });
+    }, { passive: false });
 
     function updateNavigationButtons(canGoBack, canGoForward) {
         backBtn.disabled = !canGoBack; forwardBtn.disabled = !canGoForward;
