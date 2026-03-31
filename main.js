@@ -109,12 +109,10 @@ function closeWindowMenu(windowData) {
   try { windowData.window.contentView.removeChildView(windowData.menu); } catch {}
   windowData.menu = null;
   try { windowData.window.webContents.send('menu-closed'); } catch {}
-  // Clean up any focus listeners attached when menu opened
-  if (windowData._menuFocusListeners) {
-    for (const [wc, fn] of windowData._menuFocusListeners) {
-      try { wc.removeListener('focus', fn); } catch {}
-    }
-    windowData._menuFocusListeners = null;
+  // Clean up all listeners attached when menu opened
+  if (windowData._menuCleanups) {
+    for (const fn of windowData._menuCleanups) { try { fn(); } catch {} }
+    windowData._menuCleanups = null;
   }
 }
 
@@ -136,20 +134,38 @@ ipcMain.handle("open", async (event, index) => {
     const windowXPos = browserWidth - 12 - width;
     windowData.menu.setBounds({ height: 200, width, x: windowXPos, y: 40 });
 
-    // Close menu when focus shifts to any tab or Bruno (clicks outside browser chrome)
-    const closeOnFocus = () => closeWindowMenu(windowData);
-    const listeners = [];
+    // Close menu on any click in a tab/Bruno WebContentsView, or when the
+    // BrowserWindow loses OS focus (user switches to another app).
+    const cleanups = [];
+    const closeOnce = (() => {
+      let fired = false;
+      return () => { if (!fired) { fired = true; closeWindowMenu(windowData); } };
+    })();
+
+    // Window blur → another app focused
+    windowData.window.once('blur', closeOnce);
+    cleanups.push(() => windowData.window.removeListener('blur', closeOnce));
+
+    // Click in browser chrome (URL bar, tab bar) — already handled by window-click IPC,
+    // but also guard via main-window webContents focus
+    windowData.window.webContents.once('focus', closeOnce);
+    cleanups.push(() => windowData.window.webContents.removeListener('focus', closeOnce));
+
+    // Click inside any tab or Bruno — use before-input-event (fires even when already focused)
+    const addInputClose = (wc) => {
+      const onInput = (e, input) => {
+        if (input.type === 'mouseDown') { wc.removeListener('before-input-event', onInput); closeOnce(); }
+      };
+      wc.on('before-input-event', onInput);
+      cleanups.push(() => wc.removeListener('before-input-event', onInput));
+    };
     if (windowData.tabs) {
-      windowData.tabs.TabMap.forEach(tab => {
-        tab.webContents.once('focus', closeOnFocus);
-        listeners.push([tab.webContents, closeOnFocus]);
-      });
+      windowData.tabs.TabMap.forEach(tab => addInputClose(tab.webContents));
     }
     if (windowData.bruno) {
-      windowData.bruno.webContents.once('focus', closeOnFocus);
-      listeners.push([windowData.bruno.webContents, closeOnFocus]);
+      addInputClose(windowData.bruno.webContents);
     }
-    windowData._menuFocusListeners = listeners;
+    windowData._menuCleanups = cleanups;
   }
 });
 
