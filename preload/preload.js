@@ -73,6 +73,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onShowFindInPage: (callback) => ipcRenderer.on('show-find-in-page', callback)
 });
 
+// Any click anywhere in this webContents should close the settings menu
+document.addEventListener('mousedown', () => {
+    try { ipcRenderer.send('content-view-click'); } catch {}
+}, true);
+
 contextBridge.exposeInMainWorld("bruno", {
     open: () => ipcRenderer.invoke('bruno-open'),
     close: () => ipcRenderer.invoke('bruno-close'),
