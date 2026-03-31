@@ -151,24 +151,18 @@ ipcMain.handle("open", async (event, index) => {
     windowData.window.webContents.once('focus', closeOnce);
     cleanups.push(() => windowData.window.webContents.removeListener('focus', closeOnce));
 
-    // Click inside any tab or Bruno — use before-input-event (fires even when already focused)
-    const addInputClose = (wc) => {
-      const onInput = (e, input) => {
-        if (input.type === 'mouseDown') { wc.removeListener('before-input-event', onInput); closeOnce(); }
-      };
-      wc.on('before-input-event', onInput);
-      cleanups.push(() => wc.removeListener('before-input-event', onInput));
-    };
-    if (windowData.tabs) {
-      windowData.tabs.TabMap.forEach(tab => addInputClose(tab.webContents));
-    }
-    if (windowData.bruno) {
-      addInputClose(windowData.bruno.webContents);
-    }
+    // Clicks in tabs/Bruno are detected via 'content-view-click' IPC sent from the preload
+    // (before-input-event only fires for keyboard, not mouse events in Electron)
     windowData._menuCleanups = cleanups;
   }
 });
 
+
+// Any mousedown in a tab or Bruno WebContentsView (sent from the shared preload)
+ipcMain.on("content-view-click", (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData && windowData.menu) closeWindowMenu(windowData);
+});
 
 ipcMain.on("window-click", (event, pos) => {
   const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
@@ -203,6 +197,8 @@ ipcMain.on("window-click", (event, pos) => {
         try { windowData.window.webContents.send('suggestions-created'); } catch (e) {}
         windowData.suggestions.webContents.loadFile('renderer/Suggestions/index.html');
         await new Promise(res => windowData.suggestions.webContents.once('did-finish-load', res));
+        // loadFile steals Electron-level focus; restore it to the main renderer so the URL bar keeps typing focus
+        try { windowData.window.webContents.focus(); } catch {}
       }
       const h = Math.min(280, Math.max(40, (items.length || 1) * 36));
       windowData.suggestions.setBounds({ x: Math.max(0, Math.floor(bounds.left)), y: Math.max(0, Math.floor(bounds.top)), width: Math.floor(bounds.width), height: h });

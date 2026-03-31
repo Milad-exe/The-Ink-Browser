@@ -174,6 +174,12 @@ class WindowManager {
             if (windowData.bruno?.webContents === webContents) return windowData;
             if (windowData.suggestions?.webContents === webContents) return windowData;
             if (windowData.menu?.webContents === webContents) return windowData;
+            // Match tab WebContentsViews
+            if (windowData.tabs) {
+                for (const [, tab] of windowData.tabs.TabMap) {
+                    if (tab && tab.webContents === webContents) return windowData;
+                }
+            }
         }
         return null;
     }
