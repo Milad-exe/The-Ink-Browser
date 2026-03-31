@@ -13,6 +13,8 @@ class RequestManager {
         name: requestName,
         method: 'GET',
         url: '',
+        params: {},
+        headers: {},
         body: '',
         auth: { type: 'none' },
         script: '',
@@ -28,13 +30,10 @@ class RequestManager {
 
   saveRequest(collectionPath, filename, requestData) {
     try {
+      // filename may include a subfolder path e.g. "folder/subfolder/my-request"
       const filepath = path.join(collectionPath, `${filename}.json`);
       const dir = path.dirname(filepath);
-
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(filepath, JSON.stringify(requestData, null, 2), 'utf-8');
       return true;
     } catch (error) {
@@ -53,20 +52,35 @@ class RequestManager {
     }
   }
 
+  // Recursively lists all .json request files under collectionPath.
+  // Skips: environments/, bruno.json, folder metadata files.
+  // Returns: [{ filename, folder, path }]
+  //   folder = relative path from collectionPath (or null for root-level requests)
   listRequests(collectionPath) {
     try {
-      if (!fs.existsSync(collectionPath)) {
-        return [];
-      }
-
-      const files = fs.readdirSync(collectionPath)
-        .filter(f => f.endsWith('.json'))
-        .map(f => ({
-          filename: f.replace('.json', ''),
-          path: path.join(collectionPath, f)
-        }));
-
-      return files;
+      const results = [];
+      const scan = (dir, folderPath) => {
+        if (!fs.existsSync(dir)) return;
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        entries.forEach(entry => {
+          if (entry.name === 'environments') return;
+          if (entry.name === 'bruno.json') return;
+          if (entry.isDirectory()) {
+            scan(
+              path.join(dir, entry.name),
+              folderPath ? `${folderPath}/${entry.name}` : entry.name
+            );
+          } else if (entry.name.endsWith('.json')) {
+            results.push({
+              filename: entry.name.replace('.json', ''),
+              folder: folderPath || null,
+              path: path.join(dir, entry.name)
+            });
+          }
+        });
+      };
+      scan(collectionPath, null);
+      return results;
     } catch (error) {
       console.error('Error listing requests:', error);
       return [];
@@ -76,9 +90,7 @@ class RequestManager {
   deleteRequest(collectionPath, filename) {
     try {
       const filepath = path.join(collectionPath, `${filename}.json`);
-      if (fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
+      if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
       return true;
     } catch (error) {
       console.error('Error deleting request:', error);
