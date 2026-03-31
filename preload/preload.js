@@ -77,14 +77,40 @@ contextBridge.exposeInMainWorld("bruno", {
     open: () => ipcRenderer.invoke('bruno-open'),
     close: () => ipcRenderer.invoke('bruno-close'),
     selectDirectory: () => ipcRenderer.invoke('bruno-select-directory'),
-    exportCollection: (path) => ipcRenderer.invoke('bruno-export-collection', path),
-    importCollection: (path) => ipcRenderer.invoke('bruno-import-collection', path),
-    listCollections: () => ipcRenderer.invoke('bruno-list-collections'),
-    deleteCollectionFile: (path) => ipcRenderer.invoke('bruno-delete-collection-file', path),
-    loadCollectionFile: (path) => ipcRenderer.invoke('bruno-load-collection-file', path),
-    saveCollectionFile: (path, data) => ipcRenderer.invoke('bruno-save-collection-file', path, data),
-    gitInit: (path) => ipcRenderer.invoke('bruno-git-init', path),
-    isGitRepo: (path) => ipcRenderer.invoke('bruno-is-git-repo', path),
-    gitStatus: (path) => ipcRenderer.invoke('bruno-git-status', path),
-    createGitignore: (path) => ipcRenderer.invoke('bruno-create-gitignore', path)
+    // Resize divider
+    resizeStart: (x) => ipcRenderer.invoke('bruno-resize-start', x),
+    resizeMove:  (x) => ipcRenderer.invoke('bruno-resize-move', x),
+    resizeEnd:   ()  => ipcRenderer.invoke('bruno-resize-end'),
+    // Request operations
+    listRequests:  (path)                 => ipcRenderer.invoke('bruno-list-requests', path),
+    createRequest: (path, name)           => ipcRenderer.invoke('bruno-create-request', path, name),
+    saveRequest:   (path, filename, data) => ipcRenderer.invoke('bruno-save-request', path, filename, data),
+    loadRequest:   (path)                 => ipcRenderer.invoke('bruno-load-request', path),
+    deleteRequest: (path, filename)       => ipcRenderer.invoke('bruno-delete-request', path, filename),
+    // Environment operations
+    createEnvironment:    (path, name) => ipcRenderer.invoke('bruno-create-environment', path, name),
+    listEnvironments:     (path)       => ipcRenderer.invoke('bruno-list-environments', path),
+    loadEnvironment:      (path)       => ipcRenderer.invoke('bruno-load-environment', path),
+    loadEnvironmentFull:  (path)       => ipcRenderer.invoke('bruno-load-environment-full', path),
+    saveEnvironment:      (path, vars) => ipcRenderer.invoke('bruno-save-environment', path, vars),
+    deleteEnvironment:    (path)       => ipcRenderer.invoke('bruno-delete-environment', path),
+    // Collection
+    openCollection:        ()         => ipcRenderer.invoke('bruno-list-collections'),
+    createCollection:      ()         => ipcRenderer.invoke('bruno-create-collection'),
+    initCollection:        (path)     => ipcRenderer.invoke('bruno-init-collection', path),
+    getActiveEnvironment:  (path)     => ipcRenderer.invoke('bruno-get-active-environment', path),
+    setActiveEnvironment:  (path, n)  => ipcRenderer.invoke('bruno-set-active-environment', path, n),
+    // State persistence
+    saveState: (state) => ipcRenderer.invoke('bruno-save-state', state),
+    loadState: ()      => ipcRenderer.invoke('bruno-load-state'),
+    // File ops (legacy / export-import)
+    exportCollection:    (path)       => ipcRenderer.invoke('bruno-export-collection', path),
+    importCollection:    (path)       => ipcRenderer.invoke('bruno-import-collection', path),
+    deleteCollectionFile:(path)       => ipcRenderer.invoke('bruno-delete-collection-file', path),
+    loadCollectionFile:  (path)       => ipcRenderer.invoke('bruno-load-collection-file', path),
+    saveCollectionFile:  (path, data) => ipcRenderer.invoke('bruno-save-collection-file', path, data),
+    gitInit:        (path) => ipcRenderer.invoke('bruno-git-init', path),
+    isGitRepo:      (path) => ipcRenderer.invoke('bruno-is-git-repo', path),
+    gitStatus:      (path) => ipcRenderer.invoke('bruno-git-status', path),
+    createGitignore:(path) => ipcRenderer.invoke('bruno-create-gitignore', path)
 });

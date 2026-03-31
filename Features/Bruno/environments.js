@@ -1,17 +1,24 @@
 // ============================================================================
 // Bruno Environments Management
+// Environments live in {collectionPath}/environments/{name}.json
+// Each file: { name, variables: [{ name, value, enabled, secret }] }
 // ============================================================================
 const fs = require('fs');
 const path = require('path');
 
 class EnvironmentManager {
+  _envDir(collectionPath) {
+    return path.join(collectionPath, 'environments');
+  }
+
   createEnvironment(collectionPath, envName) {
     try {
-      const envPath = path.join(collectionPath, `${envName}.env`);
-      if (fs.existsSync(envPath)) {
-        throw new Error('Environment already exists');
-      }
-      fs.writeFileSync(envPath, '', 'utf-8');
+      const dir = this._envDir(collectionPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const envPath = path.join(dir, `${envName}.json`);
+      if (fs.existsSync(envPath)) throw new Error('Environment already exists');
+      const data = { name: envName, variables: [] };
+      fs.writeFileSync(envPath, JSON.stringify(data, null, 2), 'utf-8');
       return { name: envName, path: envPath };
     } catch (error) {
       console.error('Error creating environment:', error);
@@ -21,53 +28,53 @@ class EnvironmentManager {
 
   listEnvironments(collectionPath) {
     try {
-      if (!fs.existsSync(collectionPath)) {
-        return [];
-      }
-
-      const files = fs.readdirSync(collectionPath)
-        .filter(f => f.endsWith('.env'))
+      const dir = this._envDir(collectionPath);
+      if (!fs.existsSync(dir)) return [];
+      return fs.readdirSync(dir)
+        .filter(f => f.endsWith('.json'))
         .map(f => ({
-          name: f.replace('.env', ''),
-          path: path.join(collectionPath, f)
+          name: f.replace('.json', ''),
+          path: path.join(dir, f)
         }));
-
-      return files;
     } catch (error) {
       console.error('Error listing environments:', error);
       return [];
     }
   }
 
+  // Returns flat { key: value } object for {{var}} substitution
   loadEnvironment(envPath) {
     try {
-      const content = fs.readFileSync(envPath, 'utf-8');
-      const variables = {};
-
-      content.split('\n').forEach(line => {
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.startsWith('#')) {
-          const [key, value] = trimmed.split('=');
-          if (key && value) {
-            variables[key.trim()] = value.trim();
-          }
-        }
+      const data = JSON.parse(fs.readFileSync(envPath, 'utf-8'));
+      const vars = {};
+      (data.variables || []).forEach(v => {
+        if (v.enabled !== false) vars[v.name] = v.value;
       });
-
-      return variables;
+      return vars;
     } catch (error) {
       console.error('Error loading environment:', error);
       return {};
     }
   }
 
+  // Returns full { name, variables: [...] } for editing in the UI
+  loadEnvironmentFull(envPath) {
+    try {
+      return JSON.parse(fs.readFileSync(envPath, 'utf-8'));
+    } catch (error) {
+      return { name: path.basename(envPath, '.json'), variables: [] };
+    }
+  }
+
+  // variables is an array: [{ name, value, enabled, secret }]
   saveEnvironment(envPath, variables) {
     try {
-      const content = Object.entries(variables)
-        .map(([key, value]) => `${key}=${value}`)
-        .join('\n');
-
-      fs.writeFileSync(envPath, content, 'utf-8');
+      let data = { name: path.basename(envPath, '.json'), variables: [] };
+      if (fs.existsSync(envPath)) {
+        try { data = JSON.parse(fs.readFileSync(envPath, 'utf-8')); } catch {}
+      }
+      data.variables = variables;
+      fs.writeFileSync(envPath, JSON.stringify(data, null, 2), 'utf-8');
       return true;
     } catch (error) {
       console.error('Error saving environment:', error);
@@ -77,9 +84,7 @@ class EnvironmentManager {
 
   deleteEnvironment(envPath) {
     try {
-      if (fs.existsSync(envPath)) {
-        fs.unlinkSync(envPath);
-      }
+      if (fs.existsSync(envPath)) fs.unlinkSync(envPath);
       return true;
     } catch (error) {
       console.error('Error deleting environment:', error);

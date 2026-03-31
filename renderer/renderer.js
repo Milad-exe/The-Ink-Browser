@@ -171,10 +171,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     searchBar.addEventListener('blur', () => {
-        // Delay hiding slightly to allow click on suggestion via mousedown.
-        // If suggestions overlay is open, don't auto-hide here — overlay selection will close it.
+        // Give overlayPointerDown time to be set, and allow renderSuggestions to restore focus
         setTimeout(() => {
-            if (suggestionsOpen || overlayPointerDown) return;
+            if (overlayPointerDown) return;
+            if (document.activeElement === searchBar) return; // focus was restored (overlay creation race)
             hideSuggestions();
         }, 400);
     });
@@ -505,6 +505,7 @@ document.addEventListener("DOMContentLoaded", () => {
             loadUrlInActiveTab(item.query);
         }
         hideSuggestions();
+        try { searchBar.focus(); } catch (e) {}
     });
 
     // Overlay pointer-down: when overlay receives mousedown we get notified
