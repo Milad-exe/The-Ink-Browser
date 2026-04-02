@@ -32,8 +32,19 @@
       </div>
     </div>
 
+    <!-- Inline pomodoro pill — hidden until focus mode/timer is active -->
+    <div id="pomodoro-pill" class="pomodoro-pill hidden" title="Click to manage timer">
+      <svg class="pill-ring" viewBox="0 0 28 28" width="28" height="28">
+        <circle class="pill-ring-bg"   cx="14" cy="14" r="11"/>
+        <circle class="pill-ring-fill" id="pill-ring-fill" cx="14" cy="14" r="11"/>
+      </svg>
+      <span class="pill-phase-dot" id="pill-phase-dot"></span>
+      <span class="pill-time" id="pill-time">25:00</span>
+    </div>
+
     <div class="trailing-icons">
       <button id="bookmark-btn" class="icon-btn" title="Bookmark">★</button>
+      <button id="focus-btn" class="icon-btn" title="Focus Mode">🎯</button>
       <button id="bruno-btn" class="icon-btn" title="Bruno API Client">⚡</button>
       <button id="menu-btn" class="icon-btn menu-btn" title="Menu">
         <svg viewBox="0 0 16 12" width="16" height="12" fill="currentColor">
@@ -43,6 +54,11 @@
         </svg>
       </button>
     </div>
+  </div>
+
+  <!-- Bookmark Bar -->
+  <div id="bookmark-bar" class="bookmark-bar hidden">
+    <div id="bookmark-bar-items"></div>
   </div>
 
   <!-- Tab Bar -->
@@ -57,6 +73,27 @@
 
   <!-- Content Area -->
   <div id="content-area"></div>
+
+  <!-- Pomodoro Overlay -->
+  <div id="pomodoro-overlay" class="pomodoro-overlay hidden">
+    <div class="pomodoro-card">
+      <div class="pomodoro-phase" id="pomodoro-phase">Focus</div>
+      <div class="pomodoro-time" id="pomodoro-time">25:00</div>
+      <div class="pomodoro-progress-ring">
+        <svg viewBox="0 0 120 120" width="120" height="120">
+          <circle class="ring-bg" cx="60" cy="60" r="54"/>
+          <circle class="ring-fill" id="pomodoro-ring" cx="60" cy="60" r="54"/>
+        </svg>
+      </div>
+      <div class="pomodoro-controls">
+        <button id="pomodoro-start" class="pom-btn pom-btn-primary">Start</button>
+        <button id="pomodoro-skip"  class="pom-btn">Skip</button>
+        <button id="pomodoro-reset" class="pom-btn">Reset</button>
+      </div>
+      <div class="pomodoro-sessions" id="pomodoro-sessions"></div>
+      <button id="pomodoro-close" class="pom-close" title="Close">✕</button>
+    </div>
+  </div>
 
   <script src="../renderer.js"></script>
 </body>

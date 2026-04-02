@@ -69,8 +69,29 @@ contextBridge.exposeInMainWorld('suggestions', {
 
 contextBridge.exposeInMainWorld("electronAPI", {
   windowClick: (pos) => ipcRenderer.send("window-click", pos),
+  onShowFindInPage: (callback) => ipcRenderer.on('show-find-in-page', callback),
+  openHistoryTab: () => ipcRenderer.invoke('open-history-tab'),
+  openBookmarksTab: () => ipcRenderer.invoke('open-bookmarks-tab'),
+  navigateActiveTab: (url) => ipcRenderer.invoke('navigate-active-tab', url),
+  activeTabGoBack: () => ipcRenderer.invoke('active-tab-go-back'),
+  onToggleBookmarkBar: (handler) => ipcRenderer.on('toggle-bookmark-bar', () => handler()),
+  reportChromeHeight: (height) => ipcRenderer.send('chrome-height-changed', height),
+});
 
-  onShowFindInPage: (callback) => ipcRenderer.on('show-find-in-page', callback)
+contextBridge.exposeInMainWorld('focusMode', {
+  toggle: () => ipcRenderer.invoke('focus-mode-toggle'),
+  getState: () => ipcRenderer.invoke('focus-mode-get'),
+  onChanged: (handler) => ipcRenderer.on('focus-mode-changed', (_e, active) => handler(active)),
+  overlayOpen: () => ipcRenderer.send('overlay-open'),
+  overlayClose: () => ipcRenderer.send('overlay-close'),
+});
+
+contextBridge.exposeInMainWorld('browserBookmarks', {
+  getAll:  ()           => ipcRenderer.invoke('bookmarks-get'),
+  add:     (url, title) => ipcRenderer.invoke('bookmarks-add', url, title),
+  remove:  (url)        => ipcRenderer.invoke('bookmarks-remove', url),
+  has:     (url)        => ipcRenderer.invoke('bookmarks-has', url),
+  onChanged: (handler)  => ipcRenderer.on('bookmarks-changed', () => handler()),
 });
 
 // Any click anywhere in this webContents should close the settings menu

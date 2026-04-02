@@ -5,6 +5,7 @@ const UserAgent = require("./user-agent");
 const contextMenu = require("./tab-context-menu");
 const NavigationHistory = require("./navigation-history");
 const FindDialogManager = require("./find-dialog");
+const focusMode = require("./focus-mode");
 
 class Tabs {
     constructor(mainWindow, History, Persistence) {
@@ -20,8 +21,9 @@ class Tabs {
         this.nextTabIndex = 0
         this.allowClose = false
         this.closePreventionActive = false
-    this.pinnedTabs = new Set()
+        this.pinnedTabs = new Set()
         this.tabOrder = []
+        this._closedTabHistory = [] // stack of {url, title} for "Reopen Closed Tab"
         
         this.mainWindow.on('resize', () => {
             this.resizeAllTabs()
@@ -102,6 +104,15 @@ class Tabs {
         } catch {}
     }
 
+    setWindowManager(windowManager) {
+        this._windowManager = windowManager;
+    }
+
+    _getWindowData() {
+        if (!this._windowManager) return null;
+        return this._windowManager.getWindowByWebContents(this.mainWindow.webContents);
+    }
+
     setShortcuts(shortcuts) {
         this.shortcuts = shortcuts;
     }
@@ -153,7 +164,11 @@ class Tabs {
         this.sendTabUpdate(tabIndex, tab, '', 'New Tab')
 
         tab.webContents.on('did-finish-load', () => {
-            tab.webContents.insertCSS('html{filter:grayscale(100%)}');
+            const windowData = this._getWindowData();
+            if (windowData) {
+                const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
+                focusMode.applyToTab(windowData, tab.webContents, url);
+            }
         });
             return tabIndex
     }
@@ -196,17 +211,21 @@ class Tabs {
         this.showTab(tabIndex)
 
         tab.webContents.on('did-finish-load', () => {
-            tab.webContents.insertCSS('html{filter:grayscale(100%)}');
+            const windowData = this._getWindowData();
+            if (windowData) {
+                const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
+                focusMode.applyToTab(windowData, tab.webContents, url);
+            }
             this._saveStateDebounced()
         });
             return tabIndex
-        
+
     }
     
     getTabBounds() {
         const contentBounds = this.mainWindow.getContentBounds()
-        // utility-bar (56px) + tab-bar (48px) = 104px total vertical offset
-        const yOffset = 104
+        // utility-bar (56px) + tab-bar (48px) + optional bookmark-bar (32px)
+        const yOffset = 104 + (this.bookmarkBarHeight || 0)
         const width = contentBounds.width - (this.brunoWidth || 0)
         const height = contentBounds.height - yOffset
         return { x: 0, y: yOffset, width, height }
@@ -215,15 +234,9 @@ class Tabs {
     setupTabListeners(tabIndex, tab) {
         let isNavigatingProgrammatically = false;
         let lastAddedUrl = null;
-        const shouldOpenExternally = (targetUrl) => {
-            try {
-                const u = new URL(targetUrl);
-                const host = u.hostname || '';
-                const path = u.pathname || '';
-                // Open Google/YouTube sign-in flows externally (blocked in embedded browsers)
-                if (host.endsWith('accounts.google.com')) return true;
-                if (host.endsWith('youtube.com') && /signin|ServiceLogin/i.test(path)) return true;
-            } catch {}
+        const shouldOpenExternally = (_targetUrl) => {
+            // Don't send any navigations to external browser — let them happen in-tab.
+            // window.open popups are handled separately by setWindowOpenHandler.
             return false;
         };
         
@@ -252,24 +265,13 @@ class Tabs {
             isNavigatingProgrammatically = false;
         })
 
-        // Intercept sign-in flows that get blocked and open in external browser instead
+        // All window.open / target="_blank" links open in a new tab, never a new BrowserWindow
         tab.webContents.setWindowOpenHandler(({ url }) => {
-            if (shouldOpenExternally(url)) {
-                shell.openExternal(url);
-                return { action: 'deny' };
-            }
-            return { action: 'allow' };
-        });
-        tab.webContents.on('will-redirect', (e, url) => {
-            if (shouldOpenExternally(url)) { e.preventDefault(); shell.openExternal(url); }
-        });
-        tab.webContents.on('will-navigate', (e, url) => {
-            if (shouldOpenExternally(url)) { e.preventDefault(); shell.openExternal(url); }
-        });
-        tab.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-            if (validatedURL && shouldOpenExternally(validatedURL)) {
-                shell.openExternal(validatedURL);
-            }
+            setImmediate(() => {
+                const newIndex = this.CreateTab();
+                this.loadUrl(newIndex, url);
+            });
+            return { action: 'deny' };
         });
         
         tab.webContents.on('did-navigate-in-page', (event, url) => {
@@ -289,6 +291,22 @@ class Tabs {
         
         tab._isNavigatingProgrammatically = () => isNavigatingProgrammatically;
         tab._setNavigatingProgrammatically = (value) => { isNavigatingProgrammatically = value; };
+
+        // Error page — skip aborts (e.g. navigating away mid-load) and sub-frame errors
+        tab.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+            if (!isMainFrame) return;
+            if (errorCode === -3) return; // ERR_ABORTED — user navigated away
+            const params = new URLSearchParams({
+                url:  validatedURL || '',
+                code: String(errorCode),
+                desc: errorDescription || '',
+            });
+            isNavigatingProgrammatically = true;
+            tab.webContents.loadFile(
+                path.join(__dirname, '../renderer/Error/index.html'),
+                { search: '?' + params.toString() }
+            );
+        });
 
         tab.webContents.on('found-in-page', (event, result) => {
             if (this.findDialog) {
@@ -402,10 +420,28 @@ class Tabs {
         }
     }
     
+    _destroyTab(tab) {
+        try { tab.webContents.audioMuted = true; } catch {}
+        try { this.mainWindow.contentView.removeChildView(tab); } catch {}
+        try { tab.webContents.destroy(); } catch {}
+    }
+
+    _recordClosed(index) {
+        const url = this.tabUrls.get(index);
+        if (url && url !== 'newtab' && !url.startsWith('file://')) {
+            const tab = this.TabMap.get(index);
+            let title = url;
+            try { title = tab?.webContents?.getTitle() || url; } catch {}
+            this._closedTabHistory.push({ url, title });
+            if (this._closedTabHistory.length > 20) this._closedTabHistory.shift();
+        }
+    }
+
     removeTab(index) {
         if (this.TabMap.has(index)) {
             const tab = this.TabMap.get(index)
-            this.mainWindow.contentView.removeChildView(tab)
+            this._recordClosed(index)
+            this._destroyTab(tab)
             this.TabMap.delete(index)
             this.tabUrls.delete(index)
             // Clean up pinned state if needed
@@ -435,7 +471,8 @@ class Tabs {
     removeTabWithTargetFocus(index, targetTabIndex) {
         if (this.TabMap.has(index)) {
             const tab = this.TabMap.get(index);
-            this.mainWindow.contentView.removeChildView(tab);
+            this._recordClosed(index)
+            this._destroyTab(tab);
             this.TabMap.delete(index);
             this.tabUrls.delete(index);
             this.pinnedTabs.delete(index)
@@ -553,10 +590,21 @@ class Tabs {
     
     resizeAllTabs() {
         const bounds = this.getTabBounds()
-        
+
         this.TabMap.forEach((tab, index) => {
             tab.setBounds(bounds)
         })
+    }
+
+    collapseAllTabs() {
+        // Move tabs off-screen so native views don't cover HTML overlays
+        this.TabMap.forEach((tab) => {
+            tab.setBounds({ x: -9999, y: -9999, width: 1, height: 1 });
+        });
+    }
+
+    restoreAllTabs() {
+        this.resizeAllTabs();
     }
 
     muteTab(index) {

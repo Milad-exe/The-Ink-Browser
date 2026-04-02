@@ -96,6 +96,7 @@ html, body {
 
 .omnibox-wrapper {
   flex: 1;
+  min-width: 120px;
 }
 
 .omnibox {
@@ -182,6 +183,307 @@ html, body {
   background: var(--on-surface);
   color: var(--on-primary);
   opacity: 0.85;
+}
+
+/* ========== BOOKMARK BAR ========== */
+.bookmark-bar {
+  display: flex;
+  height: 32px;
+  width: 100%;
+  background: var(--surface-container-lowest);
+  border-bottom: 1px solid var(--outline-variant);
+  padding: 0 8px;
+  align-items: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.bookmark-bar.hidden {
+  display: none;
+}
+
+#bookmark-bar-items {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  overflow: hidden;
+  height: 100%;
+}
+
+.bookmark-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 12px;
+  color: var(--on-surface);
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.12s ease;
+  flex-shrink: 0;
+}
+
+.bookmark-bar-item:hover {
+  background: var(--surface-container-high);
+}
+
+.bookmark-bar-favicon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.bookmark-bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ========== BOOKMARK BUTTON STATES ========== */
+#bookmark-btn.bookmarked {
+  color: #f5a623;
+}
+
+/* ========== POMODORO PILL ========== */
+.pomodoro-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px 0 6px;
+  border-radius: 9999px;
+  background: var(--surface-container-highest);
+  border: 1px solid rgba(198, 198, 198, 0.2);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, opacity 0.2s ease, transform 0.2s ease;
+  user-select: none;
+}
+
+.pomodoro-pill.hidden {
+  display: none;
+}
+
+.pomodoro-pill:hover {
+  background: var(--surface-container-high);
+}
+
+.pill-ring {
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.pill-ring-bg {
+  fill: none;
+  stroke: var(--outline-variant);
+  stroke-width: 2.5;
+}
+
+.pill-ring-fill {
+  fill: none;
+  stroke: var(--on-surface);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 69.1;   /* 2π × 11 */
+  stroke-dashoffset: 0;
+  transform: rotate(-90deg);
+  transform-origin: 14px 14px;
+  transition: stroke-dashoffset 1s linear, stroke 0.3s ease;
+}
+
+.pill-ring-fill.break {
+  stroke: #4caf50;
+}
+
+.pill-phase-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--on-surface);
+  flex-shrink: 0;
+  transition: background 0.3s ease;
+}
+
+.pill-phase-dot.break {
+  background: #4caf50;
+}
+
+.pill-time {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
+  color: var(--on-surface);
+  white-space: nowrap;
+}
+
+/* ========== FOCUS MODE ========== */
+#focus-btn.active {
+  background: var(--on-surface);
+  color: var(--on-primary);
+}
+#focus-btn.active:hover {
+  background: var(--on-surface);
+  color: var(--on-primary);
+  opacity: 0.85;
+}
+
+/* Pomodoro overlay */
+.pomodoro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.pomodoro-overlay.hidden {
+  display: none;
+}
+
+.pomodoro-card {
+  background: var(--surface-container-lowest);
+  border-radius: 20px;
+  padding: 36px 40px 32px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.24);
+}
+
+.pomodoro-phase {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--on-surface-variant);
+}
+
+.pomodoro-phase.break {
+  color: #4caf50;
+}
+
+.pomodoro-time {
+  font-size: 56px;
+  font-weight: 300;
+  letter-spacing: -2px;
+  color: var(--on-surface);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.pomodoro-progress-ring {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.ring-bg {
+  fill: none;
+  stroke: var(--on-surface);
+  stroke-width: 4;
+}
+
+.ring-fill {
+  fill: none;
+  stroke: var(--on-surface);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 339.3;
+  stroke-dashoffset: 0;
+  transform: rotate(-90deg);
+  transform-origin: 60px 60px;
+  transition: stroke-dashoffset 1s linear;
+}
+
+.ring-fill.break {
+  stroke: #4caf50;
+}
+
+.pomodoro-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.pom-btn {
+  border: 1px solid var(--outline-variant);
+  background: transparent;
+  border-radius: 9999px;
+  padding: 6px 18px;
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--on-surface);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pom-btn:hover {
+  background: var(--surface-container-high);
+}
+
+.pom-btn-primary {
+  background: var(--on-surface);
+  color: var(--on-primary);
+  border-color: var(--on-surface);
+}
+
+.pom-btn-primary:hover {
+  opacity: 0.85;
+  background: var(--on-surface);
+}
+
+.pomodoro-sessions {
+  display: flex;
+  gap: 6px;
+}
+
+.pom-session-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--outline-variant);
+}
+
+.pom-session-dot.done {
+  background: var(--on-surface);
+}
+
+.pom-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  line-height: 1;
+  transition: background 0.12s ease;
+}
+
+.pom-close:hover {
+  background: var(--surface-container-high);
 }
 
 /* ========== TAB BAR ========== */

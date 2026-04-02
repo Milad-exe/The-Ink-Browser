@@ -2,6 +2,7 @@ const { BrowserWindow, app, ipcMain, WebContentsView, Menu}  = require('electron
 const path = require("path");
 const WindowManager = require("./Features/window-manager");
 const Bruno = require("./Features/Bruno");
+const focusMode = require("./Features/focus-mode");
 
 class Ink {
   constructor() {
@@ -16,6 +17,9 @@ class Ink {
 
     app.whenReady().then(() => {
       Menu.setApplicationMenu(null);
+      if (process.platform === 'darwin') {
+        app.dock.setIcon(path.join(__dirname, 'logo.png'));
+      }
 
       // Initialize Bruno feature (registers IPC handlers)
       new Bruno();
@@ -376,6 +380,58 @@ ipcMain.handle("remove-history-entry", async (event, url, timestamp) => {
   }
 });
 
+// ── Bookmarks IPC ──────────────────────────────────────────────────────────
+ipcMain.handle('bookmarks-get', async () => {
+  return await inkInstance.windowManager.bookmarks.getAll();
+});
+
+ipcMain.handle('bookmarks-add', async (event, url, title) => {
+  const added = await inkInstance.windowManager.bookmarks.add(url, title);
+  // Notify the chrome renderer so the bookmark bar refreshes
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) windowData.window.webContents.send('bookmarks-changed');
+  return added;
+});
+
+ipcMain.handle('bookmarks-remove', async (event, url) => {
+  const removed = await inkInstance.windowManager.bookmarks.remove(url);
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) windowData.window.webContents.send('bookmarks-changed');
+  return removed;
+});
+
+ipcMain.handle('bookmarks-has', async (event, url) => {
+  return await inkInstance.windowManager.bookmarks.has(url);
+});
+
+ipcMain.handle('open-bookmarks-tab', async (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    try {
+      windowData.tabs.CreateTabWithPage('renderer/Bookmarks/index.html', 'bookmarks', 'Bookmarks');
+    } catch (err) {
+      console.error('Error creating bookmarks tab:', err);
+    }
+  }
+});
+
+// Navigate the currently active tab (used by history/bookmarks pages)
+ipcMain.handle('navigate-active-tab', async (event, url) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return false;
+  const idx = windowData.tabs.activeTabIndex;
+  windowData.tabs.loadUrl(idx, url);
+  return true;
+});
+
+ipcMain.handle('active-tab-go-back', async (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return false;
+  const idx = windowData.tabs.activeTabIndex;
+  windowData.tabs.goBack(idx);
+  return true;
+});
+
 ipcMain.handle("close-menu", async (event) => {
   const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
   closeWindowMenu(windowData);
@@ -386,6 +442,46 @@ ipcMain.on('focus-address-bar', (event) => {
   if (windowData) {
     windowData.window.webContents.send('focus-address-bar');
   }
+});
+
+// Forward bookmark-bar toggle from menu WebContentsView to the chrome renderer
+ipcMain.on('toggle-bookmark-bar', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) windowData.window.webContents.send('toggle-bookmark-bar');
+});
+
+// Chrome height changed (bookmark bar shown/hidden) — resize all tabs accordingly
+ipcMain.on('chrome-height-changed', (event, height) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData && windowData.tabs) {
+    windowData.tabs.bookmarkBarHeight = height;
+    windowData.tabs.resizeAllTabs();
+  }
+});
+
+// ── Overlay visibility (collapse/restore tab WebContentsViews) ─────────────
+ipcMain.on('overlay-open', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData && windowData.tabs) windowData.tabs.collapseAllTabs();
+});
+
+ipcMain.on('overlay-close', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData && windowData.tabs) windowData.tabs.restoreAllTabs();
+});
+
+// ── Focus Mode IPC ─────────────────────────────────────────────────────────
+ipcMain.handle('focus-mode-toggle', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return false;
+  focusMode.toggle(windowData);
+  return focusMode.isActive(windowData);
+});
+
+ipcMain.handle('focus-mode-get', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return false;
+  return focusMode.isActive(windowData);
 });
 
 // Drag and drop handlers

@@ -34,7 +34,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // Suggestions state
     let currentSuggestions = [];
     let activeSuggestionIndex = -1;
-    let suggestionsOpen = false;
     let overlayPointerDown = false;
 
     // Debounce helper
@@ -51,7 +50,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function hideSuggestions() {
         window.suggestions.close();
-        suggestionsOpen = false;
         currentSuggestions = [];
         activeSuggestionIndex = -1;
     }
@@ -62,13 +60,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!list.length) { hideSuggestions(); return; }
         const b = getSuggestionsBounds();
         // mark open immediately so blur handlers don't close the overlay
-        suggestionsOpen = true;
         // try to keep the input focused before opening so blur races are less likely
         try { window.focus(); searchBar.focus(); } catch (e) {}
         // open overlay and then ensure focus returns to the input after a short delay
         window.suggestions.open(b, currentSuggestions, activeSuggestionIndex).then(() => {
             try { setTimeout(() => { try { window.focus(); searchBar.focus(); } catch {} }, 45); } catch {}
-        }).catch(() => { /* keep suggestionsOpen true until closed explicitly */ });
+        }).catch(() => {});
     }
 
     function setActiveSuggestion(newIndex) {
@@ -202,6 +199,316 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // ── Bookmarks ────────────────────────────────────────────────────────────
+    const bookmarkBtn = document.getElementById('bookmark-btn');
+    const bookmarkBar = document.getElementById('bookmark-bar');
+    const bookmarkBarItems = document.getElementById('bookmark-bar-items');
+    let currentTabUrl = '';
+    let currentTabTitle = '';
+
+    // Bookmark bar visibility (persisted in localStorage)
+    let bookmarkBarVisible = localStorage.getItem('bookmarkBarVisible') !== 'false';
+    if (bookmarkBarVisible) bookmarkBar.classList.remove('hidden');
+
+    function reportChromeHeight() {
+        window.electronAPI.reportChromeHeight(bookmarkBarVisible ? 32 : 0);
+    }
+    reportChromeHeight();
+
+    async function updateBookmarkBtn(url) {
+        if (!url || url === 'newtab' || url.startsWith('file://')) {
+            bookmarkBtn.textContent = '☆';
+            bookmarkBtn.classList.remove('bookmarked');
+            return;
+        }
+        try {
+            const has = await window.browserBookmarks.has(url);
+            bookmarkBtn.textContent = has ? '★' : '☆';
+            bookmarkBtn.classList.toggle('bookmarked', has);
+        } catch {}
+    }
+
+    async function refreshBookmarkBar() {
+        bookmarkBarItems.innerHTML = '';
+        if (!bookmarkBarVisible) return;
+        let bookmarks = [];
+        try { bookmarks = await window.browserBookmarks.getAll(); } catch {}
+        bookmarks.forEach(entry => {
+            const btn = document.createElement('button');
+            btn.className = 'bookmark-bar-item';
+            btn.title = entry.title || entry.url;
+
+            let faviconUrl = '';
+            try { faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(entry.url).hostname}`; } catch {}
+
+            if (faviconUrl) {
+                const img = document.createElement('img');
+                img.className = 'bookmark-bar-favicon';
+                img.src = faviconUrl;
+                img.onerror = () => img.remove();
+                btn.appendChild(img);
+            }
+
+            const label = document.createElement('span');
+            label.className = 'bookmark-bar-label';
+            try {
+                label.textContent = entry.title || new URL(entry.url).hostname;
+            } catch {
+                label.textContent = entry.url;
+            }
+            btn.appendChild(label);
+
+            btn.addEventListener('click', () => window.tab.loadUrl(activeTabIndex, entry.url));
+            bookmarkBarItems.appendChild(btn);
+        });
+    }
+
+    bookmarkBtn.addEventListener('click', async () => {
+        if (!currentTabUrl || currentTabUrl === 'newtab' || currentTabUrl.startsWith('file://')) return;
+        try {
+            const has = await window.browserBookmarks.has(currentTabUrl);
+            if (has) {
+                await window.browserBookmarks.remove(currentTabUrl);
+                bookmarkBtn.textContent = '☆';
+                bookmarkBtn.classList.remove('bookmarked');
+            } else {
+                await window.browserBookmarks.add(currentTabUrl, currentTabTitle || currentTabUrl);
+                bookmarkBtn.textContent = '★';
+                bookmarkBtn.classList.add('bookmarked');
+            }
+            await refreshBookmarkBar();
+        } catch {}
+    });
+
+    // Bookmark bar toggle forwarded from menu via main process
+    window.electronAPI.onToggleBookmarkBar(() => {
+        bookmarkBarVisible = !bookmarkBarVisible;
+        localStorage.setItem('bookmarkBarVisible', bookmarkBarVisible);
+        bookmarkBar.classList.toggle('hidden', !bookmarkBarVisible);
+        refreshBookmarkBar();
+    });
+
+    window.browserBookmarks.onChanged(() => refreshBookmarkBar());
+
+    refreshBookmarkBar();
+
+    // ── Focus Mode + Pomodoro ────────────────────────────────────────────────
+    const focusBtn         = document.getElementById('focus-btn');
+    const utilityBar       = document.getElementById('utility-bar');
+
+    // Inline pill (in the toolbar)
+    const pomPill          = document.getElementById('pomodoro-pill');
+    const pillTime         = document.getElementById('pill-time');
+    const pillRingFill     = document.getElementById('pill-ring-fill');
+    const pillPhaseDot     = document.getElementById('pill-phase-dot');
+
+    // Full controls overlay
+    const pomOverlay       = document.getElementById('pomodoro-overlay');
+    const pomPhase         = document.getElementById('pomodoro-phase');
+    const pomTime          = document.getElementById('pomodoro-time');
+    const pomRing          = document.getElementById('pomodoro-ring');
+    const pomStartBtn      = document.getElementById('pomodoro-start');
+    const pomSkipBtn       = document.getElementById('pomodoro-skip');
+    const pomResetBtn      = document.getElementById('pomodoro-reset');
+    const pomSessions      = document.getElementById('pomodoro-sessions');
+    const pomCloseBtn      = document.getElementById('pomodoro-close');
+
+    // Pomodoro config (seconds)
+    const POM_FOCUS     = 25 * 60;
+    const POM_SHORT     = 5  * 60;
+    const POM_LONG      = 15 * 60;
+    const POM_SESSIONS  = 4;
+
+    const RING_CIRCUMFERENCE     = 2 * Math.PI * 54; // overlay ring r=54
+    const PILL_RING_CIRCUMFERENCE = 2 * Math.PI * 11; // pill ring r=11
+
+    let pomState = {
+        phase: 'focus',   // 'focus' | 'break'
+        running: false,
+        elapsed: 0,
+        total: POM_FOCUS,
+        sessionsDone: 0,
+        timer: null,
+        shown: false,     // whether pill is visible
+    };
+
+    function pomShowPill() {
+        if (pomState.shown) return;
+        pomState.shown = true;
+        pomPill.classList.remove('hidden');
+        utilityBar.classList.add('pomodoro-active');
+    }
+
+    function pomHidePill() {
+        pomState.shown = false;
+        pomPill.classList.add('hidden');
+        utilityBar.classList.remove('pomodoro-active');
+    }
+
+    function pomUpdateUI() {
+        const remaining = Math.max(0, pomState.total - pomState.elapsed);
+        const mins = Math.floor(remaining / 60).toString().padStart(2, '0');
+        const secs = (remaining % 60).toString().padStart(2, '0');
+        const timeStr = `${mins}:${secs}`;
+        const progress = pomState.elapsed / pomState.total;
+        const isFocus = pomState.phase === 'focus';
+        const phaseLabel = isFocus ? 'Focus' : (pomState.sessionsDone % POM_SESSIONS === 0 ? 'Long Break' : 'Short Break');
+
+        // Update inline pill (offset=0 → full ring, offset=circumference → empty — countdown drains)
+        pillTime.textContent = timeStr;
+        pillRingFill.style.strokeDashoffset = PILL_RING_CIRCUMFERENCE * progress;
+        pillRingFill.className = 'pill-ring-fill' + (isFocus ? '' : ' break');
+        pillPhaseDot.className = 'pill-phase-dot' + (isFocus ? '' : ' break');
+
+        // Update overlay
+        pomTime.textContent = timeStr;
+        pomRing.style.strokeDashoffset = RING_CIRCUMFERENCE * progress;
+        pomPhase.textContent = phaseLabel;
+        pomPhase.className = 'pomodoro-phase' + (isFocus ? '' : ' break');
+        pomRing.className = 'ring-fill' + (isFocus ? '' : ' break');
+        pomStartBtn.textContent = pomState.running ? 'Pause' : 'Start';
+
+        // Session dots
+        pomSessions.innerHTML = '';
+        for (let i = 0; i < POM_SESSIONS; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'pom-session-dot' + (i < (pomState.sessionsDone % POM_SESSIONS) ? ' done' : '');
+            pomSessions.appendChild(dot);
+        }
+    }
+
+    async function pomSetFocusActive(active) {
+        const current = await window.focusMode.getState();
+        if (current !== active) await window.focusMode.toggle();
+        focusBtn.classList.toggle('active', active);
+    }
+
+    async function pomAdvancePhase() {
+        if (pomState.phase === 'focus') {
+            pomState.sessionsDone++;
+            const isLong = pomState.sessionsDone % POM_SESSIONS === 0;
+            pomState.phase = 'break';
+            pomState.total = isLong ? POM_LONG : POM_SHORT;
+            await pomSetFocusActive(false);
+        } else {
+            pomState.phase = 'focus';
+            pomState.total = POM_FOCUS;
+            await pomSetFocusActive(true);
+        }
+        pomState.elapsed = 0;
+        pomState.running = true;
+        pomUpdateUI();
+    }
+
+    function pomTick() {
+        pomState.elapsed++;
+        if (pomState.elapsed >= pomState.total) {
+            clearInterval(pomState.timer);
+            pomState.timer = null;
+            pomState.running = false;
+            pomAdvancePhase().then(() => {
+                if (pomState.running) {
+                    pomState.timer = setInterval(pomTick, 1000);
+                }
+            });
+        } else {
+            pomUpdateUI();
+        }
+    }
+
+    pomStartBtn.addEventListener('click', () => {
+        if (pomState.running) {
+            clearInterval(pomState.timer);
+            pomState.timer = null;
+            pomState.running = false;
+        } else {
+            pomState.running = true;
+            pomState.timer = setInterval(pomTick, 1000);
+        }
+        pomUpdateUI();
+    });
+
+    pomSkipBtn.addEventListener('click', () => {
+        clearInterval(pomState.timer);
+        pomState.timer = null;
+        pomState.running = false;
+        pomAdvancePhase().then(() => {
+            if (pomState.running) pomState.timer = setInterval(pomTick, 1000);
+        });
+    });
+
+    pomResetBtn.addEventListener('click', async () => {
+        clearInterval(pomState.timer);
+        pomState.timer = null;
+        pomState.running = false;
+        pomState.elapsed = 0;
+        pomState.phase = 'focus';
+        pomState.total = POM_FOCUS;
+        pomState.sessionsDone = 0;
+        pomUpdateUI();
+        pomCloseOverlay();
+        pomHidePill();
+        // Turn off focus mode too
+        const active = await window.focusMode.getState();
+        if (active) {
+            await window.focusMode.toggle();
+            focusBtn.classList.remove('active');
+        }
+    });
+
+    function pomOpenOverlay() {
+        pomUpdateUI();
+        pomOverlay.classList.remove('hidden');
+        window.focusMode.overlayOpen();
+    }
+
+    function pomCloseOverlay() {
+        pomOverlay.classList.add('hidden');
+        window.focusMode.overlayClose();
+    }
+
+    pomCloseBtn.addEventListener('click', pomCloseOverlay);
+
+    // Pill click → open full controls overlay
+    pomPill.addEventListener('click', pomOpenOverlay);
+
+    // Focus button: single click = toggle focus mode + show/hide pill
+    focusBtn.addEventListener('click', async () => {
+        const active = await window.focusMode.toggle();
+        focusBtn.classList.toggle('active', active);
+        if (active) {
+            pomShowPill();
+            // Auto-start the timer
+            if (!pomState.running) {
+                pomState.running = true;
+                pomState.timer = setInterval(pomTick, 1000);
+            }
+            pomUpdateUI();
+        } else {
+            // Hide pill only if timer isn't running
+            if (!pomState.running) {
+                pomHidePill();
+                // Reset timer state so it's fresh next time
+                clearInterval(pomState.timer);
+                pomState.timer = null;
+                pomState.elapsed = 0;
+                pomState.phase = 'focus';
+                pomState.total = POM_FOCUS;
+                pomState.running = false;
+            }
+        }
+    });
+
+    // Sync button state when focus mode changes from main process (e.g. pomodoro phase flip)
+    window.focusMode.onChanged((active) => {
+        focusBtn.classList.toggle('active', active);
+    });
+
+    // Restore initial state
+    window.focusMode.getState().then(active => focusBtn.classList.toggle('active', active));
+
+    pomUpdateUI();
+
     const brunoBtn = document.getElementById("bruno-btn");
     let brunoOpen = false;
     brunoBtn.addEventListener("click", () => {
@@ -236,31 +543,39 @@ document.addEventListener("DOMContentLoaded", () => {
 
     addBtn.addEventListener("click", () => { window.tab.add(); });
 
-    window.tab.onTabCreated((event, data) => {
+    window.tab.onTabCreated((_e, data) => {
         createTabButton(data.index, data.title);
         setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
     });
 
-    window.tab.onTabRemoved((event, data) => {
+    window.tab.onTabRemoved((_e, data) => {
         removeTabButton(data.index);
+        hideSuggestions();
         setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
     });
 
-    window.tab.onTabSwitched((event, data) => {
+    window.tab.onTabSwitched((_e, data) => {
         activeTabIndex = data.index;
         setActiveTab(data.index);
         updateSearchBarUrl(data.url || "");
+        currentTabUrl = data.url || '';
+        updateBookmarkBtn(currentTabUrl);
         const activeEl = tabs.get(data.index);
         if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
         updateScrollShadows();
     });
 
-    window.tab.onUrlUpdated((event, data) => {
-        if (data.index === activeTabIndex) updateSearchBarUrl(data.url);
+    window.tab.onUrlUpdated((_e, data) => {
+        if (data.index === activeTabIndex) {
+            updateSearchBarUrl(data.url);
+            currentTabUrl = data.url || '';
+            currentTabTitle = data.title || '';
+            updateBookmarkBtn(currentTabUrl);
+        }
         updateTabTitle(data.index, data.title || data.url, data.favicon);
     });
 
-    window.tab.onNavigationUpdated((event, data) => {
+    window.tab.onNavigationUpdated((_e, data) => {
         if (data.index === activeTabIndex) updateNavigationButtons(data.canGoBack, data.canGoForward);
     });
 
@@ -387,7 +702,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    function updateTabWidths(totalTabs) {
+    function updateTabWidths(_totalTabs) {
         const actualTabCount = tabs.size; if (actualTabCount === 0) return;
         requestAnimationFrame(() => {
             const tabBarWidth = (tabsContainer && tabsContainer.offsetWidth) ? tabsContainer.offsetWidth : tabBar.offsetWidth;
