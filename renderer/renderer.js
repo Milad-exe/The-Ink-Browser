@@ -1,4 +1,8 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+    let _settings = {};
+    try { _settings = await window.inkSettings.get(); } catch {}
+    const getSearchEngine = () => _settings.searchEngine || 'google';
+    const getPomSetting = (key, def) => (typeof _settings[key] === 'number' ? _settings[key] : def);
     const addBtn = document.getElementById("new-tab-btn");
     const tabBar = document.getElementById("tab-bar");
     const tabsContainer = document.getElementById("tabs-container");
@@ -13,7 +17,56 @@ document.addEventListener("DOMContentLoaded", () => {
     const reloadBtn = document.getElementById("reload-btn");
     const menuBtn = document.getElementById("menu-btn");
 
+    // ── Window controls ───────────────────────────────────────────────────────
+    (function initWindowControls() {
+        const container = document.getElementById('window-controls');
+        if (!container || !window.windowControls) return;
+        const platform = window.windowControls.platform;
+
+        if (platform === 'darwin') {
+            // macOS: traffic-light style, left side — just provide drag region, native handles close/min/max
+            // With frame:false on mac we need to draw our own
+            container.innerHTML = `
+                <button class="wc-btn wc-close"    id="wc-close"    title="Close"></button>
+                <button class="wc-btn wc-minimize" id="wc-minimize" title="Minimize"></button>
+                <button class="wc-btn wc-maximize" id="wc-maximize" title="Maximize"></button>`;
+            container.classList.add('wc-mac');
+        } else {
+            // Windows / Linux: right side
+            container.innerHTML = `
+                <button class="wc-btn wc-minimize" id="wc-minimize" title="Minimize">
+                  <svg viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
+                </button>
+                <button class="wc-btn wc-maximize" id="wc-maximize" title="Maximize">
+                  <svg viewBox="0 0 10 10" fill="none"><rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor"/></svg>
+                </button>
+                <button class="wc-btn wc-close"    id="wc-close"    title="Close">
+                  <svg viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.2"/></svg>
+                </button>`;
+            container.classList.add('wc-win');
+        }
+
+        document.getElementById('wc-close')?.addEventListener('click', () => window.windowControls.close());
+        document.getElementById('wc-minimize')?.addEventListener('click', () => window.windowControls.minimize());
+        document.getElementById('wc-maximize')?.addEventListener('click', async () => {
+            await window.windowControls.maximize();
+        });
+
+        window.windowControls.onMaximizeChanged((isMax) => {
+            const btn = document.getElementById('wc-maximize');
+            if (!btn) return;
+            if (platform !== 'darwin') {
+                btn.querySelector('svg')?.setAttribute('viewBox', isMax ? '0 0 10 10' : '0 0 10 10');
+                btn.title = isMax ? 'Restore' : 'Maximize';
+                btn.innerHTML = isMax
+                    ? `<svg viewBox="0 0 10 10" fill="none"><rect x="2" y="0" width="8" height="8" stroke="currentColor"/><rect x="0" y="2" width="8" height="8" stroke="currentColor" fill="var(--surface-container-lowest)"/></svg>`
+                    : `<svg viewBox="0 0 10 10" fill="none"><rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor"/></svg>`;
+            }
+        });
+    })();
+
     let tabs = new Map();
+    let tabUrls = new Map(); // index → url, kept in sync for switch-to-tab suggestions
     let activeTabIndex = 0;
     let menuOpen = false;
     
@@ -35,10 +88,14 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentSuggestions = [];
     let activeSuggestionIndex = -1;
     let overlayPointerDown = false;
+    let _userTyping = false; // only show suggestions when the user actually typed
 
-    // Debounce helper
+    // Debounce helper — returns a function with a .cancel() method
     const debounce = (fn, delay = 150) => {
-        let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+        let t;
+        const debounced = (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+        debounced.cancel = () => clearTimeout(t);
+        return debounced;
     };
 
     // Position suggestions below the address bar
@@ -49,23 +106,20 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function hideSuggestions() {
+        _userTyping = false;
+        updateSuggestions.cancel();
         window.suggestions.close();
         currentSuggestions = [];
         activeSuggestionIndex = -1;
     }
 
     function renderSuggestions(list) {
+        if (!_userTyping) return;
         currentSuggestions = list;
         activeSuggestionIndex = list.length ? 0 : -1;
         if (!list.length) { hideSuggestions(); return; }
         const b = getSuggestionsBounds();
-        // mark open immediately so blur handlers don't close the overlay
-        // try to keep the input focused before opening so blur races are less likely
-        try { window.focus(); searchBar.focus(); } catch (e) {}
-        // open overlay and then ensure focus returns to the input after a short delay
-        window.suggestions.open(b, currentSuggestions, activeSuggestionIndex).then(() => {
-            try { setTimeout(() => { try { window.focus(); searchBar.focus(); } catch {} }, 45); } catch {}
-        }).catch(() => {});
+        window.suggestions.open(b, currentSuggestions, activeSuggestionIndex).catch(() => {});
     }
 
     function setActiveSuggestion(newIndex) {
@@ -81,15 +135,36 @@ document.addEventListener("DOMContentLoaded", () => {
     function handleSuggestionSelect(index) {
         const item = currentSuggestions[index];
         if (!item) return;
-        if (item.type === 'history' && item.url) {
+        if (item.type === 'switch-tab') {
+            window.tab.switch(item.tabIndex);
+            hideSuggestions();
+            searchBar.blur();
+        } else if (item.type === 'history' && item.url) {
             searchBar.value = item.url;
             loadUrlInActiveTab(item.url);
             hideSuggestions();
-        } else if ((item.type === 'google' || item.type === 'action') && item.query) {
+        } else if ((item.type === 'google' || item.type === 'duckduckgo' || item.type === 'bing' || item.type === 'action') && item.query) {
             searchBar.value = item.query;
             loadUrlInActiveTab(item.query);
             hideSuggestions();
         }
+    }
+
+    function getOpenTabSuggestions(q) {
+        const results = [];
+        const ql = q.toLowerCase();
+        tabs.forEach((btn, index) => {
+            if (index === activeTabIndex) return;
+            const url = tabUrls.get(index) || '';
+            const title = btn.querySelector('.tab-title')?.textContent || '';
+            if (!url || url === 'newtab' || url.startsWith('file://')) return;
+            if (url.toLowerCase().includes(ql) || title.toLowerCase().includes(ql)) {
+                let favicon = null;
+                try { favicon = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}`; } catch {}
+                results.push({ type: 'switch-tab', tabIndex: index, title: title || url, url, favicon });
+            }
+        });
+        return results;
     }
 
     async function getHistorySuggestions(q, limit = 5) {
@@ -126,11 +201,17 @@ document.addEventListener("DOMContentLoaded", () => {
     async function getGoogleSuggestions(q, limit = 6) {
         if (!q) return [];
         try {
-            const url = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(q)}`;
+            const engine = getSearchEngine();
+            const suggestUrls = {
+                google: `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(q)}`,
+                duckduckgo: `https://duckduckgo.com/ac/?q=${encodeURIComponent(q)}&type=list`,
+                bing: `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(q)}`,
+            };
+            const url = suggestUrls[engine] || suggestUrls.google;
             const res = await fetch(url, { cache: 'no-store' });
             const data = await res.json();
             const arr = Array.isArray(data) && Array.isArray(data[1]) ? data[1] : [];
-            return arr.slice(0, limit).map(s => ({ type: 'google', query: s }));
+            return arr.slice(0, limit).map(s => ({ type: engine, query: s }));
         } catch {
             return [];
         }
@@ -143,15 +224,17 @@ document.addEventListener("DOMContentLoaded", () => {
         const base = [{ type: 'action', query: q }];
         // Render immediately to make UI feel responsive
         renderSuggestions(base);
-        try { searchBar.focus(); } catch {}
         try {
+            const openTabs = getOpenTabSuggestions(q);
             const [hist, goog] = await Promise.all([
                 getHistorySuggestions(q, 5),
                 getGoogleSuggestions(q, 6)
             ]);
-            // Merge: action, then history, then google
-            const merged = [...base, ...hist];
+            // Merge: open tabs first, then action, then history, then search
+            const merged = [...openTabs, ...base, ...hist];
+            const seenUrls = new Set(openTabs.map(t => t.url));
             const seenQueries = new Set(merged.filter(x => x.query).map(x => x.query));
+            for (const h of hist) { if (!seenUrls.has(h.url)) merged.push(h); }
             for (const g of goog) { if (!seenQueries.has(g.query)) merged.push(g); }
             renderSuggestions(merged);
         } catch (_) {
@@ -160,11 +243,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 120);
 
     searchBar.addEventListener('input', () => {
+        _userTyping = true;
         updateSuggestions();
     });
 
     searchBar.addEventListener('focus', () => {
-        if (searchBar.value.trim()) updateSuggestions();
+        if (_userTyping && searchBar.value.trim()) updateSuggestions();
     });
 
     searchBar.addEventListener('blur', () => {
@@ -176,9 +260,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 400);
     });
 
-    // If overlay view was just created, restore focus quickly to prevent initial caret loss
+    // Overlay view created — restore focus to search bar without triggering suggestions
     window.suggestions.onCreated(() => {
-        try { window.focus(); searchBar.focus(); } catch (e) {}
+        _userTyping = true; // preserve typing state
+        try { searchBar.focus(); } catch {}
     });
 
     searchBar.addEventListener("keydown", (e) => {
@@ -206,8 +291,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentTabUrl = '';
     let currentTabTitle = '';
 
-    // Bookmark bar visibility (persisted in localStorage)
-    let bookmarkBarVisible = localStorage.getItem('bookmarkBarVisible') !== 'false';
+    // Bookmark bar visibility (persisted in inkSettings)
+    let bookmarkBarVisible = !!_settings.bookmarkBarVisible;
     if (bookmarkBarVisible) bookmarkBar.classList.remove('hidden');
 
     function reportChromeHeight() {
@@ -217,13 +302,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function updateBookmarkBtn(url) {
         if (!url || url === 'newtab' || url.startsWith('file://')) {
-            bookmarkBtn.textContent = '☆';
             bookmarkBtn.classList.remove('bookmarked');
             return;
         }
         try {
             const has = await window.browserBookmarks.has(url);
-            bookmarkBtn.textContent = has ? '★' : '☆';
             bookmarkBtn.classList.toggle('bookmarked', has);
         } catch {}
     }
@@ -269,11 +352,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const has = await window.browserBookmarks.has(currentTabUrl);
             if (has) {
                 await window.browserBookmarks.remove(currentTabUrl);
-                bookmarkBtn.textContent = '☆';
                 bookmarkBtn.classList.remove('bookmarked');
             } else {
                 await window.browserBookmarks.add(currentTabUrl, currentTabTitle || currentTabUrl);
-                bookmarkBtn.textContent = '★';
                 bookmarkBtn.classList.add('bookmarked');
             }
             await refreshBookmarkBar();
@@ -283,8 +364,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // Bookmark bar toggle forwarded from menu via main process
     window.electronAPI.onToggleBookmarkBar(() => {
         bookmarkBarVisible = !bookmarkBarVisible;
-        localStorage.setItem('bookmarkBarVisible', bookmarkBarVisible);
         bookmarkBar.classList.toggle('hidden', !bookmarkBarVisible);
+        reportChromeHeight();
         refreshBookmarkBar();
     });
 
@@ -306,20 +387,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const pomOverlay       = document.getElementById('pomodoro-overlay');
     const pomPhase         = document.getElementById('pomodoro-phase');
     const pomTime          = document.getElementById('pomodoro-time');
-    const pomRing          = document.getElementById('pomodoro-ring');
     const pomStartBtn      = document.getElementById('pomodoro-start');
     const pomSkipBtn       = document.getElementById('pomodoro-skip');
     const pomResetBtn      = document.getElementById('pomodoro-reset');
     const pomSessions      = document.getElementById('pomodoro-sessions');
     const pomCloseBtn      = document.getElementById('pomodoro-close');
 
-    // Pomodoro config (seconds)
-    const POM_FOCUS     = 25 * 60;
-    const POM_SHORT     = 5  * 60;
-    const POM_LONG      = 15 * 60;
-    const POM_SESSIONS  = 4;
+    // Pomodoro config (seconds) — loaded from settings
+    const POM_FOCUS    = getPomSetting('pomWork', 25) * 60;
+    const POM_SHORT    = getPomSetting('pomShortBreak', 5) * 60;
+    const POM_LONG     = getPomSetting('pomLongBreak', 15) * 60;
+    const POM_SESSIONS = getPomSetting('pomSessions', 4);
 
-    const RING_CIRCUMFERENCE     = 2 * Math.PI * 54; // overlay ring r=54
     const PILL_RING_CIRCUMFERENCE = 2 * Math.PI * 11; // pill ring r=11
 
     let pomState = {
@@ -362,10 +441,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Update overlay
         pomTime.textContent = timeStr;
-        pomRing.style.strokeDashoffset = RING_CIRCUMFERENCE * progress;
         pomPhase.textContent = phaseLabel;
         pomPhase.className = 'pomodoro-phase' + (isFocus ? '' : ' break');
-        pomRing.className = 'ring-fill' + (isFocus ? '' : ' break');
         pomStartBtn.textContent = pomState.running ? 'Pause' : 'Start';
 
         // Session dots
@@ -469,6 +546,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     pomCloseBtn.addEventListener('click', pomCloseOverlay);
 
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !pomOverlay.classList.contains('hidden')) {
+            pomCloseOverlay();
+        }
+    });
+
     // Pill click → open full controls overlay
     pomPill.addEventListener('click', pomOpenOverlay);
 
@@ -485,17 +568,16 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             pomUpdateUI();
         } else {
-            // Hide pill only if timer isn't running
-            if (!pomState.running) {
-                pomHidePill();
-                // Reset timer state so it's fresh next time
-                clearInterval(pomState.timer);
-                pomState.timer = null;
-                pomState.elapsed = 0;
-                pomState.phase = 'focus';
-                pomState.total = POM_FOCUS;
-                pomState.running = false;
-            }
+            // Stop and reset the timer when focus is turned off
+            clearInterval(pomState.timer);
+            pomState.timer = null;
+            pomState.running = false;
+            pomState.elapsed = 0;
+            pomState.phase = 'focus';
+            pomState.total = POM_FOCUS;
+            pomState.sessionsDone = 0;
+            pomHidePill();
+            pomUpdateUI();
         }
     });
 
@@ -535,7 +617,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if (url.includes(".") && !url.includes(" ")) {
                 formattedUrl = "https://" + url;
             } else {
-                formattedUrl = "https://www.google.com/search?q=" + encodeURIComponent(url);
+                const engines = {
+                    google: 'https://www.google.com/search?q=',
+                    duckduckgo: 'https://duckduckgo.com/?q=',
+                    bing: 'https://www.bing.com/search?q=',
+                };
+                formattedUrl = (engines[getSearchEngine()] || engines.google) + encodeURIComponent(url);
             }
         }
         window.tab.loadUrl(activeTabIndex, formattedUrl);
@@ -549,6 +636,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     window.tab.onTabRemoved((_e, data) => {
+        tabUrls.delete(data.index);
         removeTabButton(data.index);
         hideSuggestions();
         setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
@@ -556,6 +644,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     window.tab.onTabSwitched((_e, data) => {
         activeTabIndex = data.index;
+        if (data.url) tabUrls.set(data.index, data.url);
         setActiveTab(data.index);
         updateSearchBarUrl(data.url || "");
         currentTabUrl = data.url || '';
@@ -566,6 +655,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     window.tab.onUrlUpdated((_e, data) => {
+        if (data.url) tabUrls.set(data.index, data.url);
         if (data.index === activeTabIndex) {
             updateSearchBarUrl(data.url);
             currentTabUrl = data.url || '';

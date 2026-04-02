@@ -99,6 +99,22 @@ document.addEventListener('mousedown', () => {
     try { ipcRenderer.send('content-view-click'); } catch {}
 }, true);
 
+contextBridge.exposeInMainWorld('windowControls', {
+  platform:         process.platform,
+  minimize:         ()  => ipcRenderer.invoke('window-minimize'),
+  maximize:         ()  => ipcRenderer.invoke('window-maximize'),
+  close:            ()  => ipcRenderer.invoke('window-close'),
+  isMaximized:      ()  => ipcRenderer.invoke('window-is-maximized'),
+  onMaximizeChanged:(fn) => ipcRenderer.on('window-maximize-changed', (_e, v) => fn(v)),
+});
+
+contextBridge.exposeInMainWorld('inkSettings', {
+  get:               ()         => ipcRenderer.invoke('settings-get'),
+  set:               (key, val) => ipcRenderer.invoke('settings-set', key, val),
+  clearHistory:      ()         => ipcRenderer.invoke('settings-clear-history'),
+  toggleBookmarkBar: ()         => ipcRenderer.send('toggle-bookmark-bar'),
+});
+
 contextBridge.exposeInMainWorld("bruno", {
     open: () => ipcRenderer.invoke('bruno-open'),
     close: () => ipcRenderer.invoke('bruno-close'),

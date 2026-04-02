@@ -12,6 +12,9 @@
 <body>
   <!-- Top Navigation Bar -->
   <div id="utility-bar">
+    <!-- Window controls — position/style set by JS based on platform -->
+    <div id="window-controls" class="window-controls"></div>
+
     <div class="nav-start">
       <img class="browser-logo" src="../assets/logo.svg" alt="Ink" width="22" height="22">
     </div>
@@ -43,9 +46,29 @@
     </div>
 
     <div class="trailing-icons">
-      <button id="bookmark-btn" class="icon-btn" title="Bookmark">★</button>
-      <button id="focus-btn" class="icon-btn" title="Focus Mode">🎯</button>
-      <button id="bruno-btn" class="icon-btn" title="Bruno API Client">⚡</button>
+      <!-- Bookmark: filled star when bookmarked, outline when not -->
+      <button id="bookmark-btn" class="icon-btn" title="Bookmark">
+        <svg class="icon-svg bookmark-outline" viewBox="0 0 20 20" fill="none">
+          <path d="M5 3h10a1 1 0 011 1v13l-6-3.5L4 17V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+        <svg class="icon-svg bookmark-filled" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M5 3h10a1 1 0 011 1v13l-6-3.5L4 17V4a1 1 0 011-1z"/>
+        </svg>
+      </button>
+      <!-- Focus: clock icon -->
+      <button id="focus-btn" class="icon-btn" title="Focus Mode">
+        <svg class="icon-svg" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <!-- Bruno: terminal/api icon -->
+      <button id="bruno-btn" class="icon-btn" title="Bruno API Client">
+        <svg class="icon-svg" viewBox="0 0 20 20" fill="none">
+          <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M6 8l3 2-3 2M11 12h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
       <button id="menu-btn" class="icon-btn menu-btn" title="Menu">
         <svg viewBox="0 0 16 12" width="16" height="12" fill="currentColor">
           <rect y="0" width="16" height="1.5" rx="0.75"/>
@@ -79,12 +102,6 @@
     <div class="pomodoro-card">
       <div class="pomodoro-phase" id="pomodoro-phase">Focus</div>
       <div class="pomodoro-time" id="pomodoro-time">25:00</div>
-      <div class="pomodoro-progress-ring">
-        <svg viewBox="0 0 120 120" width="120" height="120">
-          <circle class="ring-bg" cx="60" cy="60" r="54"/>
-          <circle class="ring-fill" id="pomodoro-ring" cx="60" cy="60" r="54"/>
-        </svg>
-      </div>
       <div class="pomodoro-controls">
         <button id="pomodoro-start" class="pom-btn pom-btn-primary">Start</button>
         <button id="pomodoro-skip"  class="pom-btn">Skip</button>
