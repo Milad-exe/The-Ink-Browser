@@ -49,10 +49,14 @@ class WindowManager {
             minWidth: 800,
             minHeight: 600,
             icon: path.join(__dirname, '../logo.png'),
+            frame: false,
             webPreferences: {
                 preload: path.join(__dirname, "../preload/preload.js"),
             }
         });
+
+        window.on('maximize',   () => { try { window.webContents.send('window-maximize-changed', true);  } catch {} });
+        window.on('unmaximize', () => { try { window.webContents.send('window-maximize-changed', false); } catch {} });
 
         window.loadFile('renderer/Browser/index.html');
 

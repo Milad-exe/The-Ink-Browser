@@ -136,7 +136,7 @@ ipcMain.handle("open", async (event, index) => {
     const browserWidth = windowData.window.getBounds().width;
     const width = 160;
     const windowXPos = browserWidth - 12 - width;
-    windowData.menu.setBounds({ height: 200, width, x: windowXPos, y: 40 });
+    windowData.menu.setBounds({ height: 188, width, x: windowXPos, y: 40 });
 
     // Close menu on any click in a tab/Bruno WebContentsView, or when the
     // BrowserWindow loses OS focus (user switches to another app).
@@ -620,6 +620,62 @@ ipcMain.handle('reorderTabs', (event, order) => {
     return true;
   }
   return false;
+});
+
+// ── Settings IPC ──────────────────────────────────────────────────────────
+ipcMain.handle('settings-get', () => {
+  const s = inkInstance.windowManager.persistence.getAll();
+  s._version = app.getVersion();
+  return s;
+});
+
+ipcMain.handle('settings-set', (event, key, value) => {
+  inkInstance.windowManager.persistence.set(key, value);
+  if (key === 'persistAllTabs') {
+    const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+    if (windowData && windowData.tabs) {
+      try { windowData.tabs._saveStateDebounced(); } catch {}
+    }
+  }
+  return true;
+});
+
+ipcMain.handle('settings-clear-history', async () => {
+  try { return await inkInstance.windowManager.history.clearHistory(); } catch { return false; }
+});
+
+ipcMain.handle('open-settings-tab', async (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    try {
+      windowData.tabs.CreateTabWithPage('renderer/Settings/index.html', 'settings', 'Settings');
+    } catch (err) {
+      console.error('Error creating settings tab:', err);
+    }
+  }
+});
+
+// ── Window controls IPC ────────────────────────────────────────────────────
+ipcMain.handle('window-minimize', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) windowData.window.minimize();
+});
+
+ipcMain.handle('window-maximize', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return;
+  if (windowData.window.isMaximized()) windowData.window.unmaximize();
+  else windowData.window.maximize();
+});
+
+ipcMain.handle('window-close', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) windowData.window.close();
+});
+
+ipcMain.handle('window-is-maximized', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  return windowData ? windowData.window.isMaximized() : false;
 });
 
 // Bruno feature is auto-initialized in the constructor above

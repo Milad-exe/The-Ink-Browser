@@ -86,6 +86,9 @@ class Tabs {
             if (urlType === 'history') {
                 return 'History';
             }
+            if (urlType === 'settings') {
+                return 'Settings';
+            }
             const tab = this.TabMap.get(index);
             if (fallbackTitle) return fallbackTitle;
             const t = tab && tab.webContents ? tab.webContents.getTitle() : '';

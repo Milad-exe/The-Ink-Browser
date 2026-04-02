@@ -1,66 +1,30 @@
-document.addEventListener('DOMContentLoaded', async () => {
-    const buttons = document.querySelectorAll('button');
-
-    // Find the persistence button and attach an indicator dot
-    const persistBtn = Array.from(buttons).find(b => b.textContent.trim() === 'Persistence');
-    let indicator = null;
-
-    async function refreshIndicator() {
-        try {
-            const mode = await window.persist.getMode();
-            if (persistBtn) {
-                if (!indicator) {
-                    indicator = document.createElement('span');
-                    indicator.className = 'indicator';
-                    persistBtn.appendChild(indicator);
-                }
-                indicator.classList.toggle('on', !!mode);
-                indicator.classList.toggle('off', !mode);
-                persistBtn.setAttribute('aria-pressed', !!mode);
-                persistBtn.title = mode ? 'Persistence: On' : 'Persistence: Off';
-            }
-        } catch {}
+document.addEventListener('DOMContentLoaded', () => {
+    async function close() {
+        try { await window.electronAPI.closeMenu(); } catch {}
     }
 
-    await refreshIndicator();
+    document.getElementById('btn-new-tab').addEventListener('click', async () => {
+        await window.electronAPI.addTab();
+        await close();
+    });
 
-    buttons.forEach(button => {
-        button.addEventListener('click', async () => {
-            const buttonText = button.textContent.trim();
-            switch (buttonText) {
-                case 'New Tab':
-                    await window.electronAPI.addTab();
-                    await window.electronAPI.closeMenu();
-                    break;
-                case 'History':
-                    try {
-                        await window.electronAPI.openHistoryTab();
-                        await window.electronAPI.closeMenu();
-                    } catch {}
-                    break;
-                case 'New Window':
-                    await window.electronAPI.newWindow();
-                    await window.electronAPI.closeMenu();
-                    break;
-                case 'Bookmarks':
-                    try {
-                        await window.electronAPI.openBookmarksTab();
-                        await window.electronAPI.closeMenu();
-                    } catch {}
-                    break;
-                case 'Bookmark Bar':
-                    window.electronAPI.toggleBookmarkBar();
-                    await window.electronAPI.closeMenu();
-                    break;
-                case 'Persistence':
-                    try {
-                        const current = await window.persist.getMode();
-                        await window.persist.setMode(!current);
-                        await refreshIndicator();
-                        // keep menu open so the change is visible immediately
-                    } catch {}
-                    break;
-            }
-        });
+    document.getElementById('btn-new-window').addEventListener('click', async () => {
+        await window.electronAPI.newWindow();
+        await close();
+    });
+
+    document.getElementById('btn-history').addEventListener('click', async () => {
+        try { await window.electronAPI.openHistoryTab(); } catch {}
+        await close();
+    });
+
+    document.getElementById('btn-bookmarks').addEventListener('click', async () => {
+        try { await window.electronAPI.openBookmarksTab(); } catch {}
+        await close();
+    });
+
+    document.getElementById('btn-settings').addEventListener('click', async () => {
+        try { await window.electronAPI.openSettingsTab(); } catch {}
+        await close();
     });
 });

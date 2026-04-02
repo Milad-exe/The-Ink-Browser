@@ -47,20 +47,8 @@ body {
     background: rgba(0, 0, 0, 0.12);
 }
 
-/* Tiny status dot appended to the Persistence button */
-.indicator {
-    margin-left: auto;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #c7c7cc; /* off */
-    box-shadow: 0 0 0 1px rgba(0,0,0,0.08) inset;
-}
-
-.indicator.on {
-    background: #34c759; /* iOS green */
-}
-
-.indicator.off {
-    background: #c7c7cc;
+.sep {
+    height: 1px;
+    background: rgba(0, 0, 0, 0.08);
+    margin: 3px 4px;
 }

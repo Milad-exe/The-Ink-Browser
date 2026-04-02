@@ -120,6 +120,16 @@ class History {
         }
     }
 
+    async clearHistory() {
+        try {
+            await this.ensureFileExists();
+            await fs.writeFile(this.file, '[]', { encoding: 'utf8' });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     async historyFileExists() {
         try {
             const stats = await fs.stat(this.file);

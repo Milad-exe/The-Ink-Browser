@@ -40,6 +40,68 @@ html, body {
   box-sizing: border-box;
 }
 
+/* ========== WINDOW CONTROLS ========== */
+.window-controls {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+  gap: 0;
+}
+
+/* macOS traffic-light style */
+.wc-mac {
+  gap: 8px;
+  padding-left: 8px;
+  padding-right: 4px;
+}
+.wc-mac .wc-btn {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.1s;
+}
+.wc-mac .wc-close    { background: #ff5f57; }
+.wc-mac .wc-minimize { background: #febc2e; }
+.wc-mac .wc-maximize { background: #28c840; }
+.wc-mac .wc-btn:hover { opacity: 0.8; }
+
+/* Windows/Linux style */
+.wc-win {
+  margin-left: auto;
+  order: 999;
+}
+.wc-win .wc-btn {
+  width: 46px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s;
+  padding: 0;
+  border-radius: 0;
+}
+.wc-win .wc-btn svg { width: 10px; height: 10px; pointer-events: none; }
+.wc-win .wc-btn:hover { background: var(--surface-container-high); }
+.wc-win .wc-close:hover { background: #e81123; color: #fff; }
+
+/* Make the utility bar draggable for frameless window */
+#utility-bar { -webkit-app-region: drag; }
+#utility-bar button,
+#utility-bar input,
+#utility-bar .omnibox,
+#utility-bar .pomodoro-pill,
+#utility-bar .trailing-icons,
+#utility-bar .nav-buttons,
+#utility-bar .nav-start { -webkit-app-region: no-drag; }
+
 /* ========== UTILITY BAR ========== */
 #utility-bar {
   display: flex;
@@ -158,6 +220,13 @@ html, body {
   transition: all 0.15s ease;
 }
 
+.icon-svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
 .icon-btn:hover {
   background: var(--surface-container-high);
   color: var(--on-surface);
@@ -249,6 +318,9 @@ html, body {
 }
 
 /* ========== BOOKMARK BUTTON STATES ========== */
+#bookmark-btn .bookmark-filled { display: none; }
+#bookmark-btn.bookmarked .bookmark-outline { display: none; }
+#bookmark-btn.bookmarked .bookmark-filled { display: block; }
 #bookmark-btn.bookmarked {
   color: #f5a623;
 }

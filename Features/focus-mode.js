@@ -56,12 +56,17 @@ const YT_SHORTS_BLOCK_JS = `
     'ytd-reel-video-renderer',
     '#shorts-container',
   ];
+  function pauseAll() {
+    document.querySelectorAll('video,audio').forEach(m => { try { m.pause(); m.muted = true; } catch {} });
+  }
+
   function hide() {
     SELECTORS.forEach(sel => {
       document.querySelectorAll(sel).forEach(el => {
         el.style.setProperty('pointer-events', 'none', 'important');
       });
     });
+    pauseAll();
     // Show a message instead
     if (!document.getElementById('__ink_shorts_block')) {
       const msg = document.createElement('div');
@@ -71,6 +76,7 @@ const YT_SHORTS_BLOCK_JS = `
       document.body.appendChild(msg);
     }
   }
+  pauseAll();
   hide();
   new MutationObserver(hide).observe(document.documentElement, { childList: true, subtree: true });
 })();
@@ -233,6 +239,8 @@ class FocusMode {
                 this._pauseMedia(tab.webContents);
                 const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
                 this._injectDistraction(tab.webContents, url);
+                // Pause again after inject in case the distraction script triggered autoplay
+                this._pauseMedia(tab.webContents);
             } else {
                 // Reload to strip injected CSS/JS (cleanest approach)
                 try {
