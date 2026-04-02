@@ -23,7 +23,11 @@
       }
       const main = document.createElement('span'); main.textContent = item.title || item.query || item.url || '';
       const secondary = document.createElement('span'); secondary.className='secondary';
-      if ((item.type === 'google' || item.type === 'action') && item.query) { secondary.textContent = 'Search Google'; }
+      if (item.type === 'switch-tab') { secondary.textContent = 'Switch to tab'; }
+      else if (item.type === 'action') { secondary.textContent = 'Search'; }
+      else if (item.type === 'google') { secondary.textContent = 'Search Google'; }
+      else if (item.type === 'duckduckgo') { secondary.textContent = 'Search DuckDuckGo'; }
+      else if (item.type === 'bing') { secondary.textContent = 'Search Bing'; }
       el.appendChild(icon);
       el.appendChild(main);
       if (secondary.textContent) { el.appendChild(document.createTextNode(' ')); el.appendChild(secondary);} 

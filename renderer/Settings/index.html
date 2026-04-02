@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">Settings</span>
+      </div>
+      <ul class="nav-list">
+        <li class="nav-item active" data-section="general">
+          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          General
+        </li>
+        <li class="nav-item" data-section="appearance">
+          <svg viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 8h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Appearance
+        </li>
+        <li class="nav-item" data-section="focus">
+          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Focus
+        </li>
+        <li class="nav-item" data-section="privacy">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M10 2L3 5v5c0 4.418 3.134 8.033 7 9 3.866-.967 7-4.582 7-9V5L10 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          Privacy
+        </li>
+        <li class="nav-item" data-section="about">
+          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 7v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          About
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Main content -->
+    <main class="content">
+
+      <!-- General -->
+      <section id="section-general" class="section active">
+        <h2>General</h2>
+
+        <div class="card">
+          <div class="card-title">On startup</div>
+          <label class="radio-row">
+            <input type="radio" name="startup" value="new-tab">
+            <span class="radio-label">Open new tab page</span>
+          </label>
+          <label class="radio-row">
+            <input type="radio" name="startup" value="restore">
+            <span class="radio-label">Restore previous session</span>
+          </label>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Search engine</div>
+          <div class="card-desc">Used in the address bar for search queries</div>
+          <div class="select-row">
+            <select id="search-engine">
+              <option value="google">Google</option>
+              <option value="duckduckgo">DuckDuckGo</option>
+              <option value="bing">Bing</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Appearance -->
+      <section id="section-appearance" class="section">
+        <h2>Appearance</h2>
+
+        <div class="card">
+          <div class="toggle-row">
+            <div>
+              <div class="row-label">Bookmark bar</div>
+              <div class="row-desc">Show saved bookmarks below the address bar</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="bookmark-bar-toggle">
+              <span class="track"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Focus -->
+      <section id="section-focus" class="section">
+        <h2>Focus</h2>
+        <p class="section-desc">Configure your Pomodoro timer durations used during focus mode.</p>
+
+        <div class="card">
+          <div class="card-title">Timer durations</div>
+          <div class="duration-grid">
+            <div class="duration-item">
+              <label for="pom-work">Work session</label>
+              <div class="num-input-wrap">
+                <input type="number" id="pom-work" min="1" max="120" step="1">
+                <span class="unit">min</span>
+              </div>
+            </div>
+            <div class="duration-item">
+              <label for="pom-short">Short break</label>
+              <div class="num-input-wrap">
+                <input type="number" id="pom-short" min="1" max="60" step="1">
+                <span class="unit">min</span>
+              </div>
+            </div>
+            <div class="duration-item">
+              <label for="pom-long">Long break</label>
+              <div class="num-input-wrap">
+                <input type="number" id="pom-long" min="1" max="120" step="1">
+                <span class="unit">min</span>
+              </div>
+            </div>
+            <div class="duration-item">
+              <label for="pom-sessions">Sessions before long break</label>
+              <div class="num-input-wrap">
+                <input type="number" id="pom-sessions" min="1" max="10" step="1">
+                <span class="unit">sessions</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Privacy -->
+      <section id="section-privacy" class="section">
+        <h2>Privacy</h2>
+
+        <div class="card">
+          <div class="card-title">Browsing data</div>
+          <div class="card-desc">Clear data stored locally by the browser.</div>
+          <div class="action-row">
+            <div>
+              <div class="row-label">Browsing history</div>
+              <div class="row-desc">All visited pages will be removed</div>
+            </div>
+            <button class="btn-danger" id="btn-clear-history">Clear history</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- About -->
+      <section id="section-about" class="section">
+        <h2>About Ink</h2>
+
+        <div class="card about-card">
+          <img src="../assets/logo.svg" class="about-logo" alt="Ink">
+          <div class="about-name">Ink Browser</div>
+          <div class="about-version" id="about-version">Version —</div>
+          <div class="about-desc">A focused, productivity-first web browser.</div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="settings.js"></script>
+</body>
+</html>
