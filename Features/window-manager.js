@@ -3,6 +3,7 @@ const path = require("path");
 const Tabs = require("./tabs");
 const Persistence = require("./persistence");
 const History = require("./history");
+const Bookmarks = require("./bookmarks");
 const Shortcuts = require("./shortcuts");
 const contextMenu = require("./window-context-menu");
 
@@ -10,6 +11,7 @@ class WindowManager {
     constructor() {
         this.windows = new Map();
         this._history = null;
+        this._bookmarks = null;
         this.nextWindowId = 0;
         this._persistence = null;
         this._restored = false;
@@ -31,6 +33,13 @@ class WindowManager {
         return this._persistence;
     }
 
+    get bookmarks() {
+        if (!this._bookmarks) {
+            this._bookmarks = new Bookmarks();
+        }
+        return this._bookmarks;
+    }
+
     createWindow(width = 800, height = 600) {
         const windowId = this.nextWindowId++;
         
@@ -39,6 +48,7 @@ class WindowManager {
             height: height,
             minWidth: 800,
             minHeight: 600,
+            icon: path.join(__dirname, '../logo.png'),
             webPreferences: {
                 preload: path.join(__dirname, "../preload/preload.js"),
             }
@@ -53,21 +63,30 @@ class WindowManager {
         
     const tabs = new Tabs(window, this.history, this.persistence);
         const shortcuts = new Shortcuts(window, tabs, this);
-        
+
         tabs.setShortcuts(shortcuts);
+        tabs.setWindowManager(this);
 
     window.webContents.on("context-menu", async (event, params) => {
             // Determine the element under the cursor to enrich params for context decisions
             try {
                 const contextInfo = await window.webContents.executeJavaScript(
-                    `(() => { 
-                        const elementFromPoint = document.elementFromPoint(${params.x}, ${params.y}); // Get the element at the context menu position
-                        const tabElement = elementFromPoint ? elementFromPoint.closest('.tab-button') : null; // Check if it's within a tab button
-                        return { targetElementId: elementFromPoint ? (elementFromPoint.id || '') : '', isTabButton: !!tabElement }; // Return the info
+                    `(() => {
+                        const el = document.elementFromPoint(${params.x}, ${params.y});
+                        const tabEl = el ? el.closest('.tab-button') : null;
+                        const tabBarEl = el ? el.closest('#tab-bar') : null;
+                        return {
+                            targetElementId: el ? (el.id || '') : '',
+                            isTabButton: !!tabEl,
+                            rightClickedTabIndex: tabEl ? (parseInt(tabEl.dataset.index) ?? null) : null,
+                            targetAreaIsTabBar: !!tabBarEl && !tabEl,
+                        };
                     })()`
                 );
                 params.targetElementId = contextInfo.targetElementId;
                 params.isTabButton = contextInfo.isTabButton;
+                params.rightClickedTabIndex = contextInfo.rightClickedTabIndex;
+                params.targetAreaIsTabBar = contextInfo.targetAreaIsTabBar;
             } catch (_) {}
 
             const contextMenuInstance = new contextMenu(window, params, this);

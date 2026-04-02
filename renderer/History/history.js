@@ -72,7 +72,7 @@ function createHistoryEntry(container, entry) {
     
     contentDiv.addEventListener('click', () => {
         if (entry.url) {
-            window.location.href = entry.url;
+            window.electronAPI.navigateActiveTab(entry.url);
         }
     });
     
