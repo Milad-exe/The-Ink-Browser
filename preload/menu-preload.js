@@ -5,7 +5,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   addTab: () => ipcRenderer.invoke("addTab"),
   newWindow: () => ipcRenderer.invoke("newWindow"),
   openHistoryTab: () => ipcRenderer.invoke("open-history-tab"),
-  closeMenu: () => ipcRenderer.invoke("close-menu")
+  openBookmarksTab: () => ipcRenderer.invoke("open-bookmarks-tab"),
+  closeMenu: () => ipcRenderer.invoke("close-menu"),
+  toggleBookmarkBar: () => ipcRenderer.send("toggle-bookmark-bar"),
 });
 
 // Expose persistence controls to the menu renderer

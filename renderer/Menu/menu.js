@@ -43,6 +43,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     await window.electronAPI.closeMenu();
                     break;
                 case 'Bookmarks':
+                    try {
+                        await window.electronAPI.openBookmarksTab();
+                        await window.electronAPI.closeMenu();
+                    } catch {}
+                    break;
+                case 'Bookmark Bar':
+                    window.electronAPI.toggleBookmarkBar();
                     await window.electronAPI.closeMenu();
                     break;
                 case 'Persistence':
