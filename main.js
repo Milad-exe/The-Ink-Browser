@@ -1,5 +1,12 @@
-const { BrowserWindow, app, ipcMain, WebContentsView, Menu}  = require('electron');
+const { BrowserWindow, app, ipcMain, WebContentsView, Menu, session } = require('electron');
+const UserAgent = require('./Features/user-agent');
 const path = require("path");
+
+// Must be called before app.whenReady().
+// Removes Chromium's AutomationControlled flag — the flag that sets
+// navigator.webdriver = true and is the primary trigger for Google's
+// "this browser may not be secure" block.
+app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 const WindowManager = require("./Features/window-manager");
 const Bruno = require("./Features/Bruno");
 const focusMode = require("./Features/focus-mode");
@@ -20,6 +27,26 @@ class Ink {
       if (process.platform === 'darwin') {
         app.dock.setIcon(path.join(__dirname, 'logo.png'));
       }
+
+      // Set up UA + minimal privacy headers once on the default session.
+      // This runs before any tab is created so every request (including the
+      // very first navigation) sees the correct user agent.
+      UserAgent.setupSession(session.defaultSession);
+
+      // Inject chrome-spoof before every page script.
+      // This adds window.chrome and removes navigator.webdriver so Google
+      // does not redirect to the "unsupported browser" page.
+      session.defaultSession.registerPreloadScript({
+        type: 'frame',
+        id:   'chrome-spoof',
+        filePath: path.join(__dirname, 'preload/chrome-spoof.js')
+      });
+
+      // Allow all permission requests (notifications, camera, mic, etc.)
+      // so sites like Google Meet / YouTube work without prompts.
+      session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => {
+        callback(true);
+      });
 
       // Initialize Bruno feature (registers IPC handlers)
       new Bruno();

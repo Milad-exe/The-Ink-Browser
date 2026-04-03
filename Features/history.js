@@ -1,143 +1,120 @@
 const path = require('path');
-const fs = require('fs').promises;
+const fs   = require('fs').promises;
 const { app } = require('electron');
+const { encrypt, decrypt, isEncrypted } = require('./encryption');
 
 class History {
     constructor() {
-        this.historyArray = [];
-        this.file = null;
+        this.file        = null;
         this.initialized = false;
-        this.initializeFilePath();
+        this._initPath();
     }
 
-    initializeFilePath() {
+    _initPath() {
         try {
-            const userDataPath = app.getPath('userData');
-            this.file = path.join(userDataPath, 'browsing-history.json');
-        } catch (error) {
+            this.file = path.join(app.getPath('userData'), 'browsing-history.json');
+        } catch {
             this.file = path.join(process.cwd(), 'browsing-history.json');
         }
     }
 
-    async ensureFileExists() {
-        if (!this.file) {
-            return false;
+    async _ensureFile() {
+        if (this.initialized) return true;
+        if (!this.file) return false;
+        try {
+            await fs.stat(this.file);
+        } catch {
+            // File doesn't exist — write an empty encrypted history
+            await fs.writeFile(this.file, encrypt('[]'), 'utf8');
         }
-
-        if (this.initialized) {
-            return true;
-        }
-
-        const exists = await this.historyFileExists();
-        
-        if(!exists){
-            let text = '[]';
-            try {
-                await fs.writeFile(this.file, text, { encoding: 'utf8' });
-            } catch (writeError) {
-                return false;
-            }
-        }
-
         this.initialized = true;
         return true;
     }
 
-    async loadHistory(){
-        await this.ensureFileExists();
-        
+    // ── Low-level read/write (handles encrypt/decrypt + plaintext migration) ──
+
+    async _read() {
+        await this._ensureFile();
         try {
-            const data = await fs.readFile(this.file, 'utf8');
-            const jsonData = JSON.parse(data);
-            return jsonData;
-        } catch (error) {
+            const raw = await fs.readFile(this.file, 'utf8');
+            let plaintext;
+            if (isEncrypted(raw)) {
+                plaintext = decrypt(raw);
+            } else {
+                // Plaintext legacy file — migrate to encrypted on next write
+                plaintext = raw;
+            }
+            const data = JSON.parse(plaintext);
+            return Array.isArray(data) ? data : [];
+        } catch {
             return [];
         }
     }
 
-    async addToHistory(url, title) {
-        await this.ensureFileExists();
-        
+    async _write(data) {
         try {
-            let historyData = await this.loadHistory();
-            // Skip saving likely search-result pages (e.g. google.com/search?q=...)
-            const isLikelySearchResult = (rawUrl) => {
-                if (!rawUrl) return false;
-                try {
-                    const u = new URL(rawUrl);
-                    const host = (u.hostname || '').toLowerCase();
-                    const path = (u.pathname || '').toLowerCase();
-                    const params = u.searchParams;
-                    const isGoogle = host.includes('google.');
-                    const isBing = host.includes('bing.com');
-                    const isDuck = host.includes('duckduckgo.com');
-                    if ((isGoogle && (path.startsWith('/search') || path.startsWith('/url') || params.has('q'))) ||
-                        (isBing && (path.startsWith('/search') || params.has('q'))) ||
-                        (isDuck && params.has('q'))) {
-                        return true;
-                    }
-                    if (path.includes('/search') && params.has('q')) return true;
-                    if (u.search && u.search.toLowerCase().includes('q=')) return true;
-                } catch (err) {
-                    return false;
-                }
-                return false;
-            };
+            await fs.writeFile(this.file, encrypt(JSON.stringify(data, null, 2)), 'utf8');
+        } catch {}
+    }
 
-            if (isLikelySearchResult(url)) return;
-            const newEntry = {
-                url: url,
-                title: title,
-                timestamp: new Date().toISOString()
-            };
-            
-            historyData.unshift(newEntry);
-            
-            if (historyData.length > 1000) {
-                historyData = historyData.slice(0, 1000);
-            }
-            
-            await fs.writeFile(this.file, JSON.stringify(historyData, null, 2), { encoding: 'utf8' });
-        } catch (error) {
-            
-        }
+    // ── Public API ──────────────────────────────────────────────────────────
+
+    async loadHistory() {
+        return this._read();
+    }
+
+    async addToHistory(url, title) {
+        await this._ensureFile();
+        try {
+            const history = await this._read();
+
+            if (_isSearchResultUrl(url)) return;
+
+            // Remove existing entry for same URL (dedup, keep fresh timestamp at top)
+            const deduped = history.filter(e => e.url !== url);
+
+            deduped.unshift({ url, title, timestamp: new Date().toISOString() });
+
+            await this._write(deduped.slice(0, 1000));
+        } catch {}
     }
 
     async removeFromHistory(url, timestamp) {
-        await this.ensureFileExists();
-        
         try {
-            const historyData = await this.loadHistory();
-            
-            const filteredHistory = historyData.filter(entry => 
-                !(entry.url === url && entry.timestamp === timestamp)
-            );
-            
-            await fs.writeFile(this.file, JSON.stringify(filteredHistory, null, 2), { encoding: 'utf8' });
+            const history = await this._read();
+            await this._write(history.filter(e => !(e.url === url && e.timestamp === timestamp)));
             return true;
-        } catch (error) {
+        } catch {
             return false;
         }
     }
 
     async clearHistory() {
         try {
-            await this.ensureFileExists();
-            await fs.writeFile(this.file, '[]', { encoding: 'utf8' });
+            await this._ensureFile();
+            await this._write([]);
             return true;
         } catch {
             return false;
         }
     }
+}
 
-    async historyFileExists() {
-        try {
-            const stats = await fs.stat(this.file);
-            return stats.isFile();
-        } catch {
-            return false;
-        }
-    }
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function _isSearchResultUrl(rawUrl) {
+    if (!rawUrl) return false;
+    try {
+        const u      = new URL(rawUrl);
+        const host   = u.hostname.toLowerCase();
+        const p      = u.pathname.toLowerCase();
+        const params = u.searchParams;
+        if (host.includes('google.')    && (p.startsWith('/search') || p.startsWith('/url') || params.has('q'))) return true;
+        if (host.includes('bing.com')   && (p.startsWith('/search') || params.has('q'))) return true;
+        if (host.includes('duckduckgo.com') && params.has('q')) return true;
+        if (p.includes('/search') && params.has('q')) return true;
+    } catch {}
+    return false;
 }
 
 module.exports = History;
