@@ -134,7 +134,7 @@ class Tabs {
         this.mainWindow.contentView.addChildView(tab)
         tab.webContents.loadFile('renderer/NewTab/index.html')
         
-        UserAgent.setupTabHeaders(tab)
+        UserAgent.setupTab(tab)
         
         tab.webContents.on("context-menu", (event, params) => { 
             const contextMenuInstance = new contextMenu(tab, params, this);
@@ -190,7 +190,7 @@ class Tabs {
         this.mainWindow.contentView.addChildView(tab)
         tab.webContents.loadFile(pagePath)
         
-        UserAgent.setupTabHeaders(tab)
+        UserAgent.setupTab(tab)
         
         const bounds = this.getTabBounds()
         tab.setBounds(bounds)
