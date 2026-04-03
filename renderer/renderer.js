@@ -127,6 +127,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (newIndex < 0) newIndex = currentSuggestions.length - 1;
         if (newIndex >= currentSuggestions.length) newIndex = 0;
         activeSuggestionIndex = newIndex;
+        // Fill the URL bar with the selected item's URL or query
+        const item = currentSuggestions[newIndex];
+        if (item) {
+            if (item.url) searchBar.value = item.url;
+            else if (item.query) searchBar.value = item.query;
+        }
         // Push updated active index to overlay
         const b = getSuggestionsBounds();
         window.suggestions.update(b, currentSuggestions, activeSuggestionIndex);
@@ -314,6 +320,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     async function refreshBookmarkBar() {
         bookmarkBarItems.innerHTML = '';
         if (!bookmarkBarVisible) return;
+        // Bar is always shown when enabled — even with no bookmarks
         let bookmarks = [];
         try { bookmarks = await window.browserBookmarks.getAll(); } catch {}
         bookmarks.forEach(entry => {
