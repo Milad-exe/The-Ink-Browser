@@ -7,9 +7,16 @@ const path = require("path");
 // navigator.webdriver = true and is the primary trigger for Google's
 // "this browser may not be secure" block.
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
+
+// Ensure the global fallback UA (used by service workers, OAuth sub-requests,
+// and anything without a session-level UA) never exposes "Electron/".
+// This must be set before app.whenReady() fires.
+app.userAgentFallback = UserAgent.generate();
+
 const WindowManager = require("./Features/window-manager");
 const Bruno = require("./Features/Bruno");
 const focusMode = require("./Features/focus-mode");
+const { loginWithGoogle } = require("./Features/google-auth");
 
 class Ink {
   constructor() {
@@ -665,6 +672,16 @@ ipcMain.handle('settings-set', (event, key, value) => {
     }
   }
   return true;
+});
+
+// Handle Google Login request
+ipcMain.handle('google-login', async (event, clientId, clientSecret) => {
+  try {
+    const authData = await loginWithGoogle(clientId, clientSecret);
+    return { success: true, data: authData };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
 
 ipcMain.handle('settings-clear-history', async () => {
