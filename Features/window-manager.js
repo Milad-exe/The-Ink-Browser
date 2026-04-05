@@ -120,24 +120,18 @@ class WindowManager {
                 try {
                     // Create in saved order
                     state.tabs.forEach((t) => {
-                        if (t.url && t.url !== 'newtab') {
-                            const idx = tabs.CreateTab();
-                            tabs.loadUrl(idx, t.url);
-                        } else {
-                            tabs.CreateTab();
-                        }
+                        tabs.CreateLazyTab(t.url, t.title, t.pinned);
                     });
-                    // Apply pinned flags by their creation order indices
-                    const indices = Array.from(tabs.TabMap.keys()).sort((a,b)=>a-b);
-                    state.tabs.forEach((t, i) => {
-                        const idx = indices[i];
-                        if (t.pinned) tabs.pinTab(idx);
-                    });
+                    
                     // Focus saved active if valid
                     if (typeof state.activeIndex === 'number') {
                         const indices2 = Array.from(tabs.TabMap.keys()).sort((a,b)=>a-b);
                         const focusIdx = indices2[state.activeIndex] ?? indices2[0];
                         if (typeof focusIdx === 'number') tabs.showTab(focusIdx);
+                    } else {
+                        // Show first tab by default
+                        const indices2 = Array.from(tabs.TabMap.keys()).sort((a,b)=>a-b);
+                        if (indices2.length > 0) tabs.showTab(indices2[0]);
                     }
                 } catch {
                     // Fallback: at least one tab

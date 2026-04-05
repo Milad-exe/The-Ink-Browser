@@ -197,21 +197,18 @@ class FocusMode {
 
     _applyGrayscale(wc) {
         try {
-            wc.insertCSS(GRAYSCALE_CSS, { cssOrigin: 'user' });
+            wc.insertCSS(GRAYSCALE_CSS, { cssOrigin: 'user' }).then(key => {
+                wc._grayscaleKey = key;
+            });
         } catch {}
     }
 
     _removeGrayscale(wc) {
-        // CSS inserted via insertCSS can't be easily removed; reload will drop it.
-        // We toggle a body class and use a CSS override trick instead:
         try {
-            wc.executeJavaScript(`
-                (function(){
-                    const id = '${GRAYSCALE_KEY}';
-                    let el = document.getElementById(id);
-                    if (el) el.remove();
-                })();
-            `);
+            if (wc._grayscaleKey) {
+                wc.removeInsertedCSS(wc._grayscaleKey);
+                wc._grayscaleKey = null;
+            }
         } catch {}
     }
 
@@ -232,7 +229,7 @@ class FocusMode {
 
     _applyToAll(windowData, enable) {
         if (!windowData.tabs) return;
-        windowData.tabs.TabMap.forEach((tab) => {
+        windowData.tabs.TabMap.forEach((tab, index) => {
             if (!tab.webContents || tab.webContents.isDestroyed()) return;
             if (enable) {
                 this._applyGrayscale(tab.webContents);
@@ -242,15 +239,19 @@ class FocusMode {
                 // Pause again after inject in case the distraction script triggered autoplay
                 this._pauseMedia(tab.webContents);
             } else {
-                // Reload to strip injected CSS/JS (cleanest approach)
-                try {
-                    const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
-                    if (url && !url.startsWith('file://')) {
+                // Focus mode OFF
+                this._removeGrayscale(tab.webContents);
+                const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
+                
+                // Only clean up/reload if this tab actually got distraction injections
+                if (getInjectionForUrl(url)) {
+                    if (windowData.tabs.activeTabIndex === index) {
                         tab.webContents.reload();
                     } else {
-                        tab.webContents.loadFile('renderer/NewTab/index.html');
+                        // Defer reload until the tab is actually shown, to avoid massive CPU/Network spikes
+                        tab._needsReloadForFocusMode = true;
                     }
-                } catch {}
+                }
             }
         });
     }
