@@ -77,8 +77,72 @@ class Tabs {
         };
     }
 
+    CreateLazyTab(url, title, isPinned) {
+        const tabIndex = this.nextTabIndex;
+        this.nextTabIndex++;
+        
+        const tab = new WebContentsView({
+            webPreferences: {
+                preload: path.join(__dirname, '../preload/preload.js'),
+                contextIsolation: true,
+                nodeIntegration: false
+            }
+        });
+        
+        this.mainWindow.contentView.addChildView(tab);
+        tab.setVisible(false); // Do not show initially
+        
+        UserAgent.setupTab(tab);
+        
+        // Setup context menu
+        tab.webContents.on("context-menu", (event, params) => { 
+            const contextMenuInstance = new contextMenu(tab, params, this);
+            const menu = Menu.buildFromTemplate(contextMenuInstance.getTemplate());
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                menu.popup({ window: this.mainWindow });
+            }
+        });
+
+        const bounds = this.getTabBounds();
+        tab.setBounds(bounds);
+
+        this.TabMap.set(tabIndex, tab);
+        this.tabUrls.set(tabIndex, url || 'newtab');
+        this.tabOrder.push(tabIndex);
+        
+        if (isPinned) {
+            this.pinnedTabs.add(tabIndex);
+        }
+
+        tab._lazyLoaded = false;
+        tab._lazyTitle = title || url || 'New Tab';
+
+        this.navigationHistory.initializeTab(tabIndex, url || 'newtab');
+        this.setupTabListeners(tabIndex, tab);
+
+        tab.webContents.on('did-finish-load', () => {
+            const windowData = this._getWindowData();
+            if (windowData) {
+                const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
+                focusMode.applyToTab(windowData, tab.webContents, url);
+            }
+        });
+
+        this.mainWindow.webContents.send('tab-created', {
+            index: tabIndex,
+            title: tab._lazyTitle,
+            totalTabs: this.TabMap.size
+        });
+
+        return tabIndex;
+    }
+
     _computeDisplayTitleFor(index, fallbackTitle) {
         try {
+            const tab = this.TabMap.get(index);
+            if (tab && tab._lazyLoaded === false && tab._lazyTitle) {
+                return tab._lazyTitle;
+            }
             const urlType = this.tabUrls.get(index) || '';
             if (urlType === 'newtab' || (typeof urlType === 'string' && urlType.startsWith('file://'))) {
                 return 'New Tab';
@@ -89,7 +153,6 @@ class Tabs {
             if (urlType === 'settings') {
                 return 'Settings';
             }
-            const tab = this.TabMap.get(index);
             if (fallbackTitle) return fallbackTitle;
             const t = tab && tab.webContents ? tab.webContents.getTitle() : '';
             return t || 'New Tab';
@@ -391,9 +454,29 @@ class Tabs {
         })
         
         if (this.TabMap.has(index)) {
-            this.TabMap.get(index).setVisible(true)
+            const tab = this.TabMap.get(index);
+            tab.setVisible(true)
             this.activeTabIndex = index
             
+            if (tab._lazyLoaded === false) {
+                tab._lazyLoaded = true;
+                const lazyUrl = this.tabUrls.get(index);
+                if (lazyUrl === 'history') {
+                    tab.webContents.loadFile('renderer/History/index.html');
+                } else if (lazyUrl === 'bookmarks') {
+                    tab.webContents.loadFile('renderer/Bookmarks/index.html');
+                } else if (lazyUrl === 'settings') {
+                    tab.webContents.loadFile('renderer/Settings/index.html');
+                } else if (lazyUrl && lazyUrl !== 'newtab' && !lazyUrl.startsWith('file://')) {
+                    tab.webContents.loadURL(lazyUrl);
+                } else {
+                    tab.webContents.loadFile('renderer/NewTab/index.html');
+                }
+            } else if (tab._needsReloadForFocusMode) {
+                tab._needsReloadForFocusMode = false;
+                tab.webContents.reload();
+            }
+
             const currentUrl = this.tabUrls.get(index) || ''
             
             this.mainWindow.webContents.send('tab-switched', {
