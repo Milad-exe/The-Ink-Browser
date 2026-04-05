@@ -4,6 +4,7 @@ const { app } = require('electron');
 const { encrypt, decrypt, isEncrypted } = require('./encryption');
 
 const DEFAULTS = {
+    theme:             'default',
     persistAllTabs:    false,
     searchEngine:      'google',   // 'google' | 'duckduckgo' | 'bing'
     bookmarkBarVisible: false,
