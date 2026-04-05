@@ -1,18 +1,5 @@
+@import "../themes.css";
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700&display=swap');
-
-:root {
-  --bg:       #141414;
-  --surface:  #1c1c1c;
-  --surface-2:#222222;
-  --text:     #f0f0f0;
-  --text-2:   #888;
-  --text-3:   #444;
-  --border:   rgba(255,255,255,0.07);
-  --border-2: rgba(255,255,255,0.12);
-  --hover:    rgba(255,255,255,0.04);
-  --font:     'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono:     'Menlo', 'Monaco', monospace;
-}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 

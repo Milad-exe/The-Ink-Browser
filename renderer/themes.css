@@ -1,0 +1,114 @@
+/* renderer/themes.css */
+:root {
+  /* Brutalist Dark (Default) */
+  --bg:        #141414;
+  --surface:   #1c1c1c;
+  --surface-2: #222222;
+  --text:      #f0f0f0;
+  --text-2:    #888;
+  --text-3:    #4a4a4a;
+  --border:    rgba(255,255,255,0.08);
+  --border-2:  rgba(255,255,255,0.14);
+  --hover:     rgba(255,255,255,0.05);
+  --active-bg: rgba(255,255,255,0.1);
+  --accent:    #f5c842;
+  --danger:    #e74c3c;
+  --font:      'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono:      'Space Mono', 'SF Mono', monospace;
+}
+
+html[data-theme="latte"] {
+  /* Catppuccin Latte (Soft Light) */
+  --bg:        #eff1f5;
+  --surface:   #e6e9ef;
+  --surface-2: #dce0e8;
+  --text:      #4c4f69;
+  --text-2:    #5c5f77;
+  --text-3:    #6c6f85;
+  --border:    #ccd0da;
+  --border-2:  #bcc0cc;
+  --hover:     rgba(76, 79, 105, 0.06);
+  --active-bg: rgba(76, 79, 105, 0.12);
+  --accent:    #8839ef;
+  --danger:    #d20f39;
+}
+
+html[data-theme="tokyo-night"] {
+  /* Tokyo Night (Deep Cool Dark) */
+  --bg:        #1a1b26;
+  --surface:   #24283b;
+  --surface-2: #292e42;
+  --text:      #c0caf5;
+  --text-2:    #9aa5ce;
+  --text-3:    #565f89;
+  --border:    rgba(192, 202, 245, 0.1);
+  --border-2:  rgba(192, 202, 245, 0.15);
+  --hover:     rgba(169, 177, 214, 0.08);
+  --active-bg: rgba(169, 177, 214, 0.15);
+  --accent:    #7aa2f7;
+  --danger:    #f7768e;
+}
+
+html[data-theme="catppuccin"] {
+  /* Catppuccin Macchiato (Pastel Dark) */
+  --bg:        #24273a;
+  --surface:   #363a4f;
+  --surface-2: #494d64;
+  --text:      #cad3f5;
+  --text-2:    #b8c0e0;
+  --text-3:    #a5adcb;
+  --border:    #494d64;
+  --border-2:  #5b6078;
+  --hover:     rgba(202, 211, 245, 0.08);
+  --active-bg: rgba(202, 211, 245, 0.15);
+  --accent:    #c6a0f6;
+  --danger:    #ed8796;
+}
+
+html[data-theme="nord"] {
+  /* Nord (Frosty Dark) */
+  --bg:        #2e3440;
+  --surface:   #3b4252;
+  --surface-2: #434c5e;
+  --text:      #d8dee9;
+  --text-2:    #e5e9f0;
+  --text-3:    #4c566a;
+  --border:    #4c566a;
+  --border-2:  #434c5e;
+  --hover:     rgba(216, 222, 233, 0.08);
+  --active-bg: rgba(216, 222, 233, 0.15);
+  --accent:    #88c0d0;
+  --danger:    #bf616a;
+}
+
+html[data-theme="rose-pine"] {
+  /* Rosé Pine (Warm Bohemian) */
+  --bg:        #191724;
+  --surface:   #1f1d2e;
+  --surface-2: #26233a;
+  --text:      #e0def4;
+  --text-2:    #908caa;
+  --text-3:    #6e6a86;
+  --border:    #26233a;
+  --border-2:  #44415a;
+  --hover:     rgba(224, 222, 244, 0.08);
+  --active-bg: rgba(224, 222, 244, 0.15);
+  --accent:    #ebbcba;
+  --danger:    #eb6f92;
+}
+
+html[data-theme="gruvbox"] {
+  /* Gruvbox (Retro Earthy) */
+  --bg:        #282828;
+  --surface:   #3c3836;
+  --surface-2: #504945;
+  --text:      #ebdbb2;
+  --text-2:    #d5c4a1;
+  --text-3:    #bdae93;
+  --border:    #504945;
+  --border-2:  #665c54;
+  --hover:     rgba(235, 219, 178, 0.05);
+  --active-bg: rgba(235, 219, 178, 0.1);
+  --accent:    #fabd2f;
+  --danger:    #cc241d;
+}

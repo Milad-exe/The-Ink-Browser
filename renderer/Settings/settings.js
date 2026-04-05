@@ -50,6 +50,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         showToast('Search engine updated');
     });
 
+    // ── Appearance: Theme ──────────────────────────────────────────────────
+    const themeSelect = document.getElementById('theme-select');
+    themeSelect.value = settings.theme || 'default';
+
+    themeSelect.addEventListener('change', async () => {
+        await save('theme', themeSelect.value);
+        showToast('Theme updated');
+    });
+
     // ── Appearance: Bookmark bar ───────────────────────────────────────────
     const bookmarkBarToggle = document.getElementById('bookmark-bar-toggle');
 

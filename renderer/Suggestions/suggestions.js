@@ -66,6 +66,7 @@
       else if (item.type === 'duckduckgo') secondary.textContent = 'DDG';
       else if (item.type === 'bing')   secondary.textContent = 'Bing';
       else if (item.type === 'history') secondary.textContent = 'History';
+      else if (item.type === 'bookmark') secondary.textContent = 'Bookmark';
 
       if (secondary.textContent) el.appendChild(secondary);
 

@@ -1,8 +1,10 @@
+@import "../themes.css";
+
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
   margin: 0; padding: 0;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font);
   background: transparent; overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
@@ -14,8 +16,8 @@ body {
 
 .find-bar {
   display: flex; flex-direction: column;
-  background: #1c1c1c;
-  border: 1px solid rgba(255,255,255,0.12);
+  background: var(--surface);
+  border: 1px solid var(--border-2);
   border-radius: 0; padding: 10px;
   width: 100%; max-width: 264px; gap: 8px;
 }
