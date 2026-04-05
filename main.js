@@ -1,4 +1,4 @@
-const { BrowserWindow, app, ipcMain, WebContentsView, Menu, session, webContents } = require('electron');
+const { BrowserWindow, app, ipcMain, WebContentsView, Menu, session, webContents, nativeTheme } = require('electron');
 const UserAgent = require('./Features/user-agent');
 const path = require("path");
 
@@ -30,6 +30,9 @@ class Ink {
     }
 
     app.whenReady().then(() => {
+      const savedTheme = this.windowManager.persistence.get('theme');
+      nativeTheme.themeSource = (savedTheme === 'chalk' || savedTheme === 'mist') ? 'light' : 'dark';
+
       Menu.setApplicationMenu(null);
       if (process.platform === 'darwin') {
         app.dock.setIcon(path.join(__dirname, 'logo.png'));
@@ -681,6 +684,8 @@ ipcMain.on('settings-get-sync', (event) => {
 ipcMain.handle('settings-set', (event, key, value) => {
   inkInstance.windowManager.persistence.set(key, value);
   if (key === 'theme') {
+    nativeTheme.themeSource = (value === 'chalk' || value === 'mist') ? 'light' : 'dark';
+    
     // Broadcast theme update to all web contents
     const allWebContents = webContents.getAllWebContents();
     allWebContents.forEach((wc) => {
