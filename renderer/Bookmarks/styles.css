@@ -48,7 +48,7 @@ body {
   transition: opacity 0.1s, color 0.1s; flex-shrink: 0;
 }
 .bookmark-entry:hover .bookmark-remove { opacity: 1; }
-.bookmark-remove:hover { color: #e74c3c; }
+.bookmark-remove:hover { color: var(--danger); }
 
 .empty-msg {
   text-align: center; color: var(--text-3);

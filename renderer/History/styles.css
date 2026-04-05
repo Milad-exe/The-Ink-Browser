@@ -62,7 +62,7 @@ h1 {
   border-radius: 0; transition: opacity 0.1s, color 0.1s;
 }
 .history-entry:hover .history-remove-btn { opacity: 1; }
-.history-remove-btn:hover { color: #e74c3c; }
+.history-remove-btn:hover { color: var(--danger); }
 
 .container p {
   text-align: center; color: var(--text-3);
