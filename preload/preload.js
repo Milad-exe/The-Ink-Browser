@@ -113,6 +113,7 @@ contextBridge.exposeInMainWorld('inkSettings', {
   set:               (key, val) => ipcRenderer.invoke('settings-set', key, val),
   clearHistory:      ()         => ipcRenderer.invoke('settings-clear-history'),
   toggleBookmarkBar: ()         => ipcRenderer.send('toggle-bookmark-bar'),
+  loginGoogle:       (clientId, clientSecret) => ipcRenderer.invoke('google-login', clientId, clientSecret),
 });
 
 contextBridge.exposeInMainWorld("bruno", {
