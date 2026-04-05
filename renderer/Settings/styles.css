@@ -1,16 +1,4 @@
-:root {
-  --bg:      #141414;
-  --surface: #1c1c1c;
-  --text:    #f0f0f0;
-  --text-2:  #888;
-  --text-3:  #444;
-  --border:  rgba(255,255,255,0.07);
-  --border-2:rgba(255,255,255,0.12);
-  --hover:   rgba(255,255,255,0.04);
-  --accent:  #f5c842;
-  --danger:  #e74c3c;
-  --font:    'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
-}
+@import "../themes.css";
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 

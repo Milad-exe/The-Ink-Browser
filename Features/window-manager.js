@@ -49,7 +49,9 @@ class WindowManager {
             minWidth: 800,
             minHeight: 600,
             icon: path.join(__dirname, '../logo.png'),
-            frame: false,
+            frame: process.platform === 'linux' ? true : false,
+            titleBarStyle: process.platform === 'win32' || process.platform === 'linux' ? 'default' : 'hiddenInset',
+            trafficLightPosition: { x: 14, y: 16 }, // Vertically center within 50px utility bar
             webPreferences: {
                 preload: path.join(__dirname, "../preload/preload.js"),
             }

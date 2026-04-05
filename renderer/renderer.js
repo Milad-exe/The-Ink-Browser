@@ -24,12 +24,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         const platform = window.windowControls.platform;
 
         if (platform === 'darwin') {
-            // macOS: traffic-light style, left side — just provide drag region, native handles close/min/max
-            // With frame:false on mac we need to draw our own
-            container.innerHTML = `
-                <button class="wc-btn wc-close"    id="wc-close"    title="Close"></button>
-                <button class="wc-btn wc-minimize" id="wc-minimize" title="Minimize"></button>
-                <button class="wc-btn wc-maximize" id="wc-maximize" title="Maximize"></button>`;
+            // Native macOS traffic lights handle this via titleBarStyle: 'hidden'.
+            // We just add spacing so it doesn't overlap our other native header elements.
+            container.innerHTML = ``;
+            container.style.width = "72px"; // Reserve space for native traffic lights
             container.classList.add('wc-mac');
         } else {
             // Windows / Linux: right side
@@ -145,7 +143,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             window.tab.switch(item.tabIndex);
             hideSuggestions();
             searchBar.blur();
-        } else if (item.type === 'history' && item.url) {
+        } else if ((item.type === 'history' || item.type === 'bookmark') && item.url) {
             searchBar.value = item.url;
             loadUrlInActiveTab(item.url);
             hideSuggestions();
@@ -171,6 +169,29 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         });
         return results;
+    }
+
+    async function getBookmarkSuggestions(q, limit = 3) {
+        try {
+            const entries = await window.browserBookmarks.getAll();
+            if (!Array.isArray(entries) || !q) return [];
+            const results = [];
+            const ql = q.toLowerCase();
+            for (const e of entries) {
+                const url = e.url || '';
+                const title = e.title || '';
+                if (!url) continue;
+                if (url.toLowerCase().includes(ql) || title.toLowerCase().includes(ql)) {
+                    let favicon = null;
+                    try { favicon = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}`; } catch {}
+                    results.push({ type: 'bookmark', title: title || url, url, favicon });
+                    if (results.length >= limit) break;
+                }
+            }
+            return results;
+        } catch {
+            return [];
+        }
     }
 
     async function getHistorySuggestions(q, limit = 5) {
@@ -232,16 +253,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         renderSuggestions(base);
         try {
             const openTabs = getOpenTabSuggestions(q);
-            const [hist, goog] = await Promise.all([
+            const [bkmk, hist, goog] = await Promise.all([
+                getBookmarkSuggestions(q, 3),
                 getHistorySuggestions(q, 5),
                 getGoogleSuggestions(q, 6)
             ]);
-            // Merge: open tabs first, then action, then history, then search
-            const merged = [...openTabs, ...base, ...hist];
-            const seenUrls = new Set(openTabs.map(t => t.url));
-            const seenQueries = new Set(merged.filter(x => x.query).map(x => x.query));
-            for (const h of hist) { if (!seenUrls.has(h.url)) merged.push(h); }
-            for (const g of goog) { if (!seenQueries.has(g.query)) merged.push(g); }
+            // Merge: open tabs first, then bookmarks, then action, then history, then search
+            const merged = [];
+            const seenUrls = new Set();
+            const seenQueries = new Set();
+
+            for (const t of openTabs) { merged.push(t); seenUrls.add(t.url); }
+            for (const b of bkmk) { if (!seenUrls.has(b.url)) { merged.push(b); seenUrls.add(b.url); } }
+            
+            merged.push(...base); // base has .query, not .url
+            for (const x of base) { if (x.query) seenQueries.add(x.query); }
+
+            for (const h of hist) { if (!seenUrls.has(h.url)) { merged.push(h); seenUrls.add(h.url); } }
+            for (const g of goog) { if (!seenQueries.has(g.query)) { merged.push(g); seenQueries.add(g.query); } }
             renderSuggestions(merged);
         } catch (_) {
             // keep base rendered
@@ -265,6 +294,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             hideSuggestions();
         }, 400);
     });
+
+    if (window.contentInteraction) {
+        window.contentInteraction.onClicked(() => {
+            hideSuggestions();
+            searchBar.blur();
+        });
+    }
 
     // Overlay view created — restore focus to search bar without triggering suggestions
     window.suggestions.onCreated(() => {
@@ -299,11 +335,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Bookmark bar visibility (persisted in inkSettings)
     let bookmarkBarVisible = !!_settings.bookmarkBarVisible;
-    if (bookmarkBarVisible) bookmarkBar.classList.remove('hidden');
+    let hasBookmarks = false;
 
     function reportChromeHeight() {
-        window.electronAPI.reportChromeHeight(bookmarkBarVisible ? 32 : 0);
+        const showBar = bookmarkBarVisible && hasBookmarks;
+        bookmarkBar.classList.toggle('hidden', !showBar);
+        window.electronAPI.reportChromeHeight(showBar ? 28 : 0);
     }
+    
     reportChromeHeight();
 
     async function updateBookmarkBtn(url) {
@@ -319,10 +358,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     async function refreshBookmarkBar() {
         bookmarkBarItems.innerHTML = '';
-        if (!bookmarkBarVisible) return;
-        // Bar is always shown when enabled — even with no bookmarks
+        if (!bookmarkBarVisible) {
+            hasBookmarks = false;
+            reportChromeHeight();
+            return;
+        }
         let bookmarks = [];
         try { bookmarks = await window.browserBookmarks.getAll(); } catch {}
+        
+        hasBookmarks = bookmarks.length > 0;
+        reportChromeHeight();
+
         bookmarks.forEach(entry => {
             const btn = document.createElement('button');
             btn.className = 'bookmark-bar-item';
@@ -371,8 +417,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Bookmark bar toggle forwarded from menu via main process
     window.electronAPI.onToggleBookmarkBar(() => {
         bookmarkBarVisible = !bookmarkBarVisible;
-        bookmarkBar.classList.toggle('hidden', !bookmarkBarVisible);
-        reportChromeHeight();
         refreshBookmarkBar();
     });
 
@@ -693,6 +737,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         tabButton.dataset.index = index;
         tabButton.draggable = true;
         tabButton.tabIndex = 0;
+        tabButton.role = 'button';
 
         const tabTitle = document.createElement('span');
         tabTitle.className = 'tab-title';
@@ -707,6 +752,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         tabButton.appendChild(closeButton);
 
         tabButton.addEventListener('click', () => { window.tab.switch(parseInt(index)); });
+        tabButton.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                window.tab.switch(parseInt(index));
+            } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                const allTabs = Array.from(tabsContainer.querySelectorAll('.tab-button'));
+                const currentIndex = allTabs.indexOf(tabButton);
+                const nextTab = allTabs[(currentIndex + 1) % allTabs.length];
+                if (nextTab) nextTab.focus();
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                const allTabs = Array.from(tabsContainer.querySelectorAll('.tab-button'));
+                const currentIndex = allTabs.indexOf(tabButton);
+                const prevTab = allTabs[(currentIndex - 1 + allTabs.length) % allTabs.length];
+                if (prevTab) prevTab.focus();
+            }
+        });
 
         // Drag support
         tabButton.addEventListener('dragstart', (e) => {

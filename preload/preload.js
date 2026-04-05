@@ -1,5 +1,22 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+try {
+    const settings = ipcRenderer.sendSync('settings-get-sync');
+    if (settings && settings.theme && settings.theme !== 'default') {
+        const applyTheme = () => document.documentElement.setAttribute('data-theme', settings.theme);
+        if (document.documentElement) applyTheme();
+        else document.addEventListener('DOMContentLoaded', applyTheme);
+    }
+} catch (e) {}
+
+ipcRenderer.on('theme-changed', (e, theme) => {
+    if (theme && theme !== 'default') {
+        document.documentElement.setAttribute('data-theme', theme);
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+});
+
 contextBridge.exposeInMainWorld(
     "tab", {
         add: () => ipcRenderer.invoke("addTab"),
@@ -98,6 +115,10 @@ contextBridge.exposeInMainWorld('browserBookmarks', {
 document.addEventListener('mousedown', () => {
     try { ipcRenderer.send('content-view-click'); } catch {}
 }, true);
+
+contextBridge.exposeInMainWorld('contentInteraction', {
+    onClicked: (fn) => ipcRenderer.on('content-clicked', () => fn())
+});
 
 contextBridge.exposeInMainWorld('windowControls', {
   platform:         process.platform,

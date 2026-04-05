@@ -1,4 +1,4 @@
-const { BrowserWindow, app, ipcMain, WebContentsView, Menu, session } = require('electron');
+const { BrowserWindow, app, ipcMain, WebContentsView, Menu, session, webContents } = require('electron');
 const UserAgent = require('./Features/user-agent');
 const path = require("path");
 
@@ -164,13 +164,14 @@ ipcMain.handle("open", async (event, index) => {
         nodeIntegration: false
       }
     });
+    windowData.menu.setBackgroundColor('#00000000');
     windowData.window.contentView.addChildView(windowData.menu);
     windowData.menu.webContents.loadFile('renderer/Menu/index.html');
 
     const browserWidth = windowData.window.getBounds().width;
     const width = 160;
     const windowXPos = browserWidth - 12 - width;
-    windowData.menu.setBounds({ height: 188, width, x: windowXPos, y: 40 });
+    windowData.menu.setBounds({ height: 174, width, x: windowXPos, y: 40 });
 
     // Close menu on any click in a tab/Bruno WebContentsView, or when the
     // BrowserWindow loses OS focus (user switches to another app).
@@ -199,7 +200,15 @@ ipcMain.handle("open", async (event, index) => {
 // Any mousedown in a tab or Bruno WebContentsView (sent from the shared preload)
 ipcMain.on("content-view-click", (event) => {
   const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
-  if (windowData && windowData.menu) closeWindowMenu(windowData);
+  if (windowData) {
+    if (windowData.menu) closeWindowMenu(windowData);
+    
+    // Only forward the blur click if the click came from a child view (e.g. a tab), 
+    // NOT the main browser UI itself where the search bar lives.
+    if (event.sender !== windowData.window.webContents) {
+      windowData.window.webContents.send('content-clicked');
+    }
+  }
 });
 
 ipcMain.on("window-click", (event, pos) => {
@@ -230,6 +239,7 @@ ipcMain.on("window-click", (event, pos) => {
             nodeIntegration: false
           }
         });
+        windowData.suggestions.setBackgroundColor('#00000000');
         windowData.window.contentView.addChildView(windowData.suggestions);
         // Notify the renderer immediately that the overlay view was created so it can restore focus
         try { windowData.window.webContents.send('suggestions-created'); } catch (e) {}
@@ -238,7 +248,7 @@ ipcMain.on("window-click", (event, pos) => {
         // loadFile steals Electron-level focus; restore it to the main renderer so the URL bar keeps typing focus
         try { windowData.window.webContents.focus(); } catch {}
       }
-      const h = Math.min(280, Math.max(40, (items.length || 1) * 36));
+      const h = Math.min(280, (items.length || 1) * 35 + 2);
       windowData.suggestions.setBounds({ x: Math.max(0, Math.floor(bounds.left)), y: Math.max(0, Math.floor(bounds.top)), width: Math.floor(bounds.width), height: h });
       windowData.suggestions.webContents.send('suggestions-data', { items, activeIndex });
       return true;
@@ -253,7 +263,7 @@ ipcMain.on("window-click", (event, pos) => {
     if (!windowData || !windowData.suggestions) return false;
     const { bounds, items = [], activeIndex = -1 } = payload || {};
     try {
-      const h = Math.min(280, Math.max(40, (items.length || 1) * 36));
+      const h = Math.min(280, (items.length || 1) * 35 + 2);
       if (bounds && typeof bounds.left === 'number') {
         windowData.suggestions.setBounds({ x: Math.max(0, Math.floor(bounds.left)), y: Math.max(0, Math.floor(bounds.top)), width: Math.floor(bounds.width), height: h });
       }
@@ -663,8 +673,20 @@ ipcMain.handle('settings-get', () => {
   return s;
 });
 
+ipcMain.on('settings-get-sync', (event) => {
+  const s = inkInstance.windowManager.persistence.getAll();
+  event.returnValue = s;
+});
+
 ipcMain.handle('settings-set', (event, key, value) => {
   inkInstance.windowManager.persistence.set(key, value);
+  if (key === 'theme') {
+    // Broadcast theme update to all web contents
+    const allWebContents = webContents.getAllWebContents();
+    allWebContents.forEach((wc) => {
+      try { wc.send('theme-changed', value); } catch {}
+    });
+  }
   if (key === 'persistAllTabs') {
     const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
     if (windowData && windowData.tabs) {

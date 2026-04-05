@@ -21,6 +21,7 @@ class Tabs {
         this.nextTabIndex = 0
         this.allowClose = false
         this.closePreventionActive = false
+        this.isHtmlFullScreen = false
         this.pinnedTabs = new Set()
         this.tabOrder = []
         this._closedTabHistory = [] // stack of {url, title} for "Reopen Closed Tab"
@@ -28,6 +29,11 @@ class Tabs {
         this.mainWindow.on('resize', () => {
             this.resizeAllTabs()
         })
+        
+        this.mainWindow.on('leave-full-screen', () => {
+            this.isHtmlFullScreen = false;
+            this.resizeAllTabs()
+        });
         
         this.mainWindow.on('close', (event) => {
             if (this.TabMap.size > 0 && !this.allowClose) {
@@ -115,7 +121,12 @@ class Tabs {
         }
 
         tab._lazyLoaded = false;
-        tab._lazyTitle = title || url || 'New Tab';
+        
+        let tempTitle = title || url || 'New Tab';
+        if ((!title || title === 'New Tab' || title === '') && url && url.startsWith('http')) {
+            try { tempTitle = new URL(url).hostname; } catch {}
+        }
+        tab._lazyTitle = tempTitle;
 
         this.navigationHistory.initializeTab(tabIndex, url || 'newtab');
         this.setupTabListeners(tabIndex, tab);
@@ -123,8 +134,12 @@ class Tabs {
         tab.webContents.on('did-finish-load', () => {
             const windowData = this._getWindowData();
             if (windowData) {
-                const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
-                focusMode.applyToTab(windowData, tab.webContents, url);
+                const loadedUrl = tab.webContents.getURL ? tab.webContents.getURL() : '';
+                focusMode.applyToTab(windowData, tab.webContents, loadedUrl);
+            }
+            if (tab.webContents.getTitle()) {
+                tab._lazyTitle = tab.webContents.getTitle();
+                this.sendTabUpdate(tabIndex, tab, this.tabUrls.get(tabIndex) || '', tab._lazyTitle);
             }
         });
 
@@ -133,6 +148,7 @@ class Tabs {
             title: tab._lazyTitle,
             totalTabs: this.TabMap.size
         });
+        this.sendTabUpdate(tabIndex, tab, url || 'newtab', tab._lazyTitle);
 
         return tabIndex;
     }
@@ -141,6 +157,9 @@ class Tabs {
         try {
             const tab = this.TabMap.get(index);
             if (tab && tab._lazyLoaded === false && tab._lazyTitle) {
+                return tab._lazyTitle;
+            }
+            if (tab && tab._lazyTitle && tab.webContents && !tab.webContents.isDestroyed() && !tab.webContents.getTitle()) {
                 return tab._lazyTitle;
             }
             const urlType = this.tabUrls.get(index) || '';
@@ -235,6 +254,10 @@ class Tabs {
                 const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
                 focusMode.applyToTab(windowData, tab.webContents, url);
             }
+            if (tab.webContents.getTitle()) {
+                tab._lazyTitle = tab.webContents.getTitle();
+                this.sendTabUpdate(tabIndex, tab, this.tabUrls.get(tabIndex) || '', tab._lazyTitle);
+            }
         });
             return tabIndex
     }
@@ -258,9 +281,11 @@ class Tabs {
         const bounds = this.getTabBounds()
         tab.setBounds(bounds)
 
-    this.TabMap.set(tabIndex, tab)
+        tab._lazyTitle = pageTitle || pageType;
+
+        this.TabMap.set(tabIndex, tab)
         this.tabUrls.set(tabIndex, pageType)
-    this.tabOrder.push(tabIndex)
+        this.tabOrder.push(tabIndex)
         this.activeTabIndex = tabIndex
         this.navigationHistory.initializeTab(tabIndex, pageType)
         
@@ -270,9 +295,11 @@ class Tabs {
         
         this.mainWindow.webContents.send('tab-created', {
             index: tabIndex,
-            title: pageTitle,
+            title: pageTitle || pageType,
             totalTabs: this.TabMap.size
         })
+        
+        this.sendTabUpdate(tabIndex, tab, pageType, pageTitle);
         
         this.showTab(tabIndex)
 
@@ -282,19 +309,29 @@ class Tabs {
                 const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
                 focusMode.applyToTab(windowData, tab.webContents, url);
             }
+            if (tab.webContents.getTitle()) {
+                tab._lazyTitle = tab.webContents.getTitle();
+                this.sendTabUpdate(tabIndex, tab, this.tabUrls.get(tabIndex) || '', tab._lazyTitle);
+            }
             this._saveStateDebounced()
         });
-            return tabIndex
-
+        return tabIndex
     }
     
     getTabBounds() {
         const contentBounds = this.mainWindow.getContentBounds()
-        // utility-bar (56px) + tab-bar (48px) + optional bookmark-bar (32px)
-        const yOffset = 104 + (this.bookmarkBarHeight || 0)
-        const width = contentBounds.width - (this.brunoWidth || 0)
-        const height = contentBounds.height - yOffset
-        return { x: 0, y: yOffset, width, height }
+        
+        if (this.mainWindow && (this.isHtmlFullScreen || this.mainWindow.isSimpleFullScreen())) {
+            return { x: 0, y: 0, width: contentBounds.width, height: contentBounds.height };
+        }
+        
+        // utility-bar (50px) + tab-bar (38px) + optional bookmark-bar (28px)
+        const yOffset = 88 + (this.bookmarkBarHeight || 0)
+        let width = contentBounds.width - (this.brunoWidth || 0)
+        let height = contentBounds.height - yOffset
+        if (width < 0) width = 0;
+        if (height < 0) height = 0;
+        return { x: 0, y: yOffset, width: Math.floor(width), height: Math.floor(height) }
     }
     
     setupTabListeners(tabIndex, tab) {
@@ -322,9 +359,22 @@ class Tabs {
                     this.addToHistory(url, tab.webContents.getTitle())
                 }
             } else if (url.startsWith('file://')) {
-                this.tabUrls.set(tabIndex, 'newtab')
-                lastAddedUrl = 'newtab';
-                this.sendTabUpdate(tabIndex, tab, '', 'New Tab')
+                let resolvedType = 'newtab';
+                if (url.includes('/Settings/index.html')) resolvedType = 'settings';
+                else if (url.includes('/Bookmarks/index.html')) resolvedType = 'bookmarks';
+                else if (url.includes('/History/index.html')) resolvedType = 'history';
+                else if (url.includes('/Bruno/index.html')) resolvedType = 'bruno';
+                
+                this.tabUrls.set(tabIndex, resolvedType)
+                lastAddedUrl = resolvedType;
+                
+                let title = 'New Tab';
+                if (resolvedType === 'settings') title = 'Settings';
+                else if (resolvedType === 'bookmarks') title = 'Bookmarks';
+                else if (resolvedType === 'history') title = 'History';
+                else if (resolvedType === 'bruno') title = 'Bruno';
+
+                this.sendTabUpdate(tabIndex, tab, resolvedType, title)
                 this.sendNavigationUpdate(tabIndex)
             }
             
@@ -358,6 +408,19 @@ class Tabs {
         tab._isNavigatingProgrammatically = () => isNavigatingProgrammatically;
         tab._setNavigatingProgrammatically = (value) => { isNavigatingProgrammatically = value; };
 
+        // HTML5 Fullscreen (e.g. YouTube videos)
+        tab.webContents.on('enter-html-full-screen', () => {
+            this.isHtmlFullScreen = true;
+            this.mainWindow.setFullScreen(true);
+            this.resizeAllTabs();
+        });
+
+        tab.webContents.on('leave-html-full-screen', () => {
+            this.isHtmlFullScreen = false;
+            this.mainWindow.setFullScreen(false);
+            this.resizeAllTabs();
+        });
+
         // Error page — skip aborts (e.g. navigating away mid-load) and sub-frame errors
         tab.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
             if (!isMainFrame) return;
@@ -381,6 +444,7 @@ class Tabs {
         });
         
         tab.webContents.on('page-title-updated', (event, title) => {
+            tab._lazyTitle = title;
             const currentUrl = this.tabUrls.get(tabIndex) || ''
             if (currentUrl !== 'newtab' && currentUrl !== 'history' && !currentUrl.startsWith('file://')) {
                 this.sendTabUpdate(tabIndex, tab, currentUrl, title)
@@ -406,18 +470,32 @@ class Tabs {
 
     sendTabUpdate(tabIndex, tab, url, title, favicon) {
         let displayUrl = url;
-        let displayTitle = title || tab.webContents.getTitle();
+        let displayTitle = title || this._computeDisplayTitleFor(tabIndex) || "New Tab";
         
-        if (url === 'newtab' || url.startsWith('file://')) {
+        let isInternal = ['newtab', 'settings', 'bookmarks', 'history', 'bruno'].includes(url) || (url && url.startsWith('file://'));
+
+        if (isInternal) {
             displayUrl = '';
-            displayTitle = 'New Tab';
+            if (url === 'settings' || (url && url.includes('/Settings/index.html'))) displayTitle = 'Settings';
+            else if (url === 'bookmarks' || (url && url.includes('/Bookmarks/index.html'))) displayTitle = 'Bookmarks';
+            else if (url === 'history' || (url && url.includes('/History/index.html'))) displayTitle = 'History';
+            else if (url === 'bruno' || (url && url.includes('/Bruno/index.html'))) displayTitle = 'Bruno';
+            else displayTitle = 'New Tab';
+        }
+        
+        // Provide a default favicon instantly for http/https URLs to prevent empty gaps
+        let resolvedFavicon = favicon;
+        if (!resolvedFavicon && url && url.startsWith('http')) {
+            try {
+                resolvedFavicon = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=32`;
+            } catch (e) {}
         }
         
         this.mainWindow.webContents.send('url-updated', {
             index: tabIndex,
             url: displayUrl,
             title: displayTitle,
-            favicon: favicon
+            favicon: resolvedFavicon
         })
 
         // Keep the window title in sync with the active tab
@@ -497,6 +575,12 @@ class Tabs {
             const tab = this.TabMap.get(index)
             tab.webContents.loadURL(url)
             this.tabUrls.set(index, url)
+            
+            // Set a temporary title before the page actually loads
+            let tempTitle = url;
+            try { tempTitle = new URL(url).hostname; } catch {}
+            tab._lazyTitle = tempTitle;
+            this.sendTabUpdate(index, tab, url, tempTitle);
             
             this.navigationHistory.addEntry(index, url)
             
@@ -737,10 +821,8 @@ class Tabs {
         const order = this.tabOrder.length ? this.tabOrder : Array.from(this.TabMap.keys());
         const selected = includeAll ? order : order.filter(idx => this.pinnedTabs.has(idx));
         const tabs = selected.map((idx) => {
-            const tab = this.TabMap.get(idx);
             const url = this.tabUrls.get(idx) || 'newtab';
-            let title = 'New Tab';
-            try { title = tab.webContents.getTitle() || title; } catch {}
+            let title = this._computeDisplayTitleFor(idx) || 'New Tab';
             return {
                 url,
                 title,

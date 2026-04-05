@@ -141,8 +141,9 @@ class FindDialog {
         });
 
         this.findWindow.webContents.on('before-input-event', (event, input) => {
-            if (input.key === 'Escape') {
+            if (input.key === 'Escape' && input.type === 'keyDown') {
                 this.close();
+                event.preventDefault();
             }
         });
     }

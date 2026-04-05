@@ -1,5 +1,22 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+try {
+    const settings = ipcRenderer.sendSync('settings-get-sync');
+    if (settings && settings.theme && settings.theme !== 'default') {
+        const applyTheme = () => document.documentElement.setAttribute('data-theme', settings.theme);
+        if (document.documentElement) applyTheme();
+        else document.addEventListener('DOMContentLoaded', applyTheme);
+    }
+} catch (e) {}
+
+ipcRenderer.on('theme-changed', (e, theme) => {
+    if (theme && theme !== 'default') {
+        document.documentElement.setAttribute('data-theme', theme);
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+});
+
 // Preload for the Suggestions Overlay WebContentsView
 contextBridge.exposeInMainWorld('overlaySuggestions', {
   onData: (callback) => ipcRenderer.on('suggestions-data', (_e, payload) => callback(payload)),
