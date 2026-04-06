@@ -61,9 +61,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.electronAPI.navigateActiveTab(entry.url);
             });
 
+            row.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                window.browserBookmarks.showContextMenu(entry.url);
+            });
+
             container.appendChild(row);
         });
     }
+
+    window.browserBookmarks.onChanged(() => {
+        load();
+    });
 
     await load();
 });
