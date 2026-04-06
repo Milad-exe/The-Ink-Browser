@@ -32,7 +32,13 @@ class Tabs {
         
         this.mainWindow.on('leave-full-screen', () => {
             this.isHtmlFullScreen = false;
-            this.resizeAllTabs()
+            this.resizeAllTabs();
+            // Force any HTML fullscreen elements to exit if the OS window left fullscreen
+            this.TabMap.forEach(tab => {
+                if (tab && tab.webContents) {
+                    tab.webContents.executeJavaScript('if (document.fullscreenElement) document.exitFullscreen();').catch(() => {});
+                }
+            });
         });
         
         this.mainWindow.on('close', (event) => {
@@ -567,6 +573,9 @@ class Tabs {
 
             // Update window title to reflect the newly active tab
             this._updateWindowTitle(index)
+            
+            // Put the website back into focus so keyboard events register immediately
+            tab.webContents.focus()
         }
     }
     

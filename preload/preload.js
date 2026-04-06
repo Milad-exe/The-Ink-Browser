@@ -109,6 +109,7 @@ contextBridge.exposeInMainWorld('browserBookmarks', {
   remove:  (url)        => ipcRenderer.invoke('bookmarks-remove', url),
   has:     (url)        => ipcRenderer.invoke('bookmarks-has', url),
   onChanged: (handler)  => ipcRenderer.on('bookmarks-changed', () => handler()),
+  showContextMenu: (url) => ipcRenderer.send('show-bookmark-context-menu', url)
 });
 
 // Any click anywhere in this webContents should close the settings menu

@@ -432,6 +432,34 @@ ipcMain.handle('bookmarks-get', async () => {
   return await inkInstance.windowManager.bookmarks.getAll();
 });
 
+ipcMain.on('show-bookmark-context-menu', (event, url) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return;
+  const menu = Menu.buildFromTemplate([
+    { label: 'Open in New Tab', click: () => { 
+        const newIndex = windowData.tabs.CreateTab();
+        windowData.tabs.loadUrl(newIndex, url);
+        windowData.tabs.switchTab(newIndex);
+    } },
+    { label: 'Open in Background Tab', click: () => { 
+        const newIndex = windowData.tabs.CreateTab();
+        windowData.tabs.loadUrl(newIndex, url);
+    } },
+    { type: 'separator' },
+    { label: 'Copy URL', click: () => { require('electron').clipboard.writeText(url); } },
+    { type: 'separator' },
+    { label: 'Remove Bookmark', click: async () => {
+        await inkInstance.windowManager.bookmarks.remove(url);
+        // Dispatch to all tabs in case bookmark bar is open elsewhere
+        const allWebContents = webContents.getAllWebContents();
+        allWebContents.forEach((wc) => {
+          try { wc.send('bookmarks-changed'); } catch {}
+        });
+    } }
+  ]);
+  menu.popup({ window: windowData.window });
+});
+
 ipcMain.handle('bookmarks-add', async (event, url, title) => {
   const added = await inkInstance.windowManager.bookmarks.add(url, title);
   // Notify the chrome renderer so the bookmark bar refreshes
