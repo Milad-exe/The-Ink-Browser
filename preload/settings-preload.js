@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('inkSettings', {
   openBookmarksTab: ()      => ipcRenderer.invoke('open-bookmarks-tab'),
 });
 
-document.addEventListener('mousedown', () => {
+document.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
   try { ipcRenderer.send('content-view-click'); } catch {}
 }, true);
