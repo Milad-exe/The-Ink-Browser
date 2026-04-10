@@ -189,10 +189,12 @@ class WindowManager {
     getWindowByWebContents(webContents) {
         for (const [id, windowData] of this.windows) {
             if (windowData.window.webContents === webContents) return windowData;
-            // Also match child WebContentsViews (Bruno, suggestions, menu)
+            // Also match child WebContentsViews (Bruno, suggestions, menu, bookmarkPrompt, folderDropdown)
             if (windowData.bruno?.webContents === webContents) return windowData;
             if (windowData.suggestions?.webContents === webContents) return windowData;
             if (windowData.menu?.webContents === webContents) return windowData;
+            if (windowData.bookmarkPrompt?.webContents === webContents) return windowData;
+            if (windowData.folderDropdown?.webContents === webContents) return windowData;
             // Match tab WebContentsViews
             if (windowData.tabs) {
                 for (const [, tab] of windowData.tabs.TabMap) {
