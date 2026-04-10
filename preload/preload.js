@@ -91,8 +91,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openBookmarksTab: () => ipcRenderer.invoke('open-bookmarks-tab'),
   navigateActiveTab: (url) => ipcRenderer.invoke('navigate-active-tab', url),
   activeTabGoBack: () => ipcRenderer.invoke('active-tab-go-back'),
-  onToggleBookmarkBar: (handler) => ipcRenderer.on('toggle-bookmark-bar', () => handler()),
+  onToggleBookmarkBar:     (handler) => ipcRenderer.on('toggle-bookmark-bar',     () => handler()),
+  onBookmarkPromptClosed:  (handler) => ipcRenderer.on('bookmark-prompt-closed',  () => handler()),
+  onBookmarkAddPrompt:       (handler) => ipcRenderer.on('bookmark-add-from-bar',       () => handler()),
+  onBookmarkEditPrompt:      (handler) => ipcRenderer.on('bookmark-edit-prompt',          (_e, d) => handler(d)),
+  onBookmarkFolderRename:    (handler) => ipcRenderer.on('bookmark-folder-rename',        (_e, d) => handler(d)),
+  onBookmarkNewFolderPrompt: (handler) => ipcRenderer.on('bookmark-new-folder-prompt',    () => handler()),
   reportChromeHeight: (height) => ipcRenderer.send('chrome-height-changed', height),
+  openBookmarkPrompt: (bounds, url, title, hasObj, id, mode) => ipcRenderer.invoke('bookmark-prompt-open', bounds, url, title, hasObj, id, mode),
+  openFolderDropdown:  (anchorRect, folderData) => ipcRenderer.invoke('folder-dropdown-open', anchorRect, folderData),
+  closeFolderDropdown: () => ipcRenderer.send('folder-dropdown-close'),
+  onExternBookmarkDragStart:    (cb) => ipcRenderer.on('extern-bookmark-drag-start',    (_e, id, folderId) => cb(id, folderId)),
+  onExternBookmarkDragEnd:      (cb) => ipcRenderer.on('extern-bookmark-drag-end',      () => cb()),
+  onExternBookmarkDragPosition: (cb) => ipcRenderer.on('extern-bookmark-drag-position', (_e, x, y) => cb(x, y)),
+  externBookmarkDrop:           (x, y) => ipcRenderer.send('extern-bookmark-drop', x, y),
 });
 
 contextBridge.exposeInMainWorld('focusMode', {
@@ -104,16 +116,27 @@ contextBridge.exposeInMainWorld('focusMode', {
 });
 
 contextBridge.exposeInMainWorld('browserBookmarks', {
-  getAll:  ()           => ipcRenderer.invoke('bookmarks-get'),
-  add:     (url, title) => ipcRenderer.invoke('bookmarks-add', url, title),
-  remove:  (url)        => ipcRenderer.invoke('bookmarks-remove', url),
-  has:     (url)        => ipcRenderer.invoke('bookmarks-has', url),
-  onChanged: (handler)  => ipcRenderer.on('bookmarks-changed', () => handler()),
-  showContextMenu: (url) => ipcRenderer.send('show-bookmark-context-menu', url)
+  getAll:       ()               => ipcRenderer.invoke('bookmarks-get'),
+  add:          (url, title)     => ipcRenderer.invoke('bookmarks-add', url, title),
+  remove:       (url)            => ipcRenderer.invoke('bookmarks-remove', url),
+  removeById:   (id)             => ipcRenderer.invoke('bookmarks-remove-by-id', id),
+  has:          (url)            => ipcRenderer.invoke('bookmarks-has', url),
+  reorder:           (ids)                  => ipcRenderer.invoke('bookmarks-reorder', ids),
+  reorderInFolder:   (folderId, ids)        => ipcRenderer.invoke('bookmarks-reorder-in-folder', folderId, ids),
+  addFolder:      (title)              => ipcRenderer.invoke('bookmarks-add-folder', title),
+  addDivider:     ()                   => ipcRenderer.invoke('bookmarks-add-divider'),
+  moveIntoFolder:  (itemId, folderId, insertBeforeId) => ipcRenderer.invoke('bookmarks-move-into-folder', itemId, folderId, insertBeforeId ?? null),
+  moveOutOfFolder: (itemId, folderId, beforeId)   => ipcRenderer.invoke('bookmarks-move-out-of-folder', itemId, folderId, beforeId),
+  updateById:   (id, updates)    => ipcRenderer.invoke('bookmarks-update-by-id', id, updates),
+  onChanged:    (handler)        => ipcRenderer.on('bookmarks-changed', () => handler()),
+  showContextMenu:  (url)        => ipcRenderer.send('show-bookmark-context-menu', url),
+  showBarContextMenu: (item)     => ipcRenderer.send('show-bookmark-bar-context-menu', item),
+  openInNewTab: (url, switchToTab) => ipcRenderer.invoke('open-url-in-new-tab', url, switchToTab),
 });
 
 // Any click anywhere in this webContents should close the settings menu
-document.addEventListener('mousedown', () => {
+document.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
     try { ipcRenderer.send('content-view-click'); } catch {}
 }, true);
 

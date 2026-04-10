@@ -1,4 +1,4 @@
-const { BrowserWindow, app, ipcMain, WebContentsView, Menu, session, webContents, nativeTheme } = require('electron');
+const { BrowserWindow, app, ipcMain, WebContentsView, Menu, session, webContents, nativeTheme, screen } = require('electron');
 const UserAgent = require('./Features/user-agent');
 const path = require("path");
 
@@ -172,9 +172,9 @@ ipcMain.handle("open", async (event, index) => {
     windowData.menu.webContents.loadFile('renderer/Menu/index.html');
 
     const browserWidth = windowData.window.getBounds().width;
-    const width = 160;
+    const width = 220;
     const windowXPos = browserWidth - 12 - width;
-    windowData.menu.setBounds({ height: 174, width, x: windowXPos, y: 40 });
+    windowData.menu.setBounds({ height: 224, width, x: windowXPos, y: 40 });
 
     // Close menu on any click in a tab/Bruno WebContentsView, or when the
     // BrowserWindow loses OS focus (user switches to another app).
@@ -205,8 +205,15 @@ ipcMain.on("content-view-click", (event) => {
   const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
   if (windowData) {
     if (windowData.menu) closeWindowMenu(windowData);
-    
-    // Only forward the blur click if the click came from a child view (e.g. a tab), 
+    if (windowData.bookmarkPrompt) {
+      windowData.window.contentView.removeChildView(windowData.bookmarkPrompt);
+      windowData.bookmarkPrompt = null;
+    }
+    if (windowData.folderDropdown) {
+      closeFolderDropdown(windowData);
+    }
+
+    // Only forward the blur click if the click came from a child view (e.g. a tab),
     // NOT the main browser UI itself where the search bar lives.
     if (event.sender !== windowData.window.webContents) {
       windowData.window.webContents.send('content-clicked');
@@ -216,14 +223,30 @@ ipcMain.on("content-view-click", (event) => {
 
 ipcMain.on("window-click", (event, pos) => {
   const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
-  if (windowData && windowData.menu) {
-    try {
-      const bounds = windowData.menu.getBounds();
-      const isOutsideBounds = pos.x < bounds.x || pos.x > bounds.x + bounds.width ||
-        pos.y < bounds.y || pos.y > bounds.y + bounds.height;
-      if (isOutsideBounds) closeWindowMenu(windowData);
-    } catch {
-      closeWindowMenu(windowData);
+  if (windowData) {
+    if (windowData.menu) {
+      try {
+        const bounds = windowData.menu.getBounds();
+        const isOutsideBounds = pos.x < bounds.x || pos.x > bounds.x + bounds.width ||
+          pos.y < bounds.y || pos.y > bounds.y + bounds.height;
+        if (isOutsideBounds) closeWindowMenu(windowData);
+      } catch {
+        closeWindowMenu(windowData);
+      }
+    }
+    if (windowData.bookmarkPrompt) {
+      try {
+        const bounds = windowData.bookmarkPrompt.getBounds();
+        const isOutsideBounds = pos.x < bounds.x || pos.x > bounds.x + bounds.width ||
+          pos.y < bounds.y || pos.y > bounds.y + bounds.height;
+        if (isOutsideBounds) {
+          windowData.window.contentView.removeChildView(windowData.bookmarkPrompt);
+          windowData.bookmarkPrompt = null;
+        }
+      } catch {
+        windowData.window.contentView.removeChildView(windowData.bookmarkPrompt);
+        windowData.bookmarkPrompt = null;
+      }
     }
   }
 });
@@ -439,7 +462,7 @@ ipcMain.on('show-bookmark-context-menu', (event, url) => {
     { label: 'Open in New Tab', click: () => { 
         const newIndex = windowData.tabs.CreateTab();
         windowData.tabs.loadUrl(newIndex, url);
-        windowData.tabs.switchTab(newIndex);
+        windowData.tabs.showTab(newIndex);
     } },
     { label: 'Open in Background Tab', click: () => { 
         const newIndex = windowData.tabs.CreateTab();
@@ -460,23 +483,468 @@ ipcMain.on('show-bookmark-context-menu', (event, url) => {
   menu.popup({ window: windowData.window });
 });
 
-ipcMain.handle('bookmarks-add', async (event, url, title) => {
-  const added = await inkInstance.windowManager.bookmarks.add(url, title);
-  // Notify the chrome renderer so the bookmark bar refreshes
+ipcMain.handle('bookmark-prompt-open', async (event, bounds, url, title, hasObj, id, mode) => {
   const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
-  if (windowData) windowData.window.webContents.send('bookmarks-changed');
+  if (!windowData) return false;
+
+  try {
+    if (!windowData.bookmarkPrompt) {
+      windowData.bookmarkPrompt = new WebContentsView({
+        webPreferences: {
+          preload: path.join(__dirname, './preload/bookmark-prompt-preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false
+        }
+      });
+      windowData.bookmarkPrompt.setBackgroundColor('#00000000');
+      windowData.window.contentView.addChildView(windowData.bookmarkPrompt);
+    }
+
+    const w = 320;
+    const h = 260;
+    
+    // Bounds check and adjust
+    let popupX = Math.max(0, Math.floor(bounds.right) - w);
+    let popupY = Math.max(0, Math.floor(bounds.bottom) + 8);
+    
+    windowData.bookmarkPrompt.setBounds({ x: popupX, y: popupY, width: w, height: h });
+    
+    windowData.bookmarkPrompt.webContents.loadFile('renderer/BookmarkPrompt/index.html');
+    await new Promise(res => windowData.bookmarkPrompt.webContents.once('did-finish-load', res));
+    
+    windowData.bookmarkPrompt.webContents.focus();
+    windowData.bookmarkPrompt.webContents.send('init-prompt', { url, title, hasObj, id, mode });
+    return true;
+  } catch (err) {
+    console.error('bookmark-prompt-open error:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('bookmark-prompt-close', async (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData || !windowData.bookmarkPrompt) return false;
+  try {
+    windowData.window.contentView.removeChildView(windowData.bookmarkPrompt);
+    windowData.bookmarkPrompt = null;
+    windowData.window.webContents.focus();
+    // Let the chrome renderer refresh the bookmark button state
+    windowData.window.webContents.send('bookmark-prompt-closed');
+    return true;
+  } catch (err) {
+    console.error('bookmark-prompt-close error:', err);
+    return false;
+  }
+});
+
+// ── Folder dropdown WebContentsView ──────────────────────────────────────────
+function closeFolderDropdown(windowData) {
+  if (!windowData || !windowData.folderDropdown) return;
+  try {
+    windowData.window.contentView.removeChildView(windowData.folderDropdown);
+  } catch {}
+  windowData.folderDropdown = null;
+  windowData.folderDropdownId = null;
+}
+
+ipcMain.handle('folder-dropdown-open', async (event, anchorRect, folderData) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return false;
+
+  // Toggle: clicking the same folder button while it's open closes it
+  if (windowData.folderDropdown && windowData.folderDropdownId === folderData.id) {
+    closeFolderDropdown(windowData);
+    windowData.window.webContents.focus();
+    return true;
+  }
+
+  closeFolderDropdown(windowData);
+  try {
+    const view = new WebContentsView({
+      webPreferences: {
+        preload: path.join(__dirname, './preload/folder-dropdown-preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      }
+    });
+    view.setBackgroundColor('#00000000');
+    windowData.window.contentView.addChildView(view);
+    windowData.folderDropdown   = view;
+    windowData.folderDropdownId = folderData.id;
+
+    const itemH  = 32; // approx height per item
+    const count  = (folderData.children || []).filter(c => c.type !== 'divider').length || 1;
+    const sepH   = (folderData.children || []).filter(c => c.type === 'divider').length * 7;
+    const h      = Math.min(count * itemH + sepH + 10, 360);
+    const w      = 220;
+    const winW   = windowData.window.getContentBounds().width;
+    const x      = Math.max(0, Math.min(Math.floor(anchorRect.left), winW - w));
+    const y      = Math.floor(anchorRect.bottom);
+
+    view.setBounds({ x, y, width: w, height: h });
+    view.webContents.loadFile('renderer/FolderDropdown/index.html');
+    await new Promise(res => view.webContents.once('did-finish-load', res));
+    // Re-insert as last child so it's above all tab views in z-order
+    windowData.window.contentView.removeChildView(view);
+    windowData.window.contentView.addChildView(view);
+    view.webContents.send('folder-dropdown-init', { children: folderData.children || [], folderId: folderData.id, title: folderData.title || 'Folder' });
+    return true;
+  } catch (err) {
+    console.error('folder-dropdown-open error:', err);
+    closeFolderDropdown(windowData);
+    return false;
+  }
+});
+
+ipcMain.on('folder-dropdown-close', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) {
+    closeFolderDropdown(windowData);
+    windowData.window.webContents.focus();
+  }
+});
+
+// Re-insert the dropdown as the last contentView child so it stays above tab views.
+// Called from dragstart inside the dropdown — Electron's drag system can silently
+// demote the view in hit-test order when another WebContentsView has focus.
+ipcMain.on('folder-dropdown-raise', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData || !windowData.folderDropdown) return;
+  try {
+    windowData.window.contentView.removeChildView(windowData.folderDropdown);
+    windowData.window.contentView.addChildView(windowData.folderDropdown);
+  } catch {}
+});
+
+ipcMain.on('folder-dropdown-update-bounds', (event, width, height) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData && windowData.folderDropdown) {
+    const b = windowData.folderDropdown.getBounds();
+    const winW = windowData.window.getContentBounds().width;
+
+    // ensure it fits in screen
+    b.width = width;
+    b.height = Math.min(height, 500);
+
+    // Reposition x if it overflows the right edge
+    if (b.x + b.width > winW) {
+      b.x = Math.max(0, winW - b.width);
+    }
+
+    try { windowData.folderDropdown.setBounds(b); } catch {}
+  }
+});
+
+ipcMain.on('folder-dropdown-navigate', (event, url) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return;
+  closeFolderDropdown(windowData);
+  windowData.window.webContents.focus();
+  if (windowData.tabs) windowData.tabs.loadUrl(windowData.tabs.activeTabIndex, url);
+});
+
+ipcMain.on('folder-dropdown-new-tab', (event, url) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return;
+  closeFolderDropdown(windowData);
+  windowData.window.webContents.focus();
+  if (windowData.tabs) {
+    const idx = windowData.tabs.CreateTab(url);
+    windowData.tabs.showTab(idx);
+  }
+});
+
+ipcMain.on('folder-dropdown-ctx-menu', (event, item) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return;
+  showFolderDropdownContextMenu(windowData, item);
+});
+
+function showFolderDropdownContextMenu(windowData, item) {
+  const { type, id, url, title, parentFolderId } = item || {};
+
+  const broadcast = () => {
+    const allWebContents = webContents.getAllWebContents();
+    allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
+  };
+
+  const closeAndFocus = () => {
+    closeFolderDropdown(windowData);
+    windowData.window.webContents.focus();
+  };
+
+  // Find a folder node anywhere in the bookmark tree
+  function findFolderDeep(items, targetId) {
+    for (const it of items) {
+      if (it.id === targetId) return it;
+      if (it.type === 'folder' && it.children) {
+        const found = findFolderDeep(it.children, targetId);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  // Refresh a specific panel inside the open dropdown without closing it.
+  // If renameId is provided, the dropdown will start inline rename for that item.
+  async function refreshPanel(folderId, renameId = null) {
+    if (!windowData.folderDropdown) return;
+    broadcast();
+    try {
+      const all = await inkInstance.windowManager.bookmarks.getAll();
+      const folder = findFolderDeep(all, folderId);
+      if (!folder) return;
+      windowData.folderDropdown.webContents.send('folder-dropdown-refresh-panel', {
+        folderId,
+        children: folder.children || [],
+        renameId,
+      });
+    } catch {}
+  }
+
+  // Inline rename for a folder item already visible in the dropdown
+  const startInlineRename = (itemId, itemTitle) => {
+    if (!windowData.folderDropdown) return;
+    try { windowData.folderDropdown.webContents.send('folder-dropdown-start-rename', { id: itemId, title: itemTitle }); } catch {}
+  };
+
+  // "New Folder / Divider Here" scoped to the parent folder the user is viewing
+  const addHere = parentFolderId ? [
+    { type: 'separator' },
+    { label: 'New Folder Here', click: async () => {
+        const newId = await inkInstance.windowManager.bookmarks.addFolderInto('New Folder', parentFolderId);
+        if (newId) await refreshPanel(parentFolderId, newId);
+    }},
+    { label: 'New Divider Here', click: async () => {
+        await inkInstance.windowManager.bookmarks.addDividerInto(parentFolderId);
+        await refreshPanel(parentFolderId);
+    }},
+  ] : [];
+
+  let template = [];
+
+  if (type === 'bookmark') {
+    template = [
+      { label: 'Open',               click: () => { closeAndFocus(); windowData.tabs.loadUrl(windowData.tabs.activeTabIndex, url); }},
+      { label: 'Open in New Tab',    click: () => { closeAndFocus(); const i = windowData.tabs.CreateTab(); windowData.tabs.loadUrl(i, url); windowData.tabs.showTab(i); }},
+      { label: 'Open in Background', click: () => { const i = windowData.tabs.CreateTab(); windowData.tabs.loadUrl(i, url); }},
+      { type: 'separator' },
+      { label: 'Edit',   click: () => { closeAndFocus(); windowData.window.webContents.send('bookmark-edit-prompt', { id, url, title }); }},
+      { label: 'Delete', click: async () => {
+          await inkInstance.windowManager.bookmarks.removeById(id);
+          if (parentFolderId) await refreshPanel(parentFolderId);
+          else broadcast();
+      }},
+      ...addHere,
+    ];
+  } else if (type === 'folder') {
+    template = [
+      { label: 'Open All in New Tabs', click: async () => {
+          const all = await inkInstance.windowManager.bookmarks.getAll();
+          const folder = findFolderDeep(all, id);
+          if (folder && folder.children) {
+            folder.children.filter(c => c.type === 'bookmark').forEach(c => {
+              const i = windowData.tabs.CreateTab(); windowData.tabs.loadUrl(i, c.url);
+            });
+          }
+      }},
+      { type: 'separator' },
+      // Rename inline — dropdown stays open
+      { label: 'Rename', click: () => startInlineRename(id, title) },
+      { label: 'Delete', click: async () => {
+          await inkInstance.windowManager.bookmarks.removeById(id);
+          if (parentFolderId) await refreshPanel(parentFolderId);
+          else { broadcast(); closeAndFocus(); }
+      }},
+      ...addHere,
+    ];
+  } else if (type === 'folder-bg') {
+    // Right-clicked on empty space inside a folder panel
+    template = [
+      { label: 'New Folder Here', click: async () => {
+          const newId = await inkInstance.windowManager.bookmarks.addFolderInto('New Folder', id);
+          if (newId) await refreshPanel(id, newId);
+      }},
+      { label: 'New Divider Here', click: async () => {
+          await inkInstance.windowManager.bookmarks.addDividerInto(id);
+          await refreshPanel(id);
+      }},
+      { type: 'separator' },
+      { label: 'Rename', click: () => startInlineRename(id, title) },
+      { label: 'Delete', click: async () => {
+          await inkInstance.windowManager.bookmarks.removeById(id);
+          broadcast();
+          closeAndFocus(); // folder itself deleted — close the dropdown
+      }},
+    ];
+  } else if (type === 'divider') {
+    template = [
+      { label: 'Delete Divider', click: async () => {
+          await inkInstance.windowManager.bookmarks.removeById(id);
+          if (parentFolderId) await refreshPanel(parentFolderId);
+          else broadcast();
+      }},
+      ...addHere,
+    ];
+  }
+
+  if (template.length) Menu.buildFromTemplate(template).popup({ window: windowData.window });
+}
+
+ipcMain.handle('bookmarks-update-title', async (_event, url, title) => {
+  await inkInstance.windowManager.bookmarks.updateTitle(url, title);
+  const allWebContents = webContents.getAllWebContents();
+  allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
+  return true;
+});
+
+ipcMain.handle('bookmarks-add', async (_event, url, title) => {
+  const added = await inkInstance.windowManager.bookmarks.add(url, title);
+  const allWebContents = webContents.getAllWebContents();
+  allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
   return added;
 });
 
-ipcMain.handle('bookmarks-remove', async (event, url) => {
+ipcMain.handle('bookmarks-remove', async (_event, url) => {
   const removed = await inkInstance.windowManager.bookmarks.remove(url);
-  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
-  if (windowData) windowData.window.webContents.send('bookmarks-changed');
+  const allWebContents = webContents.getAllWebContents();
+  allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
   return removed;
 });
 
 ipcMain.handle('bookmarks-has', async (event, url) => {
   return await inkInstance.windowManager.bookmarks.has(url);
+});
+
+ipcMain.handle('bookmarks-reorder', async (_event, ids) => {
+  await inkInstance.windowManager.bookmarks.reorder(ids);
+  const allWebContents = webContents.getAllWebContents();
+  allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
+  return true;
+});
+
+ipcMain.handle('bookmarks-add-folder', async (_event, title) => {
+  const id = await inkInstance.windowManager.bookmarks.addFolder(title);
+  const allWebContents = webContents.getAllWebContents();
+  allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
+  return id;
+});
+
+ipcMain.handle('bookmarks-add-divider', async () => {
+  const id = await inkInstance.windowManager.bookmarks.addDivider();
+  const allWebContents = webContents.getAllWebContents();
+  allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
+  return id;
+});
+
+ipcMain.handle('bookmarks-move-out-of-folder', async (_event, itemId, folderId, insertBeforeId) => {
+  const ok = await inkInstance.windowManager.bookmarks.moveOutOfFolder(itemId, folderId, insertBeforeId);
+  if (ok) {
+    const allWebContents = webContents.getAllWebContents();
+    allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
+  }
+  return ok;
+});
+
+ipcMain.handle('bookmarks-move-into-folder', async (_event, itemId, folderId, insertBeforeId) => {
+  const ok = await inkInstance.windowManager.bookmarks.moveIntoFolder(itemId, folderId, insertBeforeId);
+  if (ok) {
+    const allWebContents = webContents.getAllWebContents();
+    allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
+  }
+  return ok;
+});
+
+ipcMain.handle('bookmarks-remove-by-id', async (_event, id) => {
+  const removed = await inkInstance.windowManager.bookmarks.removeById(id);
+  const allWebContents = webContents.getAllWebContents();
+  allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
+  return removed;
+});
+
+ipcMain.handle('bookmarks-update-by-id', async (_event, id, updates) => {
+  const ok = await inkInstance.windowManager.bookmarks.updateById(id, updates);
+  const allWebContents = webContents.getAllWebContents();
+  allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
+  return ok;
+});
+
+// ── Unified bookmark bar context menu ──────────────────────────────────────
+function showBookmarkBarContextMenu(windowData, item) {
+  const { type, id, url, title, bookmarkBarVisible: barVisible } = item || {};
+
+  const broadcast = () => {
+    const allWebContents = webContents.getAllWebContents();
+    allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
+  };
+
+  const addItems = [
+    { type: 'separator' },
+    { label: 'Add Bookmark', click: () => windowData.window.webContents.send('bookmark-add-from-bar') },
+    { label: 'Add Folder',   click: () => windowData.window.webContents.send('bookmark-new-folder-prompt') },
+    { label: 'Add Divider',  click: async () => { await inkInstance.windowManager.bookmarks.addDivider(); broadcast(); } },
+  ];
+
+  let template = [];
+
+  if (type === 'bookmark') {
+    template = [
+      { label: 'Open',                click: () => windowData.tabs.loadUrl(windowData.tabs.activeTabIndex, url) },
+      { label: 'Open in New Tab',     click: () => { const i = windowData.tabs.CreateTab(); windowData.tabs.loadUrl(i, url); windowData.tabs.showTab(i); } },
+      { label: 'Open in Background',  click: () => { const i = windowData.tabs.CreateTab(); windowData.tabs.loadUrl(i, url); } },
+      { type: 'separator' },
+      { label: 'Edit',    click: () => windowData.window.webContents.send('bookmark-edit-prompt',   { id, url, title }) },
+      { label: 'Delete',  click: async () => { await inkInstance.windowManager.bookmarks.removeById(id); broadcast(); } },
+      ...addItems,
+    ];
+  } else if (type === 'folder') {
+    template = [
+      { label: 'Open All in New Tabs', click: async () => {
+          const all = await inkInstance.windowManager.bookmarks.getAll();
+          const folder = all.find(b => b.id === id);
+          if (folder && folder.children) {
+            folder.children.filter(c => c.type === 'bookmark').forEach(c => {
+              const i = windowData.tabs.CreateTab(); windowData.tabs.loadUrl(i, c.url);
+            });
+          }
+      }},
+      { type: 'separator' },
+      { label: 'Rename', click: () => windowData.window.webContents.send('bookmark-folder-rename', { id, title }) },
+      { label: 'Delete', click: async () => { await inkInstance.windowManager.bookmarks.removeById(id); broadcast(); } },
+      ...addItems,
+    ];
+  } else if (type === 'divider') {
+    template = [
+      { label: 'Delete Divider', click: async () => { await inkInstance.windowManager.bookmarks.removeById(id); broadcast(); } },
+    ];
+  } else {
+    // bar background
+    template = [
+      { label: 'Add Bookmark', click: () => windowData.window.webContents.send('bookmark-add-from-bar') },
+      { label: 'Add Folder',   click: () => windowData.window.webContents.send('bookmark-new-folder-prompt') },
+      { label: 'Add Divider',  click: async () => { await inkInstance.windowManager.bookmarks.addDivider(); broadcast(); } },
+      { type: 'separator' },
+      { label: 'Show Bookmark Bar', type: 'checkbox', checked: !!barVisible,
+        click: () => windowData.window.webContents.send('toggle-bookmark-bar') },
+    ];
+  }
+
+  Menu.buildFromTemplate(template).popup({ window: windowData.window });
+}
+
+ipcMain.on('show-bookmark-bar-context-menu', (event, item) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return;
+  showBookmarkBarContextMenu(windowData, item);
+});
+
+ipcMain.handle('open-url-in-new-tab', async (event, url, switchToTab = true) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return false;
+  const newIndex = windowData.tabs.CreateTab();
+  windowData.tabs.loadUrl(newIndex, url);
+  if (switchToTab) windowData.tabs.showTab(newIndex);
+  return true;
 });
 
 ipcMain.handle('open-bookmarks-tab', async (event) => {
@@ -779,3 +1247,52 @@ ipcMain.handle('window-is-maximized', (event) => {
 
 // Bruno feature is auto-initialized in the constructor above
 // All Bruno IPC handlers are registered by the Bruno class
+
+let _externDragPollInterval = null;
+let _externDragWindowData  = null;
+
+function stopExternDragPoll() {
+  if (_externDragPollInterval) { clearInterval(_externDragPollInterval); _externDragPollInterval = null; }
+  _externDragWindowData = null;
+}
+
+ipcMain.on('folder-dropdown-drag-start', (event, id, folderId) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (!windowData) return;
+  closeFolderDropdown(windowData);
+  windowData.window.webContents.send('extern-bookmark-drag-start', id, folderId);
+
+  // Poll cursor position and forward to the bar renderer so it can highlight drop targets
+  stopExternDragPoll();
+  _externDragWindowData = windowData;
+  _externDragPollInterval = setInterval(() => {
+    if (!_externDragWindowData) { stopExternDragPoll(); return; }
+    const cursor   = screen.getCursorScreenPoint();
+    const winBounds = _externDragWindowData.window.getBounds();
+    // Convert screen coords → window-content coords
+    const x = cursor.x - winBounds.x;
+    const y = cursor.y - winBounds.y;
+    try { _externDragWindowData.window.webContents.send('extern-bookmark-drag-position', x, y); } catch {}
+  }, 30);
+});
+
+ipcMain.on('folder-dropdown-drag-end', (event) => {
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  stopExternDragPoll();
+  if (windowData) windowData.window.webContents.send('extern-bookmark-drag-end');
+});
+
+ipcMain.on('extern-bookmark-drop', (event, x, y) => {
+  stopExternDragPoll();
+  const windowData = inkInstance.windowManager.getWindowByWebContents(event.sender);
+  if (windowData) windowData.window.webContents.send('extern-bookmark-drag-end');
+});
+
+ipcMain.handle('bookmarks-reorder-in-folder', async (_event, folderId, orderedIds) => {
+  const ok = await inkInstance.windowManager.bookmarks.reorderInFolder(folderId, orderedIds);
+  if (ok) {
+    const allWebContents = webContents.getAllWebContents();
+    allWebContents.forEach((wc) => { try { wc.send('bookmarks-changed'); } catch {} });
+  }
+  return ok;
+});
