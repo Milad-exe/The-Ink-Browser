@@ -10,34 +10,34 @@ const contextMenu = require("./window-context-menu");
 class WindowManager {
     constructor() {
         this.windows = new Map();
-        this._history = null;
-        this._bookmarks = null;
+        this.cachedHistory = null;
+        this.cachedBookmarks = null;
         this.nextWindowId = 0;
-        this._persistence = null;
-        this._restored = false;
+        this.cachedPersistence = null;
+        this.restored = false;
         // Track most recently focused BrowserWindow
         this.lastFocusedWindowId = null;
     }
 
     get history() {
-        if (!this._history) {
-            this._history = new History();
+        if (!this.cachedHistory) {
+            this.cachedHistory = new History();
         }
-        return this._history;
+        return this.cachedHistory;
     }
 
     get persistence() {
-        if (!this._persistence) {
-            this._persistence = new Persistence();
+        if (!this.cachedPersistence) {
+            this.cachedPersistence = new Persistence();
         }
-        return this._persistence;
+        return this.cachedPersistence;
     }
 
     get bookmarks() {
-        if (!this._bookmarks) {
-            this._bookmarks = new Bookmarks();
+        if (!this.cachedBookmarks) {
+            this.cachedBookmarks = new Bookmarks();
         }
-        return this._bookmarks;
+        return this.cachedBookmarks;
     }
 
     createWindow(width = 800, height = 600) {
@@ -67,13 +67,13 @@ class WindowManager {
             this.lastFocusedWindowId = windowId;
         });
         
-    const tabs = new Tabs(window, this.history, this.persistence);
+        const tabs = new Tabs(window, this.history, this.persistence);
         const shortcuts = new Shortcuts(window, tabs, this);
 
         tabs.setShortcuts(shortcuts);
         tabs.setWindowManager(this);
 
-    window.webContents.on("context-menu", async (event, params) => {
+        window.webContents.on("context-menu", async (_event, params) => {
             // Determine the element under the cursor to enrich params for context decisions
             try {
                 const contextInfo = await window.webContents.executeJavaScript(
@@ -117,31 +117,31 @@ class WindowManager {
 
         window.webContents.once('did-finish-load', () => {
             // Restore only once into the first opened window (if any state exists)
-            const state = (!this._restored && this.persistence.hasState()) ? this.persistence.loadState() : null;
+            const state = (!this.restored && this.persistence.hasState()) ? this.persistence.loadState() : null;
             if (state && state.tabs && state.tabs.length > 0) {
                 try {
                     // Create in saved order
                     state.tabs.forEach((t) => {
-                        tabs.CreateLazyTab(t.url, t.title, t.pinned);
+                        tabs.createLazyTab(t.url, t.title, t.pinned);
                     });
                     
                     // Focus saved active if valid
                     if (typeof state.activeIndex === 'number') {
-                        const indices2 = Array.from(tabs.TabMap.keys()).sort((a,b)=>a-b);
-                        const focusIdx = indices2[state.activeIndex] ?? indices2[0];
+                        const tabKeys = Array.from(tabs.tabMap.keys()).sort((a,b)=>a-b);
+                        const focusIdx = tabKeys[state.activeIndex] ?? tabKeys[0];
                         if (typeof focusIdx === 'number') tabs.showTab(focusIdx);
                     } else {
                         // Show first tab by default
-                        const indices2 = Array.from(tabs.TabMap.keys()).sort((a,b)=>a-b);
-                        if (indices2.length > 0) tabs.showTab(indices2[0]);
+                        const tabKeys = Array.from(tabs.tabMap.keys()).sort((a,b)=>a-b);
+                        if (tabKeys.length > 0) tabs.showTab(tabKeys[0]);
                     }
                 } catch {
                     // Fallback: at least one tab
-                    if (tabs.getTotalTabs() === 0) tabs.CreateTab();
+                    if (tabs.getTotalTabs() === 0) tabs.createTab();
                 }
-                this._restored = true;
+                this.restored = true;
             } else {
-                tabs.CreateTab();
+                tabs.createTab();
             }
             shortcuts.registerAllShortcuts();
         });
@@ -166,7 +166,7 @@ class WindowManager {
                             setTimeout(() => {
                                 try {
                                     const activeIdx = next.tabs.activeTabIndex;
-                                    const activeTab = next.tabs.TabMap.get(activeIdx);
+                                    const activeTab = next.tabs.tabMap.get(activeIdx);
                                     if (activeTab && activeTab.webContents) {
                                         activeTab.webContents.focus();
                                     }
@@ -197,7 +197,7 @@ class WindowManager {
             if (windowData.folderDropdown?.webContents === webContents) return windowData;
             // Match tab WebContentsViews
             if (windowData.tabs) {
-                for (const [, tab] of windowData.tabs.TabMap) {
+                for (const [, tab] of windowData.tabs.tabMap) {
                     if (tab && tab.webContents === webContents) return windowData;
                 }
             }

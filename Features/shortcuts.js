@@ -1,4 +1,4 @@
-const { globalShortcut, BrowserWindow } = require('electron');
+const { globalShortcut, BrowserWindow, app } = require('electron');
 
 class Shortcuts {
     constructor(mainWindow, tabManager, windowManager = null) {
@@ -18,17 +18,17 @@ class Shortcuts {
     }
 
     setupAllTabListeners() {
-        this.tabManager.TabMap.forEach((tab) => {
+        this.tabManager.tabMap.forEach((tab) => {
             this.setupTabListener(tab);
         });
     }
 
     setupTabListener(tab) {
-        if (!tab._shortcutListenerSetup) {
+        if (!tab.shortcutListenerSetup) {
             tab.webContents.on('before-input-event', (event, input) => {
                 this.handleInput(event, input);
             });
-            tab._shortcutListenerSetup = true;
+            tab.shortcutListenerSetup = true;
         }
     }
 
@@ -37,16 +37,16 @@ class Shortcuts {
     }
 
     registerWebContents(wc) {
-        if (wc._inkShortcutHandler) return;
+        if (wc.inkShortcutHandler) return;
         const handler = (event, input) => this.handleInput(event, input);
-        wc._inkShortcutHandler = handler;
+        wc.inkShortcutHandler = handler;
         wc.on('before-input-event', handler);
     }
 
     unregisterWebContents(wc) {
-        if (wc._inkShortcutHandler) {
-            wc.removeListener('before-input-event', wc._inkShortcutHandler);
-            wc._inkShortcutHandler = null;
+        if (wc.inkShortcutHandler) {
+            wc.removeListener('before-input-event', wc.inkShortcutHandler);
+            wc.inkShortcutHandler = null;
         }
     }
 
@@ -71,7 +71,7 @@ class Shortcuts {
 
     registerTabShortcuts() {
         this.registerShortcut('CmdOrCtrl+T', () => {
-            this.tabManager.CreateTab();
+            this.tabManager.createTab();
         });
 
         this.registerShortcut('CmdOrCtrl+N', () => {
@@ -88,10 +88,10 @@ class Shortcuts {
 
         this.registerShortcut('CmdOrCtrl+W', () => {
             const currentTabIndex = this.tabManager.activeTabIndex;
-            const totalTabs = this.tabManager.TabMap.size;
+            const totalTabs = this.tabManager.tabMap.size;
             
             if (totalTabs > 1) {
-                const allTabIndexes = Array.from(this.tabManager.TabMap.keys()).sort((a, b) => a - b);
+                const allTabIndexes = Array.from(this.tabManager.tabMap.keys()).sort((a, b) => a - b);
                 const currentPosition = allTabIndexes.indexOf(currentTabIndex);
                 let targetTabIndex = null;
                 
@@ -113,8 +113,8 @@ class Shortcuts {
                     this.mainWindow.focus();
                     this.mainWindow.show();
                     
-                    if (this.tabManager.TabMap.has(this.tabManager.activeTabIndex)) {
-                        const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+                    if (this.tabManager.tabMap.has(this.tabManager.activeTabIndex)) {
+                        const activeTab = this.tabManager.tabMap.get(this.tabManager.activeTabIndex);
                         if (activeTab && activeTab.webContents) {
                             activeTab.webContents.focus();
                         }
@@ -152,7 +152,7 @@ class Shortcuts {
         });
 
         this.registerShortcut('CmdOrCtrl+Shift+R', () => {
-            const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+            const activeTab = this.tabManager.tabMap.get(this.tabManager.activeTabIndex);
             if (activeTab) {
                 activeTab.webContents.reloadIgnoringCache();
             }
@@ -161,7 +161,7 @@ class Shortcuts {
 
     registerPageShortcuts() {
         this.registerShortcut('CmdOrCtrl+F', () => {
-            const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+            const activeTab = this.tabManager.tabMap.get(this.tabManager.activeTabIndex);
             if (activeTab) {
                 if (this.tabManager.findDialog) {
                     this.tabManager.findDialog.show(activeTab);
@@ -170,7 +170,7 @@ class Shortcuts {
         });
 
         this.registerShortcut('CmdOrCtrl+Z', () => {
-            const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+            const activeTab = this.tabManager.tabMap.get(this.tabManager.activeTabIndex);
             if (activeTab && activeTab.webContents.isFocused()) {
                 activeTab.webContents.undo();
             } else if (this.mainWindow.webContents.isFocused()) {
@@ -180,7 +180,7 @@ class Shortcuts {
 
         if (process.platform === 'darwin') {
             this.registerShortcut('CmdOrCtrl+Shift+Z', () => {
-                const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+                const activeTab = this.tabManager.tabMap.get(this.tabManager.activeTabIndex);
                 if (activeTab && activeTab.webContents.isFocused()) {
                     activeTab.webContents.redo();
                 } else if (this.mainWindow.webContents.isFocused()) {
@@ -189,7 +189,7 @@ class Shortcuts {
             });
         } else {
             this.registerShortcut('CmdOrCtrl+Y', () => {
-                const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+                const activeTab = this.tabManager.tabMap.get(this.tabManager.activeTabIndex);
                 if (activeTab && activeTab.webContents.isFocused()) {
                     activeTab.webContents.redo();
                 } else if (this.mainWindow.webContents.isFocused()) {
@@ -217,14 +217,14 @@ class Shortcuts {
 
     registerDeveloperShortcuts() {
         this.registerShortcut('F12', () => {
-            const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+            const activeTab = this.tabManager.tabMap.get(this.tabManager.activeTabIndex);
             if (activeTab) {
                 activeTab.webContents.toggleDevTools();
             }
         });
 
         this.registerShortcut('CmdOrCtrl+Shift+I', () => {
-            const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+            const activeTab = this.tabManager.tabMap.get(this.tabManager.activeTabIndex);
             if (activeTab) {
                 activeTab.webContents.toggleDevTools();
             }
@@ -232,8 +232,6 @@ class Shortcuts {
     }
 
     registerApplicationShortcuts() {
-        const { app } = require('electron');
-        
         // Quit the app directly (mark all tabs allowClose so their close guards don't block)
         this.registerShortcut('CmdOrCtrl+Q', () => {
             if (this.windowManager) {
@@ -304,7 +302,7 @@ class Shortcuts {
     }
 
     switchToNextTab() {
-        const tabIndexes = Array.from(this.tabManager.TabMap.keys()).sort((a, b) => a - b);
+        const tabIndexes = Array.from(this.tabManager.tabMap.keys()).sort((a, b) => a - b);
         const userTabIndexes = tabIndexes.filter(index => {
             const url = this.tabManager.tabUrls.get(index);
             return url !== undefined;
@@ -318,7 +316,7 @@ class Shortcuts {
     }
 
     switchToPreviousTab() {
-        const tabIndexes = Array.from(this.tabManager.TabMap.keys()).sort((a, b) => a - b);
+        const tabIndexes = Array.from(this.tabManager.tabMap.keys()).sort((a, b) => a - b);
         const userTabIndexes = tabIndexes.filter(index => {
             const url = this.tabManager.tabUrls.get(index);
             return url !== undefined;
@@ -332,7 +330,7 @@ class Shortcuts {
     }
 
     switchToTabByNumber(number) {
-        const tabIndexes = Array.from(this.tabManager.TabMap.keys()).sort((a, b) => a - b);
+        const tabIndexes = Array.from(this.tabManager.tabMap.keys()).sort((a, b) => a - b);
         
         const userTabIndexes = tabIndexes.filter(index => {
             const url = this.tabManager.tabUrls.get(index);
@@ -346,7 +344,7 @@ class Shortcuts {
     }
 
     zoomIn() {
-        const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+        const activeTab = this.tabManager.tabMap.get(this.tabManager.activeTabIndex);
         if (activeTab) {
             const currentZoom = activeTab.webContents.getZoomLevel();
             activeTab.webContents.setZoomLevel(currentZoom + 0.5);
@@ -354,7 +352,7 @@ class Shortcuts {
     }
 
     zoomOut() {
-        const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+        const activeTab = this.tabManager.tabMap.get(this.tabManager.activeTabIndex);
         if (activeTab) {
             const currentZoom = activeTab.webContents.getZoomLevel();
             activeTab.webContents.setZoomLevel(currentZoom - 0.5);
@@ -362,7 +360,7 @@ class Shortcuts {
     }
 
     resetZoom() {
-        const activeTab = this.tabManager.TabMap.get(this.tabManager.activeTabIndex);
+        const activeTab = this.tabManager.tabMap.get(this.tabManager.activeTabIndex);
         if (activeTab) {
             activeTab.webContents.setZoomLevel(0);
         }

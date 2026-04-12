@@ -20,11 +20,11 @@ class Persistence {
         this.dir          = path.join(userDir, 'ink');
         this.statePath    = path.join(this.dir, 'tabs-state.json');
         this.settingsPath = path.join(this.dir, 'settings.json');
-        this._ensureDir();
-        this.settings = this._loadSettings();
+        this.ensureDir();
+        this.settings = this.loadSettings();
     }
 
-    _ensureDir() {
+    ensureDir() {
         try {
             if (!fs.existsSync(this.dir)) fs.mkdirSync(this.dir, { recursive: true });
         } catch {}
@@ -32,23 +32,23 @@ class Persistence {
 
     // ── Encrypted read / write helpers (sync, for startup path) ──────────────
 
-    _readEncrypted(filePath) {
+    readEncrypted(filePath) {
         const raw = fs.readFileSync(filePath, 'utf-8');
         if (isEncrypted(raw)) return decrypt(raw);
         // Legacy plaintext — return as-is; will be re-saved encrypted on next write
         return raw;
     }
 
-    _writeEncrypted(filePath, data) {
+    writeEncrypted(filePath, data) {
         fs.writeFileSync(filePath, encrypt(JSON.stringify(data, null, 2)));
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
 
-    _loadSettings() {
+    loadSettings() {
         try {
             if (fs.existsSync(this.settingsPath)) {
-                const plaintext = this._readEncrypted(this.settingsPath);
+                const plaintext = this.readEncrypted(this.settingsPath);
                 const obj = JSON.parse(plaintext);
                 return { ...DEFAULTS, ...obj };
             }
@@ -56,8 +56,8 @@ class Persistence {
         return { ...DEFAULTS };
     }
 
-    _save() {
-        try { this._writeEncrypted(this.settingsPath, this.settings); } catch {}
+    save() {
+        try { this.writeEncrypted(this.settingsPath, this.settings); } catch {}
     }
 
     getAll() { return { ...this.settings }; }
@@ -67,12 +67,12 @@ class Persistence {
     set(key, value) {
         if (!(key in DEFAULTS)) return;
         this.settings[key] = value;
-        this._save();
+        this.save();
     }
 
     // Legacy API
     getPersistMode()      { return !!this.settings.persistAllTabs; }
-    setPersistMode(enabled) { this.settings.persistAllTabs = !!enabled; this._save(); }
+    setPersistMode(enabled) { this.settings.persistAllTabs = !!enabled; this.save(); }
 
     // ── Tab State ─────────────────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ class Persistence {
     loadState() {
         try {
             if (!fs.existsSync(this.statePath)) return null;
-            const plaintext = this._readEncrypted(this.statePath);
+            const plaintext = this.readEncrypted(this.statePath);
             const obj = JSON.parse(plaintext);
             if (!obj || !Array.isArray(obj.tabs)) return null;
             return obj;
@@ -93,7 +93,7 @@ class Persistence {
     }
 
     saveState(state) {
-        try { this._writeEncrypted(this.statePath, state); } catch {}
+        try { this.writeEncrypted(this.statePath, state); } catch {}
     }
 }
 

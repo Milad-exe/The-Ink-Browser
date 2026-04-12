@@ -7,10 +7,10 @@ class History {
     constructor() {
         this.file        = null;
         this.initialized = false;
-        this._initPath();
+        this.initPath();
     }
 
-    _initPath() {
+    initPath() {
         try {
             this.file = path.join(app.getPath('userData'), 'browsing-history.json');
         } catch {
@@ -18,7 +18,7 @@ class History {
         }
     }
 
-    async _ensureFile() {
+    async ensureFile() {
         if (this.initialized) return true;
         if (!this.file) return false;
         try {
@@ -33,8 +33,8 @@ class History {
 
     // ── Low-level read/write (handles encrypt/decrypt + plaintext migration) ──
 
-    async _read() {
-        await this._ensureFile();
+    async read() {
+        await this.ensureFile();
         try {
             const raw = await fs.readFile(this.file, 'utf8');
             let plaintext;
@@ -51,7 +51,7 @@ class History {
         }
     }
 
-    async _write(data) {
+    async write(data) {
         try {
             await fs.writeFile(this.file, encrypt(JSON.stringify(data, null, 2)), 'utf8');
         } catch {}
@@ -60,29 +60,29 @@ class History {
     // ── Public API ──────────────────────────────────────────────────────────
 
     async loadHistory() {
-        return this._read();
+        return this.read();
     }
 
     async addToHistory(url, title) {
-        await this._ensureFile();
+        await this.ensureFile();
         try {
-            const history = await this._read();
+            const history = await this.read();
 
-            if (_isSearchResultUrl(url)) return;
+            if (isSearchResultUrl(url)) return;
 
             // Remove existing entry for same URL (dedup, keep fresh timestamp at top)
             const deduped = history.filter(e => e.url !== url);
 
             deduped.unshift({ url, title, timestamp: new Date().toISOString() });
 
-            await this._write(deduped.slice(0, 1000));
+            await this.write(deduped.slice(0, 1000));
         } catch {}
     }
 
     async removeFromHistory(url, timestamp) {
         try {
-            const history = await this._read();
-            await this._write(history.filter(e => !(e.url === url && e.timestamp === timestamp)));
+            const history = await this.read();
+            await this.write(history.filter(e => !(e.url === url && e.timestamp === timestamp)));
             return true;
         } catch {
             return false;
@@ -91,8 +91,8 @@ class History {
 
     async clearHistory() {
         try {
-            await this._ensureFile();
-            await this._write([]);
+            await this.ensureFile();
+            await this.write([]);
             return true;
         } catch {
             return false;
@@ -102,7 +102,7 @@ class History {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function _isSearchResultUrl(rawUrl) {
+function isSearchResultUrl(rawUrl) {
     if (!rawUrl) return false;
     try {
         const u      = new URL(rawUrl);

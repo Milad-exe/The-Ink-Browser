@@ -7,13 +7,13 @@ const fs = require('fs');
 const path = require('path');
 
 class EnvironmentManager {
-  _envDir(collectionPath) {
+  envDir(collectionPath) {
     return path.join(collectionPath, 'environments');
   }
 
   createEnvironment(collectionPath, envName) {
     try {
-      const dir = this._envDir(collectionPath);
+      const dir = this.envDir(collectionPath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       const envPath = path.join(dir, `${envName}.json`);
       if (fs.existsSync(envPath)) throw new Error('Environment already exists');
@@ -28,7 +28,7 @@ class EnvironmentManager {
 
   listEnvironments(collectionPath) {
     try {
-      const dir = this._envDir(collectionPath);
+      const dir = this.envDir(collectionPath);
       if (!fs.existsSync(dir)) return [];
       return fs.readdirSync(dir)
         .filter(f => f.endsWith('.json'))

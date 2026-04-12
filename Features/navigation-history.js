@@ -93,7 +93,7 @@ class NavigationHistory {
             }
             
             return false
-        } catch (e) {
+        } catch {
             return false
         }
     }
