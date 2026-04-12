@@ -7,10 +7,10 @@ const path = require('path');
 class BrunoUI {
   constructor() {
     // Per-window resize state
-    this._resizing = new WeakMap();
+    this.resizing = new WeakMap();
   }
 
-  _getBrunoBounds(win, ratio) {
+  getBrunoBounds(win, ratio) {
     const bounds = win.getContentBounds();
     const topOffset = 104;
     const brunoWidth = Math.floor(bounds.width * ratio);
@@ -44,9 +44,9 @@ class BrunoUI {
           windowData.shortcuts.registerWebContents(windowData.bruno.webContents);
         }
 
-        windowData._brunoResizeHandler = () => {
+        windowData.brunoResizeHandler = () => {
           if (windowData.bruno) {
-            const b = this._getBrunoBounds(windowData.window, windowData.brunoRatio);
+            const b = this.getBrunoBounds(windowData.window, windowData.brunoRatio);
             windowData.bruno.setBounds(b);
             if (windowData.tabs) {
               windowData.tabs.brunoWidth = b.width;
@@ -54,10 +54,10 @@ class BrunoUI {
             }
           }
         };
-        windowData.window.on('resize', windowData._brunoResizeHandler);
+        windowData.window.on('resize', windowData.brunoResizeHandler);
       }
 
-      const b = this._getBrunoBounds(windowData.window, windowData.brunoRatio);
+      const b = this.getBrunoBounds(windowData.window, windowData.brunoRatio);
       windowData.bruno.setBounds(b);
       if (windowData.tabs) {
         windowData.tabs.brunoWidth = b.width;
@@ -81,9 +81,9 @@ class BrunoUI {
         if (windowData.shortcuts) {
           windowData.shortcuts.unregisterWebContents(windowData.bruno.webContents);
         }
-        if (windowData._brunoResizeHandler) {
-          windowData.window.off('resize', windowData._brunoResizeHandler);
-          windowData._brunoResizeHandler = null;
+        if (windowData.brunoResizeHandler) {
+          windowData.window.off('resize', windowData.brunoResizeHandler);
+          windowData.brunoResizeHandler = null;
         }
         windowData.window.contentView.removeChildView(windowData.bruno);
         windowData.bruno = null;
@@ -108,7 +108,7 @@ class BrunoUI {
     try {
       const windowData = global.inkInstance?.windowManager?.getWindowByWebContents(event.sender);
       if (!windowData) return;
-      this._resizing.set(windowData, { startX, startRatio: windowData.brunoRatio });
+      this.resizing.set(windowData, { startX, startRatio: windowData.brunoRatio });
     } catch (e) {
       console.error('startResize error:', e);
     }
@@ -118,15 +118,15 @@ class BrunoUI {
   doResize(event, currentX) {
     try {
       const windowData = global.inkInstance?.windowManager?.getWindowByWebContents(event.sender);
-      if (!windowData || !this._resizing.has(windowData)) return;
+      if (!windowData || !this.resizing.has(windowData)) return;
 
-      const { startX, startRatio } = this._resizing.get(windowData);
+      const { startX, startRatio } = this.resizing.get(windowData);
       const winWidth = windowData.window.getContentBounds().width;
       const delta = startX - currentX; // dragging left → delta positive → Bruno wider
       const newRatio = Math.min(0.75, Math.max(0.20, startRatio + delta / winWidth));
       windowData.brunoRatio = newRatio;
 
-      const b = this._getBrunoBounds(windowData.window, newRatio);
+      const b = this.getBrunoBounds(windowData.window, newRatio);
       windowData.bruno?.setBounds(b);
       if (windowData.tabs) {
         windowData.tabs.brunoWidth = b.width;
@@ -140,7 +140,7 @@ class BrunoUI {
   endResize(event) {
     try {
       const windowData = global.inkInstance?.windowManager?.getWindowByWebContents(event.sender);
-      if (windowData) this._resizing.delete(windowData);
+      if (windowData) this.resizing.delete(windowData);
     } catch (e) {
       console.error('endResize error:', e);
     }

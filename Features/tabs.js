@@ -15,7 +15,7 @@ class Tabs {
         this.navigationHistory = new NavigationHistory()
         this.findDialog = FindDialogManager.getInstance().createDialog(mainWindow)
         this.shortcuts = null
-        this.TabMap = new Map()
+        this.tabMap = new Map()
         this.tabUrls = new Map()
         this.activeTabIndex = 0
         this.nextTabIndex = 0
@@ -24,7 +24,7 @@ class Tabs {
         this.isHtmlFullScreen = false
         this.pinnedTabs = new Set()
         this.tabOrder = []
-        this._closedTabHistory = [] // stack of {url, title} for "Reopen Closed Tab"
+        this.closedTabHistory = [] // stack of {url, title} for "Reopen Closed Tab"
         
         this.mainWindow.on('resize', () => {
             this.resizeAllTabs()
@@ -34,7 +34,7 @@ class Tabs {
             this.isHtmlFullScreen = false;
             this.resizeAllTabs();
             // Force any HTML fullscreen elements to exit if the OS window left fullscreen
-            this.TabMap.forEach(tab => {
+            this.tabMap.forEach(tab => {
                 if (tab && tab.webContents) {
                     tab.webContents.executeJavaScript('if (document.fullscreenElement) document.exitFullscreen();').catch(() => {});
                 }
@@ -42,15 +42,15 @@ class Tabs {
         });
         
         this.mainWindow.on('close', (event) => {
-            if (this.TabMap.size > 0 && !this.allowClose) {
+            if (this.tabMap.size > 0 && !this.allowClose) {
                 event.preventDefault();
                 
                 setImmediate(() => {
                     if (!this.mainWindow.isDestroyed()) {
                         this.mainWindow.focus();
                         
-                        if (this.TabMap.has(this.activeTabIndex)) {
-                            const activeTab = this.TabMap.get(this.activeTabIndex);
+                        if (this.tabMap.has(this.activeTabIndex)) {
+                            const activeTab = this.tabMap.get(this.activeTabIndex);
                             if (activeTab && activeTab.webContents) {
                                 activeTab.webContents.focus();
                             }
@@ -61,17 +61,11 @@ class Tabs {
             }
         });
         
-        this.mainWindow.on('closed', () => {
-        });
-        
-        this.mainWindow.on('before-quit', (event) => {
-        });
-        
         const originalClose = this.mainWindow.close.bind(this.mainWindow);
         const originalDestroy = this.mainWindow.destroy.bind(this.mainWindow);
         
         this.mainWindow.close = () => {
-            if (this.TabMap.size > 0 && !this.allowClose) {
+            if (this.tabMap.size > 0 && !this.allowClose) {
                 return;
             }
             
@@ -81,7 +75,7 @@ class Tabs {
         };
         
         this.mainWindow.destroy = () => {
-            if (this.TabMap.size > 0 && !this.allowClose) {
+            if (this.tabMap.size > 0 && !this.allowClose) {
                 return;
             }
             
@@ -89,7 +83,7 @@ class Tabs {
         };
     }
 
-    CreateLazyTab(url, title, isPinned) {
+    createLazyTab(url, title, isPinned) {
         const tabIndex = this.nextTabIndex;
         this.nextTabIndex++;
         
@@ -118,7 +112,7 @@ class Tabs {
         const bounds = this.getTabBounds();
         tab.setBounds(bounds);
 
-        this.TabMap.set(tabIndex, tab);
+        this.tabMap.set(tabIndex, tab);
         this.tabUrls.set(tabIndex, url || 'newtab');
         this.tabOrder.push(tabIndex);
         
@@ -126,47 +120,47 @@ class Tabs {
             this.pinnedTabs.add(tabIndex);
         }
 
-        tab._lazyLoaded = false;
+        tab.lazyLoaded = false;
         
         let tempTitle = title || url || 'New Tab';
         if ((!title || title === 'New Tab' || title === '') && url && url.startsWith('http')) {
             try { tempTitle = new URL(url).hostname; } catch {}
         }
-        tab._lazyTitle = tempTitle;
+        tab.lazyTitle = tempTitle;
 
         this.navigationHistory.initializeTab(tabIndex, url || 'newtab');
         this.setupTabListeners(tabIndex, tab);
 
         tab.webContents.on('did-finish-load', () => {
-            const windowData = this._getWindowData();
+            const windowData = this.getWindowData();
             if (windowData) {
-                const loadedUrl = tab.webContents.getURL ? tab.webContents.getURL() : '';
-                focusMode.applyToTab(windowData, tab.webContents, loadedUrl);
+                focusMode.applyToTab(windowData, tab.webContents, tab.webContents.getURL?.() ?? '');
             }
-            if (tab.webContents.getTitle()) {
-                tab._lazyTitle = tab.webContents.getTitle();
-                this.sendTabUpdate(tabIndex, tab, this.tabUrls.get(tabIndex) || '', tab._lazyTitle);
+            const title = tab.webContents.getTitle();
+            if (title) {
+                tab.lazyTitle = title;
+                this.sendTabUpdate(tabIndex, tab, this.tabUrls.get(tabIndex) || '', title);
             }
         });
 
         this.mainWindow.webContents.send('tab-created', {
             index: tabIndex,
-            title: tab._lazyTitle,
-            totalTabs: this.TabMap.size
+            title: tab.lazyTitle,
+            totalTabs: this.tabMap.size
         });
-        this.sendTabUpdate(tabIndex, tab, url || 'newtab', tab._lazyTitle);
+        this.sendTabUpdate(tabIndex, tab, url || 'newtab', tab.lazyTitle);
 
         return tabIndex;
     }
 
-    _computeDisplayTitleFor(index, fallbackTitle) {
+    computeDisplayTitleFor(index, fallbackTitle) {
         try {
-            const tab = this.TabMap.get(index);
-            if (tab && tab._lazyLoaded === false && tab._lazyTitle) {
-                return tab._lazyTitle;
+            const tab = this.tabMap.get(index);
+            if (tab && tab.lazyLoaded === false && tab.lazyTitle) {
+                return tab.lazyTitle;
             }
-            if (tab && tab._lazyTitle && tab.webContents && !tab.webContents.isDestroyed() && !tab.webContents.getTitle()) {
-                return tab._lazyTitle;
+            if (tab && tab.lazyTitle && tab.webContents && !tab.webContents.isDestroyed() && !tab.webContents.getTitle()) {
+                return tab.lazyTitle;
             }
             const urlType = this.tabUrls.get(index) || '';
             if (urlType === 'newtab' || (typeof urlType === 'string' && urlType.startsWith('file://'))) {
@@ -186,9 +180,9 @@ class Tabs {
         }
     }
 
-    _updateWindowTitle(index, explicitTitle) {
+    updateWindowTitle(index, explicitTitle) {
         try {
-            const title = explicitTitle || this._computeDisplayTitleFor(index);
+            const title = explicitTitle || this.computeDisplayTitleFor(index);
             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
                 this.mainWindow.setTitle(title);
             }
@@ -196,19 +190,19 @@ class Tabs {
     }
 
     setWindowManager(windowManager) {
-        this._windowManager = windowManager;
+        this.windowManager = windowManager;
     }
 
-    _getWindowData() {
-        if (!this._windowManager) return null;
-        return this._windowManager.getWindowByWebContents(this.mainWindow.webContents);
+    getWindowData() {
+        if (!this.windowManager) return null;
+        return this.windowManager.getWindowByWebContents(this.mainWindow.webContents);
     }
 
     setShortcuts(shortcuts) {
         this.shortcuts = shortcuts;
     }
 
-    CreateTab(){
+    createTab(){
         const tabIndex = this.nextTabIndex
         this.nextTabIndex++
         
@@ -233,42 +227,39 @@ class Tabs {
         const bounds = this.getTabBounds()
         tab.setBounds(bounds)
 
-    this.TabMap.set(tabIndex, tab)
+    this.tabMap.set(tabIndex, tab)
         this.tabUrls.set(tabIndex, 'newtab')
     this.tabOrder.push(tabIndex)
         this.activeTabIndex = tabIndex
         this.navigationHistory.initializeTab(tabIndex, 'newtab')
-        
-        const initialHistory = this.navigationHistory.getHistory(tabIndex);
-        
         this.setupTabListeners(tabIndex, tab)
-        
+
         this.mainWindow.webContents.send('tab-created', {
             index: tabIndex,
             title: 'New Tab',
-            totalTabs: this.TabMap.size
+            totalTabs: this.tabMap.size
         })
-        
-    this.showTab(tabIndex)
-    this._saveStateDebounced()
 
+        this.showTab(tabIndex)
+        this.saveStateDebounced()
         this.sendTabUpdate(tabIndex, tab, '', 'New Tab')
 
         tab.webContents.on('did-finish-load', () => {
-            const windowData = this._getWindowData();
+            const windowData = this.getWindowData();
             if (windowData) {
-                const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
-                focusMode.applyToTab(windowData, tab.webContents, url);
+                focusMode.applyToTab(windowData, tab.webContents, tab.webContents.getURL?.() ?? '');
             }
-            if (tab.webContents.getTitle()) {
-                tab._lazyTitle = tab.webContents.getTitle();
-                this.sendTabUpdate(tabIndex, tab, this.tabUrls.get(tabIndex) || '', tab._lazyTitle);
+            const title = tab.webContents.getTitle();
+            if (title) {
+                tab.lazyTitle = title;
+                this.sendTabUpdate(tabIndex, tab, this.tabUrls.get(tabIndex) || '', title);
             }
         });
-            return tabIndex
+
+        return tabIndex
     }
 
-    CreateTabWithPage(pagePath, pageType, pageTitle) {
+    createTabWithPage(pagePath, pageType, pageTitle) {
         const tabIndex = this.nextTabIndex
         this.nextTabIndex++
         
@@ -287,22 +278,19 @@ class Tabs {
         const bounds = this.getTabBounds()
         tab.setBounds(bounds)
 
-        tab._lazyTitle = pageTitle || pageType;
+        tab.lazyTitle = pageTitle || pageType;
 
-        this.TabMap.set(tabIndex, tab)
+        this.tabMap.set(tabIndex, tab)
         this.tabUrls.set(tabIndex, pageType)
         this.tabOrder.push(tabIndex)
         this.activeTabIndex = tabIndex
         this.navigationHistory.initializeTab(tabIndex, pageType)
-        
-        const initialHistory = this.navigationHistory.getHistory(tabIndex);
-        
         this.setupTabListeners(tabIndex, tab)
         
         this.mainWindow.webContents.send('tab-created', {
             index: tabIndex,
             title: pageTitle || pageType,
-            totalTabs: this.TabMap.size
+            totalTabs: this.tabMap.size
         })
         
         this.sendTabUpdate(tabIndex, tab, pageType, pageTitle);
@@ -310,16 +298,16 @@ class Tabs {
         this.showTab(tabIndex)
 
         tab.webContents.on('did-finish-load', () => {
-            const windowData = this._getWindowData();
+            const windowData = this.getWindowData();
             if (windowData) {
-                const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
-                focusMode.applyToTab(windowData, tab.webContents, url);
+                focusMode.applyToTab(windowData, tab.webContents, tab.webContents.getURL?.() ?? '');
             }
-            if (tab.webContents.getTitle()) {
-                tab._lazyTitle = tab.webContents.getTitle();
-                this.sendTabUpdate(tabIndex, tab, this.tabUrls.get(tabIndex) || '', tab._lazyTitle);
+            const title = tab.webContents.getTitle();
+            if (title) {
+                tab.lazyTitle = title;
+                this.sendTabUpdate(tabIndex, tab, this.tabUrls.get(tabIndex) || '', title);
             }
-            this._saveStateDebounced()
+            this.saveStateDebounced();
         });
         return tabIndex
     }
@@ -343,12 +331,7 @@ class Tabs {
     setupTabListeners(tabIndex, tab) {
         let isNavigatingProgrammatically = false;
         let lastAddedUrl = null;
-        const shouldOpenExternally = (_targetUrl) => {
-            // Don't send any navigations to external browser — let them happen in-tab.
-            // window.open popups are handled separately by setWindowOpenHandler.
-            return false;
-        };
-        
+
         if (this.shortcuts) {
             this.shortcuts.onTabCreated(tab);
         }
@@ -390,7 +373,7 @@ class Tabs {
         // All window.open / target="_blank" links open in a new tab, never a new BrowserWindow
         tab.webContents.setWindowOpenHandler(({ url }) => {
             setImmediate(() => {
-                const newIndex = this.CreateTab();
+                const newIndex = this.createTab();
                 this.loadUrl(newIndex, url);
             });
             return { action: 'deny' };
@@ -411,8 +394,8 @@ class Tabs {
             }
         })
         
-        tab._isNavigatingProgrammatically = () => isNavigatingProgrammatically;
-        tab._setNavigatingProgrammatically = (value) => { isNavigatingProgrammatically = value; };
+        tab.isNavigatingProgrammatically = () => isNavigatingProgrammatically;
+        tab.setNavigatingProgrammatically = (value) => { isNavigatingProgrammatically = value; };
 
         // HTML5 Fullscreen (e.g. YouTube videos)
         tab.webContents.on('enter-html-full-screen', () => {
@@ -450,7 +433,7 @@ class Tabs {
         });
         
         tab.webContents.on('page-title-updated', (event, title) => {
-            tab._lazyTitle = title;
+            tab.lazyTitle = title;
             const currentUrl = this.tabUrls.get(tabIndex) || ''
             if (currentUrl !== 'newtab' && currentUrl !== 'history' && !currentUrl.startsWith('file://')) {
                 this.sendTabUpdate(tabIndex, tab, currentUrl, title)
@@ -476,7 +459,7 @@ class Tabs {
 
     sendTabUpdate(tabIndex, tab, url, title, favicon) {
         let displayUrl = url;
-        let displayTitle = title || this._computeDisplayTitleFor(tabIndex) || "New Tab";
+        let displayTitle = title || this.computeDisplayTitleFor(tabIndex) || "New Tab";
         
         let isInternal = ['newtab', 'settings', 'bookmarks', 'history', 'bruno'].includes(url) || (url && url.startsWith('file://'));
 
@@ -506,12 +489,12 @@ class Tabs {
 
         // Keep the window title in sync with the active tab
         if (tabIndex === this.activeTabIndex) {
-            this._updateWindowTitle(tabIndex, displayTitle);
+            this.updateWindowTitle(tabIndex, displayTitle);
         }
     }
     
     sendNavigationUpdate(tabIndex) {
-        if (this.TabMap.has(tabIndex) && tabIndex === this.activeTabIndex) {
+        if (this.tabMap.has(tabIndex) && tabIndex === this.activeTabIndex) {
             try {
                 this.mainWindow.webContents.send('navigation-updated', {
                     index: tabIndex,
@@ -533,17 +516,17 @@ class Tabs {
     }
     
     showTab(index) {
-        this.TabMap.forEach((tab, i) => {
+        this.tabMap.forEach((tab, i) => {
             tab.setVisible(false)
         })
         
-        if (this.TabMap.has(index)) {
-            const tab = this.TabMap.get(index);
+        if (this.tabMap.has(index)) {
+            const tab = this.tabMap.get(index);
             tab.setVisible(true)
             this.activeTabIndex = index
             
-            if (tab._lazyLoaded === false) {
-                tab._lazyLoaded = true;
+            if (tab.lazyLoaded === false) {
+                tab.lazyLoaded = true;
                 const lazyUrl = this.tabUrls.get(index);
                 if (lazyUrl === 'history') {
                     tab.webContents.loadFile('renderer/History/index.html');
@@ -556,8 +539,8 @@ class Tabs {
                 } else {
                     tab.webContents.loadFile('renderer/NewTab/index.html');
                 }
-            } else if (tab._needsReloadForFocusMode) {
-                tab._needsReloadForFocusMode = false;
+            } else if (tab.needsReloadForFocusMode) {
+                tab.needsReloadForFocusMode = false;
                 tab.webContents.reload();
             }
 
@@ -566,13 +549,13 @@ class Tabs {
             this.mainWindow.webContents.send('tab-switched', {
                 index: index,
                 url: (currentUrl === 'newtab' || currentUrl === 'history') ? '' : currentUrl,
-                totalTabs: this.TabMap.size
+                totalTabs: this.tabMap.size
             })
             
             this.sendNavigationUpdate(index)
 
             // Update window title to reflect the newly active tab
-            this._updateWindowTitle(index)
+            this.updateWindowTitle(index)
             
             // Put the website back into focus so keyboard events register immediately
             tab.webContents.focus()
@@ -580,15 +563,15 @@ class Tabs {
     }
     
     loadUrl(index, url) {
-        if (this.TabMap.has(index)) {
-            const tab = this.TabMap.get(index)
+        if (this.tabMap.has(index)) {
+            const tab = this.tabMap.get(index)
             tab.webContents.loadURL(url)
             this.tabUrls.set(index, url)
             
             // Set a temporary title before the page actually loads
             let tempTitle = url;
             try { tempTitle = new URL(url).hostname; } catch {}
-            tab._lazyTitle = tempTitle;
+            tab.lazyTitle = tempTitle;
             this.sendTabUpdate(index, tab, url, tempTitle);
             
             this.navigationHistory.addEntry(index, url)
@@ -599,29 +582,29 @@ class Tabs {
         }
     }
     
-    _destroyTab(tab) {
+    destroyTab(tab) {
         try { tab.webContents.audioMuted = true; } catch {}
         try { this.mainWindow.contentView.removeChildView(tab); } catch {}
         try { tab.webContents.destroy(); } catch {}
     }
 
-    _recordClosed(index) {
+    recordClosed(index) {
         const url = this.tabUrls.get(index);
         if (url && url !== 'newtab' && !url.startsWith('file://')) {
-            const tab = this.TabMap.get(index);
+            const tab = this.tabMap.get(index);
             let title = url;
             try { title = tab?.webContents?.getTitle() || url; } catch {}
-            this._closedTabHistory.push({ url, title });
-            if (this._closedTabHistory.length > 20) this._closedTabHistory.shift();
+            this.closedTabHistory.push({ url, title });
+            if (this.closedTabHistory.length > 20) this.closedTabHistory.shift();
         }
     }
 
     removeTab(index) {
-        if (this.TabMap.has(index)) {
-            const tab = this.TabMap.get(index)
-            this._recordClosed(index)
-            this._destroyTab(tab)
-            this.TabMap.delete(index)
+        if (this.tabMap.has(index)) {
+            const tab = this.tabMap.get(index)
+            this.recordClosed(index)
+            this.destroyTab(tab)
+            this.tabMap.delete(index)
             this.tabUrls.delete(index)
             // Clean up pinned state if needed
             this.pinnedTabs.delete(index)
@@ -631,28 +614,28 @@ class Tabs {
             
             this.mainWindow.webContents.send('tab-removed', {
                 index: index,
-                totalTabs: this.TabMap.size
+                totalTabs: this.tabMap.size
             })
             
-            if (this.activeTabIndex === index && this.TabMap.size > 0) {
-                const remainingTabs = Array.from(this.TabMap.keys())
+            if (this.activeTabIndex === index && this.tabMap.size > 0) {
+                const remainingTabs = Array.from(this.tabMap.keys())
                 this.showTab(remainingTabs[0])
             }
             
-            if (this.TabMap.size === 0) {
+            if (this.tabMap.size === 0) {
                 this.allowClose = true;
                 this.mainWindow.close();
             }
-            this._saveStateDebounced()
+            this.saveStateDebounced()
         }
     }
     
     removeTabWithTargetFocus(index, targetTabIndex) {
-        if (this.TabMap.has(index)) {
-            const tab = this.TabMap.get(index);
-            this._recordClosed(index)
-            this._destroyTab(tab);
-            this.TabMap.delete(index);
+        if (this.tabMap.has(index)) {
+            const tab = this.tabMap.get(index);
+            this.recordClosed(index)
+            this.destroyTab(tab);
+            this.tabMap.delete(index);
             this.tabUrls.delete(index);
             this.pinnedTabs.delete(index)
             this.tabOrder = this.tabOrder.filter(i => i !== index)
@@ -661,17 +644,17 @@ class Tabs {
             
             this.mainWindow.webContents.send('tab-removed', {
                 index: index,
-                totalTabs: this.TabMap.size
+                totalTabs: this.tabMap.size
             });
             
-            if (this.TabMap.size === 0) {
+            if (this.tabMap.size === 0) {
                 this.allowClose = true;
                 this.mainWindow.close();
             } else {
-                if (targetTabIndex !== null && this.TabMap.has(targetTabIndex)) {
+                if (targetTabIndex !== null && this.tabMap.has(targetTabIndex)) {
                     this.showTab(targetTabIndex);
                 } else {
-                    const remainingTabs = Array.from(this.TabMap.keys());
+                    const remainingTabs = Array.from(this.tabMap.keys());
                     this.showTab(remainingTabs[0]);
                 }
                 
@@ -681,30 +664,25 @@ class Tabs {
                     }
                 }, 20);
             }
-            this._saveStateDebounced()
+            this.saveStateDebounced()
         }
     }
     
     getTotalTabs() {
-        return this.TabMap.size
+        return this.tabMap.size
     }
     
     goBack(index) {
-        const startTime = performance.now();
-        
-        if (this.TabMap.has(index)) {
-            const tab = this.TabMap.get(index)
-            const currentUrl = this.tabUrls.get(index);
-            const historyBefore = this.navigationHistory.getHistory(index);
+        if (this.tabMap.has(index)) {
+            const tab = this.tabMap.get(index)
             const previousUrl = this.navigationHistory.goBack(index)
-            const historyAfter = this.navigationHistory.getHistory(index);
 
             if (previousUrl && previousUrl !== 'newtab') {
-                tab._setNavigatingProgrammatically(true);
+                tab.setNavigatingProgrammatically(true);
                 tab.webContents.loadURL(previousUrl)
                 this.tabUrls.set(index, previousUrl)
             } else if (previousUrl === 'newtab') {
-                tab._setNavigatingProgrammatically(true);
+                tab.setNavigatingProgrammatically(true);
                 tab.webContents.loadFile('renderer/NewTab/index.html')
                 this.tabUrls.set(index, 'newtab')
             } else {
@@ -712,38 +690,30 @@ class Tabs {
                 this.tabUrls.set(index, 'newtab')
             }
             this.sendNavigationUpdate(index)
-            const endTime = performance.now();
-        } else {}
+        }
     }
-    
+
     goForward(index) {
-        const startTime = performance.now();
-        
-        if (this.TabMap.has(index)) {
-            const tab = this.TabMap.get(index)
-            const currentUrl = this.tabUrls.get(index);
-            
-            const historyBefore = this.navigationHistory.getHistory(index);
+        if (this.tabMap.has(index)) {
+            const tab = this.tabMap.get(index)
             const nextUrl = this.navigationHistory.goForward(index);
-            const historyAfter = this.navigationHistory.getHistory(index);
-            
+
             if (nextUrl && nextUrl !== 'newtab') {
-                tab._setNavigatingProgrammatically(true);
+                tab.setNavigatingProgrammatically(true);
                 tab.webContents.loadURL(nextUrl)
                 this.tabUrls.set(index, nextUrl)
             } else if (nextUrl === 'newtab') {
-                tab._setNavigatingProgrammatically(true);
+                tab.setNavigatingProgrammatically(true);
                 tab.webContents.loadFile('renderer/NewTab/index.html')
                 this.tabUrls.set(index, 'newtab')
             }
             this.sendNavigationUpdate(index)
-            const endTime = performance.now();
-        } else {}
+        }
     }
-    
+
     reload(index) {
-        if (this.TabMap.has(index)) {
-            const tab = this.TabMap.get(index)
+        if (this.tabMap.has(index)) {
+            const tab = this.tabMap.get(index)
             tab.webContents.reload()
             setTimeout(() => {
                 this.sendNavigationUpdate(index)
@@ -752,7 +722,7 @@ class Tabs {
     }
     
     canGoBack(index) {
-        if (this.TabMap.has(index)) {
+        if (this.tabMap.has(index)) {
             const canGoBack = this.navigationHistory.canGoBack(index);
             return canGoBack;
         }
@@ -760,7 +730,7 @@ class Tabs {
     }
     
     canGoForward(index) {
-        if (this.TabMap.has(index)) {
+        if (this.tabMap.has(index)) {
             const canGoForward = this.navigationHistory.canGoForward(index);
             return canGoForward;
         }
@@ -770,14 +740,14 @@ class Tabs {
     resizeAllTabs() {
         const bounds = this.getTabBounds()
 
-        this.TabMap.forEach((tab, index) => {
+        this.tabMap.forEach((tab, index) => {
             tab.setBounds(bounds)
         })
     }
 
     collapseAllTabs() {
         // Move tabs off-screen so native views don't cover HTML overlays
-        this.TabMap.forEach((tab) => {
+        this.tabMap.forEach((tab) => {
             tab.setBounds({ x: -9999, y: -9999, width: 1, height: 1 });
         });
     }
@@ -787,51 +757,47 @@ class Tabs {
     }
 
     muteTab(index) {
-        if (this.TabMap.has(index)) {
-            const tab = this.TabMap.get(index);
+        if (this.tabMap.has(index)) {
+            const tab = this.tabMap.get(index);
             const isMuted = tab.webContents.isAudioMuted();
             tab.webContents.setAudioMuted(!isMuted);
         }
     }
 
     pinTab(index) {
-        console.log('[MAIN] pinTab sending event for index', index);
         const isPinned = this.pinnedTabs.has(index)
         if (!isPinned) {
-            const totalTabs = this.TabMap.size
+            const totalTabs = this.tabMap.size
             const futurePinned = this.pinnedTabs.size + 1
             const futureUnpinned = totalTabs - futurePinned
             if (futureUnpinned <= 0) {
-                // Auto-create a new unpinned tab; then return focus to the original tab
-                this.CreateTab()
-                // Leave focus on the newly created tab so subsequent pin acts on it
-                // Proceed to pin the originally requested tab index
-                console.log('[MAIN] pinTab auto-created new tab to preserve one unpinned')
+                // Auto-create a new unpinned tab to keep at least one unpinned
+                this.createTab()
             }
             this.pinnedTabs.add(index)
         } else {
             this.pinnedTabs.delete(index)
         }
         this.mainWindow.webContents.send('pin-tab', { index });
-        this._saveStateDebounced()
+        this.saveStateDebounced()
     }
 
     reorderTabs(newOrder) {
         if (!Array.isArray(newOrder)) return;
-        const allKeys = new Set(this.TabMap.keys());
+        const allKeys = new Set(this.tabMap.keys());
         const ok = newOrder.every(k => allKeys.has(k)) && newOrder.length === allKeys.size;
         if (!ok) return;
         this.tabOrder = [...newOrder];
-        this._saveStateDebounced();
+        this.saveStateDebounced();
     }
 
-    _buildSerializableState() {
+    buildSerializableState() {
         const includeAll = !!(this.persistence && this.persistence.getPersistMode());
-        const order = this.tabOrder.length ? this.tabOrder : Array.from(this.TabMap.keys());
+        const order = this.tabOrder.length ? this.tabOrder : Array.from(this.tabMap.keys());
         const selected = includeAll ? order : order.filter(idx => this.pinnedTabs.has(idx));
         const tabs = selected.map((idx) => {
             const url = this.tabUrls.get(idx) || 'newtab';
-            let title = this._computeDisplayTitleFor(idx) || 'New Tab';
+            let title = this.computeDisplayTitleFor(idx) || 'New Tab';
             return {
                 url,
                 title,
@@ -843,11 +809,11 @@ class Tabs {
         return { tabs, activeIndex: activeOrdinal, persistAllTabs: includeAll };
     }
 
-    _saveStateDebounced() {
+    saveStateDebounced() {
         if (!this.persistence) return;
-        clearTimeout(this._saveTimer);
-        this._saveTimer = setTimeout(() => {
-            try { this.persistence.saveState(this._buildSerializableState()); } catch {}
+        clearTimeout(this.saveTimer);
+        this.saveTimer = setTimeout(() => {
+            try { this.persistence.saveState(this.buildSerializableState()); } catch {}
         }, 200);
     }
 }

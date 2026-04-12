@@ -6,31 +6,31 @@ class TabContextMenu {
         this.tabManager = tabManager;
         this.contextTemplate = [];
 
-        this._addPageItems(params);
-        this._addSelectionItems(params);
-        this._addEditableItems(params);
-        this._addLinkItems(params);
-        this._addImageItems(params);
-        this._addMediaItems(params);
+        this.addPageItems(params);
+        this.addSelectionItems(params);
+        this.addEditableItems(params);
+        this.addLinkItems(params);
+        this.addImageItems(params);
+        this.addMediaItems(params);
     }
 
     getTemplate() {
         return this.contextTemplate;
     }
 
-    _sep() {
+    sep() {
         const last = this.contextTemplate[this.contextTemplate.length - 1];
         if (last && last.type !== 'separator') {
             this.contextTemplate.push({ type: 'separator' });
         }
     }
 
-    _openInNewTab(url) {
-        const newIndex = this.tabManager.CreateTab();
+    openInNewTab(url) {
+        const newIndex = this.tabManager.createTab();
         this.tabManager.loadUrl(newIndex, url);
     }
 
-    _addPageItems(params) {
+    addPageItems(params) {
         const wc = this.tab.webContents;
         const currentUrl = wc.getURL ? wc.getURL() : '';
         const isRealPage = currentUrl && !currentUrl.startsWith('file://');
@@ -65,7 +65,7 @@ class TabContextMenu {
                 },
                 {
                     label: 'View Page Source',
-                    click: () => this._openInNewTab(`view-source:${currentUrl}`),
+                    click: () => this.openInNewTab(`view-source:${currentUrl}`),
                 },
                 { type: 'separator' },
                 {
@@ -84,9 +84,9 @@ class TabContextMenu {
         );
     }
 
-    _addSelectionItems(params) {
+    addSelectionItems(params) {
         if (!params.selectionText) return;
-        this._sep();
+        this.sep();
         const truncated = params.selectionText.length > 40
             ? params.selectionText.slice(0, 40) + '…'
             : params.selectionText;
@@ -98,14 +98,14 @@ class TabContextMenu {
             },
             {
                 label: `Search Google for "${truncated}"`,
-                click: () => this._openInNewTab(`https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`),
+                click: () => this.openInNewTab(`https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`),
             },
         );
     }
 
-    _addEditableItems(params) {
+    addEditableItems(params) {
         if (!params.isEditable) return;
-        this._sep();
+        this.sep();
         this.contextTemplate.push(
             { label: 'Undo',       role: 'undo',      enabled: params.editFlags.canUndo },
             { label: 'Redo',       role: 'redo',      enabled: params.editFlags.canRedo },
@@ -117,13 +117,13 @@ class TabContextMenu {
         );
     }
 
-    _addLinkItems(params) {
+    addLinkItems(params) {
         if (!params.linkURL) return;
-        this._sep();
+        this.sep();
         this.contextTemplate.push(
             {
                 label: 'Open Link in New Tab',
-                click: () => this._openInNewTab(params.linkURL),
+                click: () => this.openInNewTab(params.linkURL),
             },
             {
                 label: 'Open Link in New Window',
@@ -140,13 +140,13 @@ class TabContextMenu {
         );
     }
 
-    _addImageItems(params) {
+    addImageItems(params) {
         if (!params.srcURL || params.mediaType !== 'image') return;
-        this._sep();
+        this.sep();
         this.contextTemplate.push(
             {
                 label: 'Open Image in New Tab',
-                click: () => this._openInNewTab(params.srcURL),
+                click: () => this.openInNewTab(params.srcURL),
             },
             {
                 label: 'Save Image As…',
@@ -158,19 +158,19 @@ class TabContextMenu {
             },
             {
                 label: 'Search Google for Image',
-                click: () => this._openInNewTab(`https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`),
+                click: () => this.openInNewTab(`https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`),
             },
         );
     }
 
-    _addMediaItems(params) {
+    addMediaItems(params) {
         if (!params.srcURL || (params.mediaType !== 'video' && params.mediaType !== 'audio')) return;
         const label = params.mediaType === 'video' ? 'Video' : 'Audio';
-        this._sep();
+        this.sep();
         this.contextTemplate.push(
             {
                 label: `Open ${label} in New Tab`,
-                click: () => this._openInNewTab(params.srcURL),
+                click: () => this.openInNewTab(params.srcURL),
             },
             {
                 label: `Save ${label} As…`,

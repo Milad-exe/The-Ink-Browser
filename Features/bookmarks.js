@@ -5,152 +5,152 @@ const { encrypt, decrypt, isEncrypted } = require('./encryption');
 
 class Bookmarks {
     constructor() {
-        this._file  = path.join(app.getPath('userData'), 'bookmarks.json');
-        this._cache = null;
+        this.file  = path.join(app.getPath('userData'), 'bookmarks.json');
+        this.cache = null;
     }
 
-    _genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+    genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
-    _normalize(item) {
-        if (!item.id)   item = { ...item, id: this._genId() };
+    normalize(item) {
+        if (!item.id)   item = { ...item, id: this.genId() };
         if (!item.type) item = { ...item, type: 'bookmark' };
         return item;
     }
 
     // ── Low-level read/write ─────────────────────────────────────────────────
 
-    async _load() {
-        if (this._cache) return this._cache;
+    async load() {
+        if (this.cache) return this.cache;
         try {
-            const raw = await fs.readFile(this._file, 'utf8');
+            const raw = await fs.readFile(this.file, 'utf8');
             let plaintext;
             if (isEncrypted(raw)) plaintext = decrypt(raw);
-            else                  plaintext = raw; // legacy plaintext — encrypted on next _save()
-            this._cache = JSON.parse(plaintext);
-            if (!Array.isArray(this._cache)) this._cache = [];
+            else                  plaintext = raw; // legacy plaintext — encrypted on next save()
+            this.cache = JSON.parse(plaintext);
+            if (!Array.isArray(this.cache)) this.cache = [];
         } catch {
-            this._cache = [];
+            this.cache = [];
         }
         // Migrate: ensure every top-level item has an id and type
-        this._cache = this._cache.map(item => this._normalize(item));
-        return this._cache;
+        this.cache = this.cache.map(item => this.normalize(item));
+        return this.cache;
     }
 
-    async _save() {
+    async save() {
         try {
-            await fs.writeFile(this._file, encrypt(JSON.stringify(this._cache, null, 2)), 'utf8');
+            await fs.writeFile(this.file, encrypt(JSON.stringify(this.cache, null, 2)), 'utf8');
         } catch {}
     }
 
     // ── Public API ───────────────────────────────────────────────────────────
 
     async getAll() {
-        return this._load();
+        return this.load();
     }
 
     async add(url, title) {
-        const bookmarks = await this._load();
+        const bookmarks = await this.load();
         const exists    = bookmarks.some(b => b.type === 'bookmark' && b.url === url);
         if (!exists) {
-            bookmarks.push({ type: 'bookmark', id: this._genId(), url, title: title || url, addedAt: Date.now() });
-            await this._save();
+            bookmarks.push({ type: 'bookmark', id: this.genId(), url, title: title || url, addedAt: Date.now() });
+            await this.save();
         }
         return !exists;
     }
 
     async remove(url) {
-        const bookmarks = await this._load();
+        const bookmarks = await this.load();
         const idx       = bookmarks.findIndex(b => b.url === url);
         if (idx !== -1) {
             bookmarks.splice(idx, 1);
-            await this._save();
+            await this.save();
             return true;
         }
         return false;
     }
 
     async removeById(id) {
-        await this._load();
-        const result = this._findNodeAndParentArray(id);
+        await this.load();
+        const result = this.findNodeAndParentArray(id);
         if (result) {
             result.parentArray.splice(result.index, 1);
-            await this._save();
+            await this.save();
             return true;
         }
         return false;
     }
 
     async has(url) {
-        const bookmarks = await this._load();
+        const bookmarks = await this.load();
         return bookmarks.some(b => b.type === 'bookmark' && b.url === url);
     }
 
     async updateTitle(url, title) {
-        const bookmarks = await this._load();
+        const bookmarks = await this.load();
         const entry     = bookmarks.find(b => b.url === url);
         if (entry && title) {
             entry.title = title;
-            await this._save();
+            await this.save();
         }
     }
 
     async updateById(id, updates) {
-        await this._load();
-        const result = this._findNodeAndParentArray(id);
+        await this.load();
+        const result = this.findNodeAndParentArray(id);
         if (result) {
             Object.assign(result.node, updates);
-            await this._save();
+            await this.save();
             return true;
         }
         return false;
     }
 
     async addFolder(title) {
-        const bookmarks = await this._load();
-        const id = this._genId();
+        const bookmarks = await this.load();
+        const id = this.genId();
         bookmarks.push({ type: 'folder', id, title: title || 'New Folder', children: [] });
-        await this._save();
+        await this.save();
         return id;
     }
 
     async addDivider() {
-        const bookmarks = await this._load();
-        const id = this._genId();
+        const bookmarks = await this.load();
+        const id = this.genId();
         bookmarks.push({ type: 'divider', id });
-        await this._save();
+        await this.save();
         return id;
     }
 
     // Add a sub-folder directly inside an existing folder
     async addFolderInto(title, parentFolderId) {
-        await this._load();
-        const result = this._findNodeAndParentArray(parentFolderId);
+        await this.load();
+        const result = this.findNodeAndParentArray(parentFolderId);
         if (!result || result.node.type !== 'folder') return null;
-        const id = this._genId();
+        const id = this.genId();
         if (!Array.isArray(result.node.children)) result.node.children = [];
         result.node.children.push({ type: 'folder', id, title: title || 'New Folder', children: [] });
-        await this._save();
+        await this.save();
         return id;
     }
 
     // Add a divider directly inside an existing folder
     async addDividerInto(parentFolderId) {
-        await this._load();
-        const result = this._findNodeAndParentArray(parentFolderId);
+        await this.load();
+        const result = this.findNodeAndParentArray(parentFolderId);
         if (!result || result.node.type !== 'folder') return null;
-        const id = this._genId();
+        const id = this.genId();
         if (!Array.isArray(result.node.children)) result.node.children = [];
         result.node.children.push({ type: 'divider', id });
-        await this._save();
+        await this.save();
         return id;
     }
 
-    _findNodeAndParentArray(id, array) {
-        array = array || (this._cache || []);
+    findNodeAndParentArray(id, array) {
+        array = array || (this.cache || []);
         for (let i = 0; i < array.length; i++) {
             if (array[i].id === id) return { node: array[i], parentArray: array, index: i };
             if (array[i].type === 'folder' && Array.isArray(array[i].children)) {
-                const result = this._findNodeAndParentArray(id, array[i].children);
+                const result = this.findNodeAndParentArray(id, array[i].children);
                 if (result) return result;
             }
         }
@@ -158,38 +158,38 @@ class Bookmarks {
     }
 
     async moveOutOfFolder(itemId, folderId, insertBeforeId) {
-        await this._load();
-        const src = this._findNodeAndParentArray(itemId);
+        await this.load();
+        const src = this.findNodeAndParentArray(itemId);
         if (!src) return false;
         
         // Remove from its current location
         const [item] = src.parentArray.splice(src.index, 1);
         
         if (insertBeforeId) {
-            const target = this._findNodeAndParentArray(insertBeforeId);
+            const target = this.findNodeAndParentArray(insertBeforeId);
             if (target) {
                 target.parentArray.splice(target.index, 0, item);
             } else {
-                this._cache.push(item);
+                this.cache.push(item);
             }
         } else {
-            this._cache.push(item);
+            this.cache.push(item);
         }
-        await this._save();
+        await this.save();
         return true;
     }
 
     async moveIntoFolder(itemId, folderId, insertBeforeId = null) {
-        await this._load();
-        const src = this._findNodeAndParentArray(itemId);
+        await this.load();
+        const src = this.findNodeAndParentArray(itemId);
         if (!src) return false;
         if (itemId === folderId) return false;
 
-        const folderTarget = this._findNodeAndParentArray(folderId);
+        const folderTarget = this.findNodeAndParentArray(folderId);
         if (!folderTarget || folderTarget.node.type !== 'folder') return false;
 
         if (src.node.type === 'folder') {
-            if (this._findNodeAndParentArray(folderId, src.node.children || [])) {
+            if (this.findNodeAndParentArray(folderId, src.node.children || [])) {
                 return false; // prevent cycles
             }
         }
@@ -209,23 +209,23 @@ class Bookmarks {
         } else {
             folderTarget.node.children.push(item);
         }
-        await this._save();
+        await this.save();
         return true;
     }
 
     async reorder(ids) {
-        const bookmarks = await this._load();
+        const bookmarks = await this.load();
         const map       = new Map(bookmarks.map(b => [b.id, b]));
         const reordered = ids.map(id => map.get(id)).filter(Boolean);
         const inOrder   = new Set(ids);
         bookmarks.forEach(b => { if (!inOrder.has(b.id)) reordered.push(b); });
-        this._cache = reordered;
-        await this._save();
+        this.cache = reordered;
+        await this.save();
     }
 
     async reorderInFolder(folderId, orderedIds) {
-        await this._load();
-        const result = this._findNodeAndParentArray(folderId);
+        await this.load();
+        const result = this.findNodeAndParentArray(folderId);
         if (!result || result.node.type !== 'folder') return false;
         const folder   = result.node;
         const children = folder.children || [];
@@ -234,7 +234,7 @@ class Bookmarks {
         const inOrder   = new Set(orderedIds);
         children.forEach(c => { if (!inOrder.has(c.id)) reordered.push(c); });
         folder.children = reordered;
-        await this._save();
+        await this.save();
         return true;
     }
 }

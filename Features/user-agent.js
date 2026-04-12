@@ -3,7 +3,7 @@ const os = require('os');
 class UserAgent {
 
     static generate() {
-        return `Mozilla/5.0 (${_platformString()}; rv:124.0) Gecko/20100101 Firefox/124.0`;
+        return `Mozilla/5.0 (${platformString()}; rv:124.0) Gecko/20100101 Firefox/124.0`;
     }
 
     /**
@@ -48,7 +48,7 @@ class UserAgent {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function _platformString() {
+function platformString() {
     switch (os.platform()) {
         case 'darwin': return 'Macintosh; Intel Mac OS X 10.15';
         case 'win32':  return os.arch() === 'x64' ? 'Windows NT 10.0; Win64; x64' : 'Windows NT 10.0; WOW64';
