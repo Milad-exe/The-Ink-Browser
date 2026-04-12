@@ -6,30 +6,30 @@ class WindowContextMenu {
         this.windowManager = windowManager;
         this.contextTemplate = [];
 
-        this._addSelectionItems(params);
-        this._addEditableItems(params);
-        this._addTabItems(params);
-        this._addTabBarItems(params);
+        this.addSelectionItems(params);
+        this.addEditableItems(params);
+        this.addTabItems(params);
+        this.addTabBarItems(params);
     }
 
     getTemplate() {
         return this.contextTemplate;
     }
 
-    _sep() {
+    sep() {
         const last = this.contextTemplate[this.contextTemplate.length - 1];
         if (last && last.type !== 'separator') {
             this.contextTemplate.push({ type: 'separator' });
         }
     }
 
-    _getWindowData() {
+    getWindowData() {
         return this.windowManager.getWindowByWebContents(this.window.webContents);
     }
 
-    _addSelectionItems(params) {
+    addSelectionItems(params) {
         if (!params.selectionText) return;
-        const windowData = this._getWindowData();
+        const windowData = this.getWindowData();
         this.contextTemplate.push(
             {
                 label: 'Copy',
@@ -40,16 +40,16 @@ class WindowContextMenu {
                 label: `Search Google for "${params.selectionText.slice(0, 40)}${params.selectionText.length > 40 ? '…' : ''}"`,
                 click: () => {
                     if (!windowData) return;
-                    const newIndex = windowData.tabs.CreateTab();
+                    const newIndex = windowData.tabs.createTab();
                     windowData.tabs.loadUrl(newIndex, `https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`);
                 },
             },
         );
     }
 
-    _addEditableItems(params) {
+    addEditableItems(params) {
         if (!params.isEditable) return;
-        this._sep();
+        this.sep();
         this.contextTemplate.push(
             { label: 'Undo',       role: 'undo',      enabled: params.editFlags.canUndo },
             { label: 'Redo',       role: 'redo',      enabled: params.editFlags.canRedo },
@@ -61,27 +61,27 @@ class WindowContextMenu {
         );
     }
 
-    _addTabItems(params) {
+    addTabItems(params) {
         if (!params.isTabButton) return;
 
-        const windowData = this._getWindowData();
+        const windowData = this.getWindowData();
         if (!windowData) return;
 
         // Use the right-clicked tab's index; fall back to active tab
-        const tabIndex = (params.rightClickedTabIndex != null && windowData.tabs.TabMap.has(params.rightClickedTabIndex))
+        const tabIndex = (params.rightClickedTabIndex != null && windowData.tabs.tabMap.has(params.rightClickedTabIndex))
             ? params.rightClickedTabIndex
             : windowData.tabs.activeTabIndex;
 
         const isPinned = windowData.tabs.pinnedTabs.has(tabIndex);
         const isMuted = (() => {
-            try { return windowData.tabs.TabMap.get(tabIndex)?.webContents?.isAudioMuted() ?? false; } catch { return false; }
+            try { return windowData.tabs.tabMap.get(tabIndex)?.webContents?.isAudioMuted() ?? false; } catch { return false; }
         })();
 
-        this._sep();
+        this.sep();
         this.contextTemplate.push(
             {
                 label: 'New Tab',
-                click: () => windowData.tabs.CreateTab(),
+                click: () => windowData.tabs.createTab(),
             },
             { type: 'separator' },
             {
@@ -93,10 +93,10 @@ class WindowContextMenu {
                 click: () => {
                     const url = windowData.tabs.tabUrls.get(tabIndex);
                     if (url && url !== 'newtab') {
-                        const newIndex = windowData.tabs.CreateTab();
+                        const newIndex = windowData.tabs.createTab();
                         windowData.tabs.loadUrl(newIndex, url);
                     } else {
-                        windowData.tabs.CreateTab();
+                        windowData.tabs.createTab();
                     }
                 },
             },
@@ -115,9 +115,9 @@ class WindowContextMenu {
             },
             {
                 label: 'Close Other Tabs',
-                enabled: windowData.tabs.TabMap.size > 1,
+                enabled: windowData.tabs.tabMap.size > 1,
                 click: () => {
-                    const toClose = Array.from(windowData.tabs.TabMap.keys()).filter(i => i !== tabIndex);
+                    const toClose = Array.from(windowData.tabs.tabMap.keys()).filter(i => i !== tabIndex);
                     // Switch to the right-clicked tab first so focus is preserved
                     windowData.tabs.showTab(tabIndex);
                     toClose.forEach(i => windowData.tabs.removeTab(i));
@@ -126,51 +126,51 @@ class WindowContextMenu {
         );
 
         // Reopen last closed tab if any
-        const closed = windowData.tabs._closedTabHistory;
+        const closed = windowData.tabs.closedTabHistory;
         if (closed && closed.length > 0) {
-            this._sep();
+            this.sep();
             this.contextTemplate.push({
                 label: 'Reopen Closed Tab',
                 click: () => {
                     const last = closed.pop();
                     if (last && last.url && last.url !== 'newtab') {
-                        const newIndex = windowData.tabs.CreateTab();
+                        const newIndex = windowData.tabs.createTab();
                         windowData.tabs.loadUrl(newIndex, last.url);
                     } else {
-                        windowData.tabs.CreateTab();
+                        windowData.tabs.createTab();
                     }
                 },
             });
         }
     }
 
-    _addTabBarItems(params) {
+    addTabBarItems(params) {
         // Show when right-clicking on empty tab bar space (not on a tab button)
         if (params.isTabButton) return;
         if (params.targetElementId !== 'tab-bar' && params.targetAreaIsTabBar !== true) return;
 
-        const windowData = this._getWindowData();
+        const windowData = this.getWindowData();
         if (!windowData) return;
 
-        this._sep();
+        this.sep();
         this.contextTemplate.push(
             {
                 label: 'New Tab',
-                click: () => windowData.tabs.CreateTab(),
+                click: () => windowData.tabs.createTab(),
             },
         );
 
-        const closed = windowData.tabs._closedTabHistory;
+        const closed = windowData.tabs.closedTabHistory;
         if (closed && closed.length > 0) {
             this.contextTemplate.push({
                 label: 'Reopen Closed Tab',
                 click: () => {
                     const last = closed.pop();
                     if (last && last.url && last.url !== 'newtab') {
-                        const newIndex = windowData.tabs.CreateTab();
+                        const newIndex = windowData.tabs.createTab();
                         windowData.tabs.loadUrl(newIndex, last.url);
                     } else {
-                        windowData.tabs.CreateTab();
+                        windowData.tabs.createTab();
                     }
                 },
             });

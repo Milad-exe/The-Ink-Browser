@@ -8,28 +8,28 @@ const path = require('path');
 
 const BRUNO_JSON = 'bruno.json';
 
-function _brunoJsonPath(dirPath) {
+function brunoJsonPath(dirPath) {
   return path.join(dirPath, BRUNO_JSON);
 }
 
-function _readBrunoJson(dirPath) {
-  const p = _brunoJsonPath(dirPath);
+function readBrunoJson(dirPath) {
+  const p = brunoJsonPath(dirPath);
   if (!fs.existsSync(p)) return null;
   try { return JSON.parse(fs.readFileSync(p, 'utf-8')); } catch { return null; }
 }
 
-function _writeBrunoJson(dirPath, data) {
-  fs.writeFileSync(_brunoJsonPath(dirPath), JSON.stringify(data, null, 2), 'utf-8');
+function writeBrunoJson(dirPath, data) {
+  fs.writeFileSync(brunoJsonPath(dirPath), JSON.stringify(data, null, 2), 'utf-8');
 }
 
 // Returns info about a collection directory, creating bruno.json if absent.
 function initCollection(dirPath) {
   try {
     if (!fs.existsSync(dirPath)) return null;
-    let data = _readBrunoJson(dirPath);
+    let data = readBrunoJson(dirPath);
     if (!data) {
       data = { name: path.basename(dirPath), version: '1', activeEnvironment: null };
-      _writeBrunoJson(dirPath, data);
+      writeBrunoJson(dirPath, data);
     }
     return { ...data, path: dirPath };
   } catch (error) {
@@ -41,7 +41,7 @@ function initCollection(dirPath) {
 // Read the active environment name stored in bruno.json (null if none)
 function getActiveEnvironment(dirPath) {
   try {
-    const data = _readBrunoJson(dirPath);
+    const data = readBrunoJson(dirPath);
     return data ? data.activeEnvironment || null : null;
   } catch (error) {
     console.error('Error reading active environment:', error);
@@ -52,9 +52,9 @@ function getActiveEnvironment(dirPath) {
 // Persist the active environment name into bruno.json
 function setActiveEnvironment(dirPath, envName) {
   try {
-    let data = _readBrunoJson(dirPath) || { name: path.basename(dirPath), version: '1' };
+    let data = readBrunoJson(dirPath) || { name: path.basename(dirPath), version: '1' };
     data.activeEnvironment = envName || null;
-    _writeBrunoJson(dirPath, data);
+    writeBrunoJson(dirPath, data);
     return true;
   } catch (error) {
     console.error('Error saving active environment:', error);

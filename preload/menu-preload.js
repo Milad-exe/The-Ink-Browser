@@ -9,7 +9,7 @@ try {
     }
 } catch (e) {}
 
-ipcRenderer.on('theme-changed', (e, theme) => {
+ipcRenderer.on('theme-changed', (_e, theme) => {
     if (theme && theme !== 'default') {
         document.documentElement.setAttribute('data-theme', theme);
     } else {

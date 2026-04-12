@@ -20,28 +20,28 @@ const KEY_BYTES  = 32;   // 256-bit key
 const IV_BYTES   = 12;   // 96-bit IV — optimal for GCM
 const TAG_BYTES  = 16;   // 128-bit auth tag
 
-let _key     = null;
-let _keyPath = null;
+let cachedKey     = null;
+let cachedKeyPath = null;
 
 // ── Key path ────────────────────────────────────────────────────────────────
 
-function _resolveKeyPath() {
-    if (_keyPath) return _keyPath;
+function resolveKeyPath() {
+    if (cachedKeyPath) return cachedKeyPath;
     try {
         const { app } = require('electron');
-        _keyPath = path.join(app.getPath('userData'), 'ink', '.key');
+        cachedKeyPath = path.join(app.getPath('userData'), 'ink', '.key');
     } catch {
-        _keyPath = path.join(process.cwd(), '.ink-key');
+        cachedKeyPath = path.join(process.cwd(), '.ink-key');
     }
-    return _keyPath;
+    return cachedKeyPath;
 }
 
 // ── Key loading / generation ─────────────────────────────────────────────────
 
-function _getKey() {
-    if (_key) return _key;
+function getKey() {
+    if (cachedKey) return cachedKey;
 
-    const keyPath = _resolveKeyPath();
+    const keyPath = resolveKeyPath();
     const dir     = path.dirname(keyPath);
 
     if (!fs.existsSync(dir)) {
@@ -51,15 +51,15 @@ function _getKey() {
     if (fs.existsSync(keyPath)) {
         const stored = fs.readFileSync(keyPath);
         if (stored.length === KEY_BYTES) {
-            _key = stored;
-            return _key;
+            cachedKey = stored;
+            return cachedKey;
         }
         // Key file corrupt — regenerate (existing data will be unreadable; safer than no encryption)
     }
 
-    _key = crypto.randomBytes(KEY_BYTES);
-    fs.writeFileSync(keyPath, _key, { mode: 0o600 });
-    return _key;
+    cachedKey = crypto.randomBytes(KEY_BYTES);
+    fs.writeFileSync(keyPath, cachedKey, { mode: 0o600 });
+    return cachedKey;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ function _getKey() {
  * Returns a JSON string safe to store in a file.
  */
 function encrypt(plaintext) {
-    const key       = _getKey();
+    const key       = getKey();
     const iv        = crypto.randomBytes(IV_BYTES);
     const cipher    = crypto.createCipheriv(ALGO, key, iv, { authTagLength: TAG_BYTES });
     const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
@@ -88,7 +88,7 @@ function encrypt(plaintext) {
  * Throws if the data has been tampered with (GCM auth tag mismatch).
  */
 function decrypt(ciphertext) {
-    const key     = _getKey();
+    const key     = getKey();
     const { iv, tag, data } = JSON.parse(ciphertext);
     const decipher = crypto.createDecipheriv(ALGO, key, Buffer.from(iv, 'base64'), { authTagLength: TAG_BYTES });
     decipher.setAuthTag(Buffer.from(tag, 'base64'));

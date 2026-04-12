@@ -54,13 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    
     prevBtn.addEventListener('click', findPrevious);
-
-    
     nextBtn.addEventListener('click', findNext);
-
-    
     closeBtn.addEventListener('click', closeDialog);
 
     function findNext() {

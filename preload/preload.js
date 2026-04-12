@@ -9,7 +9,7 @@ try {
     }
 } catch (e) {}
 
-ipcRenderer.on('theme-changed', (e, theme) => {
+ipcRenderer.on('theme-changed', (_e, theme) => {
     if (theme && theme !== 'default') {
         document.documentElement.setAttribute('data-theme', theme);
     } else {
@@ -30,7 +30,7 @@ contextBridge.exposeInMainWorld(
         getButton: (index) => ipcRenderer.invoke("getTabButton", index),
         pin: (index) => ipcRenderer.invoke("pinTab", index),
     reorder: (order) => ipcRenderer.invoke('reorderTabs', order),
-        onTabCreated: (callback) => ipcRenderer.on('tab-created', callback),
+    onTabCreated: (callback) => ipcRenderer.on('tab-created', callback),
         onTabRemoved: (callback) => ipcRenderer.on('tab-removed', callback),
         onTabSwitched: (callback) => ipcRenderer.on('tab-switched', callback),
         onUrlUpdated: (callback) => ipcRenderer.on('url-updated', callback),
@@ -79,9 +79,9 @@ contextBridge.exposeInMainWorld('suggestions', {
     open: (bounds, items, activeIndex) => ipcRenderer.invoke('suggestions-open', { bounds, items, activeIndex }),
     update: (bounds, items, activeIndex) => ipcRenderer.invoke('suggestions-update', { bounds, items, activeIndex }),
     close: () => ipcRenderer.invoke('suggestions-close'),
-        onSelected: (handler) => ipcRenderer.on('suggestion-selected', (_e, item) => handler(item)),
-        onPointerDown: (handler) => ipcRenderer.on('suggestions-pointer-down', (_e) => handler()),
-        onCreated: (handler) => ipcRenderer.on('suggestions-created', (_e) => handler())
+    onSelected:   (handler) => ipcRenderer.on('suggestion-selected',   (_e, item) => handler(item)),
+    onPointerDown:(handler) => ipcRenderer.on('suggestions-pointer-down', () => handler()),
+    onCreated:    (handler) => ipcRenderer.on('suggestions-created',    () => handler())
 });
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -121,12 +121,12 @@ contextBridge.exposeInMainWorld('browserBookmarks', {
   remove:       (url)            => ipcRenderer.invoke('bookmarks-remove', url),
   removeById:   (id)             => ipcRenderer.invoke('bookmarks-remove-by-id', id),
   has:          (url)            => ipcRenderer.invoke('bookmarks-has', url),
-  reorder:           (ids)                  => ipcRenderer.invoke('bookmarks-reorder', ids),
-  reorderInFolder:   (folderId, ids)        => ipcRenderer.invoke('bookmarks-reorder-in-folder', folderId, ids),
-  addFolder:      (title)              => ipcRenderer.invoke('bookmarks-add-folder', title),
-  addDivider:     ()                   => ipcRenderer.invoke('bookmarks-add-divider'),
-  moveIntoFolder:  (itemId, folderId, insertBeforeId) => ipcRenderer.invoke('bookmarks-move-into-folder', itemId, folderId, insertBeforeId ?? null),
-  moveOutOfFolder: (itemId, folderId, beforeId)   => ipcRenderer.invoke('bookmarks-move-out-of-folder', itemId, folderId, beforeId),
+  reorder:           (ids)                         => ipcRenderer.invoke('bookmarks-reorder', ids),
+  reorderInFolder:   (folderId, ids)               => ipcRenderer.invoke('bookmarks-reorder-in-folder', folderId, ids),
+  addFolder:         (title)                       => ipcRenderer.invoke('bookmarks-add-folder', title),
+  addDivider:        ()                            => ipcRenderer.invoke('bookmarks-add-divider'),
+  moveIntoFolder:    (itemId, folderId, beforeId)  => ipcRenderer.invoke('bookmarks-move-into-folder', itemId, folderId, beforeId ?? null),
+  moveOutOfFolder:   (itemId, folderId, beforeId)  => ipcRenderer.invoke('bookmarks-move-out-of-folder', itemId, folderId, beforeId),
   updateById:   (id, updates)    => ipcRenderer.invoke('bookmarks-update-by-id', id, updates),
   onChanged:    (handler)        => ipcRenderer.on('bookmarks-changed', () => handler()),
   showContextMenu:  (url)        => ipcRenderer.send('show-bookmark-context-menu', url),

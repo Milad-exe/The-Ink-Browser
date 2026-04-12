@@ -9,7 +9,7 @@ try {
     }
 } catch (e) {}
 
-ipcRenderer.on('theme-changed', (e, theme) => {
+ipcRenderer.on('theme-changed', (_e, theme) => {
     if (theme && theme !== 'default') {
         document.documentElement.setAttribute('data-theme', theme);
     } else {
@@ -25,7 +25,7 @@ contextBridge.exposeInMainWorld('findAPI', {
     close: () => ipcRenderer.invoke('find-close'),
     
     onMatchesUpdated: (callback) => {
-        ipcRenderer.on('find-matches-updated', (event, current, total) => {
+        ipcRenderer.on('find-matches-updated', (_e, current, total) => {
             callback(current, total);
         });
     }

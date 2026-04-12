@@ -157,24 +157,24 @@ function getInjectionForUrl(url) {
 class FocusMode {
     constructor() {
         // keyed by window id → { active: bool }
-        this._state = new Map();
+        this.state = new Map();
     }
 
     isActive(windowData) {
-        return this._state.get(windowData.id)?.active ?? false;
+        return this.state.get(windowData.id)?.active ?? false;
     }
 
     enable(windowData) {
-        this._state.set(windowData.id, { active: true });
-        this._applyToAll(windowData, true);
+        this.state.set(windowData.id, { active: true });
+        this.applyToAll(windowData, true);
         if (windowData.window && !windowData.window.isDestroyed()) {
             windowData.window.webContents.send('focus-mode-changed', true);
         }
     }
 
     disable(windowData) {
-        this._state.set(windowData.id, { active: false });
-        this._applyToAll(windowData, false);
+        this.state.set(windowData.id, { active: false });
+        this.applyToAll(windowData, false);
         if (windowData.window && !windowData.window.isDestroyed()) {
             windowData.window.webContents.send('focus-mode-changed', false);
         }
@@ -191,35 +191,35 @@ class FocusMode {
     /** Called from Tabs when a new tab finishes loading — apply if active */
     applyToTab(windowData, tabWebContents, url) {
         if (!this.isActive(windowData)) return;
-        this._applyGrayscale(tabWebContents);
-        this._injectDistraction(tabWebContents, url);
+        this.applyGrayscale(tabWebContents);
+        this.injectDistraction(tabWebContents, url);
     }
 
-    _applyGrayscale(wc) {
+    applyGrayscale(wc) {
         try {
             wc.insertCSS(GRAYSCALE_CSS, { cssOrigin: 'user' }).then(key => {
-                wc._grayscaleKey = key;
+                wc.grayscaleKey = key;
             });
         } catch {}
     }
 
-    _removeGrayscale(wc) {
+    removeGrayscale(wc) {
         try {
-            if (wc._grayscaleKey) {
-                wc.removeInsertedCSS(wc._grayscaleKey);
-                wc._grayscaleKey = null;
+            if (wc.grayscaleKey) {
+                wc.removeInsertedCSS(wc.grayscaleKey);
+                wc.grayscaleKey = null;
             }
         } catch {}
     }
 
-    _injectDistraction(wc, url) {
+    injectDistraction(wc, url) {
         const js = getInjectionForUrl(url || '');
         if (js) {
             try { wc.executeJavaScript(js); } catch {}
         }
     }
 
-    _pauseMedia(wc) {
+    pauseMedia(wc) {
         try {
             wc.executeJavaScript(
                 `document.querySelectorAll('video,audio').forEach(m => { try { m.pause(); } catch {} });`
@@ -227,20 +227,20 @@ class FocusMode {
         } catch {}
     }
 
-    _applyToAll(windowData, enable) {
+    applyToAll(windowData, enable) {
         if (!windowData.tabs) return;
-        windowData.tabs.TabMap.forEach((tab, index) => {
+        windowData.tabs.tabMap.forEach((tab, index) => {
             if (!tab.webContents || tab.webContents.isDestroyed()) return;
             if (enable) {
-                this._applyGrayscale(tab.webContents);
-                this._pauseMedia(tab.webContents);
+                this.applyGrayscale(tab.webContents);
+                this.pauseMedia(tab.webContents);
                 const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
-                this._injectDistraction(tab.webContents, url);
+                this.injectDistraction(tab.webContents, url);
                 // Pause again after inject in case the distraction script triggered autoplay
-                this._pauseMedia(tab.webContents);
+                this.pauseMedia(tab.webContents);
             } else {
                 // Focus mode OFF
-                this._removeGrayscale(tab.webContents);
+                this.removeGrayscale(tab.webContents);
                 const url = tab.webContents.getURL ? tab.webContents.getURL() : '';
                 
                 // Only clean up/reload if this tab actually got distraction injections
@@ -249,7 +249,7 @@ class FocusMode {
                         tab.webContents.reload();
                     } else {
                         // Defer reload until the tab is actually shown, to avoid massive CPU/Network spikes
-                        tab._needsReloadForFocusMode = true;
+                        tab.needsReloadForFocusMode = true;
                     }
                 }
             }

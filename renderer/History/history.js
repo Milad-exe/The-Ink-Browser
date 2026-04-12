@@ -2,12 +2,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const containerDiv = document.getElementById('container');
 
     document.addEventListener('click', async () => {
-        try {
-            if (window.menu && window.menu.close) {
-                await window.menu.close();
-            }
-        } catch (error) {
-        }
+        try { await window.menu?.close(); } catch {}
     });
 
     try {
@@ -24,9 +19,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             noHistoryMsg.style.color = '#666';
             containerDiv.appendChild(noHistoryMsg);
         }
-    } catch (error) {
+    } catch (err) {
         const errorMsg = document.createElement('p');
-        errorMsg.textContent = 'Error loading history: ' + error.message;
+        errorMsg.textContent = 'Error loading history: ' + err.message;
         errorMsg.style.textAlign = 'center';
         errorMsg.style.color = '#ff0000';
         containerDiv.appendChild(errorMsg);
@@ -62,12 +57,9 @@ function createHistoryEntry(container, entry) {
         e.stopPropagation();
         
         try {
-            const success = await window.browserHistory.remove(entry.url, entry.timestamp);
-            if (success) {
-                entryDiv.remove();
-            }
-        } catch (error) {
-        }
+            const ok = await window.browserHistory.remove(entry.url, entry.timestamp);
+            if (ok) entryDiv.remove();
+        } catch {}
     });
     
     contentDiv.addEventListener('click', () => {
