@@ -1,13 +1,14 @@
 /**
  * FolderDropdown — single-panel drill-down renderer
  *
- * One panel at a time. Clicking a folder navigates into it; a back button at
- * the top navigates out. The back button is also a drop target — dropping an
- * item on it moves it into the parent folder.
+ * Tree navigation model:
+ *   rootData    — the folder opened from the bookmark bar (never changes)
+ *   currentNode — null means "show rootData", a folder entry means "show that folder"
+ *   backStack   — array of folder entries for click-based back navigation
  *
- * During drag, hovering over a folder spring-opens it (navigates in) after
- * DRAG_SPRING_DELAY ms without any WebContentsView resize, because the panel
- * width is fixed and height changes are suppressed until drag ends.
+ * During drag, spring-hover over a folder sets currentNode to that entry and
+ * swaps the items list in-place. No WebContentsView resize happens — width is
+ * fixed — so no spurious dragend is triggered on macOS.
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -20,29 +21,38 @@ const FOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="1
            22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"/>
 </svg>`;
 
-const DRAG_SPRING_DELAY = 500;   // ms hover before folder spring-opens during drag
-const MAX_HEIGHT        = 480;   // px
-const PANEL_WIDTH       = 240;   // px — fixed, never changes during drag
-const PANEL_PADDING     = 16;    // px — shadow/border space in WebContentsView
+const DRAG_SPRING_DELAY = 500;
+const MAX_HEIGHT        = 480;
+const PANEL_WIDTH       = 240;
+const PANEL_PADDING     = 16;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// State
+// Tree state
 // ─────────────────────────────────────────────────────────────────────────────
 
-// navStack[i] = { folderId, title, children[] }
-// navStack[0]  = root folder opened from the bookmark bar
-// navStack[-1] = currently visible level
-let navStack = [];
+let rootData    = null;   // { folderId, title, children[] } — set on init, never mutated
+let currentNode = null;   // null = rootData, else a folder entry reference
+let backStack   = [];     // stack of folder entries for click-based back nav
 
-let dragId          = null;  // id of item being dragged
-let dragFolderId    = null;  // folder that owns the dragged item
-let dragSpringTimer = null;  // pending spring-open timer
-let dragSpringBtn   = null;  // button the spring timer is targeting
-let insidePanel     = false; // true once drag enters the panel area
-let leftDropdown    = false; // true once drag exits the WebContentsView
-let pendingResize   = false; // deferred updateSize (suppressed during drag)
-let renamingId      = null;
+function currentFolder() {
+    return currentNode || rootData;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drag state
+// ─────────────────────────────────────────────────────────────────────────────
+
+let dragId            = null;
+let dragFolderId      = null;
+let dragSpringTimer   = null;
+let dragSpringBtn     = null;
+let insidePanel       = false;
+let leftDropdown      = false;
+let pendingResize     = false;
+let renamingId        = null;
+let suppressDragEnd   = false; // true immediately after a spring-navigate fires
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -50,22 +60,37 @@ let renamingId      = null;
 // ─────────────────────────────────────────────────────────────────────────────
 
 window.folderDropdown.onInit(({ children, folderId, title }) => {
-    navStack      = [{ folderId, title: title || 'Folder', children: children || [] }];
-    dragId        = null; dragFolderId = null;
+    rootData    = { folderId, title: title || 'Folder', children: children || [] };
+    currentNode = null;
+    backStack   = [];
+    dragId = null; dragFolderId = null;
     dragSpringTimer = null; dragSpringBtn = null;
-    insidePanel   = false; leftDropdown = false;
-    pendingResize = false; renamingId   = null;
+    insidePanel = false; leftDropdown = false;
+    pendingResize = false; suppressDragEnd = false; renamingId = null;
     renderPanel();
 });
 
 window.folderDropdown.onRefreshPanel(({ folderId, children, renameId }) => {
-    const idx = navStack.findIndex(n => n.folderId === folderId);
-    if (idx === -1) return;
-    navStack[idx].children = children;
-    if (idx === navStack.length - 1) {
-        renderPanel();
-        if (renameId) requestAnimationFrame(() => startInlineRename(renameId, ''));
+    // Update data tree
+    if (rootData && rootData.folderId === folderId) {
+        rootData = { ...rootData, children };
     }
+    for (let i = 0; i < backStack.length; i++) {
+        if (backStack[i]?.id === folderId) backStack[i] = { ...backStack[i], children };
+    }
+    if (currentNode && currentNode.id === folderId) {
+        currentNode = { ...currentNode, children };
+    }
+
+    // After a drag-drop the spring may have left currentNode pointing at a subfolder.
+    // Reset back to root so the user sees the updated parent folder.
+    if (!dragId && currentNode) {
+        currentNode = null;
+        backStack   = [];
+    }
+
+    renderPanel();
+    if (renameId) requestAnimationFrame(() => startInlineRename(renameId, ''));
 });
 
 window.folderDropdown.onStartRename(({ id, title }) => {
@@ -74,140 +99,128 @@ window.folderDropdown.onStartRename(({ id, title }) => {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Navigation
+// Navigation (click-based, uses backStack)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function currentLevel() {
-    return navStack[navStack.length - 1];
-}
-
-function navigateInto(entry) {
-    navStack.push({ folderId: entry.id, title: entry.title || 'Folder', children: entry.children || [] });
+function clickInto(entry) {
+    if (currentNode) backStack.push(currentNode);
+    else backStack.push(null); // null sentinel = "back to root"
+    currentNode = entry;
     renderPanel();
 }
+
+function clickBack() {
+    if (!backStack.length) return;
+    const prev  = backStack.pop();
+    currentNode = prev; // null restores root
+    renderPanel();
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spring navigation (drag-based, direct pointer swap, no backStack)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function springInto(entry) {
+    console.log('[drag] springInto', entry.id, entry.title, '| dragId=', dragId);
+
+    // Suppress the dragend that fires immediately after swapItemsList mutates the DOM.
+    // The OS ends the drag session when hit-testing is disturbed by the swap, then
+    // restarts it — the dragend listener must not call close() in that window.
+    suppressDragEnd = true;
+    setTimeout(() => { suppressDragEnd = false; }, 150);
+
+    // Move drag source to document.body ATOMICALLY before any DOM changes.
+    if (dragId) {
+        const src = document.querySelector(`.item[data-id="${dragId}"]`);
+        if (src) {
+            src.style.cssText =
+                'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;';
+            document.body.appendChild(src);
+        }
+    }
+
+    currentNode = entry;
+    swapItemsList();
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Render
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Spring-navigate into a subfolder during a drag without touching the DOM
- * outside the items list. Replaces only the list contents in-place so the
- * OS drag session (which is tied to the drag source element) is not disturbed.
- * The navStack root entry is mutated to point at the subfolder so drop
- * handlers use the right folderId.
+ * Full panel render — rebuilds the entire container.
+ * Only called outside of drag (init, click nav, refresh).
  */
-function springInto(entry) {
-    console.log('[drag] springInto', entry.id, 'children=', (entry.children||[]).length, 'dragId=', dragId);
-
-    // Move the drag source to document.body BEFORE touching the list DOM.
-    // This is a single atomic DOM move — the element is never parentless.
-    // Calling .remove() first creates an orphan phase during which macOS fires
-    // dragend synchronously, killing the drag session before springInto finishes.
-    if (dragId) {
-        const src = document.querySelector(`.item[data-id="${dragId}"]`);
-        if (src) {
-            src.style.cssText =
-                'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;';
-            document.body.appendChild(src); // atomic move, never orphaned
-        }
-    }
-
-    // Replace the root navStack entry with the subfolder — no push, no back button.
-    navStack[0] = { folderId: entry.id, title: entry.title || 'Folder', children: entry.children || [] };
-
-    const folderId = entry.id;
-    const children = entry.children || [];
-
-    const newList = document.createElement('div');
-    newList.className = 'items-list';
-    newList.dataset.folderId = folderId;
-
-    if (!children.length) {
-        const empty = document.createElement('div');
-        empty.className   = 'empty';
-        empty.textContent = '(empty)';
-        newList.appendChild(empty);
-    } else {
-        children.forEach(e => {
-            if (e.id === dragId) return; // skip — parked off-screen
-            newList.appendChild(buildItem(e, folderId, newList));
-        });
-    }
-
-    attachListDragHandlers(newList, folderId);
-
-    const oldList = document.querySelector('.items-list');
-    if (oldList) oldList.replaceWith(newList);
-    else document.getElementById('container').appendChild(newList);
-
-    updateSize();
-}
-
-function navigateBack() {
-    if (navStack.length <= 1) return;
-    navStack.pop();
-    renderPanel();
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Panel render
-// ─────────────────────────────────────────────────────────────────────────────
-
 function renderPanel() {
-    const container = document.getElementById('container');
-
-    // ── Drag-safe re-render ──────────────────────────────────────────────────
-    // Removing the drag-source element from the DOM (via innerHTML='') ends the
-    // OS drag session immediately on macOS/Chromium. To survive a spring-navigate
-    // re-render mid-drag we:
-    //   1. Detach the source element before clearing the container.
-    //   2. Park it off-screen in document.body — drag session stays alive.
-    //   3. Don't re-render it as a normal item (skip it in the child list).
-    //   4. resetDragState() removes the parked element when drag ends.
+    // Park drag source atomically before wiping the container
     if (dragId) {
         const src = document.querySelector(`.item[data-id="${dragId}"]`);
         if (src) {
             src.style.cssText =
                 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;';
-            document.body.appendChild(src); // atomic move — never orphaned
+            document.body.appendChild(src);
         }
     }
 
+    const container = document.getElementById('container');
     container.innerHTML = '';
 
-    const depth = navStack.length - 1;
-    const { folderId, title, children } = currentLevel();
+    const folder = currentFolder();
+    const depth  = backStack.length + (currentNode ? 1 : 0);
 
-    // Back button + current folder title (shown when inside a sub-folder)
     if (depth > 0) {
-        const parentTitle = navStack[depth - 1].title;
+        const parentTitle = backStack.length
+            ? (backStack[backStack.length - 1]?.title || rootData.title)
+            : rootData.title;
         container.appendChild(buildBackButton(parentTitle));
 
         const header = document.createElement('div');
-        header.className = 'folder-header';
-        header.textContent = title;
+        header.className   = 'folder-header';
+        header.textContent = folder.title || folder.id;
         container.appendChild(header);
     }
 
-    // Items
+    container.appendChild(buildList(folder));
+    updateSize();
+}
+
+/**
+ * Swap only the items list in-place — used during drag spring-navigation.
+ * The container chrome (back button, header) is intentionally left alone.
+ */
+function swapItemsList() {
+    const folder  = currentFolder();
+    const newList = buildList(folder);
+    const oldList = document.querySelector('.items-list');
+    if (oldList) oldList.replaceWith(newList);
+    else document.getElementById('container').appendChild(newList);
+    updateSize();
+}
+
+function buildList(folder) {
+    const folderId = folder.folderId || folder.id;
+    const children = folder.children || [];
+
     const list = document.createElement('div');
-    list.className = 'items-list';
+    list.className        = 'items-list';
     list.dataset.folderId = folderId;
 
-    if (!children || !children.length) {
+    if (!children.length) {
         const empty = document.createElement('div');
         empty.className   = 'empty';
         empty.textContent = '(empty)';
         list.appendChild(empty);
     } else {
         children.forEach(entry => {
-            if (entry.id === dragId) return; // skip — parked off-screen
+            if (entry.id === dragId) return; // skip parked source
             list.appendChild(buildItem(entry, folderId, list));
         });
     }
 
     attachListDragHandlers(list, folderId);
-    container.appendChild(list);
-
-    updateSize();
+    return list;
 }
 
 
@@ -220,34 +233,20 @@ function buildBackButton(parentTitle) {
     btn.className = 'back-btn';
 
     const arrow = document.createElement('span');
-    arrow.className = 'back-arrow';
+    arrow.className   = 'back-arrow';
     arrow.textContent = '‹';
 
     const lbl = document.createElement('span');
-    lbl.className = 'back-label';
+    lbl.className   = 'back-label';
     lbl.textContent = parentTitle;
 
     btn.append(arrow, lbl);
+    btn.addEventListener('click', () => { if (!dragId) clickBack(); });
 
-    btn.addEventListener('click', () => {
-        if (!dragId) navigateBack();
-    });
-
-    // Drop target: move dragged item into the parent folder, then navigate back
-    btn.addEventListener('dragenter', (e) => {
-        if (!dragId) return;
-        e.preventDefault();
-        btn.classList.add('drag-over');
-    });
-    btn.addEventListener('dragover', (e) => {
-        if (!dragId) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        btn.classList.add('drag-over');
-    });
-    btn.addEventListener('dragleave', (e) => {
-        if (!btn.contains(e.relatedTarget)) btn.classList.remove('drag-over');
-    });
+    // Drop target: move item into the parent folder then go back
+    btn.addEventListener('dragenter', (e) => { if (!dragId) return; e.preventDefault(); btn.classList.add('drag-over'); });
+    btn.addEventListener('dragover',  (e) => { if (!dragId) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    btn.addEventListener('dragleave', (e) => { if (!btn.contains(e.relatedTarget)) btn.classList.remove('drag-over'); });
     btn.addEventListener('drop', async (e) => {
         e.preventDefault();
         btn.classList.remove('drag-over');
@@ -258,12 +257,12 @@ function buildBackButton(parentTitle) {
         const srcId = dragId;
         resetDragState();
 
-        const parentFolderId = navStack[navStack.length - 2].folderId;
+        const parentFolderId = backStack.length
+            ? (backStack[backStack.length - 1]?.id || rootData.folderId)
+            : rootData.folderId;
         await window.folderDropdown.moveIntoFolder(srcId, parentFolderId, null);
-        // Remove from current level cache and navigate back
-        navStack[navStack.length - 1].children =
-            navStack[navStack.length - 1].children.filter(c => c.id !== srcId);
-        navigateBack();
+        currentNode = backStack.pop() || null;
+        renderPanel();
     });
 
     return btn;
@@ -271,7 +270,7 @@ function buildBackButton(parentTitle) {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// updateSize — width is fixed; suppress height changes during drag
+// updateSize
 // ─────────────────────────────────────────────────────────────────────────────
 
 function updateSize() {
@@ -280,8 +279,7 @@ function updateSize() {
     const container = document.getElementById('container');
     if (!container) return;
     const h = Math.min(container.scrollHeight + 8, MAX_HEIGHT);
-    const w = PANEL_WIDTH + PANEL_PADDING;
-    window.folderDropdown.updateBounds(w, h);
+    window.folderDropdown.updateBounds(PANEL_WIDTH + PANEL_PADDING, h);
 }
 
 
@@ -309,7 +307,6 @@ function buildItem(entry, folderId, list) {
 
     attachItemContextMenu(btn, entry, folderId);
     attachItemDragHandlers(btn, entry, folderId, list);
-
     return btn;
 }
 
@@ -327,12 +324,7 @@ function buildFolderItem(btn, entry) {
     arrow.textContent = '▶';
 
     btn.append(icon, lbl, arrow);
-
-    // Click navigates in (not during drag)
-    btn.addEventListener('click', () => {
-        if (dragId || renamingId) return;
-        navigateInto(entry);
-    });
+    btn.addEventListener('click', () => { if (!dragId && !renamingId) clickInto(entry); });
 }
 
 function buildBookmarkItem(btn, entry) {
@@ -372,10 +364,8 @@ function attachItemContextMenu(btn, entry, folderId) {
         e.preventDefault();
         e.stopPropagation();
         window.folderDropdown.showCtxMenu({
-            type: entry.type,
-            id:   entry.id,
-            url:  entry.url,
-            title: entry.title,
+            type: entry.type, id: entry.id,
+            url: entry.url, title: entry.title,
             parentFolderId: folderId,
         });
     });
@@ -397,17 +387,16 @@ function clearDragSpringTimer() {
 }
 
 function resetDragState() {
-    const id  = dragId;
-    dragId    = null; dragFolderId = null;
+    const id = dragId;
+    dragId = null; dragFolderId = null;
     insidePanel = false; leftDropdown = false;
-    // Remove the off-screen parked element (kept alive during spring-navigate).
     if (id) document.querySelector(`.item[data-id="${id}"]`)?.remove();
     if (pendingResize) updateSize();
 }
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// List-level drag handlers (drop on empty space)
+// List drag handlers (drop on empty space)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function attachListDragHandlers(list, folderId) {
@@ -424,30 +413,21 @@ function attachListDragHandlers(list, folderId) {
         e.preventDefault();
         clearDragSpringTimer();
         clearDragVisuals();
-
         const srcId = dragId;
         resetDragState();
-
         await window.folderDropdown.moveIntoFolder(srcId, folderId, null);
-        // Optimistic: remove from cached children and re-render
-        const lvl = navStack[navStack.length - 1];
-        if (lvl.folderId === folderId) {
-            const item = lvl.children.find(c => c.id === srcId);
-            if (item) {
-                lvl.children = [...lvl.children.filter(c => c.id !== srcId), item];
-            }
-            renderPanel();
-        }
+        // onRefreshPanel will re-render when the IPC broadcast arrives
     });
 
     list.addEventListener('contextmenu', (e) => {
         if (e.target.closest('.item[data-id]')) return;
         e.preventDefault();
+        const f = currentFolder();
         window.folderDropdown.showCtxMenu({
             type: 'folder-bg',
-            id: folderId,
-            title: currentLevel().title,
-            parentFolderId: folderId,
+            id: f.folderId || f.id,
+            title: f.title,
+            parentFolderId: f.folderId || f.id,
         });
     });
 }
@@ -460,41 +440,38 @@ function attachListDragHandlers(list, folderId) {
 function attachItemDragHandlers(btn, entry, folderId, list) {
     btn.addEventListener('dragstart', (e) => {
         if (renamingId) { e.preventDefault(); return; }
-
         dragId       = entry.id;
         dragFolderId = folderId;
         insidePanel  = false;
         leftDropdown = false;
-
         btn.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', entry.id);
-        console.log('[drag] dragstart id=', entry.id);
+        console.log('[drag] dragstart', entry.id);
     });
 
     btn.addEventListener('dragend', () => {
-        console.log('[drag] dragend id=', entry.id, 'dragId=', dragId);
         btn.classList.remove('dragging');
         clearDragSpringTimer();
         clearDragVisuals();
-
         if (!dragId) return;
-
+        // Spurious dragend fired by macOS when swapItemsList mutated the DOM.
+        // The OS drag session is still live — do nothing at all.
+        if (suppressDragEnd) {
+            return;
+        }
         const left = leftDropdown;
         resetDragState();
-
-        if (left) {
-            window.folderDropdown.dragEnd();
-        } else {
-            window.folderDropdown.close();
-        }
+        console.log('[drag] dragend real — left=', left);
+        if (left) window.folderDropdown.dragEnd();
+        else window.folderDropdown.close();
     });
 
+    // dragenter is reliable on macOS; dragover is often dispatched to the list
+    // container instead of the child button, so spring logic lives here.
     btn.addEventListener('dragenter', (e) => {
-        console.log('[drag] dragenter on', entry.id, entry.type, '| dragId=', dragId, '| dragSpringBtn===btn?', dragSpringBtn === btn);
         if (!dragId || dragId === entry.id) return;
         e.preventDefault();
-
         if (dragSpringBtn === btn) return;
 
         clearDragVisuals();
@@ -503,15 +480,14 @@ function attachItemDragHandlers(btn, entry, folderId, list) {
         if (entry.type === 'folder') {
             btn.classList.add('drag-into');
             dragSpringBtn   = btn;
-            console.log('[drag] spring timer set for', entry.id);
             dragSpringTimer = setTimeout(() => {
-                console.log('[drag] spring timer fired for', entry.id, '| dragSpringBtn===btn?', dragSpringBtn === btn);
                 dragSpringTimer = null;
                 if (dragSpringBtn !== btn) return;
                 dragSpringBtn = null;
-                console.log('[drag] calling springInto', entry.id);
+                console.log('[drag] spring firing for', entry.id);
                 springInto(entry);
             }, DRAG_SPRING_DELAY);
+            console.log('[drag] spring armed for', entry.id);
         } else {
             btn.classList.add('drop-before');
         }
@@ -525,11 +501,8 @@ function attachItemDragHandlers(btn, entry, folderId, list) {
     });
 
     btn.addEventListener('dragleave', (e) => {
-        console.log('[drag] dragleave on', entry.id, '| relatedTarget=', e.relatedTarget, '| dragSpringBtn===btn?', dragSpringBtn === btn);
         if (btn.contains(e.relatedTarget)) return;
-        // Only cancel the spring timer if the cursor moved to another item button.
-        // Moving to the list background, a divider, or null (spurious macOS event)
-        // does NOT count — the cursor is still effectively hovering this folder.
+        // Only cancel if cursor moved to another item — not to list background or null.
         const movedToItem = e.relatedTarget?.closest?.('.item[data-id]');
         if (movedToItem && movedToItem !== btn) {
             if (dragSpringBtn === btn) clearDragSpringTimer();
@@ -543,33 +516,26 @@ function attachItemDragHandlers(btn, entry, folderId, list) {
         btn.classList.remove('drag-into', 'drop-before');
         clearDragSpringTimer();
         clearDragVisuals();
-
         if (!dragId || dragId === entry.id) return;
 
         const srcId = dragId;
         resetDragState();
 
         if (entry.type === 'folder') {
-            // Move into folder, remove from current view, re-render
-            const lvl = navStack[navStack.length - 1];
-            lvl.children = lvl.children.filter(c => c.id !== srcId);
             await window.folderDropdown.moveIntoFolder(srcId, entry.id, null);
-            renderPanel();
         } else {
-            // Reorder within same panel
             const ids  = Array.from(list.querySelectorAll('.item[data-id]')).map(el => el.dataset.id);
             const from = ids.indexOf(srcId);
             const to   = ids.indexOf(entry.id);
             if (from !== -1 && to !== -1) {
                 ids.splice(from, 1);
                 ids.splice(to, 0, srcId);
-                const lvl      = navStack[navStack.length - 1];
-                const childMap = new Map(lvl.children.map(c => [c.id, c]));
-                lvl.children   = ids.map(id => childMap.get(id)).filter(Boolean);
                 await window.folderDropdown.reorderInFolder(folderId, ids);
-                renderPanel();
+            } else {
+                await window.folderDropdown.moveIntoFolder(srcId, folderId, entry.id);
             }
         }
+        // onRefreshPanel will re-render when the IPC broadcast arrives
     });
 }
 
@@ -582,8 +548,8 @@ function startInlineRename(itemId, currentTitle) {
     const btn = document.querySelector(`.item[data-id="${itemId}"]`);
     if (!btn || renamingId === itemId) return;
 
-    renamingId = itemId;
-    const lbl  = btn.querySelector('.item-label');
+    renamingId    = itemId;
+    const lbl     = btn.querySelector('.item-label');
     if (!lbl) return;
 
     const input = document.createElement('input');
@@ -592,25 +558,20 @@ function startInlineRename(itemId, currentTitle) {
     lbl.style.display = 'none';
     btn.appendChild(input);
 
-    const blockEvent = (e) => e.stopPropagation();
-    btn.addEventListener('mouseup', blockEvent, true);
-    btn.addEventListener('click',   blockEvent, true);
-
+    const block = (e) => e.stopPropagation();
+    btn.addEventListener('mouseup', block, true);
+    btn.addEventListener('click',   block, true);
     requestAnimationFrame(() => { input.focus(); input.select(); });
 
     let done = false;
 
     async function commit() {
-        if (done) return;
-        done = true;
+        if (done) return; done = true;
         renamingId = null;
-        btn.removeEventListener('mouseup', blockEvent, true);
-        btn.removeEventListener('click',   blockEvent, true);
-
+        btn.removeEventListener('mouseup', block, true);
+        btn.removeEventListener('click',   block, true);
         const newTitle = input.value.trim() || currentTitle || 'New Folder';
-        input.remove();
-        lbl.style.display = '';
-
+        input.remove(); lbl.style.display = '';
         if (newTitle !== (currentTitle || lbl.textContent)) {
             lbl.textContent = newTitle;
             await window.folderDropdown.updateById(itemId, { title: newTitle });
@@ -618,13 +579,11 @@ function startInlineRename(itemId, currentTitle) {
     }
 
     function cancel() {
-        if (done) return;
-        done = true;
+        if (done) return; done = true;
         renamingId = null;
-        btn.removeEventListener('mouseup', blockEvent, true);
-        btn.removeEventListener('click',   blockEvent, true);
-        input.remove();
-        lbl.style.display = '';
+        btn.removeEventListener('mouseup', block, true);
+        btn.removeEventListener('click',   block, true);
+        input.remove(); lbl.style.display = '';
     }
 
     input.addEventListener('keydown', (e) => {
@@ -637,18 +596,15 @@ function startInlineRename(itemId, currentTitle) {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Global drag-leave detection (cursor exits WebContentsView boundary)
+// Global drag-leave (cursor exits WebContentsView)
 // ─────────────────────────────────────────────────────────────────────────────
 
 document.addEventListener('dragleave', (e) => {
     if (!dragId || !insidePanel) return;
-
-    const exitedView = e.clientX <= 2
-        || e.clientY <= 2
+    const exited = e.clientX <= 2 || e.clientY <= 2
         || e.clientX >= window.innerWidth  - 3
         || e.clientY >= window.innerHeight - 3;
-
-    if (exitedView) {
+    if (exited) {
         leftDropdown = true;
         window.folderDropdown.dragStart(dragId, dragFolderId);
         window.folderDropdown.close();
