@@ -448,6 +448,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const item = document.createElement('button');
         item.className = 'bookmark-overflow-item';
+        item.dataset.id = entry.id;
+        item.dataset.parentFolderId = parentFolderId || '';
 
         if (parentFolderId) {
             item.draggable = true;
@@ -464,6 +466,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (entry.type === 'folder') {
+            item.classList.add('bookmark-overflow-folder-item');
             item.appendChild(makeFolderIcon('bookmark-overflow-folder-icon'));
             const lbl   = document.createElement('span');
             lbl.textContent = entry.title || 'Folder';
@@ -473,8 +476,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             arrow.textContent = '▶';
             item.appendChild(arrow);
 
+            // Hover to open (Firefox-style)
+            item.addEventListener('mouseenter', () => {
+                clearTimeout(overflowCloseTimer);
+                clearTimeout(overflowHoverTimer);
+                overflowHoverTimer = setTimeout(() => openFolderSubPanel(item, entry), 220);
+            });
+            item.addEventListener('mouseleave', (e) => {
+                clearTimeout(overflowHoverTimer);
+                const sub = document.getElementById('bm-subdropdown');
+                if (sub && (e.relatedTarget === sub || sub.contains(e.relatedTarget))) return;
+                overflowCloseTimer = setTimeout(() => {
+                    document.getElementById('bm-subdropdown')?.remove();
+                    document.querySelectorAll('#bm-dropdown .has-submenu-open')
+                        .forEach(el => el.classList.remove('has-submenu-open'));
+                }, 220);
+            });
+            // Click also opens (fallback)
             item.addEventListener('click', (e) => {
                 e.stopPropagation();
+                clearTimeout(overflowHoverTimer);
                 const existing = document.getElementById('bm-subdropdown');
                 if (existing && existing.dataset.forId === entry.id) {
                     existing.remove(); item.classList.remove('has-submenu-open');
@@ -531,15 +552,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.body.appendChild(sub);
         const r = anchorItem.getBoundingClientRect();
-        sub.style.left = r.right + 'px';
+        // Flip left if sub would overflow the right edge
+        const subW = 200;
+        const spaceRight = window.innerWidth - r.right;
+        sub.style.left = (spaceRight >= subW ? r.right : r.left - subW) + 'px';
         sub.style.top  = r.top + 'px';
         anchorItem.classList.add('has-submenu-open');
+
+        // Keep sub open while cursor is inside it
+        sub.addEventListener('mouseenter', () => clearTimeout(overflowCloseTimer));
+        sub.addEventListener('mouseleave', (e) => {
+            if (e.relatedTarget === anchorItem || anchorItem.contains(e.relatedTarget)) return;
+            overflowCloseTimer = setTimeout(() => {
+                sub.remove();
+                anchorItem.classList.remove('has-submenu-open');
+            }, 220);
+        });
     }
 
     // ── Drag and drop ─────────────────────────────────────────────────────────
 
     let dragSrcId       = null;
-    let dragSrcFolderId = null; // set when drag starts from inside a folder dropdown
+    let dragSrcFolderId = null;
     let bmDragActive    = false;
     let externDragId    = null;
     let externLastTarget = null;
@@ -548,6 +582,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     let springTimer    = null;
     let springFolderId = null;
     let springOpen     = false;
+
+    // Overflow dropdown subfolder hover-open state
+    let overflowHoverTimer = null;
+    let overflowCloseTimer = null;
 
     function clearDragClasses() {
         document.querySelectorAll('.drag-into, .drop-before')
@@ -602,7 +640,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             el.classList.remove('drop-before');
                             el.classList.add('drag-into');
                             openDropdown(el, item.id, (panel) => buildSpringPanel(panel, item));
-                        }, 700);
+                        }, 500);
                     }
                 }
             } else {
@@ -645,19 +683,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     function buildSpringPanel(panel, folderEntry) {
         const children = folderEntry.children || [];
 
+        // Spring timer state local to this panel instance
+        let panelSpringTimer = null;
+        let panelSpringRow   = null;
+
+        function clearPanelSpring() {
+            if (panelSpringTimer) { clearTimeout(panelSpringTimer); panelSpringTimer = null; }
+            panelSpringRow = null;
+        }
+
         function makeDropRow(child) {
             const row = makeDropdownItem(child, folderEntry.id);
+
+            row.addEventListener('dragenter', (e) => {
+                if (!bmDragActive || dragSrcId === child.id) return;
+                e.preventDefault();
+                if (panelSpringRow === row) return;
+
+                clearDragClasses(); clearPanelSpring();
+
+                if (child.type === 'folder') {
+                    row.classList.add('drag-into');
+                    panelSpringRow   = row;
+                    panelSpringTimer = setTimeout(() => {
+                        panelSpringTimer = null;
+                        if (panelSpringRow !== row) return;
+                        panelSpringRow = null;
+                        // Replace the current spring panel with the child folder's panel
+                        const sub = document.getElementById('bm-subdropdown') || panel;
+                        sub.innerHTML = '';
+                        buildSpringPanel(sub, child);
+                        sub.id            = 'bm-subdropdown';
+                        sub.dataset.forId = child.id;
+                    }, 500);
+                } else {
+                    row.classList.add('drop-before');
+                }
+            });
+
             row.addEventListener('dragover', (e) => {
                 if (!bmDragActive || dragSrcId === child.id) return;
                 e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move';
-                clearDragClasses();
-                row.classList.add(child.type === 'folder' ? 'drag-into' : 'drop-before');
             });
-            row.addEventListener('dragleave', () => row.classList.remove('drop-before', 'drag-into'));
+
+            row.addEventListener('dragleave', (e) => {
+                if (row.contains(e.relatedTarget)) return;
+                const movedToItem = e.relatedTarget?.closest?.('.bookmark-overflow-item');
+                if (movedToItem && movedToItem !== row) {
+                    if (panelSpringRow === row) clearPanelSpring();
+                    row.classList.remove('drop-before', 'drag-into');
+                }
+            });
+
             row.addEventListener('drop', async (e) => {
                 if (!dragSrcId || dragSrcId === child.id) return;
                 e.preventDefault(); e.stopPropagation();
-                row.classList.remove('drop-before', 'drag-into'); clearSpring(true);
+                row.classList.remove('drop-before', 'drag-into');
+                clearSpring(true); clearPanelSpring();
                 if (child.type === 'folder') {
                     await window.browserBookmarks.moveIntoFolder(dragSrcId, child.id, null);
                 } else {
@@ -682,7 +764,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         panel.addEventListener('drop', async (e) => {
             if (!dragSrcId || e.target.closest('.bookmark-overflow-item, .bookmark-overflow-sep')) return;
-            e.preventDefault(); clearSpring(true);
+            e.preventDefault(); clearSpring(true); clearPanelSpring();
             await window.browserBookmarks.moveIntoFolder(dragSrcId, folderEntry.id, null);
         });
     }
@@ -697,10 +779,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.electronAPI.onExternBookmarkDragPosition((x, y) => {
         if (!externDragId) return;
         clearDragClasses();
-        const el      = document.elementFromPoint(x, y);
-        const barItem = el?.closest('.bookmark-bar-item, .bookmark-bar-divider');
-        externLastTarget = barItem || null;
-        if (barItem) barItem.classList.add(barItem.classList.contains('bookmark-bar-folder') ? 'drag-into' : 'drop-before');
+        const el           = document.elementFromPoint(x, y);
+        const barItem      = el?.closest('.bookmark-bar-item, .bookmark-bar-divider');
+        const overflowItem = el?.closest('.bookmark-overflow-item');
+
+        if (barItem) {
+            externLastTarget = barItem;
+            barItem.classList.add(barItem.classList.contains('bookmark-bar-folder') ? 'drag-into' : 'drop-before');
+        } else if (overflowItem && overflowItem.dataset.id && overflowItem.dataset.id !== externDragId) {
+            externLastTarget = overflowItem;
+            overflowItem.classList.add(
+                overflowItem.classList.contains('bookmark-overflow-folder-item') ? 'drag-into' : 'drop-before'
+            );
+        } else {
+            externLastTarget = null;
+        }
     });
 
     window.electronAPI.onExternBookmarkDragEnd(async () => {
@@ -714,6 +807,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         const targetId = target.dataset.id;
         if (!targetId || targetId === srcId) return;
 
+        // Target is inside a spring-opened overflow panel (subfolder)
+        if (target.classList.contains('bookmark-overflow-item')) {
+            const parentFolderId = target.dataset.parentFolderId;
+            if (target.classList.contains('bookmark-overflow-folder-item')) {
+                // Drop onto a folder → append to its end
+                await window.browserBookmarks.moveIntoFolder(srcId, targetId, null);
+            } else if (parentFolderId) {
+                // Drop before a bookmark inside the spring folder
+                await window.browserBookmarks.moveIntoFolder(srcId, parentFolderId, targetId);
+            }
+            return;
+        }
+
+        // Target is a bar item
         if (target.classList.contains('bookmark-bar-folder')) {
             await window.browserBookmarks.moveIntoFolder(srcId, targetId);
         } else if (srcFolder) {
@@ -847,7 +954,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 more.addEventListener('click', (e) => {
                     e.stopPropagation();
                     openDropdown(more, '__overflow__', (panel) => {
-                        hidden.forEach(entry => panel.appendChild(makeDropdownItem(entry)));
+                        // Pass '__root__' as parentFolderId so drag handlers are attached
+                        hidden.forEach(entry => panel.appendChild(makeDropdownItem(entry, '__root__')));
                     });
                 });
                 bookmarkBarItems.appendChild(more);
