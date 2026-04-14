@@ -122,15 +122,11 @@ function clickBack() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function springInto(entry) {
-    console.log('[drag] springInto', entry.id, entry.title, '| dragId=', dragId);
-
-    // Suppress the dragend that fires immediately after swapItemsList mutates the DOM.
-    // The OS ends the drag session when hit-testing is disturbed by the swap, then
-    // restarts it — the dragend listener must not call close() in that window.
     suppressDragEnd = true;
     setTimeout(() => { suppressDragEnd = false; }, 150);
 
-    // Move drag source to document.body ATOMICALLY before any DOM changes.
+    // Park drag source at document.body BEFORE any DOM changes so it is never
+    // orphaned by a replaceWith / insertBefore below.
     if (dragId) {
         const src = document.querySelector(`.item[data-id="${dragId}"]`);
         if (src) {
@@ -141,7 +137,46 @@ function springInto(entry) {
     }
 
     currentNode = entry;
-    swapItemsList();
+
+    // ── Surgical DOM update — NEVER wipe the container during drag ───────────
+    // Replacing container.innerHTML fires spurious dragend on macOS.
+    // Instead: insert/update chrome (back btn + header) then swap the list.
+    const container   = document.getElementById('container');
+    const folder      = currentFolder(); // = entry
+    const parentTitle = backStack.length
+        ? (backStack[backStack.length - 1]?.title || rootData.title)
+        : rootData.title;
+
+    let backBtn = container.querySelector('.back-btn');
+    let hdr     = container.querySelector('.folder-header');
+
+    if (!backBtn) {
+        // First spring from root — insert chrome before the existing items list
+        backBtn = buildBackButton(parentTitle);
+        hdr = document.createElement('div');
+        hdr.className   = 'folder-header';
+        hdr.textContent = folder.title || folder.id;
+        const existingList = container.querySelector('.items-list');
+        if (existingList) {
+            container.insertBefore(backBtn, existingList);
+            container.insertBefore(hdr,     existingList);
+        } else {
+            container.appendChild(backBtn);
+            container.appendChild(hdr);
+        }
+    } else {
+        // Already showing a subfolder — just update the labels
+        const lbl = backBtn.querySelector('.back-label');
+        if (lbl) lbl.textContent = parentTitle;
+        if (hdr)  hdr.textContent = folder.title || folder.id;
+    }
+
+    // Swap only the items list — minimum DOM churn
+    const newList = buildList(folder);
+    const oldList = container.querySelector('.items-list');
+    if (oldList) oldList.replaceWith(newList);
+    else         container.appendChild(newList);
+    // No updateSize — dragId is set so the IPC call is suppressed anyway
 }
 
 
@@ -244,17 +279,18 @@ function buildBackButton(parentTitle) {
     btn.addEventListener('click', () => { if (!dragId) clickBack(); });
 
     // Drop target: move item into the parent folder then go back
-    btn.addEventListener('dragenter', (e) => { if (!dragId) return; e.preventDefault(); btn.classList.add('drag-over'); });
-    btn.addEventListener('dragover',  (e) => { if (!dragId) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    btn.addEventListener('dragenter', (e) => { e.preventDefault(); btn.classList.add('drag-over'); });
+    btn.addEventListener('dragover',  (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
     btn.addEventListener('dragleave', (e) => { if (!btn.contains(e.relatedTarget)) btn.classList.remove('drag-over'); });
     btn.addEventListener('drop', async (e) => {
         e.preventDefault();
         btn.classList.remove('drag-over');
         clearDragSpringTimer();
         clearDragVisuals();
-        if (!dragId) return;
 
-        const srcId = dragId;
+        const srcId = dragId || e.dataTransfer.getData('text/plain');
+        if (!srcId) return;
+
         resetDragState();
 
         const parentFolderId = backStack.length
@@ -400,20 +436,23 @@ function resetDragState() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function attachListDragHandlers(list, folderId) {
-    list.addEventListener('dragenter', () => { if (dragId) insidePanel = true; });
+    list.addEventListener('dragenter', () => { insidePanel = true; });
 
     list.addEventListener('dragover', (e) => {
-        if (!dragId || e.target.closest('.item[data-id]')) return;
+        if (e.target.closest('.item[data-id]')) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
     });
 
     list.addEventListener('drop', async (e) => {
-        if (!dragId || e.target.closest('.item[data-id]')) return;
+        if (e.target.closest('.item[data-id]')) return;
         e.preventDefault();
         clearDragSpringTimer();
         clearDragVisuals();
-        const srcId = dragId;
+
+        const srcId = dragId || e.dataTransfer.getData('text/plain');
+        if (!srcId) return;
+
         resetDragState();
         await window.folderDropdown.moveIntoFolder(srcId, folderId, null);
         // onRefreshPanel will re-render when the IPC broadcast arrives
@@ -470,7 +509,7 @@ function attachItemDragHandlers(btn, entry, folderId, list) {
     // dragenter is reliable on macOS; dragover is often dispatched to the list
     // container instead of the child button, so spring logic lives here.
     btn.addEventListener('dragenter', (e) => {
-        if (!dragId || dragId === entry.id) return;
+        if (dragId === entry.id) return;
         e.preventDefault();
         if (dragSpringBtn === btn) return;
 
@@ -494,7 +533,7 @@ function attachItemDragHandlers(btn, entry, folderId, list) {
     });
 
     btn.addEventListener('dragover', (e) => {
-        if (!dragId || dragId === entry.id) return;
+        if (dragId === entry.id) return;
         e.preventDefault();
         e.stopPropagation();
         e.dataTransfer.dropEffect = 'move';
@@ -516,9 +555,11 @@ function attachItemDragHandlers(btn, entry, folderId, list) {
         btn.classList.remove('drag-into', 'drop-before');
         clearDragSpringTimer();
         clearDragVisuals();
-        if (!dragId || dragId === entry.id) return;
+        if (dragId === entry.id) return;
 
-        const srcId = dragId;
+        const srcId = dragId || e.dataTransfer.getData('text/plain');
+        if (!srcId) return;
+
         resetDragState();
 
         if (entry.type === 'folder') {
