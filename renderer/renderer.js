@@ -531,6 +531,188 @@ document.addEventListener('DOMContentLoaded', async () => {
         return item;
     }
 
+    // ── Folder bar click → floating folder WebContentsView ───────────────────
+    async function openFolderPanel(btn, entry) {
+        const rect = btn.getBoundingClientRect();
+        closeDropdown();
+        try {
+            await window.electronAPI.openFolderDropdown(
+                { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
+                entry,
+            );
+        } catch {}
+    }
+
+    /**
+     * Fill a panel div with the items of a folder entry.
+     * Each folder item shows a ▶ arrow; hovering over it for 300ms opens a
+     * side-panel (same pattern as the overflow subfolder).
+     * Drag from any item sets dragSrcId/FolderId and closes the panel.
+     */
+    function buildFolderPanelItems(panel, folderEntry) {
+        const folderId = folderEntry.id;
+        const children = folderEntry.children || [];
+
+        if (!children.length) {
+            const empty = document.createElement('div');
+            empty.className   = 'bookmark-overflow-empty';
+            empty.textContent = '(empty)';
+            panel.appendChild(empty);
+            return;
+        }
+
+        // Local spring state for subfolders within this panel
+        let panelSpringTimer = null;
+        let panelSpringRow   = null;
+        function clearPanelSpring() {
+            if (panelSpringTimer) { clearTimeout(panelSpringTimer); panelSpringTimer = null; }
+            panelSpringRow = null;
+        }
+
+        children.forEach(child => {
+            if (child.type === 'divider') {
+                const sep = document.createElement('div');
+                sep.className = 'bookmark-overflow-sep';
+                panel.appendChild(sep);
+                return;
+            }
+
+            const row = document.createElement('button');
+            row.className              = 'bookmark-overflow-item';
+            row.dataset.id             = child.id;
+            row.dataset.parentFolderId = folderId;
+
+            if (child.type === 'folder') {
+                row.classList.add('bookmark-overflow-folder-item');
+                row.appendChild(makeFolderIcon('bookmark-overflow-folder-icon'));
+                const lbl = document.createElement('span');
+                lbl.textContent = child.title || 'Folder';
+                row.appendChild(lbl);
+                const arr = document.createElement('span');
+                arr.className   = 'bookmark-overflow-submenu-arrow';
+                arr.textContent = '▶';
+                row.appendChild(arr);
+
+                // Click drills in: rebuild the panel contents for the subfolder
+                row.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // Clear current contents down to the header+sep then refill
+                    const panelEl = document.getElementById('bm-dropdown');
+                    if (!panelEl) return;
+                    // Remove everything after the separator
+                    while (panelEl.children.length > 2) panelEl.removeChild(panelEl.lastChild);
+                    // Update header text
+                    const hdr = panelEl.querySelector('.bookmark-folder-panel-header');
+                    if (hdr) hdr.textContent = child.title || 'Folder';
+                    buildFolderPanelItems(panelEl, child);
+                });
+            } else {
+                const fav = faviconFor(child.url);
+                if (fav) {
+                    const img = document.createElement('img');
+                    img.className = 'bookmark-bar-favicon'; img.src = fav;
+                    img.onerror   = () => img.remove();
+                    row.appendChild(img);
+                }
+                const lbl = document.createElement('span');
+                try { lbl.textContent = child.title || new URL(child.url).hostname; }
+                catch { lbl.textContent = child.url; }
+                row.appendChild(lbl);
+
+                row.addEventListener('click', () => {
+                    closeDropdown();
+                    window.tab.loadUrl(activeTabIndex, child.url);
+                });
+                row.addEventListener('auxclick', (e) => {
+                    if (e.button !== 1) return;
+                    e.preventDefault();
+                    closeDropdown();
+                    window.browserBookmarks.openInNewTab(child.url, false);
+                });
+            }
+
+            // Drag — same pattern as makeDropdownItem
+            row.draggable = true;
+            row.addEventListener('dragstart', (e) => {
+                dragSrcId = child.id; dragSrcFolderId = folderId; bmDragActive = true;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', child.id);
+                closeDropdown();
+            });
+            row.addEventListener('dragend', () => {
+                dragSrcId = null; dragSrcFolderId = null; bmDragActive = false;
+                clearDragClasses(); clearSpring(true);
+            });
+
+            // Drag-over target: spring into subfolder, or show drop-before line
+            row.addEventListener('dragenter', (e) => {
+                if (!bmDragActive || dragSrcId === child.id) return;
+                e.preventDefault();
+                if (panelSpringRow === row) return;
+                clearDragClasses(); clearPanelSpring();
+                if (child.type === 'folder') {
+                    row.classList.add('drag-into');
+                    panelSpringRow   = row;
+                    panelSpringTimer = setTimeout(() => {
+                        if (panelSpringRow !== row) return;
+                        panelSpringRow = null; panelSpringTimer = null;
+                        const panelEl = document.getElementById('bm-dropdown');
+                        if (!panelEl) return;
+                        while (panelEl.children.length > 2) panelEl.removeChild(panelEl.lastChild);
+                        const hdr = panelEl.querySelector('.bookmark-folder-panel-header');
+                        if (hdr) hdr.textContent = child.title || 'Folder';
+                        buildFolderPanelItems(panelEl, child);
+                    }, 500);
+                } else {
+                    row.classList.add('drop-before');
+                }
+            });
+            row.addEventListener('dragover', (e) => {
+                if (!bmDragActive || dragSrcId === child.id) return;
+                e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move';
+            });
+            row.addEventListener('dragleave', (e) => {
+                if (row.contains(e.relatedTarget)) return;
+                const moved = e.relatedTarget?.closest?.('.bookmark-overflow-item');
+                if (moved && moved !== row) {
+                    if (panelSpringRow === row) clearPanelSpring();
+                    row.classList.remove('drop-before', 'drag-into');
+                }
+            });
+            row.addEventListener('drop', async (e) => {
+                if (!dragSrcId || dragSrcId === child.id) return;
+                e.preventDefault(); e.stopPropagation();
+                row.classList.remove('drop-before', 'drag-into');
+                clearSpring(true); clearPanelSpring();
+                if (child.type === 'folder') {
+                    await window.browserBookmarks.moveIntoFolder(dragSrcId, child.id, null);
+                } else {
+                    await window.browserBookmarks.moveIntoFolder(dragSrcId, folderId, child.id);
+                }
+            });
+
+            row.addEventListener('contextmenu', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                window.browserBookmarks.showBarContextMenu({
+                    type: child.type, id: child.id, url: child.url, title: child.title,
+                });
+            });
+
+            panel.appendChild(row);
+        });
+
+        // Drop on empty space within the panel → append to folder end
+        panel.addEventListener('dragover', (e) => {
+            if (!bmDragActive || e.target.closest('.bookmark-overflow-item, .bookmark-overflow-sep')) return;
+            e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+        });
+        panel.addEventListener('drop', async (e) => {
+            if (!dragSrcId || e.target.closest('.bookmark-overflow-item, .bookmark-overflow-sep')) return;
+            e.preventDefault(); clearSpring(true);
+            await window.browserBookmarks.moveIntoFolder(dragSrcId, folderId, null);
+        });
+    }
+
     function openFolderSubPanel(anchorItem, entry) {
         document.querySelectorAll('#bm-dropdown .has-submenu-open')
             .forEach(el => el.classList.remove('has-submenu-open'));
@@ -595,7 +777,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     function clearSpring(closePanel = false) {
         if (springTimer) { clearTimeout(springTimer); springTimer = null; }
         springFolderId = null;
-        if (closePanel && springOpen) { closeDropdown(); springOpen = false; }
+        if (closePanel && springOpen) {
+            closeDropdown();
+            window.electronAPI.closeFolderDropdown();
+            springOpen = false;
+        }
     }
 
     // Prevent bookmark drags from bubbling to the tab bar's own dragover handler
@@ -635,11 +821,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (springFolderId !== item.id) {
                         clearSpring(false);
                         springFolderId = item.id;
-                        springTimer = setTimeout(() => {
+                        springTimer = setTimeout(async () => {
                             springOpen = true;
                             el.classList.remove('drop-before');
                             el.classList.add('drag-into');
-                            openDropdown(el, item.id, (panel) => buildSpringPanel(panel, item));
+                            const rect = el.getBoundingClientRect();
+                            closeDropdown();
+                            try {
+                                await window.electronAPI.openFolderDropdown(
+                                    { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
+                                    item,
+                                );
+                            } catch {}
                         }, 500);
                     }
                 }
@@ -683,42 +876,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     function buildSpringPanel(panel, folderEntry) {
         const children = folderEntry.children || [];
 
-        // Spring timer state local to this panel instance
-        let panelSpringTimer = null;
-        let panelSpringRow   = null;
-
-        function clearPanelSpring() {
-            if (panelSpringTimer) { clearTimeout(panelSpringTimer); panelSpringTimer = null; }
-            panelSpringRow = null;
-        }
-
         function makeDropRow(child) {
             const row = makeDropdownItem(child, folderEntry.id);
 
             row.addEventListener('dragenter', (e) => {
                 if (!bmDragActive || dragSrcId === child.id) return;
                 e.preventDefault();
-                if (panelSpringRow === row) return;
-
-                clearDragClasses(); clearPanelSpring();
-
-                if (child.type === 'folder') {
-                    row.classList.add('drag-into');
-                    panelSpringRow   = row;
-                    panelSpringTimer = setTimeout(() => {
-                        panelSpringTimer = null;
-                        if (panelSpringRow !== row) return;
-                        panelSpringRow = null;
-                        // Replace the current spring panel with the child folder's panel
-                        const sub = document.getElementById('bm-subdropdown') || panel;
-                        sub.innerHTML = '';
-                        buildSpringPanel(sub, child);
-                        sub.id            = 'bm-subdropdown';
-                        sub.dataset.forId = child.id;
-                    }, 500);
-                } else {
-                    row.classList.add('drop-before');
-                }
+                clearDragClasses();
+                // Show drop target. Folders get drag-into (drop inside), bookmarks get drop-before.
+                // No sub-spring: rebuilding the panel DOM during a live drag causes macOS to
+                // fire spurious dragleave/dragend. Drop onto a folder moves into it directly.
+                row.classList.add(child.type === 'folder' ? 'drag-into' : 'drop-before');
             });
 
             row.addEventListener('dragover', (e) => {
@@ -728,18 +896,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             row.addEventListener('dragleave', (e) => {
                 if (row.contains(e.relatedTarget)) return;
-                const movedToItem = e.relatedTarget?.closest?.('.bookmark-overflow-item');
-                if (movedToItem && movedToItem !== row) {
-                    if (panelSpringRow === row) clearPanelSpring();
-                    row.classList.remove('drop-before', 'drag-into');
-                }
+                row.classList.remove('drop-before', 'drag-into');
             });
 
             row.addEventListener('drop', async (e) => {
                 if (!dragSrcId || dragSrcId === child.id) return;
                 e.preventDefault(); e.stopPropagation();
                 row.classList.remove('drop-before', 'drag-into');
-                clearSpring(true); clearPanelSpring();
+                clearSpring(true);
                 if (child.type === 'folder') {
                     await window.browserBookmarks.moveIntoFolder(dragSrcId, child.id, null);
                 } else {
@@ -764,7 +928,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         panel.addEventListener('drop', async (e) => {
             if (!dragSrcId || e.target.closest('.bookmark-overflow-item, .bookmark-overflow-sep')) return;
-            e.preventDefault(); clearSpring(true); clearPanelSpring();
+            e.preventDefault(); clearSpring(true);
             await window.browserBookmarks.moveIntoFolder(dragSrcId, folderEntry.id, null);
         });
     }
@@ -861,13 +1025,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             lbl.className   = 'bookmark-bar-label';
             lbl.textContent = entry.title || 'Folder';
             btn.appendChild(lbl);
-            btn.addEventListener('click', () => {
-                const rect = btn.getBoundingClientRect();
-                window.electronAPI.openFolderDropdown(
-                    { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
-                    entry,
-                );
-            });
+            btn.addEventListener('click', () => openFolderPanel(btn, entry));
         } else {
             btn.className = 'bookmark-bar-item';
             btn.title     = entry.title || entry.url;

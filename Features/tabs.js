@@ -96,6 +96,7 @@ class Tabs {
         });
         
         this.mainWindow.contentView.addChildView(tab);
+        this.raiseFloatingViews();
         tab.setVisible(false); // Do not show initially
         
         UserAgent.setupTab(tab);
@@ -198,6 +199,20 @@ class Tabs {
         return this.windowManager.getWindowByWebContents(this.mainWindow.webContents);
     }
 
+    raiseFloatingViews() {
+        const wd = this.getWindowData();
+        if (!wd?.window?.contentView) return;
+
+        const overlays = [wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown];
+        overlays.forEach((view) => {
+            if (!view) return;
+            try {
+                wd.window.contentView.removeChildView(view);
+                wd.window.contentView.addChildView(view);
+            } catch {}
+        });
+    }
+
     setShortcuts(shortcuts) {
         this.shortcuts = shortcuts;
     }
@@ -215,6 +230,7 @@ class Tabs {
         })
         this.mainWindow.contentView.addChildView(tab)
         tab.webContents.loadFile('renderer/NewTab/index.html')
+        this.raiseFloatingViews()
         
         UserAgent.setupTab(tab)
         
@@ -272,6 +288,7 @@ class Tabs {
         })
         this.mainWindow.contentView.addChildView(tab)
         tab.webContents.loadFile(pagePath)
+        this.raiseFloatingViews()
         
         UserAgent.setupTab(tab)
         
@@ -559,6 +576,7 @@ class Tabs {
             
             // Put the website back into focus so keyboard events register immediately
             tab.webContents.focus()
+            this.raiseFloatingViews()
         }
     }
     
