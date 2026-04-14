@@ -51,6 +51,10 @@ function register(ipcMain, { wm, screen, webContents }) {
             wd.window.contentView.removeChildView(view);
             wd.window.contentView.addChildView(view);
 
+            view.webContents.on('console-message', (_e, level, msg, line) => {
+                const tag = ['', 'warn', 'error', 'debug'][level] || '';
+                console.log(`[dropdown${tag ? ':' + tag : ''}:${line}] ${msg}`);
+            });
             view.webContents.send('folder-dropdown-init', {
                 children:  folderData.children || [],
                 folderId:  folderData.id,
@@ -286,11 +290,12 @@ function initialBounds(anchorRect, folderData, win) {
     const children  = folderData.children || [];
     const itemCount = children.filter(c => c.type !== 'divider').length || 1;
     const sepCount  = children.filter(c => c.type === 'divider').length;
-    const h   = Math.min(itemCount * 32 + sepCount * 7 + 10, 360);
-    const w   = 220;
+    // Single-panel width (matches PANEL_WIDTH + PANEL_PADDING in dropdown.js)
+    const w    = 240 + 16;
+    const h    = Math.min(itemCount * 28 + sepCount * 7 + 16, 480);
     const winW = win.getContentBounds().width;
-    const x   = Math.max(0, Math.min(Math.floor(anchorRect.left), winW - w));
-    const y   = Math.floor(anchorRect.bottom);
+    const x    = Math.max(0, Math.min(Math.floor(anchorRect.left), winW - w));
+    const y    = Math.floor(anchorRect.bottom);
     return { x, y, width: w, height: h };
 }
 

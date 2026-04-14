@@ -128,12 +128,16 @@ body { display: flex; flex-direction: column; }
   display: flex; height: 28px; width: 100%;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
-  padding: 0 10px; align-items: center;
-  overflow: hidden; flex-shrink: 0;
+  padding: 0 6px; align-items: center;
+  overflow: visible; flex-shrink: 0;
+  position: relative;
 }
 .bookmark-bar.hidden { display: none; }
 
-#bookmark-bar-items { display: flex; gap: 0; align-items: center; overflow: hidden; height: 100%; }
+#bookmark-bar-items {
+  display: flex; gap: 0; align-items: center;
+  overflow: hidden; height: 100%; flex: 1;
+}
 
 .bookmark-bar-item {
   display: flex; align-items: center; gap: 5px;
@@ -142,15 +146,15 @@ body { display: flex; flex-direction: column; }
   cursor: pointer; font-family: var(--font); font-size: 11.5px;
   color: var(--text-2); white-space: nowrap; max-width: 160px;
   overflow: hidden; text-overflow: ellipsis;
-  transition: background 0.1s, color 0.1s; flex-shrink: 0;
-  margin: 0 1px;
+  transition: background 0.08s, color 0.08s; flex-shrink: 0;
+  margin: 0 1px; position: relative;
 }
 .bookmark-bar-item:hover { background: var(--hover); color: var(--text); }
 .bookmark-bar-favicon { width: 12px; height: 12px; flex-shrink: 0; border-radius: 2px; }
 .bookmark-bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .bookmark-bar-more {
-  font-size: 11px; font-weight: 600; padding: 0 10px;
+  font-size: 11px; font-weight: 600; padding: 0 8px;
   color: var(--text-3); flex-shrink: 0;
 }
 .bookmark-bar-more:hover { color: var(--text); }
@@ -162,7 +166,7 @@ body { display: flex; flex-direction: column; }
   display: flex; align-items: center;
   opacity: 0.6;
 }
-.bookmark-bar-item:hover .bookmark-folder-icon { opacity: 0.85; }
+.bookmark-bar-item:hover .bookmark-folder-icon { opacity: 0.9; }
 
 /* inline folder rename */
 .bookmark-bar-rename-input {
@@ -183,29 +187,43 @@ body { display: flex; flex-direction: column; }
   width: 1px; height: 16px; flex-shrink: 0;
   background: var(--border-2);
   margin: 0 4px; align-self: center;
-  cursor: grab;
+  cursor: grab; position: relative;
 }
 .bookmark-bar-divider:active { cursor: grabbing; }
 
 /* drag-to-reorder */
 .bookmark-bar-item.dragging,
-.bookmark-bar-divider.dragging { opacity: 0.35; }
+.bookmark-bar-divider.dragging { opacity: 0.3; }
 
-/* Insert position indicator — thin accent line to the LEFT of target (insert before) */
-.bookmark-bar-item.drop-before,
-.bookmark-bar-divider.drop-before { box-shadow: -2px 0 0 0 var(--accent, #4a9eff); }
+/* Insert position indicator — crisp 2px accent line on the left side of target */
+.bookmark-bar-item.drop-before::before,
+.bookmark-bar-divider.drop-before::before {
+  content: '';
+  position: absolute;
+  left: -2px; top: 2px; bottom: 2px;
+  width: 2px;
+  background: var(--accent, #4a9eff);
+  border-radius: 1px;
+  pointer-events: none;
+}
 
 /* Drop-into-folder indicator */
-.bookmark-bar-folder.drag-into { background: var(--active-bg); outline: 1px dashed var(--border-2); color: var(--text); }
+.bookmark-bar-folder.drag-into {
+  background: color-mix(in srgb, var(--accent, #4a9eff) 15%, var(--hover));
+  color: var(--text);
+  outline: 1px solid color-mix(in srgb, var(--accent, #4a9eff) 40%, transparent);
+  outline-offset: -1px;
+}
 
 /* shared dropdown panel (overflow + subfolder) */
 .bookmark-overflow-dropdown {
   position: fixed; z-index: 9999;
   background: var(--surface); border: 1px solid var(--border-2);
   min-width: 200px; max-width: 300px;
-  padding: 4px 0;
-  border-radius: 5px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+  padding: 3px 0;
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1);
+  overflow: hidden;
 }
 
 .bookmark-overflow-item {
@@ -215,11 +233,28 @@ body { display: flex; flex-direction: column; }
   font-family: var(--font); font-size: 12px;
   color: var(--text-2); text-align: left;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  transition: background 0.07s, color 0.07s;
+  transition: background 0.06s, color 0.06s;
+  position: relative;
 }
-.bookmark-overflow-item:hover { background: var(--hover); color: var(--text); }
-/* Insert position indicator — thin accent line at the TOP (insert before) */
-.bookmark-overflow-item.drop-before { box-shadow: inset 0 2px 0 0 var(--accent, #4a9eff); }
+.bookmark-overflow-item:hover,
+.bookmark-overflow-item.has-submenu-open { background: var(--hover); color: var(--text); }
+
+/* Drop-before indicator — crisp 2px line above the item */
+.bookmark-overflow-item.drop-before::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 8px; right: 8px;
+  height: 2px;
+  background: var(--accent, #4a9eff);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+/* Drop-into-folder indicator */
+.bookmark-overflow-item.drag-into {
+  background: color-mix(in srgb, var(--accent, #4a9eff) 15%, var(--hover));
+  color: var(--text);
+}
 
 /* Folder icon inside overflow dropdown items */
 .bookmark-overflow-folder-icon {
@@ -227,17 +262,19 @@ body { display: flex; flex-direction: column; }
   display: flex; align-items: center;
   opacity: 0.6;
 }
-.bookmark-overflow-item:hover .bookmark-overflow-folder-icon { opacity: 0.85; }
+.bookmark-overflow-item:hover .bookmark-overflow-folder-icon,
+.bookmark-overflow-item.has-submenu-open .bookmark-overflow-folder-icon { opacity: 0.9; }
 
 /* ▶ arrow indicating a subfolder */
 .bookmark-overflow-submenu-arrow {
   font-size: 7px;
-  opacity: 0.4;
+  opacity: 0.35;
   flex-shrink: 0;
   margin-left: auto;
   padding-left: 8px;
 }
-.bookmark-overflow-item:hover .bookmark-overflow-submenu-arrow { opacity: 0.65; }
+.bookmark-overflow-item:hover .bookmark-overflow-submenu-arrow,
+.bookmark-overflow-item.has-submenu-open .bookmark-overflow-submenu-arrow { opacity: 0.6; }
 
 .bookmark-overflow-sep {
   height: 1px; background: var(--border); margin: 3px 0;
