@@ -54,6 +54,7 @@ let leftDropdown    = false;
 let pendingResize   = false;
 let renamingId      = null;
 let lastRaiseAt     = 0;
+let backHoverTimer  = null;
 
 // True once we've received at least one dragover after the most recent
 // springInto call. A real mouse release always produces dragover events
@@ -85,6 +86,29 @@ function ensureRaised() {
     window.folderDropdown.raise();
 }
 
+function canGoBackOneLevel() {
+    return !!currentNode || backStack.length > 0;
+}
+
+function clearBackHoverTimer() {
+    if (backHoverTimer !== null) {
+        clearTimeout(backHoverTimer);
+        backHoverTimer = null;
+    }
+}
+
+function armBackHoverTimer(isDragBack) {
+    clearBackHoverTimer();
+    backHoverTimer = setTimeout(() => {
+        backHoverTimer = null;
+        if (isDragBack) {
+            springBack();
+            return;
+        }
+        if (!dragId && canGoBackOneLevel()) clickBack();
+    }, DRAG_SPRING_DELAY);
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // IPC handlers
@@ -99,6 +123,7 @@ window.folderDropdown.onInit(({ children, folderId, title }) => {
     insidePanel = false; leftDropdown = false;
     pendingResize = false; renamingId = null;
     lastRaiseAt = 0;
+    clearBackHoverTimer();
     gotDragoverAfterSpring = true;
     renderPanel();
 });
@@ -138,9 +163,121 @@ function clickInto(entry) {
 }
 
 function clickBack() {
-    if (!backStack.length) return;
-    currentNode = backStack.pop();
+    if (!canGoBackOneLevel()) return;
+    if (!backStack.length) currentNode = null;
+    else currentNode = backStack.pop();
     renderPanel();
+}
+
+function findFolderPathById(targetId) {
+    if (!rootData || !targetId) return null;
+
+    function walk(node, trail) {
+        const nodeId = node.folderId || node.id;
+        const nextTrail = trail.concat(node);
+        if (nodeId === targetId) return nextTrail;
+
+        const children = node.children || [];
+        for (const child of children) {
+            if (child.type !== 'folder') continue;
+            const found = walk(child, nextTrail);
+            if (found) return found;
+        }
+        return null;
+    }
+
+    return walk(rootData, []);
+}
+
+function getParentContextForNode(node) {
+    if (!node) {
+        return {
+            parentNode: null,
+            parentTitle: rootData?.title || 'Folder',
+            parentFolderId: rootData?.folderId || null,
+        };
+    }
+
+    const nodeId = node.id || node.folderId;
+    const path = findFolderPathById(nodeId);
+    if (!path || path.length < 2) {
+        return {
+            parentNode: null,
+            parentTitle: rootData?.title || 'Folder',
+            parentFolderId: rootData?.folderId || null,
+        };
+    }
+
+    const parentRaw = path[path.length - 2];
+    const grandRaw = path[path.length - 3] || null;
+    return {
+        parentNode: (parentRaw?.folderId === rootData?.folderId) ? null : parentRaw,
+        parentTitle: grandRaw?.title || rootData?.title || 'Folder',
+        parentFolderId: parentRaw?.folderId || parentRaw?.id || rootData?.folderId || null,
+    };
+}
+
+function applyDragFolderView(nextNode, parentTitle) {
+    currentNode = nextNode;
+
+    const folder = currentFolder();
+    if (!folder) return;
+    const folderId = folder.folderId || folder.id;
+
+    const container = document.getElementById('container');
+    if (!container) return;
+
+    const backBtn = container.querySelector('.back-btn');
+    const hdr = container.querySelector('.folder-header');
+
+    if (backBtn) {
+        if (nextNode) {
+            backBtn.querySelector('.back-label').textContent = parentTitle || rootData?.title || 'Folder';
+            backBtn.classList.remove('hidden');
+        } else {
+            backBtn.classList.add('hidden');
+        }
+    }
+
+    if (hdr) {
+        if (nextNode) {
+            hdr.textContent = folder.title || folder.id;
+            hdr.classList.remove('hidden');
+        } else {
+            hdr.classList.add('hidden');
+        }
+    }
+
+    const list = container.querySelector('.items-list');
+    if (!list) return;
+
+    list.dataset.folderId = folderId;
+
+    const srcEl = dragId ? list.querySelector(`.item[data-id="${dragId}"]`) : null;
+    if (srcEl) {
+        srcEl.style.cssText =
+            'visibility:hidden;height:0;padding:0;overflow:hidden;pointer-events:none;';
+    }
+
+    Array.from(list.children).forEach(child => {
+        if (child !== srcEl) list.removeChild(child);
+    });
+
+    const children = folder.children || [];
+    if (!children.length) {
+        const empty = document.createElement('div');
+        empty.className   = 'empty';
+        empty.textContent = '(empty)';
+        list.appendChild(empty);
+    } else {
+        children.forEach(c => {
+            if (c.id === dragId) return;
+            list.appendChild(buildItem(c, folderId, list));
+        });
+    }
+
+    updateSize();
+    ensureRaised();
 }
 
 
@@ -167,67 +304,18 @@ function springInto(entry) {
     // because the DOM mutations below disturbed Chromium's hit-test tree).
     gotDragoverAfterSpring = false;
 
-    currentNode = entry;
+    const parentCtx = getParentContextForNode(entry);
+    applyDragFolderView(entry, parentCtx.parentTitle);
+}
 
-    const folder      = currentFolder();
-    const folderId    = folder.folderId || folder.id;
-    const parentTitle = backStack.length
-        ? (backStack[backStack.length - 1]?.title || rootData.title)
-        : rootData.title;
+function springBack() {
+    if (!currentNode) return;
 
-    const container = document.getElementById('container');
-
-    // ── Update chrome (text + classList only — no DOM insertions) ────────────
-    const backBtn = container.querySelector('.back-btn');
-    const hdr     = container.querySelector('.folder-header');
-    if (backBtn) {
-        backBtn.querySelector('.back-label').textContent = parentTitle;
-        backBtn.classList.remove('hidden');
-    }
-    if (hdr) {
-        hdr.textContent = folder.title || folder.id;
-        hdr.classList.remove('hidden');
-    }
-
-    // ── Update list in-place ─────────────────────────────────────────────────
-    const list = container.querySelector('.items-list');
-    if (!list) return;
-
-    list.dataset.folderId = folderId;
-
-    // Collapse the drag source visually WITHOUT removing it from the DOM or
-    // changing its layout participation. display:none removes from layout and
-    // can trigger spurious dragend in Chromium; visibility:hidden does not.
-    const srcEl = dragId ? list.querySelector(`.item[data-id="${dragId}"]`) : null;
-    if (srcEl) {
-        srcEl.style.cssText =
-            'visibility:hidden;height:0;padding:0;overflow:hidden;pointer-events:none;';
-    }
-
-    // Remove every child EXCEPT the drag source (never detach the source).
-    Array.from(list.children).forEach(child => {
-        if (child !== srcEl) list.removeChild(child);
-    });
-
-    // Append the new folder's items after the hidden source.
-    const children = folder.children || [];
-    if (!children.length) {
-        const empty = document.createElement('div');
-        empty.className   = 'empty';
-        empty.textContent = '(empty)';
-        list.appendChild(empty);
-    } else {
-        children.forEach(c => {
-            if (c.id === dragId) return; // skip — source is already in list
-            list.appendChild(buildItem(c, folderId, list));
-        });
-    }
-    // list-level handlers read folderId from list.dataset — no re-attach needed
-
-    // Keep bounds in sync after spring-open. During internal drags updateSize
-    // defers via pendingResize; during external drags it updates immediately.
-    updateSize();
     ensureRaised();
+    gotDragoverAfterSpring = false;
+
+    const parentCtx = getParentContextForNode(currentNode);
+    applyDragFolderView(parentCtx.parentNode, parentCtx.parentTitle);
 }
 
 
@@ -293,6 +381,7 @@ function buildList(folder) {
     // so they stay correct across spring navigations without re-attaching.
     list.addEventListener('dragenter', (e) => {
         if (!isBookmarkDragEvent(e)) return;
+        clearBackHoverTimer();
         insidePanel = true;
         ensureRaised();
     });
@@ -300,6 +389,7 @@ function buildList(folder) {
     list.addEventListener('dragover', (e) => {
         if (e.target.closest('.item[data-id]')) return;
         if (!isBookmarkDragEvent(e)) return;
+        clearBackHoverTimer();
         ensureRaised();
         gotDragoverAfterSpring = true;
         e.preventDefault();
@@ -354,12 +444,22 @@ function buildBackButton(parentTitle) {
 
     btn.append(arrow, lbl);
     btn.addEventListener('click', () => { if (!dragId) clickBack(); });
+    btn.addEventListener('mouseenter', () => {
+        if (dragId || renamingId || !canGoBackOneLevel()) return;
+        armBackHoverTimer(false);
+    });
+    btn.addEventListener('mouseleave', () => {
+        if (!dragId) clearBackHoverTimer();
+    });
 
     btn.addEventListener('dragenter', (e) => {
         if (!isBookmarkDragEvent(e)) return;
+        if (!canGoBackOneLevel()) return;
         e.preventDefault();
+        clearDragSpringTimer();
         btn.classList.add('drag-over');
         ensureRaised();
+        armBackHoverTimer(true);
     });
     btn.addEventListener('dragover', (e) => {
         if (!isBookmarkDragEvent(e)) return;
@@ -367,20 +467,25 @@ function buildBackButton(parentTitle) {
         gotDragoverAfterSpring = true;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+
+        // Cross-view drags can miss dragenter on macOS.
+        if (backHoverTimer === null && canGoBackOneLevel()) {
+            armBackHoverTimer(true);
+        }
     });
     btn.addEventListener('dragleave', (e) => {
+        clearBackHoverTimer();
         if (!btn.contains(e.relatedTarget)) btn.classList.remove('drag-over');
     });
     btn.addEventListener('drop', async (e) => {
         e.preventDefault();
         btn.classList.remove('drag-over');
+        clearBackHoverTimer();
         clearDragSpringTimer();
         clearDragVisuals();
         const srcId = getDragIdFromEvent(e);
         if (!srcId) return;
-        const parentFolderId = backStack.length
-            ? (backStack[backStack.length - 1]?.id || rootData.folderId)
-            : rootData.folderId;
+        const parentFolderId = getParentContextForNode(currentNode).parentFolderId;
         if (!parentFolderId || srcId === parentFolderId) return;
         resetDragState();
         await window.folderDropdown.moveIntoFolder(srcId, parentFolderId, null);
@@ -510,6 +615,7 @@ function clearDragSpringTimer() {
 
 function resetDragState() {
     const id = dragId;
+    clearBackHoverTimer();
     dragId = null; dragFolderId = null;
     insidePanel = false; leftDropdown = false;
     // Remove the (hidden) drag source element now that the drag is over
@@ -526,6 +632,7 @@ function attachItemDragHandlers(btn, entry, folderId, list) {
     function armHoverTarget() {
         if (dragSpringBtn === btn) return;
 
+        clearBackHoverTimer();
         clearDragVisuals();
         clearDragSpringTimer();
 
@@ -545,6 +652,7 @@ function attachItemDragHandlers(btn, entry, folderId, list) {
 
     btn.addEventListener('dragstart', (e) => {
         if (renamingId) { e.preventDefault(); return; }
+        clearBackHoverTimer();
         dragId       = entry.id;
         dragFolderId = folderId;
         insidePanel  = false;
@@ -700,6 +808,7 @@ document.addEventListener('dragleave', (e) => {
         || e.clientX >= window.innerWidth  - 3
         || e.clientY >= window.innerHeight - 3;
     if (exited) {
+        clearBackHoverTimer();
         leftDropdown = true;
         window.folderDropdown.dragStart(dragId, dragFolderId);
         window.folderDropdown.close();
