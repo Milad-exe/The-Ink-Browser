@@ -217,10 +217,10 @@ class Tabs {
         this.shortcuts = shortcuts;
     }
 
-    createTab(){
+    createTab(insertAfterIndex = null){
         const tabIndex = this.nextTabIndex
         this.nextTabIndex++
-        
+
         const tab = new WebContentsView({
             webPreferences: {
                 preload: path.join(__dirname, '../preload/preload.js'),
@@ -231,10 +231,10 @@ class Tabs {
         this.mainWindow.contentView.addChildView(tab)
         tab.webContents.loadFile('renderer/NewTab/index.html')
         this.raiseFloatingViews()
-        
+
         UserAgent.setupTab(tab)
-        
-        tab.webContents.on("context-menu", (event, params) => { 
+
+        tab.webContents.on("context-menu", (event, params) => {
             const contextMenuInstance = new contextMenu(tab, params, this);
             const menu = Menu.buildFromTemplate(contextMenuInstance.getTemplate());
             menu.popup({ window: this.mainWindow });
@@ -243,9 +243,16 @@ class Tabs {
         const bounds = this.getTabBounds()
         tab.setBounds(bounds)
 
-    this.tabMap.set(tabIndex, tab)
+        this.tabMap.set(tabIndex, tab)
         this.tabUrls.set(tabIndex, 'newtab')
-    this.tabOrder.push(tabIndex)
+        const afterPos = (insertAfterIndex !== null && insertAfterIndex !== undefined)
+            ? this.tabOrder.indexOf(insertAfterIndex)
+            : -1;
+        if (afterPos !== -1) {
+            this.tabOrder.splice(afterPos + 1, 0, tabIndex);
+        } else {
+            this.tabOrder.push(tabIndex);
+        }
         this.activeTabIndex = tabIndex
         this.navigationHistory.initializeTab(tabIndex, 'newtab')
         this.setupTabListeners(tabIndex, tab)
@@ -253,7 +260,8 @@ class Tabs {
         this.mainWindow.webContents.send('tab-created', {
             index: tabIndex,
             title: 'New Tab',
-            totalTabs: this.tabMap.size
+            totalTabs: this.tabMap.size,
+            afterIndex: afterPos !== -1 ? insertAfterIndex : null,
         })
 
         this.showTab(tabIndex)
