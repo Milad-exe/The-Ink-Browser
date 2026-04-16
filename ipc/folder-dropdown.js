@@ -114,7 +114,8 @@ function register(ipcMain, { wm, screen, webContents }) {
         closeFolderDropdown(wd);
         wd.window.webContents.focus();
         if (wd.tabs) {
-            const idx = wd.tabs.createTab(url);
+            const idx = wd.tabs.createTab(wd.tabs.activeTabIndex);
+            wd.tabs.loadUrl(idx, url);
             wd.tabs.showTab(idx);
         }
     });
@@ -222,8 +223,8 @@ function showFolderDropdownContextMenu(wd, item, wm, webContents) {
     if (type === 'bookmark') {
         template = [
             { label: 'Open',               click: () => { closeAndFocus(); wd.tabs.loadUrl(wd.tabs.activeTabIndex, url); } },
-            { label: 'Open in New Tab',    click: () => { closeAndFocus(); const i = wd.tabs.createTab(); wd.tabs.loadUrl(i, url); wd.tabs.showTab(i); } },
-            { label: 'Open in Background', click: () => { const i = wd.tabs.createTab(); wd.tabs.loadUrl(i, url); } },
+            { label: 'Open in New Tab',    click: () => { closeAndFocus(); const i = wd.tabs.createTab(wd.tabs.activeTabIndex); wd.tabs.loadUrl(i, url); wd.tabs.showTab(i); } },
+            { label: 'Open in Background', click: () => { const i = wd.tabs.createTab(wd.tabs.activeTabIndex); wd.tabs.loadUrl(i, url); } },
             { type: 'separator' },
             { label: 'Edit',   click: () => { closeAndFocus(); wd.window.webContents.send('bookmark-edit-prompt', { id, url, title }); } },
             { label: 'Delete', click: async () => {
@@ -238,8 +239,11 @@ function showFolderDropdownContextMenu(wd, item, wm, webContents) {
                 const all    = await wm.bookmarks.getAll();
                 const folder = findFolderDeep(all, id);
                 if (folder?.children) {
+                    let insertAfter = wd.tabs.activeTabIndex;
                     folder.children.filter(c => c.type === 'bookmark').forEach(c => {
-                        const i = wd.tabs.createTab(); wd.tabs.loadUrl(i, c.url);
+                        const i = wd.tabs.createTab(insertAfter);
+                        wd.tabs.loadUrl(i, c.url);
+                        insertAfter = i;
                     });
                 }
             }},
