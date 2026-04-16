@@ -58,6 +58,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentTabUrl   = '';
     let currentTabTitle = '';
 
+    // ── Bookmark bar state (must be declared before initBookmarkBar() is called) ──
+    let bookmarkBarVisible = !!settings.bookmarkBarVisible;
+    let hasBookmarks       = false;
+    let renamingFolderId   = null;
+    let refreshSeq         = 0;
+    let openDropdownId     = null; // id of the anchor button whose dropdown is open
+    let dropdownCleanup    = null;
+
     // ── DOM references ─────────────────────────────────────────────────────────
 
     const searchBar        = document.getElementById('searchBar');
@@ -394,15 +402,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Bookmark bar
     // ─────────────────────────────────────────────────────────────────────────
 
-    let bookmarkBarVisible = !!settings.bookmarkBarVisible;
-    let hasBookmarks       = false;
-    let renamingFolderId  = null;
-    let refreshSeq        = 0;
-
-    // ── Dropdown (overflow + folder sub-panels) ───────────────────────────────
-
-    let openDropdownId  = null; // id of the anchor button whose dropdown is open
-    let dropdownCleanup = null;
+    // ── Dropdown (overflow + folder sub-panels) ──────────────────────────────
 
     function closeDropdown() {
         document.getElementById('bm-dropdown')?.remove();
