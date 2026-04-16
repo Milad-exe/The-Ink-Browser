@@ -1270,6 +1270,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // ── IPC events from main process ──────────────────────────────────────
 
         window.tab.onTabCreated((_e, data) => {
+            console.log('[tab-created] index:', data.index, 'afterIndex:', data.afterIndex, 'type:', typeof data.afterIndex);
             createTabButton(data.index, data.title, data.afterIndex ?? null);
             setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
         });
@@ -1418,6 +1419,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         const afterBtn = afterIndex !== null ? tabs.get(afterIndex) : null;
+        console.log('[createTabButton] index:', index, 'afterIndex:', afterIndex, 'afterBtn found:', !!afterBtn, 'nextSibling:', afterBtn?.nextSibling?.dataset?.index);
         if (afterBtn && afterBtn.nextSibling) {
             tabsContainer.insertBefore(btn, afterBtn.nextSibling);
         } else if (afterBtn) {
