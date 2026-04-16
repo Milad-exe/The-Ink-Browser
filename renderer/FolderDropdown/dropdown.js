@@ -16,10 +16,20 @@
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="11"
+const FOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="12"
   viewBox="0 0 24 20" fill="currentColor">
   <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0
            22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"/>
+</svg>`;
+
+const BACK_ARROW_SVG = `<svg width="6" height="10" viewBox="0 0 6 10" fill="none"
+  stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5 1L1 5l4 4"/>
+</svg>`;
+
+const CHEVRON_RIGHT_SVG = `<svg width="5" height="9" viewBox="0 0 5 9" fill="none"
+  stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M1 1l3 3.5L1 8"/>
 </svg>`;
 
 const DRAG_SPRING_DELAY = 500;
@@ -239,15 +249,6 @@ function applyDragFolderView(nextNode, parentTitle) {
         }
     }
 
-    if (hdr) {
-        if (nextNode) {
-            hdr.textContent = folder.title || folder.id;
-            hdr.classList.remove('hidden');
-        } else {
-            hdr.classList.add('hidden');
-        }
-    }
-
     const list = container.querySelector('.items-list');
     if (!list) return;
 
@@ -330,12 +331,13 @@ function renderPanel() {
     const folder = currentFolder();
     const depth  = backStack.length + (currentNode ? 1 : 0);
 
-    // Always create back-btn and header so springInto can find them.
+    // Always create back-btn so springInto can find it.
+    // folder-header is kept in DOM (hidden) for spring-nav compatibility.
     const backBtn = buildBackButton('');
     container.appendChild(backBtn);
 
     const hdr = document.createElement('div');
-    hdr.className = 'folder-header';
+    hdr.className = 'folder-header hidden';
     container.appendChild(hdr);
 
     if (depth > 0) {
@@ -343,10 +345,8 @@ function renderPanel() {
             ? (backStack[backStack.length - 1]?.title || rootData.title)
             : rootData.title;
         backBtn.querySelector('.back-label').textContent = parentTitle;
-        hdr.textContent = folder.title || folder.id;
     } else {
         backBtn.classList.add('hidden');
-        hdr.classList.add('hidden');
     }
 
     container.appendChild(buildList(folder));
@@ -435,8 +435,8 @@ function buildBackButton(parentTitle) {
     btn.className = 'back-btn';
 
     const arrow = document.createElement('span');
-    arrow.className   = 'back-arrow';
-    arrow.textContent = '‹';
+    arrow.className = 'back-arrow';
+    arrow.innerHTML = BACK_ARROW_SVG;
 
     const lbl = document.createElement('span');
     lbl.className   = 'back-label';
@@ -547,8 +547,8 @@ function buildFolderItem(btn, entry) {
     lbl.textContent = entry.title || 'Folder';
 
     const arrow = document.createElement('span');
-    arrow.className   = 'submenu-arrow';
-    arrow.textContent = '▶';
+    arrow.className = 'submenu-arrow';
+    arrow.innerHTML = CHEVRON_RIGHT_SVG;
 
     btn.append(icon, lbl, arrow);
     btn.addEventListener('click', () => { if (!dragId && !renamingId) clickInto(entry); });
