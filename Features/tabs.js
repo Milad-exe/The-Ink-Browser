@@ -398,7 +398,7 @@ class Tabs {
         // All window.open / target="_blank" links open in a new tab, never a new BrowserWindow
         tab.webContents.setWindowOpenHandler(({ url }) => {
             setImmediate(() => {
-                const newIndex = this.createTab();
+                const newIndex = this.createTab(tabIndex);
                 this.loadUrl(newIndex, url);
             });
             return { action: 'deny' };

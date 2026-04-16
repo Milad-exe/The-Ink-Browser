@@ -17,6 +17,14 @@ function register(ipcMain, { wm, webContents }) {
 
     const broadcast = () => broadcastBookmarksChanged(webContents);
 
+    const getSenderTabIndex = (wd, senderWebContents) => {
+        if (!wd?.tabs?.tabMap) return null;
+        for (const [index, tab] of wd.tabs.tabMap.entries()) {
+            if (tab?.webContents === senderWebContents) return index;
+        }
+        return null;
+    };
+
     // ── Read ─────────────────────────────────────────────────────────────────
 
     ipcMain.handle('bookmarks-get', async () => {
@@ -102,7 +110,8 @@ function register(ipcMain, { wm, webContents }) {
     ipcMain.handle('open-url-in-new-tab', (_e, url, switchToTab = true) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd) return false;
-        const idx = wd.tabs.createTab();
+        const sourceTabIndex = getSenderTabIndex(wd, _e.sender);
+        const idx = wd.tabs.createTab(sourceTabIndex);
         wd.tabs.loadUrl(idx, url);
         if (switchToTab) wd.tabs.showTab(idx);
         return true;
@@ -171,9 +180,10 @@ function register(ipcMain, { wm, webContents }) {
     ipcMain.on('show-bookmark-context-menu', (_e, url) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd) return;
+        const sourceTabIndex = getSenderTabIndex(wd, _e.sender);
         Menu.buildFromTemplate([
-            { label: 'Open in New Tab',       click: () => { const i = wd.tabs.createTab(); wd.tabs.loadUrl(i, url); wd.tabs.showTab(i); } },
-            { label: 'Open in Background Tab', click: () => { const i = wd.tabs.createTab(); wd.tabs.loadUrl(i, url); } },
+            { label: 'Open in New Tab',       click: () => { const i = wd.tabs.createTab(sourceTabIndex); wd.tabs.loadUrl(i, url); wd.tabs.showTab(i); } },
+            { label: 'Open in Background Tab', click: () => { const i = wd.tabs.createTab(sourceTabIndex); wd.tabs.loadUrl(i, url); } },
             { type: 'separator' },
             { label: 'Copy URL', click: () => { require('electron').clipboard.writeText(url); } },
             { type: 'separator' },
