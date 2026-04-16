@@ -26,7 +26,15 @@ class TabContextMenu {
     }
 
     openInNewTab(url) {
-        const newIndex = this.tabManager.createTab();
+        let sourceTabIndex = null;
+        for (const [index, tab] of this.tabManager.tabMap) {
+            if (tab === this.tab) {
+                sourceTabIndex = index;
+                break;
+            }
+        }
+
+        const newIndex = this.tabManager.createTab(sourceTabIndex);
         this.tabManager.loadUrl(newIndex, url);
     }
 
