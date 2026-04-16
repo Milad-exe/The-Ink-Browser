@@ -444,13 +444,6 @@ function buildBackButton(parentTitle) {
 
     btn.append(arrow, lbl);
     btn.addEventListener('click', () => { if (!dragId) clickBack(); });
-    btn.addEventListener('mouseenter', () => {
-        if (dragId || renamingId || !canGoBackOneLevel()) return;
-        armBackHoverTimer(false);
-    });
-    btn.addEventListener('mouseleave', () => {
-        if (!dragId) clearBackHoverTimer();
-    });
 
     btn.addEventListener('dragenter', (e) => {
         if (!isBookmarkDragEvent(e)) return;
