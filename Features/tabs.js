@@ -102,8 +102,19 @@ class Tabs {
         UserAgent.setupTab(tab);
         
         // Setup context menu
-        tab.webContents.on("context-menu", (event, params) => { 
-            const contextMenuInstance = new contextMenu(tab, params, this);
+        tab.webContents.on("context-menu", async (_event, params) => {
+            let menuParams = params;
+            if (params?.linkURL) {
+                try {
+                    await tab.webContents.executeJavaScript(
+                        'try { const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); } catch {}',
+                        true,
+                    );
+                } catch {}
+                menuParams = { ...params, selectionText: '' };
+            }
+
+            const contextMenuInstance = new contextMenu(tab, menuParams, this);
             const menu = Menu.buildFromTemplate(contextMenuInstance.getTemplate());
             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
                 menu.popup({ window: this.mainWindow });
@@ -217,7 +228,7 @@ class Tabs {
         this.shortcuts = shortcuts;
     }
 
-    createTab(insertAfterIndex = null){
+    createTab(insertAfterIndex = null, shouldActivate = true){
         const tabIndex = this.nextTabIndex
         this.nextTabIndex++
 
@@ -234,14 +245,26 @@ class Tabs {
 
         UserAgent.setupTab(tab)
 
-        tab.webContents.on("context-menu", (event, params) => {
-            const contextMenuInstance = new contextMenu(tab, params, this);
+        tab.webContents.on("context-menu", async (_event, params) => {
+            let menuParams = params;
+            if (params?.linkURL) {
+                try {
+                    await tab.webContents.executeJavaScript(
+                        'try { const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); } catch {}',
+                        true,
+                    );
+                } catch {}
+                menuParams = { ...params, selectionText: '' };
+            }
+
+            const contextMenuInstance = new contextMenu(tab, menuParams, this);
             const menu = Menu.buildFromTemplate(contextMenuInstance.getTemplate());
             menu.popup({ window: this.mainWindow });
         })
 
         const bounds = this.getTabBounds()
         tab.setBounds(bounds)
+        tab.setVisible(false)
 
         this.tabMap.set(tabIndex, tab)
         this.tabUrls.set(tabIndex, 'newtab')
@@ -253,7 +276,10 @@ class Tabs {
         } else {
             this.tabOrder.push(tabIndex);
         }
-        this.activeTabIndex = tabIndex
+        const previousActiveTabIndex = this.activeTabIndex
+        if (shouldActivate) {
+            this.activeTabIndex = tabIndex
+        }
         this.navigationHistory.initializeTab(tabIndex, 'newtab')
         this.setupTabListeners(tabIndex, tab)
 
@@ -262,9 +288,17 @@ class Tabs {
             title: 'New Tab',
             totalTabs: this.tabMap.size,
             afterIndex: afterPos !== -1 ? insertAfterIndex : null,
+            active: shouldActivate,
         })
 
-        this.showTab(tabIndex)
+        if (shouldActivate) {
+            this.showTab(tabIndex)
+        } else {
+            const activeTab = this.tabMap.get(previousActiveTabIndex)
+            if (activeTab) {
+                activeTab.setVisible(true)
+            }
+        }
         this.saveStateDebounced()
         this.sendTabUpdate(tabIndex, tab, '', 'New Tab')
 
@@ -398,7 +432,7 @@ class Tabs {
         // All window.open / target="_blank" links open in a new tab, never a new BrowserWindow
         tab.webContents.setWindowOpenHandler(({ url }) => {
             setImmediate(() => {
-                const newIndex = this.createTab(tabIndex);
+                const newIndex = this.createTab(tabIndex, false);
                 this.loadUrl(newIndex, url);
             });
             return { action: 'deny' };
