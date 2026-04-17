@@ -1271,7 +1271,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         window.tab.onTabCreated((_e, data) => {
             console.log('[tab-created] index:', data.index, 'afterIndex:', data.afterIndex, 'type:', typeof data.afterIndex);
-            createTabButton(data.index, data.title, data.afterIndex ?? null);
+            createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false);
             setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
         });
 
@@ -1357,7 +1357,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ── Tab DOM helpers ───────────────────────────────────────────────────────
 
-    function createTabButton(index, title, afterIndex = null) {
+    function createTabButton(index, title, afterIndex = null, shouldActivate = true) {
         if (tabs.has(index)) return;
 
         const btn = document.createElement('div');
@@ -1428,7 +1428,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             tabsContainer.appendChild(btn);
         }
         tabs.set(index, btn);
-        setActiveTab(index);
+        if (shouldActivate) {
+            setActiveTab(index);
+        }
         updateScrollShadows();
     }
 

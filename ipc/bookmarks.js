@@ -107,13 +107,13 @@ function register(ipcMain, { wm, webContents }) {
 
     // ── Tab helpers ───────────────────────────────────────────────────────────
 
-    ipcMain.handle('open-url-in-new-tab', (_e, url, switchToTab = true) => {
+    ipcMain.handle('open-url-in-new-tab', (_e, url, switchToTab = false) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd) return false;
         const sourceTabIndex = getSenderTabIndex(wd, _e.sender);
-        const idx = wd.tabs.createTab(sourceTabIndex);
+        const shouldActivate = !!switchToTab;
+        const idx = wd.tabs.createTab(sourceTabIndex, shouldActivate);
         wd.tabs.loadUrl(idx, url);
-        if (switchToTab) wd.tabs.showTab(idx);
         return true;
     });
 
@@ -182,8 +182,8 @@ function register(ipcMain, { wm, webContents }) {
         if (!wd) return;
         const sourceTabIndex = getSenderTabIndex(wd, _e.sender);
         Menu.buildFromTemplate([
-            { label: 'Open in New Tab',       click: () => { const i = wd.tabs.createTab(sourceTabIndex); wd.tabs.loadUrl(i, url); wd.tabs.showTab(i); } },
-            { label: 'Open in Background Tab', click: () => { const i = wd.tabs.createTab(sourceTabIndex); wd.tabs.loadUrl(i, url); } },
+            { label: 'Open in New Tab',       click: () => { const i = wd.tabs.createTab(sourceTabIndex, false); wd.tabs.loadUrl(i, url); } },
+            { label: 'Open in Background Tab', click: () => { const i = wd.tabs.createTab(sourceTabIndex, false); wd.tabs.loadUrl(i, url); } },
             { type: 'separator' },
             { label: 'Copy URL', click: () => { require('electron').clipboard.writeText(url); } },
             { type: 'separator' },
@@ -210,8 +210,8 @@ function showBookmarkBarContextMenu(wd, item, wm, webContents) {
     if (type === 'bookmark') {
         template = [
             { label: 'Open',               click: () => wd.tabs.loadUrl(wd.tabs.activeTabIndex, url) },
-            { label: 'Open in New Tab',    click: () => { const i = wd.tabs.createTab(); wd.tabs.loadUrl(i, url); wd.tabs.showTab(i); } },
-            { label: 'Open in Background', click: () => { const i = wd.tabs.createTab(); wd.tabs.loadUrl(i, url); } },
+            { label: 'Open in New Tab',    click: () => { const i = wd.tabs.createTab(null, false); wd.tabs.loadUrl(i, url); } },
+            { label: 'Open in Background', click: () => { const i = wd.tabs.createTab(null, false); wd.tabs.loadUrl(i, url); } },
             { type: 'separator' },
             { label: 'Edit',   click: () => wd.window.webContents.send('bookmark-edit-prompt', { id, url, title }) },
             { label: 'Delete', click: async () => { await wm.bookmarks.removeById(id); broadcast(); } },
@@ -224,7 +224,7 @@ function showBookmarkBarContextMenu(wd, item, wm, webContents) {
                 const folder = all.find(b => b.id === id);
                 if (folder?.children) {
                     folder.children.filter(c => c.type === 'bookmark').forEach(c => {
-                        const i = wd.tabs.createTab(); wd.tabs.loadUrl(i, c.url);
+                        const i = wd.tabs.createTab(null, false); wd.tabs.loadUrl(i, c.url);
                     });
                 }
             }},

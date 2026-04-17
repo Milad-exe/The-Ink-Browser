@@ -17,6 +17,117 @@ ipcRenderer.on('theme-changed', (_e, theme) => {
     }
 });
 
+function findAnchorInEventPath(event) {
+    try {
+        if (event && typeof event.composedPath === 'function') {
+            const path = event.composedPath();
+            for (const node of path) {
+                if (node && node.nodeType === 1 && node.tagName === 'A' && node.href) return node;
+            }
+        }
+    } catch {}
+
+    let el = event ? event.target : null;
+    while (el && el.nodeType === 1) {
+        if (el.tagName === 'A' && el.href) return el;
+        el = el.parentElement;
+    }
+    return null;
+}
+
+function clearDocumentSelection() {
+    try {
+        const sel = window.getSelection && window.getSelection();
+        if (sel && sel.rangeCount > 0) sel.removeAllRanges();
+    } catch {}
+
+    try {
+        const active = document.activeElement;
+        if (!active) return;
+        if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') {
+            const end = typeof active.selectionEnd === 'number' ? active.selectionEnd : 0;
+            active.setSelectionRange(end, end);
+        }
+    } catch {}
+}
+
+let suppressLinkSelection = false;
+let suppressLinkSelectionTimer = null;
+
+function ensureSuppressSelectionStyle() {
+    const styleId = 'ink-suppress-link-selection-style';
+    if (document.getElementById(styleId)) return;
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+html.ink-suppress-link-selection,
+html.ink-suppress-link-selection * {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+}
+html.ink-suppress-link-selection ::selection {
+    background: transparent !important;
+    color: inherit !important;
+}
+`;
+    const host = document.head || document.documentElement;
+    if (host) host.appendChild(style);
+}
+
+function enableLinkSelectionSuppression() {
+    ensureSuppressSelectionStyle();
+    suppressLinkSelection = true;
+    if (suppressLinkSelectionTimer) {
+        clearTimeout(suppressLinkSelectionTimer);
+        suppressLinkSelectionTimer = null;
+    }
+    try { document.documentElement.classList.add('ink-suppress-link-selection'); } catch {}
+    clearDocumentSelection();
+}
+
+function disableLinkSelectionSuppression(delay = 120) {
+    if (suppressLinkSelectionTimer) clearTimeout(suppressLinkSelectionTimer);
+    suppressLinkSelectionTimer = setTimeout(() => {
+        suppressLinkSelection = false;
+        try { document.documentElement.classList.remove('ink-suppress-link-selection'); } catch {}
+        clearDocumentSelection();
+        suppressLinkSelectionTimer = null;
+    }, delay);
+}
+
+// Right-clicking links should not create or retain text highlighting.
+const onLinkRightMouseDown = (event) => {
+    if (!event || event.button !== 2) return;
+    if (!findAnchorInEventPath(event)) return;
+    enableLinkSelectionSuppression();
+    event.preventDefault();
+};
+
+document.addEventListener('pointerdown', onLinkRightMouseDown, true);
+document.addEventListener('mousedown', onLinkRightMouseDown, true);
+
+document.addEventListener('selectstart', (event) => {
+    if (!suppressLinkSelection) return;
+    event.preventDefault();
+}, true);
+
+document.addEventListener('contextmenu', (event) => {
+    if (!findAnchorInEventPath(event) && !suppressLinkSelection) return;
+    enableLinkSelectionSuppression();
+    disableLinkSelectionSuppression();
+}, true);
+
+document.addEventListener('mouseup', (event) => {
+    if (!suppressLinkSelection) return;
+    if (!event || event.button !== 2) return;
+    disableLinkSelectionSuppression();
+}, true);
+
+window.addEventListener('blur', () => {
+    if (!suppressLinkSelection) return;
+    disableLinkSelectionSuppression(0);
+}, true);
+
 contextBridge.exposeInMainWorld(
     "tab", {
         add: () => ipcRenderer.invoke("addTab"),
