@@ -25,6 +25,10 @@ class TabContextMenu {
         }
     }
 
+    hasHighlightedText(params) {
+        return typeof params.selectionText === 'string' && params.selectionText.trim().length > 0;
+    }
+
     openInNewTab(url) {
         let sourceTabIndex = null;
         for (const [index, tab] of this.tabManager.tabMap) {
@@ -34,7 +38,7 @@ class TabContextMenu {
             }
         }
 
-        const newIndex = this.tabManager.createTab(sourceTabIndex);
+        const newIndex = this.tabManager.createTab(sourceTabIndex, false);
         this.tabManager.loadUrl(newIndex, url);
     }
 
@@ -93,7 +97,8 @@ class TabContextMenu {
     }
 
     addSelectionItems(params) {
-        if (!params.selectionText) return;
+        if (params.linkURL) return;
+        if (!this.hasHighlightedText(params)) return;
         this.sep();
         const truncated = params.selectionText.length > 40
             ? params.selectionText.slice(0, 40) + '…'
