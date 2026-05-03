@@ -1380,6 +1380,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         btn.appendChild(closeBtn);
 
         btn.addEventListener('click', () => window.tab.switch(parseInt(index)));
+        btn.addEventListener('mousedown', (e) => {
+            if (e.button !== 1) return;
+            e.preventDefault();
+        });
+        btn.addEventListener('auxclick', (e) => {
+            if (e.button !== 1) return;
+            e.preventDefault();
+            e.stopPropagation();
+            window.tab.remove(parseInt(index));
+        });
         btn.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault(); window.tab.switch(parseInt(index));
