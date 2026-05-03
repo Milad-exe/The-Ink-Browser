@@ -124,7 +124,9 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
 
     ipcMain.handle('window-close', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        if (wd) wd.window.close();
+        if (!wd) return;
+        if (wd.tabs) wd.tabs.allowClose = true;
+        wd.window.close();
     });
 
     ipcMain.handle('window-is-maximized', (_e) => {
