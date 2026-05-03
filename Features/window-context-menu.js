@@ -93,10 +93,10 @@ class WindowContextMenu {
                 click: () => {
                     const url = windowData.tabs.tabUrls.get(tabIndex);
                     if (url && url !== 'newtab') {
-                        const newIndex = windowData.tabs.createTab();
+                        const newIndex = windowData.tabs.createTab(tabIndex);
                         windowData.tabs.loadUrl(newIndex, url);
                     } else {
-                        windowData.tabs.createTab();
+                        windowData.tabs.createTab(tabIndex);
                     }
                 },
             },
