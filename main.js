@@ -18,12 +18,55 @@
 
 // ── Pre-ready flags (must run before app.whenReady) ──────────────────────────
 
-// Removes navigator.webdriver = true, which triggers Google's "unsupported browser" block.
 const { app, ipcMain, session, BrowserWindow, Menu, webContents, nativeTheme, screen } = require('electron');
 const UserAgent = require('./Features/user-agent');
+const { handleProtocolCallback } = require('./Features/google-auth');
 
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 app.userAgentFallback = UserAgent.generate();
+
+// ── ink:// protocol — OAuth callback handler ──────────────────────────────────
+// After the user authenticates in their system browser, Google redirects to
+// ink://oauth?code=…  The OS delivers that URL back to this process via:
+//   macOS      — app 'open-url' event
+//   Windows/Linux — app 'second-instance' event (requires single-instance lock)
+//
+// In development (electron . script.js), pass the script path so the registry
+// entry on Windows points back to this instance, not a bare electron.exe.
+if (process.defaultApp) {
+    const path = require('path');
+    if (process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient('ink', process.execPath, [path.resolve(process.argv[1])]);
+    }
+} else {
+    app.setAsDefaultProtocolClient('ink');
+}
+
+// macOS: ink:// URL delivered as an event (app may already be running)
+app.on('open-url', (event, url) => {
+    event.preventDefault();
+    if (url.startsWith('ink://oauth')) handleProtocolCallback(url);
+});
+
+// Windows/Linux: a second instance is launched with the URL in its argv.
+// requestSingleInstanceLock prevents that second instance from fully starting
+// and routes its arguments here instead.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+    app.quit();
+} else {
+    app.on('second-instance', (_event, argv) => {
+        // Bring the primary window to the front
+        const wins = BrowserWindow.getAllWindows();
+        if (wins.length > 0) {
+            const win = wins[0];
+            if (win.isMinimized()) win.restore();
+            win.focus();
+        }
+        const url = argv.find(a => a.startsWith('ink://'));
+        if (url) handleProtocolCallback(url);
+    });
+}
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
