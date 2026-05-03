@@ -71,6 +71,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         try { window.inkSettings.toggleBookmarkBar(); } catch {}
     });
 
+    // ── Focus: Distraction blocking ───────────────────────────────────────
+    const shortformToggle = document.getElementById('shortform-toggle');
+    shortformToggle.checked = !!settings.blockShortform;
+
+    shortformToggle.addEventListener('change', async () => {
+        await save('blockShortform', shortformToggle.checked);
+        showToast(shortformToggle.checked ? 'Distraction blocking enabled' : 'Distraction blocking disabled');
+    });
+
     // ── Focus: Pomodoro durations ──────────────────────────────────────────
     const fields = {
         'pom-work':     { key: 'pomWork',       min: 1, max: 120 },
