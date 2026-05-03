@@ -27,7 +27,7 @@ main.js                 — Electron main process entry point
     persistence.js      — settings + tab session state (encrypted JSON)
     navigation-history.js — per-tab back/forward stack (BST-backed)
     shortcuts.js        — keyboard shortcut registration
-    focus-mode.js       — distraction-blocking + grayscale (singleton)
+    focus-mode/         — focus mode core + injections + grayscale helpers
     find-dialog.js      — in-page find floating window
     user-agent.js       — Firefox UA spoofing
     encryption.js       — AES-256-GCM at-rest encryption
@@ -224,7 +224,7 @@ Keyboard shortcuts registered via `before-input-event` on every `WebContents` (m
 
 ---
 
-### `focus-mode.js`
+### `focus-mode/`
 
 Singleton. Per-window state (keyed by `windowData.id`).
 
@@ -236,6 +236,9 @@ When enabled:
 When disabled:
 - Removes grayscale CSS.
 - Reloads tabs that received distraction injection (active tab immediately; others deferred until shown via `_needsReloadForFocusMode`).
+
+Additional setting:
+- A `blockShortform` setting blocks short-form video feeds (Shorts, TikTok, Reels) without hiding recommendations. Focus mode overrides it and the state is restored afterward.
 
 ---
 

@@ -8,6 +8,7 @@ const DEFAULTS = {
     persistAllTabs:    false,
     searchEngine:      'google',   // 'google' | 'duckduckgo' | 'bing'
     bookmarkBarVisible: false,
+    blockShortform:    false,
     pomWork:           25,          // minutes
     pomShortBreak:     5,
     pomLongBreak:      15,
