@@ -10,6 +10,8 @@ const { loginWithGoogle } = require('../Features/google-auth');
 
 function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
 
+    focusMode.setShortformEnabled(wm, !!wm.persistence.get('blockShortform'));
+
     // ── Settings ──────────────────────────────────────────────────────────────
 
     ipcMain.handle('settings-get', () => {
@@ -36,6 +38,10 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
         if (key === 'persistAllTabs') {
             const wd = wm.getWindowByWebContents(_e.sender);
             if (wd?.tabs) { try { wd.tabs.saveStateDebounced(); } catch {} }
+        }
+
+        if (key === 'blockShortform') {
+            focusMode.setShortformEnabled(wm, !!value);
         }
 
         return true;

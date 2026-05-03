@@ -342,73 +342,20 @@ Receives a `found-in-page` event result and forwards `activeMatchOrdinal` and `m
 
 ---
 
-## focus-mode.js
+## focus-mode/
 
 ### Purpose
 
-Singleton that tracks and applies "focus mode" per browser window. When enabled, focus mode applies a grayscale CSS filter to all tabs and injects distraction-blocking JavaScript into YouTube, YouTube Shorts, TikTok, and Instagram. When disabled, grayscale is removed and affected tabs are reloaded to clear injected scripts.
+Singleton that tracks and applies "focus mode" per browser window. The feature is split into helper modules:
 
-### Module-level Constants
+- `index.js` — state + orchestration (focus mode plus shortform setting)
+- `injections.js` — site-specific JS blockers
+- `grayscale.js` — grayscale CSS helpers
+- `media.js` — media pause helper
 
-| Constant | Purpose |
-|---|---|
-| `GRAYSCALE_CSS` | CSS string that sets `filter: grayscale(100%)` on the `html` element |
-| `GRAYSCALE_KEY` | Unused identifier constant (`'__ink_grayscale__'`) |
-| `YT_BLOCK_JS` | Injected into YouTube watch pages — hides sidebar recommendations, end-screen cards, home feed, and chip filters using a `MutationObserver` loop |
-| `YT_SHORTS_BLOCK_JS` | Injected into YouTube Shorts — disables infinite scroll, hides the shorts feed, and shows a blocking overlay |
-| `TIKTOK_BLOCK_JS` | Injected into TikTok — disables pointer events on feed containers and shows a blocking overlay |
-| `INSTAGRAM_BLOCK_JS` | Injected into Instagram — disables pointer events on reels/explore and shows a blocking overlay |
+When focus mode is enabled, it applies grayscale and full distraction blockers (including YouTube recommendations). When disabled, it removes grayscale and reloads tabs that received injections (active tab immediately; background tabs deferred).
 
-### Module-level Functions
-
-#### `getHostname(url)`
-Extracts the hostname from a URL string.
-- **Returns** `string` — hostname, or `''` on parse failure
-
-#### `getInjectionForUrl(url)`
-Returns the appropriate distraction-blocking JS string for the given URL, or `null` if the site is not blocked.
-- **Returns** `string|null`
-
-### Class: `FocusMode` (exported as singleton)
-
-#### Key Variables
-
-| Property | Type | Purpose |
-|---|---|---|
-| `state` | `Map<number, {active: boolean}>` | Maps window ID → focus mode state |
-
-#### Methods
-
-##### `isActive(windowData)`
-Returns whether focus mode is currently on for the given window.
-- **Returns** `boolean`
-
-##### `enable(windowData)`
-Activates focus mode: applies grayscale + distraction injection to all tabs, sends `focus-mode-changed` IPC to the renderer.
-
-##### `disable(windowData)`
-Deactivates focus mode: removes grayscale, reloads tabs that had distraction scripts injected (deferred for background tabs), sends `focus-mode-changed` IPC.
-
-##### `toggle(windowData)`
-Enables if inactive, disables if active.
-
-##### `applyToTab(windowData, tabWebContents, url)`
-Called from `Tabs` when a tab finishes loading. If focus mode is active, applies grayscale and injects distraction-blocking JS for the given URL.
-
-##### `applyGrayscale(wc)`
-Inserts the grayscale CSS into `wc` via `insertCSS`. Stores the returned CSS key on `wc.grayscaleKey` for later removal.
-
-##### `removeGrayscale(wc)`
-Removes the previously inserted grayscale CSS using the stored `wc.grayscaleKey`.
-
-##### `injectDistraction(wc, url)`
-Executes the site-specific blocking JS in `wc` if `getInjectionForUrl(url)` returns a script.
-
-##### `pauseMedia(wc)`
-Executes JS in `wc` that pauses all `<video>` and `<audio>` elements.
-
-##### `applyToAll(windowData, enable)`
-Iterates all tabs in `windowData.tabs.tabMap`. If `enable`, applies grayscale, pauses media, and injects distraction scripts. If `!enable`, removes grayscale and schedules reloads for tabs with injected scripts.
+The `blockShortform` setting applies shortform-only blocking (Shorts, TikTok, Reels) without hiding recommendations. Focus mode overrides it and the shortform state is restored when focus mode ends.
 
 ---
 

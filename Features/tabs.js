@@ -425,6 +425,9 @@ class Tabs {
                 this.sendTabUpdate(tabIndex, tab, resolvedType, title)
                 this.sendNavigationUpdate(tabIndex)
             }
+
+            const windowData = this.getWindowData();
+            if (windowData) focusMode.applyToTab(windowData, tab.webContents, url);
             
             isNavigatingProgrammatically = false;
         })
@@ -451,6 +454,9 @@ class Tabs {
                     this.addToHistory(url, tab.webContents.getTitle())
                 }
             }
+
+            const windowData = this.getWindowData();
+            if (windowData) focusMode.applyToTab(windowData, tab.webContents, url);
         })
         
         tab.isNavigatingProgrammatically = () => isNavigatingProgrammatically;
@@ -600,6 +606,10 @@ class Tabs {
                 }
             } else if (tab.needsReloadForFocusMode) {
                 tab.needsReloadForFocusMode = false;
+                tab.needsReloadForShortform = false;
+                tab.webContents.reload();
+            } else if (tab.needsReloadForShortform) {
+                tab.needsReloadForShortform = false;
                 tab.webContents.reload();
             }
 
