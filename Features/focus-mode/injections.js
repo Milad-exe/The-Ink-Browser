@@ -35,11 +35,38 @@ const YT_SHORTS_BLOCK_JS = `
   if (window.__inkFocusShorts) return;
   window.__inkFocusShorts = true;
 
+  const STYLE_KEYS = ['overflow', 'overscroll-behavior', 'height', 'touch-action'];
+  const _savedStyles = { root: null, body: null };
+
+  function saveStyles(el, key) {
+    if (_savedStyles[key]) return;
+    const store = {};
+    STYLE_KEYS.forEach(prop => {
+      store[prop] = el.style.getPropertyValue(prop) || '';
+    });
+    _savedStyles[key] = store;
+  }
+
+  function restoreStyles(el, key) {
+    const store = _savedStyles[key];
+    if (store) {
+      STYLE_KEYS.forEach(prop => {
+        const value = store[prop];
+        if (value) el.style.setProperty(prop, value);
+        else el.style.removeProperty(prop);
+      });
+      _savedStyles[key] = null;
+      return;
+    }
+    STYLE_KEYS.forEach(prop => el.style.removeProperty(prop));
+  }
+
   function lockScroll() {
     const root = document.documentElement;
     const body = document.body;
-    [root, body].forEach(el => {
+    [[root, 'root'], [body, 'body']].forEach(([el, key]) => {
       if (!el) return;
+      saveStyles(el, key);
       el.style.setProperty('overflow', 'hidden', 'important');
       el.style.setProperty('overscroll-behavior', 'none', 'important');
       el.style.setProperty('height', '100%', 'important');
@@ -47,7 +74,31 @@ const YT_SHORTS_BLOCK_JS = `
     });
   }
 
+  function unlockScroll() {
+    const root = document.documentElement;
+    const body = document.body;
+    [[root, 'root'], [body, 'body']].forEach(([el, key]) => {
+      if (!el) return;
+      restoreStyles(el, key);
+    });
+  }
+
+  function isActivePath() {
+    return location.pathname.startsWith('/shorts');
+  }
+
+  let _active = isActivePath();
+
+  function refreshActive() {
+    const next = isActivePath();
+    if (next === _active) return;
+    _active = next;
+    if (_active) lockScroll();
+    else unlockScroll();
+  }
+
   function blockEvent(e) {
+    if (!_active) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     return false;
@@ -56,6 +107,7 @@ const YT_SHORTS_BLOCK_JS = `
   const blockKeys = new Set(['ArrowDown','ArrowUp','PageDown','PageUp','Home','End']);
 
   function onKeydown(e) {
+    if (!_active) return;
     if (blockKeys.has(e.key)) blockEvent(e);
   }
 
@@ -65,7 +117,43 @@ const YT_SHORTS_BLOCK_JS = `
     document.addEventListener('touchmove', blockEvent, { passive: false, capture: true });
     document.addEventListener('keydown', onKeydown, true);
     document.addEventListener('mousedown', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('pointerdown', (e) => { if (e.button === 1) blockEvent(e); }, true);
     document.addEventListener('auxclick', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('mousemove', (e) => { if (e.buttons & 4) blockEvent(e); }, { passive: false, capture: true });
+    document.addEventListener('pointermove', (e) => { if (e.buttons & 4) blockEvent(e); }, { passive: false, capture: true });
+  }
+
+  if (!window.__inkAutoplayBlocked) {
+    window.__inkAutoplayBlocked = true;
+    // _gesture tracks whether the NEXT play() was directly triggered by a user click.
+    // Reset whenever a video element appears (player init), so page-load autoplay is blocked
+    // even if a navigation gesture window is still open.
+    let _gesture = false;
+    const _markGesture = () => {
+      _gesture = true;
+      requestAnimationFrame(() => { _gesture = false; });
+    };
+    document.addEventListener('click',    _markGesture, { capture: true, passive: true });
+    document.addEventListener('keydown',  _markGesture, { capture: true, passive: true });
+    document.addEventListener('pointerup',_markGesture, { capture: true, passive: true });
+    try {
+      const _origPlay = HTMLVideoElement.prototype.play;
+      HTMLVideoElement.prototype.play = function() {
+        if (!_gesture) return Promise.resolve();
+        return _origPlay.apply(this, arguments);
+      };
+    } catch {}
+    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch {} }
+    document.querySelectorAll('video').forEach(_pauseVid);
+    // Watch for new videos — pause them AND reset gesture so player init can't ride a navigation click
+    new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+      if (!n || n.nodeType !== 1) return;
+      if (n.tagName === 'VIDEO') { _gesture = false; _pauseVid(n); }
+      else if (n.querySelectorAll) {
+        const vids = n.querySelectorAll('video');
+        if (vids.length) { _gesture = false; vids.forEach(_pauseVid); }
+      }
+    }))).observe(document.documentElement, { childList: true, subtree: true });
   }
 
   function shouldBlockNav(target) {
@@ -78,6 +166,7 @@ const YT_SHORTS_BLOCK_JS = `
   }
 
   function onNavClick(e) {
+    if (!_active) return;
     const target = e.target && e.target.closest ? e.target.closest('button,yt-icon-button,a,[role="button"]') : null;
     if (!shouldBlockNav(target)) return;
     blockEvent(e);
@@ -90,9 +179,11 @@ const YT_SHORTS_BLOCK_JS = `
   }
 
   function block() {
-    lockScroll();
+    refreshActive();
+    if (_active) lockScroll();
   }
   block();
+  setInterval(refreshActive, 500);
   new MutationObserver(block).observe(document.documentElement, { childList: true, subtree: true });
 })();
 `;
@@ -102,11 +193,38 @@ const TIKTOK_BLOCK_JS = `
   if (window.__inkFocusTT) return;
   window.__inkFocusTT = true;
 
+  const STYLE_KEYS = ['overflow', 'overscroll-behavior', 'height', 'touch-action'];
+  const _savedStyles = { root: null, body: null };
+
+  function saveStyles(el, key) {
+    if (_savedStyles[key]) return;
+    const store = {};
+    STYLE_KEYS.forEach(prop => {
+      store[prop] = el.style.getPropertyValue(prop) || '';
+    });
+    _savedStyles[key] = store;
+  }
+
+  function restoreStyles(el, key) {
+    const store = _savedStyles[key];
+    if (store) {
+      STYLE_KEYS.forEach(prop => {
+        const value = store[prop];
+        if (value) el.style.setProperty(prop, value);
+        else el.style.removeProperty(prop);
+      });
+      _savedStyles[key] = null;
+      return;
+    }
+    STYLE_KEYS.forEach(prop => el.style.removeProperty(prop));
+  }
+
   function lockScroll() {
     const root = document.documentElement;
     const body = document.body;
-    [root, body].forEach(el => {
+    [[root, 'root'], [body, 'body']].forEach(([el, key]) => {
       if (!el) return;
+      saveStyles(el, key);
       el.style.setProperty('overflow', 'hidden', 'important');
       el.style.setProperty('overscroll-behavior', 'none', 'important');
       el.style.setProperty('height', '100%', 'important');
@@ -114,7 +232,36 @@ const TIKTOK_BLOCK_JS = `
     });
   }
 
+  function unlockScroll() {
+    const root = document.documentElement;
+    const body = document.body;
+    [[root, 'root'], [body, 'body']].forEach(([el, key]) => {
+      if (!el) return;
+      restoreStyles(el, key);
+    });
+  }
+
+  function isActivePath() {
+    const path = location.pathname || '';
+    if (path === '/' || path.startsWith('/@')) return true;
+    if (path.startsWith('/foryou') || path.startsWith('/following')) return true;
+    if (path.startsWith('/t/') || path.startsWith('/discover')) return true;
+    if (path.startsWith('/search') || path.startsWith('/tag') || path.startsWith('/music')) return true;
+    return !!document.querySelector('video');
+  }
+
+  let _active = isActivePath();
+
+  function refreshActive() {
+    const next = isActivePath();
+    if (next === _active) return;
+    _active = next;
+    if (_active) lockScroll();
+    else unlockScroll();
+  }
+
   function blockEvent(e) {
+    if (!_active) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     return false;
@@ -123,6 +270,7 @@ const TIKTOK_BLOCK_JS = `
   const blockKeys = new Set(['ArrowDown','ArrowUp','PageDown','PageUp','Home','End']);
 
   function onKeydown(e) {
+    if (!_active) return;
     if (blockKeys.has(e.key)) blockEvent(e);
   }
 
@@ -132,7 +280,43 @@ const TIKTOK_BLOCK_JS = `
     document.addEventListener('touchmove', blockEvent, { passive: false, capture: true });
     document.addEventListener('keydown', onKeydown, true);
     document.addEventListener('mousedown', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('pointerdown', (e) => { if (e.button === 1) blockEvent(e); }, true);
     document.addEventListener('auxclick', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('mousemove', (e) => { if (e.buttons & 4) blockEvent(e); }, { passive: false, capture: true });
+    document.addEventListener('pointermove', (e) => { if (e.buttons & 4) blockEvent(e); }, { passive: false, capture: true });
+  }
+
+  if (!window.__inkAutoplayBlocked) {
+    window.__inkAutoplayBlocked = true;
+    // _gesture tracks whether the NEXT play() was directly triggered by a user click.
+    // Reset whenever a video element appears (player init), so page-load autoplay is blocked
+    // even if a navigation gesture window is still open.
+    let _gesture = false;
+    const _markGesture = () => {
+      _gesture = true;
+      requestAnimationFrame(() => { _gesture = false; });
+    };
+    document.addEventListener('click',    _markGesture, { capture: true, passive: true });
+    document.addEventListener('keydown',  _markGesture, { capture: true, passive: true });
+    document.addEventListener('pointerup',_markGesture, { capture: true, passive: true });
+    try {
+      const _origPlay = HTMLVideoElement.prototype.play;
+      HTMLVideoElement.prototype.play = function() {
+        if (!_gesture) return Promise.resolve();
+        return _origPlay.apply(this, arguments);
+      };
+    } catch {}
+    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch {} }
+    document.querySelectorAll('video').forEach(_pauseVid);
+    // Watch for new videos — pause them AND reset gesture so player init can't ride a navigation click
+    new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+      if (!n || n.nodeType !== 1) return;
+      if (n.tagName === 'VIDEO') { _gesture = false; _pauseVid(n); }
+      else if (n.querySelectorAll) {
+        const vids = n.querySelectorAll('video');
+        if (vids.length) { _gesture = false; vids.forEach(_pauseVid); }
+      }
+    }))).observe(document.documentElement, { childList: true, subtree: true });
   }
 
   function shouldBlockNav(target) {
@@ -142,6 +326,7 @@ const TIKTOK_BLOCK_JS = `
   }
 
   function onNavClick(e) {
+    if (!_active) return;
     const target = e.target && e.target.closest ? e.target.closest('button,a,[role="button"]') : null;
     if (!shouldBlockNav(target)) return;
     blockEvent(e);
@@ -154,9 +339,11 @@ const TIKTOK_BLOCK_JS = `
   }
 
   function block() {
-    lockScroll();
+    refreshActive();
+    if (_active) lockScroll();
   }
   block();
+  setInterval(refreshActive, 500);
   new MutationObserver(block).observe(document.documentElement, { childList: true, subtree: true });
 })();
 `;
@@ -166,11 +353,38 @@ const INSTAGRAM_BLOCK_JS = `
   if (window.__inkFocusIG) return;
   window.__inkFocusIG = true;
 
+  const STYLE_KEYS = ['overflow', 'overscroll-behavior', 'height', 'touch-action'];
+  const _savedStyles = { root: null, body: null };
+
+  function saveStyles(el, key) {
+    if (_savedStyles[key]) return;
+    const store = {};
+    STYLE_KEYS.forEach(prop => {
+      store[prop] = el.style.getPropertyValue(prop) || '';
+    });
+    _savedStyles[key] = store;
+  }
+
+  function restoreStyles(el, key) {
+    const store = _savedStyles[key];
+    if (store) {
+      STYLE_KEYS.forEach(prop => {
+        const value = store[prop];
+        if (value) el.style.setProperty(prop, value);
+        else el.style.removeProperty(prop);
+      });
+      _savedStyles[key] = null;
+      return;
+    }
+    STYLE_KEYS.forEach(prop => el.style.removeProperty(prop));
+  }
+
   function lockScroll() {
     const root = document.documentElement;
     const body = document.body;
-    [root, body].forEach(el => {
+    [[root, 'root'], [body, 'body']].forEach(([el, key]) => {
       if (!el) return;
+      saveStyles(el, key);
       el.style.setProperty('overflow', 'hidden', 'important');
       el.style.setProperty('overscroll-behavior', 'none', 'important');
       el.style.setProperty('height', '100%', 'important');
@@ -178,7 +392,32 @@ const INSTAGRAM_BLOCK_JS = `
     });
   }
 
+  function unlockScroll() {
+    const root = document.documentElement;
+    const body = document.body;
+    [[root, 'root'], [body, 'body']].forEach(([el, key]) => {
+      if (!el) return;
+      restoreStyles(el, key);
+    });
+  }
+
+  function isActivePath() {
+    const path = location.pathname || '';
+    return path.startsWith('/reel') || path.startsWith('/reels') || path.startsWith('/explore');
+  }
+
+  let _active = isActivePath();
+
+  function refreshActive() {
+    const next = isActivePath();
+    if (next === _active) return;
+    _active = next;
+    if (_active) lockScroll();
+    else unlockScroll();
+  }
+
   function blockEvent(e) {
+    if (!_active) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     return false;
@@ -187,6 +426,7 @@ const INSTAGRAM_BLOCK_JS = `
   const blockKeys = new Set(['ArrowDown','ArrowUp','PageDown','PageUp','Home','End']);
 
   function onKeydown(e) {
+    if (!_active) return;
     if (blockKeys.has(e.key)) blockEvent(e);
   }
 
@@ -196,7 +436,43 @@ const INSTAGRAM_BLOCK_JS = `
     document.addEventListener('touchmove', blockEvent, { passive: false, capture: true });
     document.addEventListener('keydown', onKeydown, true);
     document.addEventListener('mousedown', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('pointerdown', (e) => { if (e.button === 1) blockEvent(e); }, true);
     document.addEventListener('auxclick', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('mousemove', (e) => { if (e.buttons & 4) blockEvent(e); }, { passive: false, capture: true });
+    document.addEventListener('pointermove', (e) => { if (e.buttons & 4) blockEvent(e); }, { passive: false, capture: true });
+  }
+
+  if (!window.__inkAutoplayBlocked) {
+    window.__inkAutoplayBlocked = true;
+    // _gesture tracks whether the NEXT play() was directly triggered by a user click.
+    // Reset whenever a video element appears (player init), so page-load autoplay is blocked
+    // even if a navigation gesture window is still open.
+    let _gesture = false;
+    const _markGesture = () => {
+      _gesture = true;
+      requestAnimationFrame(() => { _gesture = false; });
+    };
+    document.addEventListener('click',    _markGesture, { capture: true, passive: true });
+    document.addEventListener('keydown',  _markGesture, { capture: true, passive: true });
+    document.addEventListener('pointerup',_markGesture, { capture: true, passive: true });
+    try {
+      const _origPlay = HTMLVideoElement.prototype.play;
+      HTMLVideoElement.prototype.play = function() {
+        if (!_gesture) return Promise.resolve();
+        return _origPlay.apply(this, arguments);
+      };
+    } catch {}
+    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch {} }
+    document.querySelectorAll('video').forEach(_pauseVid);
+    // Watch for new videos — pause them AND reset gesture so player init can't ride a navigation click
+    new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+      if (!n || n.nodeType !== 1) return;
+      if (n.tagName === 'VIDEO') { _gesture = false; _pauseVid(n); }
+      else if (n.querySelectorAll) {
+        const vids = n.querySelectorAll('video');
+        if (vids.length) { _gesture = false; vids.forEach(_pauseVid); }
+      }
+    }))).observe(document.documentElement, { childList: true, subtree: true });
   }
 
   function shouldBlockNav(target) {
@@ -206,6 +482,7 @@ const INSTAGRAM_BLOCK_JS = `
   }
 
   function onNavClick(e) {
+    if (!_active) return;
     const target = e.target && e.target.closest ? e.target.closest('button,a,[role="button"]') : null;
     if (!shouldBlockNav(target)) return;
     blockEvent(e);
@@ -218,9 +495,11 @@ const INSTAGRAM_BLOCK_JS = `
   }
 
   function block() {
-    lockScroll();
+    refreshActive();
+    if (_active) lockScroll();
   }
   block();
+  setInterval(refreshActive, 500);
   new MutationObserver(block).observe(document.documentElement, { childList: true, subtree: true });
 })();
 `;
@@ -231,11 +510,38 @@ const YT_SHORTS_ONLY_JS = `
   if (window.__inkShortformYTShorts) return;
   window.__inkShortformYTShorts = true;
 
+  const STYLE_KEYS = ['overflow', 'overscroll-behavior', 'height', 'touch-action'];
+  const _savedStyles = { root: null, body: null };
+
+  function saveStyles(el, key) {
+    if (_savedStyles[key]) return;
+    const store = {};
+    STYLE_KEYS.forEach(prop => {
+      store[prop] = el.style.getPropertyValue(prop) || '';
+    });
+    _savedStyles[key] = store;
+  }
+
+  function restoreStyles(el, key) {
+    const store = _savedStyles[key];
+    if (store) {
+      STYLE_KEYS.forEach(prop => {
+        const value = store[prop];
+        if (value) el.style.setProperty(prop, value);
+        else el.style.removeProperty(prop);
+      });
+      _savedStyles[key] = null;
+      return;
+    }
+    STYLE_KEYS.forEach(prop => el.style.removeProperty(prop));
+  }
+
   function lockScroll() {
     const root = document.documentElement;
     const body = document.body;
-    [root, body].forEach(el => {
+    [[root, 'root'], [body, 'body']].forEach(([el, key]) => {
       if (!el) return;
+      saveStyles(el, key);
       el.style.setProperty('overflow', 'hidden', 'important');
       el.style.setProperty('overscroll-behavior', 'none', 'important');
       el.style.setProperty('height', '100%', 'important');
@@ -243,7 +549,31 @@ const YT_SHORTS_ONLY_JS = `
     });
   }
 
+  function unlockScroll() {
+    const root = document.documentElement;
+    const body = document.body;
+    [[root, 'root'], [body, 'body']].forEach(([el, key]) => {
+      if (!el) return;
+      restoreStyles(el, key);
+    });
+  }
+
+  function isActivePath() {
+    return location.pathname.startsWith('/shorts');
+  }
+
+  let _active = isActivePath();
+
+  function refreshActive() {
+    const next = isActivePath();
+    if (next === _active) return;
+    _active = next;
+    if (_active) lockScroll();
+    else unlockScroll();
+  }
+
   function blockEvent(e) {
+    if (!_active) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     return false;
@@ -252,6 +582,7 @@ const YT_SHORTS_ONLY_JS = `
   const blockKeys = new Set(['ArrowDown','ArrowUp','PageDown','PageUp','Home','End']);
 
   function onKeydown(e) {
+    if (!_active) return;
     if (blockKeys.has(e.key)) blockEvent(e);
   }
 
@@ -261,7 +592,43 @@ const YT_SHORTS_ONLY_JS = `
     document.addEventListener('touchmove', blockEvent, { passive: false, capture: true });
     document.addEventListener('keydown', onKeydown, true);
     document.addEventListener('mousedown', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('pointerdown', (e) => { if (e.button === 1) blockEvent(e); }, true);
     document.addEventListener('auxclick', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('mousemove', (e) => { if (e.buttons & 4) blockEvent(e); }, { passive: false, capture: true });
+    document.addEventListener('pointermove', (e) => { if (e.buttons & 4) blockEvent(e); }, { passive: false, capture: true });
+  }
+
+  if (!window.__inkAutoplayBlocked) {
+    window.__inkAutoplayBlocked = true;
+    // _gesture tracks whether the NEXT play() was directly triggered by a user click.
+    // Reset whenever a video element appears (player init), so page-load autoplay is blocked
+    // even if a navigation gesture window is still open.
+    let _gesture = false;
+    const _markGesture = () => {
+      _gesture = true;
+      requestAnimationFrame(() => { _gesture = false; });
+    };
+    document.addEventListener('click',    _markGesture, { capture: true, passive: true });
+    document.addEventListener('keydown',  _markGesture, { capture: true, passive: true });
+    document.addEventListener('pointerup',_markGesture, { capture: true, passive: true });
+    try {
+      const _origPlay = HTMLVideoElement.prototype.play;
+      HTMLVideoElement.prototype.play = function() {
+        if (!_gesture) return Promise.resolve();
+        return _origPlay.apply(this, arguments);
+      };
+    } catch {}
+    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch {} }
+    document.querySelectorAll('video').forEach(_pauseVid);
+    // Watch for new videos — pause them AND reset gesture so player init can't ride a navigation click
+    new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+      if (!n || n.nodeType !== 1) return;
+      if (n.tagName === 'VIDEO') { _gesture = false; _pauseVid(n); }
+      else if (n.querySelectorAll) {
+        const vids = n.querySelectorAll('video');
+        if (vids.length) { _gesture = false; vids.forEach(_pauseVid); }
+      }
+    }))).observe(document.documentElement, { childList: true, subtree: true });
   }
 
   function shouldBlockNav(target) {
@@ -274,6 +641,7 @@ const YT_SHORTS_ONLY_JS = `
   }
 
   function onNavClick(e) {
+    if (!_active) return;
     const target = e.target && e.target.closest ? e.target.closest('button,yt-icon-button,a,[role="button"]') : null;
     if (!shouldBlockNav(target)) return;
     blockEvent(e);
@@ -286,9 +654,11 @@ const YT_SHORTS_ONLY_JS = `
   }
 
   function block() {
-    lockScroll();
+    refreshActive();
+    if (_active) lockScroll();
   }
   block();
+  setInterval(refreshActive, 500);
   new MutationObserver(block).observe(document.documentElement, { childList: true, subtree: true });
 })();
 `;
@@ -298,11 +668,38 @@ const TIKTOK_SHORTFORM_JS = `
   if (window.__inkShortformTT) return;
   window.__inkShortformTT = true;
 
+  const STYLE_KEYS = ['overflow', 'overscroll-behavior', 'height', 'touch-action'];
+  const _savedStyles = { root: null, body: null };
+
+  function saveStyles(el, key) {
+    if (_savedStyles[key]) return;
+    const store = {};
+    STYLE_KEYS.forEach(prop => {
+      store[prop] = el.style.getPropertyValue(prop) || '';
+    });
+    _savedStyles[key] = store;
+  }
+
+  function restoreStyles(el, key) {
+    const store = _savedStyles[key];
+    if (store) {
+      STYLE_KEYS.forEach(prop => {
+        const value = store[prop];
+        if (value) el.style.setProperty(prop, value);
+        else el.style.removeProperty(prop);
+      });
+      _savedStyles[key] = null;
+      return;
+    }
+    STYLE_KEYS.forEach(prop => el.style.removeProperty(prop));
+  }
+
   function lockScroll() {
     const root = document.documentElement;
     const body = document.body;
-    [root, body].forEach(el => {
+    [[root, 'root'], [body, 'body']].forEach(([el, key]) => {
       if (!el) return;
+      saveStyles(el, key);
       el.style.setProperty('overflow', 'hidden', 'important');
       el.style.setProperty('overscroll-behavior', 'none', 'important');
       el.style.setProperty('height', '100%', 'important');
@@ -310,7 +707,36 @@ const TIKTOK_SHORTFORM_JS = `
     });
   }
 
+  function unlockScroll() {
+    const root = document.documentElement;
+    const body = document.body;
+    [[root, 'root'], [body, 'body']].forEach(([el, key]) => {
+      if (!el) return;
+      restoreStyles(el, key);
+    });
+  }
+
+  function isActivePath() {
+    const path = location.pathname || '';
+    if (path === '/' || path.startsWith('/@')) return true;
+    if (path.startsWith('/foryou') || path.startsWith('/following')) return true;
+    if (path.startsWith('/t/') || path.startsWith('/discover')) return true;
+    if (path.startsWith('/search') || path.startsWith('/tag') || path.startsWith('/music')) return true;
+    return !!document.querySelector('video');
+  }
+
+  let _active = isActivePath();
+
+  function refreshActive() {
+    const next = isActivePath();
+    if (next === _active) return;
+    _active = next;
+    if (_active) lockScroll();
+    else unlockScroll();
+  }
+
   function blockEvent(e) {
+    if (!_active) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     return false;
@@ -319,6 +745,7 @@ const TIKTOK_SHORTFORM_JS = `
   const blockKeys = new Set(['ArrowDown','ArrowUp','PageDown','PageUp','Home','End']);
 
   function onKeydown(e) {
+    if (!_active) return;
     if (blockKeys.has(e.key)) blockEvent(e);
   }
 
@@ -327,6 +754,44 @@ const TIKTOK_SHORTFORM_JS = `
     document.addEventListener('wheel', blockEvent, { passive: false, capture: true });
     document.addEventListener('touchmove', blockEvent, { passive: false, capture: true });
     document.addEventListener('keydown', onKeydown, true);
+    document.addEventListener('mousedown', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('pointerdown', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('auxclick', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('mousemove', (e) => { if (e.buttons & 4) blockEvent(e); }, { passive: false, capture: true });
+    document.addEventListener('pointermove', (e) => { if (e.buttons & 4) blockEvent(e); }, { passive: false, capture: true });
+  }
+
+  if (!window.__inkAutoplayBlocked) {
+    window.__inkAutoplayBlocked = true;
+    // _gesture tracks whether the NEXT play() was directly triggered by a user click.
+    // Reset whenever a video element appears (player init), so page-load autoplay is blocked
+    // even if a navigation gesture window is still open.
+    let _gesture = false;
+    const _markGesture = () => {
+      _gesture = true;
+      requestAnimationFrame(() => { _gesture = false; });
+    };
+    document.addEventListener('click',    _markGesture, { capture: true, passive: true });
+    document.addEventListener('keydown',  _markGesture, { capture: true, passive: true });
+    document.addEventListener('pointerup',_markGesture, { capture: true, passive: true });
+    try {
+      const _origPlay = HTMLVideoElement.prototype.play;
+      HTMLVideoElement.prototype.play = function() {
+        if (!_gesture) return Promise.resolve();
+        return _origPlay.apply(this, arguments);
+      };
+    } catch {}
+    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch {} }
+    document.querySelectorAll('video').forEach(_pauseVid);
+    // Watch for new videos — pause them AND reset gesture so player init can't ride a navigation click
+    new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+      if (!n || n.nodeType !== 1) return;
+      if (n.tagName === 'VIDEO') { _gesture = false; _pauseVid(n); }
+      else if (n.querySelectorAll) {
+        const vids = n.querySelectorAll('video');
+        if (vids.length) { _gesture = false; vids.forEach(_pauseVid); }
+      }
+    }))).observe(document.documentElement, { childList: true, subtree: true });
   }
 
   function shouldBlockNav(target) {
@@ -336,6 +801,7 @@ const TIKTOK_SHORTFORM_JS = `
   }
 
   function onNavClick(e) {
+    if (!_active) return;
     const target = e.target && e.target.closest ? e.target.closest('button,a,[role="button"]') : null;
     if (!shouldBlockNav(target)) return;
     blockEvent(e);
@@ -348,9 +814,11 @@ const TIKTOK_SHORTFORM_JS = `
   }
 
   function block() {
-    lockScroll();
+    refreshActive();
+    if (_active) lockScroll();
   }
   block();
+  setInterval(refreshActive, 500);
   new MutationObserver(block).observe(document.documentElement, { childList: true, subtree: true });
 })();
 `;
@@ -360,11 +828,38 @@ const INSTAGRAM_SHORTFORM_JS = `
   if (window.__inkShortformIG) return;
   window.__inkShortformIG = true;
 
+  const STYLE_KEYS = ['overflow', 'overscroll-behavior', 'height', 'touch-action'];
+  const _savedStyles = { root: null, body: null };
+
+  function saveStyles(el, key) {
+    if (_savedStyles[key]) return;
+    const store = {};
+    STYLE_KEYS.forEach(prop => {
+      store[prop] = el.style.getPropertyValue(prop) || '';
+    });
+    _savedStyles[key] = store;
+  }
+
+  function restoreStyles(el, key) {
+    const store = _savedStyles[key];
+    if (store) {
+      STYLE_KEYS.forEach(prop => {
+        const value = store[prop];
+        if (value) el.style.setProperty(prop, value);
+        else el.style.removeProperty(prop);
+      });
+      _savedStyles[key] = null;
+      return;
+    }
+    STYLE_KEYS.forEach(prop => el.style.removeProperty(prop));
+  }
+
   function lockScroll() {
     const root = document.documentElement;
     const body = document.body;
-    [root, body].forEach(el => {
+    [[root, 'root'], [body, 'body']].forEach(([el, key]) => {
       if (!el) return;
+      saveStyles(el, key);
       el.style.setProperty('overflow', 'hidden', 'important');
       el.style.setProperty('overscroll-behavior', 'none', 'important');
       el.style.setProperty('height', '100%', 'important');
@@ -372,7 +867,32 @@ const INSTAGRAM_SHORTFORM_JS = `
     });
   }
 
+  function unlockScroll() {
+    const root = document.documentElement;
+    const body = document.body;
+    [[root, 'root'], [body, 'body']].forEach(([el, key]) => {
+      if (!el) return;
+      restoreStyles(el, key);
+    });
+  }
+
+  function isActivePath() {
+    const path = location.pathname || '';
+    return path.startsWith('/reel') || path.startsWith('/reels') || path.startsWith('/explore');
+  }
+
+  let _active = isActivePath();
+
+  function refreshActive() {
+    const next = isActivePath();
+    if (next === _active) return;
+    _active = next;
+    if (_active) lockScroll();
+    else unlockScroll();
+  }
+
   function blockEvent(e) {
+    if (!_active) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     return false;
@@ -381,6 +901,7 @@ const INSTAGRAM_SHORTFORM_JS = `
   const blockKeys = new Set(['ArrowDown','ArrowUp','PageDown','PageUp','Home','End']);
 
   function onKeydown(e) {
+    if (!_active) return;
     if (blockKeys.has(e.key)) blockEvent(e);
   }
 
@@ -389,6 +910,44 @@ const INSTAGRAM_SHORTFORM_JS = `
     document.addEventListener('wheel', blockEvent, { passive: false, capture: true });
     document.addEventListener('touchmove', blockEvent, { passive: false, capture: true });
     document.addEventListener('keydown', onKeydown, true);
+    document.addEventListener('mousedown', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('pointerdown', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('auxclick', (e) => { if (e.button === 1) blockEvent(e); }, true);
+    document.addEventListener('mousemove', (e) => { if (e.buttons & 4) blockEvent(e); }, { passive: false, capture: true });
+    document.addEventListener('pointermove', (e) => { if (e.buttons & 4) blockEvent(e); }, { passive: false, capture: true });
+  }
+
+  if (!window.__inkAutoplayBlocked) {
+    window.__inkAutoplayBlocked = true;
+    // _gesture tracks whether the NEXT play() was directly triggered by a user click.
+    // Reset whenever a video element appears (player init), so page-load autoplay is blocked
+    // even if a navigation gesture window is still open.
+    let _gesture = false;
+    const _markGesture = () => {
+      _gesture = true;
+      requestAnimationFrame(() => { _gesture = false; });
+    };
+    document.addEventListener('click',    _markGesture, { capture: true, passive: true });
+    document.addEventListener('keydown',  _markGesture, { capture: true, passive: true });
+    document.addEventListener('pointerup',_markGesture, { capture: true, passive: true });
+    try {
+      const _origPlay = HTMLVideoElement.prototype.play;
+      HTMLVideoElement.prototype.play = function() {
+        if (!_gesture) return Promise.resolve();
+        return _origPlay.apply(this, arguments);
+      };
+    } catch {}
+    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch {} }
+    document.querySelectorAll('video').forEach(_pauseVid);
+    // Watch for new videos — pause them AND reset gesture so player init can't ride a navigation click
+    new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+      if (!n || n.nodeType !== 1) return;
+      if (n.tagName === 'VIDEO') { _gesture = false; _pauseVid(n); }
+      else if (n.querySelectorAll) {
+        const vids = n.querySelectorAll('video');
+        if (vids.length) { _gesture = false; vids.forEach(_pauseVid); }
+      }
+    }))).observe(document.documentElement, { childList: true, subtree: true });
   }
 
   function shouldBlockNav(target) {
@@ -398,6 +957,7 @@ const INSTAGRAM_SHORTFORM_JS = `
   }
 
   function onNavClick(e) {
+    if (!_active) return;
     const target = e.target && e.target.closest ? e.target.closest('button,a,[role="button"]') : null;
     if (!shouldBlockNav(target)) return;
     blockEvent(e);
@@ -410,9 +970,11 @@ const INSTAGRAM_SHORTFORM_JS = `
   }
 
   function block() {
-    lockScroll();
+    refreshActive();
+    if (_active) lockScroll();
   }
   block();
+  setInterval(refreshActive, 500);
   new MutationObserver(block).observe(document.documentElement, { childList: true, subtree: true });
 })();
 `;

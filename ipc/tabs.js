@@ -15,6 +15,15 @@ function register(ipcMain, { wm, BrowserWindow }) {
         if (wd) wd.tabs.createTab();
     });
 
+    // Open a URL in a new background tab without loading it until the user switches to it
+    ipcMain.handle('addTabLazy', (_e, url) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (!wd) return;
+        let title = url;
+        try { title = new URL(url).hostname; } catch {}
+        wd.tabs.createLazyTab(url, title, false);
+    });
+
     ipcMain.handle('removeTab', (_e, index) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd) wd.tabs.removeTab(index);
