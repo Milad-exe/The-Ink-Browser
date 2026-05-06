@@ -9,6 +9,9 @@ const DEFAULTS = {
     searchEngine:      'google',   // 'google' | 'duckduckgo' | 'bing'
     bookmarkBarVisible: false,
     blockShortform:    false,
+    settingsPage:      'general',
+    windowBounds:      null,
+    windowState:       null,
     pomWork:           25,          // minutes
     pomShortBreak:     5,
     pomLongBreak:      15,

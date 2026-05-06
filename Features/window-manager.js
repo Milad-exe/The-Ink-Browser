@@ -1,4 +1,4 @@
-const { BrowserWindow, Menu}  = require('electron');
+const { BrowserWindow, Menu, screen } = require('electron');
 const path = require("path");
 const Tabs = require("./tabs");
 const Persistence = require("./persistence");
@@ -40,12 +40,82 @@ class WindowManager {
         return this.cachedBookmarks;
     }
 
+    _clampBoundsToDisplays(bounds) {
+        try {
+            const displays = screen.getAllDisplays();
+            const { x, y, width, height } = bounds;
+            const visible = displays.some(d => {
+                const wa = d.workArea;
+                return x < wa.x + wa.width - 50 &&
+                       x + width > wa.x + 50 &&
+                       y < wa.y + wa.height - 50 &&
+                       y + height > wa.y + 50;
+            });
+            if (!visible) {
+                const primary = screen.getPrimaryDisplay().workArea;
+                return { x: primary.x, y: primary.y, width, height };
+            }
+        } catch {}
+        return bounds;
+    }
+
+    _persistWindowBounds(window, options = {}) {
+        try {
+            if (!window || window.isDestroyed()) return;
+            const { forceNormal = false } = options || {};
+            const isMinimized = typeof window.isMinimized === 'function' ? window.isMinimized() : false;
+            const isMaximized = forceNormal ? false
+                : (typeof window.isMaximized === 'function' ? window.isMaximized() : false);
+            const windowData = this.getWindowByWebContents?.(window.webContents);
+            const isHtmlFullScreen = !!windowData?.tabs?.isHtmlFullScreen;
+            const isFullScreen = forceNormal ? false
+                : (!isHtmlFullScreen && (typeof window.isFullScreen === 'function' ? window.isFullScreen() : false));
+            const bounds = window.getBounds();
+            const normalBounds = (isMinimized || isMaximized || isFullScreen) && typeof window.getNormalBounds === 'function'
+                ? window.getNormalBounds()
+                : bounds;
+            if (normalBounds && normalBounds.width > 0 && normalBounds.height > 0) {
+                this.persistence.set('windowBounds', normalBounds);
+                this.persistence.set('windowState', {
+                    bounds,
+                    normalBounds,
+                    isMaximized,
+                    isFullScreen,
+                });
+            }
+        } catch {}
+    }
+
+    _persistPrimaryWindowBounds() {
+        try {
+            const focused = BrowserWindow.getFocusedWindow();
+            if (focused && !focused.isDestroyed()) {
+                this._persistWindowBounds(focused);
+                return;
+            }
+            const primary = this.getPrimaryWindow();
+            if (primary?.window) this._persistWindowBounds(primary.window);
+        } catch {}
+    }
+
     createWindow(width = 800, height = 600) {
         const windowId = this.nextWindowId++;
-        
+
+        // Restore saved size/position when there are no open windows
+        const savedState = this.windows.size === 0
+            ? this.persistence.get('windowState')
+            : null;
+        const savedBounds = this.windows.size === 0
+            ? (savedState?.normalBounds || savedState?.bounds || this.persistence.get('windowBounds'))
+            : null;
+        const restoredBounds = (savedBounds && savedBounds.width > 0 && savedBounds.height > 0)
+            ? this._clampBoundsToDisplays(savedBounds)
+            : null;
+
         const window = new BrowserWindow({
-            width: width,
-            height: height,
+            width:  restoredBounds ? restoredBounds.width  : width,
+            height: restoredBounds ? restoredBounds.height : height,
+            ...(restoredBounds ? { x: restoredBounds.x, y: restoredBounds.y } : {}),
             minWidth: 800,
             minHeight: 600,
             icon: path.join(__dirname, '../logo.png'),
@@ -57,10 +127,52 @@ class WindowManager {
             }
         });
 
-        window.on('maximize',   () => { try { window.webContents.send('window-maximize-changed', true);  } catch {} });
-        window.on('unmaximize', () => { try { window.webContents.send('window-maximize-changed', false); } catch {} });
+        window.on('maximize',   () => {
+            try { window.webContents.send('window-maximize-changed', true); } catch {}
+            this._persistWindowBounds(window);
+        });
+        window.on('unmaximize', () => {
+            try { window.webContents.send('window-maximize-changed', false); } catch {}
+            this._persistWindowBounds(window);
+        });
+
+        window.on('enter-full-screen', () => {
+            this._persistWindowBounds(window);
+        });
+        window.on('leave-full-screen', () => {
+            this._persistWindowBounds(window);
+        });
+
+        const shouldFullScreen = !!savedState?.isFullScreen;
+        const shouldMaximize = !!savedState?.isMaximized && !shouldFullScreen;
+        if (shouldFullScreen || shouldMaximize) {
+            window.once('ready-to-show', () => {
+                try {
+                    if (shouldFullScreen) window.setFullScreen(true);
+                    else window.maximize();
+                } catch {}
+            });
+        }
 
         window.loadFile('renderer/Browser/index.html');
+
+        // Save window bounds whenever it moves or resizes (debounced)
+        let _saveBoundsTimer = null;
+        const _saveBounds = () => {
+            clearTimeout(_saveBoundsTimer);
+            _saveBoundsTimer = setTimeout(() => {
+                this._persistWindowBounds(window, { forceNormal: true });
+            }, 400);
+        };
+        window.on('resize', _saveBounds);
+        window.on('move',   _saveBounds);
+
+        // If this is the last window, persist its bounds before it closes.
+        window.on('close', () => {
+            if (this.windows.size === 1) {
+                this._persistWindowBounds(window);
+            }
+        });
 
         // Track focus order: most recently focused is considered primary for persistence
         window.on('focus', () => {
@@ -175,6 +287,9 @@ class WindowManager {
                         } catch {}
                     }
                 }
+
+                // After a window closes, persist bounds from the remaining primary window.
+                this._persistPrimaryWindowBounds();
             }
         });
 
@@ -240,7 +355,7 @@ class WindowManager {
         try {
             const primary = this.getPrimaryWindow();
             if (!primary || !primary.tabs) return false;
-            const state = primary.tabs._buildSerializableState();
+            const state = primary.tabs.buildSerializableState();
             this.persistence.saveState(state);
             return true;
         } catch (e) {

@@ -131,6 +131,7 @@ window.addEventListener('blur', () => {
 contextBridge.exposeInMainWorld(
     "tab", {
         add: () => ipcRenderer.invoke("addTab"),
+        addLazy: (url) => ipcRenderer.invoke("addTabLazy", url),
         remove: (index) => ipcRenderer.invoke("removeTab", index),
         switch: (index) => ipcRenderer.invoke("switchTab", index),
         loadUrl: (index, url) => ipcRenderer.invoke("loadUrl", index, url),

@@ -358,10 +358,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const seenUrls  = new Set();
             const seenQuery = new Set();
 
+            // Action (what you typed) always first so pressing Enter is predictable
+            merged.push(...base);
+            for (const x of base) { if (x.query) seenQuery.add(x.query); }
+            // Then open tabs, bookmarks, history — URL matches above search suggestions
             for (const t of openTabs)   { merged.push(t); seenUrls.add(t.url); }
             for (const b of bookmarks)  { if (!seenUrls.has(b.url)) { merged.push(b); seenUrls.add(b.url); } }
-            merged.push(...base);
-            for (const x of base)       { if (x.query) seenQuery.add(x.query); }
             for (const h of hist)       { if (!seenUrls.has(h.url))   { merged.push(h); seenUrls.add(h.url); } }
             for (const s of search)     { if (!seenQuery.has(s.query)) { merged.push(s); seenQuery.add(s.query); } }
 
@@ -1326,6 +1328,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             const after = getDragAfterElement(tabsContainer, e.clientX);
             if (after == null) tabsContainer.appendChild(dragging);
             else               tabsContainer.insertBefore(dragging, after);
+        });
+
+        // ── Drop text / URLs onto the tab bar to open a new tab ──────────────
+
+        function extractDropUrl(dt) {
+            const uriList = dt.getData('text/uri-list');
+            if (uriList) {
+                const first = uriList.split(/\r?\n/).map(s => s.trim()).find(s => s && !s.startsWith('#'));
+                if (first) return first;
+            }
+            const text = dt.getData('text/plain');
+            if (text && text.trim() && isNaN(text.trim())) return text.trim();
+            return null;
+        }
+
+        tabBar.addEventListener('dragover', (e) => {
+            // Only accept external drops (not tab-reorder drags which carry numeric plain text)
+            const types = e.dataTransfer.types;
+            if (types.includes('text/uri-list') || types.includes('text/plain') || types.includes('text/html')) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+            }
+        });
+
+        tabBar.addEventListener('drop', async (e) => {
+            const url = extractDropUrl(e.dataTransfer);
+            if (!url) return;
+            e.preventDefault();
+            e.stopPropagation();
+            await window.tab.addLazy(url);
         });
 
         // ── Scroll controls ───────────────────────────────────────────────────
