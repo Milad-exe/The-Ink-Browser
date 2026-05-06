@@ -7,12 +7,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const navItems = document.querySelectorAll('.nav-item');
     const sections = document.querySelectorAll('.section');
 
+    // Restore last active section
+    const savedSection = settings.settingsPage || 'general';
+    const savedNavItem = document.querySelector(`.nav-item[data-section="${savedSection}"]`);
+    if (savedNavItem) {
+        navItems.forEach(n => n.classList.remove('active'));
+        sections.forEach(s => s.classList.remove('active'));
+        savedNavItem.classList.add('active');
+        const savedSectionEl = document.getElementById('section-' + savedSection);
+        if (savedSectionEl) savedSectionEl.classList.add('active');
+    }
+
     navItems.forEach(item => {
         item.addEventListener('click', () => {
             navItems.forEach(n => n.classList.remove('active'));
             sections.forEach(s => s.classList.remove('active'));
             item.classList.add('active');
             document.getElementById('section-' + item.dataset.section).classList.add('active');
+            save('settingsPage', item.dataset.section);
         });
     });
 

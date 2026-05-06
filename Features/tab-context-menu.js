@@ -6,12 +6,16 @@ class TabContextMenu {
         this.tabManager = tabManager;
         this.contextTemplate = [];
 
-        this.addPageItems(params);
-        this.addSelectionItems(params);
-        this.addEditableItems(params);
+        // Context-specific items first (most relevant to what was clicked)
         this.addLinkItems(params);
         this.addImageItems(params);
         this.addMediaItems(params);
+        this.addSelectionItems(params);
+        this.addEditableItems(params);
+        // Page navigation + utilities
+        this.addPageItems(params);
+        // Inspect always last
+        this.addInspect(params);
     }
 
     getTemplate() {
@@ -30,16 +34,11 @@ class TabContextMenu {
     }
 
     openInNewTab(url) {
-        let sourceTabIndex = null;
-        for (const [index, tab] of this.tabManager.tabMap) {
-            if (tab === this.tab) {
-                sourceTabIndex = index;
-                break;
-            }
-        }
-
-        const newIndex = this.tabManager.createTab(sourceTabIndex, false);
-        this.tabManager.loadUrl(newIndex, url);
+        // Lazy-load: tab shows in the bar but the page doesn't load until the user switches to it.
+        // This prevents background autoplay on video sites.
+        let title = url;
+        try { title = new URL(url).hostname; } catch {}
+        this.tabManager.createLazyTab(url, title, false);
     }
 
     addPageItems(params) {
@@ -47,6 +46,7 @@ class TabContextMenu {
         const currentUrl = wc.getURL ? wc.getURL() : '';
         const isRealPage = currentUrl && !currentUrl.startsWith('file://');
 
+        this.sep();
         this.contextTemplate.push(
             {
                 label: 'Back',
@@ -62,10 +62,10 @@ class TabContextMenu {
                 label: 'Reload',
                 click: () => wc.reload(),
             },
-            { type: 'separator' },
         );
 
         if (isRealPage) {
+            this.sep();
             this.contextTemplate.push(
                 {
                     label: 'Save Page As…',
@@ -79,19 +79,23 @@ class TabContextMenu {
                     label: 'View Page Source',
                     click: () => this.openInNewTab(`view-source:${currentUrl}`),
                 },
-                { type: 'separator' },
+            );
+            this.sep();
+            this.contextTemplate.push(
                 {
                     label: 'Copy Page URL',
                     click: () => clipboard.writeText(currentUrl),
                 },
-                { type: 'separator' },
             );
         }
+    }
 
+    addInspect(params) {
+        this.sep();
         this.contextTemplate.push(
             {
                 label: 'Inspect Element',
-                click: () => wc.inspectElement(params.x, params.y),
+                click: () => this.tab.webContents.inspectElement(params.x, params.y),
             },
         );
     }
@@ -132,7 +136,6 @@ class TabContextMenu {
 
     addLinkItems(params) {
         if (!params.linkURL) return;
-        this.sep();
         this.contextTemplate.push(
             {
                 label: 'Open Link in New Tab',
@@ -158,16 +161,16 @@ class TabContextMenu {
         this.sep();
         this.contextTemplate.push(
             {
-                label: 'Open Image in New Tab',
-                click: () => this.openInNewTab(params.srcURL),
-            },
-            {
                 label: 'Save Image As…',
                 click: () => this.tab.webContents.downloadURL(params.srcURL),
             },
             {
                 label: 'Copy Image Address',
                 click: () => clipboard.writeText(params.srcURL),
+            },
+            {
+                label: 'Open Image in New Tab',
+                click: () => this.openInNewTab(params.srcURL),
             },
             {
                 label: 'Search Google for Image',

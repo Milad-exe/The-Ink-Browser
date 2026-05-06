@@ -29,6 +29,8 @@ class WindowContextMenu {
 
     addSelectionItems(params) {
         if (!params.selectionText) return;
+        // Skip in editable fields — Cut/Copy/Paste from addEditableItems covers it
+        if (params.isEditable) return;
         const windowData = this.getWindowData();
         this.contextTemplate.push(
             {

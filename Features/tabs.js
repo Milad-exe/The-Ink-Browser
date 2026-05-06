@@ -158,7 +158,8 @@ class Tabs {
         this.mainWindow.webContents.send('tab-created', {
             index: tabIndex,
             title: tab.lazyTitle,
-            totalTabs: this.tabMap.size
+            totalTabs: this.tabMap.size,
+            active: false,
         });
         this.sendTabUpdate(tabIndex, tab, url || 'newtab', tab.lazyTitle);
 
