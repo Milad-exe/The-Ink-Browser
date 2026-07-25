@@ -681,7 +681,7 @@ class Tabs {
     static PAGE_RADIUS = 12;
     // Shell inset above the tab strip (matches body padding-top in
     // Browser/styles.css) so the space above the tabs matches the space below.
-    static SHELL_TOP = 14;
+    static SHELL_TOP = 6;
 
     // 0 while a video (or the OS) is truly fullscreen — the page must be
     // edge-to-edge and square there; otherwise the rounded floating card.
@@ -696,9 +696,9 @@ class Tabs {
             return { x: 0, y: 0, width: contentBounds.width, height: contentBounds.height };
         }
         // shell top inset (see body padding-top in Browser/styles.css) +
-        // tab-bar (42px) + utility-bar (52px) + optional bookmark-bar (30px)
+        // tab-bar (38px) + utility-bar (50px) + optional bookmark-bar (30px)
         const pad = Tabs.SHELL_PAD;
-        const yOffset = 94 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
+        const yOffset = 90 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
         let width = contentBounds.width - pad * 2;
         let height = contentBounds.height - yOffset - pad;
         if (width < 0)
