@@ -246,6 +246,14 @@
                 }
             });
         }
+        // The new-tab page owns focus on open (the chrome omnibox no longer grabs
+        // it). Focus our own search box so the user can type immediately.
+        if (input) {
+            const grab = () => { try { input.focus(); } catch { } };
+            grab();
+            requestAnimationFrame(grab);
+            window.addEventListener('focus', grab);
+        }
         // Let clicks on the page dismiss any open chrome overlay (menu, prompts).
         if (window.electronAPI && window.electronAPI.windowClick) {
             window.addEventListener('click', (e) => {

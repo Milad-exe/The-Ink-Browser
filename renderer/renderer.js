@@ -60,6 +60,10 @@
         let tabLoading = new Set(); // tabIndexes currently loading
         let activeTabIndex = 0;
         let currentTabUrl = '';
+        // True once the user (click) or Cmd+L/Cmd+K intentionally focuses the
+        // omnibox — lets the startup focus guard tell an intended focus from the
+        // native focus-restore that pulls the bar on launch / new window.
+        let omniFocusIntent = false;
         let currentTabTitle = '';
         // ── Settings (synchronous) ────────────────────────────────────────────────
         let settings = {};
@@ -121,6 +125,41 @@
         initExtensions();
         initUtilityBarConfig();
         initReaderAndPip();
+        initChromeClock();
+        // Startup / new-window focus guard: a browser normally focuses the address
+        // bar on a new tab, but our new-tab page has its OWN search box that should
+        // own focus instead. Chromium's native focus-restore can still pull focus
+        // to the omnibox when the window first opens; bounce it back for a short
+        // window after load — but only when the active tab is the blank new-tab
+        // page and the user hasn't intentionally focused the bar (click / Cmd+L).
+        searchBar.addEventListener('mousedown', () => { omniFocusIntent = true; });
+        (function guardStartupFocus() {
+            let tries = 0;
+            const iv = setInterval(() => {
+                const blankTab = !currentTabUrl || currentTabUrl === 'newtab';
+                if (blankTab && !omniFocusIntent && !userTyping && !barEdited &&
+                    document.activeElement === searchBar) {
+                    try { searchBar.blur(); } catch { }
+                }
+                if (++tries >= 12) clearInterval(iv);
+            }, 50);
+        })();
+        // ─────────────────────────────────────────────────────────────────────────
+        // Chrome status clock (tab strip) — updates on the minute, no seconds timer
+        // ─────────────────────────────────────────────────────────────────────────
+        function initChromeClock() {
+            const el = document.getElementById('chrome-clock');
+            if (!el)
+                return;
+            const paint = () => {
+                const n = new Date();
+                const h = n.getHours(), m = n.getMinutes();
+                el.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+            };
+            paint();
+            // Align to the top of the next minute, then tick each minute.
+            setTimeout(() => { paint(); setInterval(paint, 60000); }, (60 - new Date().getSeconds()) * 1000);
+        }
         // ─────────────────────────────────────────────────────────────────────────
         // Window controls
         // ─────────────────────────────────────────────────────────────────────────
@@ -313,6 +352,7 @@
             // tab (the page load can steal focus back) — don't clobber text the
             // user already started typing.
             window.electronAPI.onFocusAddressBar?.(() => {
+                omniFocusIntent = true; // Cmd+L / Cmd+K is an intentional focus
                 if (userTyping && document.activeElement === searchBar)
                     return;
                 try {
@@ -784,6 +824,7 @@
             const text = String(input || '').trim();
             if (!text) return '';
             if (/^https?:\/\//i.test(text)) return text;
+            if (/^northstar:\/\//i.test(text)) return text; // internal-page scheme
             if (/^(file|about|data|blob):/i.test(text)) return text; // dropped file:// etc.
             if (text.includes('.') && !/\s/.test(text)) return 'https://' + text;
             const engines = {
@@ -802,6 +843,19 @@
             if (!url || url === 'newtab' || url.startsWith('file://'))
                 return url || '';
             return window.urlUtils?.getDomain(url) || url;
+        }
+        // Internal-page tokens ('settings', 'settings/appearance', 'history',
+        // 'bookmarks') display as northstar:// urls in the omnibox. Accepts a bare
+        // token or an already-formed northstar:// url; null for anything else.
+        function northstarDisplay(token) {
+            if (!token)
+                return null;
+            if (/^northstar:\/\//i.test(token))
+                return token;
+            const base = String(token).split('/')[0];
+            if (['settings', 'history', 'bookmarks'].includes(base))
+                return 'northstar://' + token;
+            return null;
         }
         // ── Firefox-style resting URL display ─────────────────────────────────────
         // While the bar is unfocused the full URL stays visible, painted into the
@@ -831,6 +885,9 @@
         // Resting input value: the full URL for http(s) pages, the legacy domain
         // fallback for internal pages (newtab, file://).
         function restingValueFor(url) {
+            const ns = northstarDisplay(url);
+            if (ns)
+                return ns;
             return urlDisplayParts(url) ? url : getDomainDisplay(url);
         }
         function updateUrlDisplay() {

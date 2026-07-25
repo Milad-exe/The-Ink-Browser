@@ -101,6 +101,50 @@ function preloadForPage(kind) {
     }
     return path.join(base, 'preload.js');
 }
+// Internal pages addressable via the northstar:// scheme, e.g. northstar://settings
+// or northstar://settings/appearance. Shown in the omnibox and typeable to navigate.
+const INTERNAL_PAGES = {
+    settings: { file: 'renderer/Settings/index.html', title: 'Settings' },
+    history: { file: 'renderer/History/index.html', title: 'History' },
+    bookmarks: { file: 'renderer/Bookmarks/index.html', title: 'Bookmarks' },
+};
+const SETTINGS_SECTIONS = ['general', 'appearance', 'focus', 'privacy', 'passwords', 'extensions', 'about'];
+// Parse a northstar:// URL → { type, section } (section only for settings), or null.
+function parseNorthstarUrl(raw) {
+    const m = /^northstar:\/\/([a-z]+)(?:\/([a-z]+))?\/?$/i.exec((raw || '').trim());
+    if (!m)
+        return null;
+    const type = m[1].toLowerCase();
+    if (!INTERNAL_PAGES[type])
+        return null;
+    let section = m[2] ? m[2].toLowerCase() : null;
+    if (!(type === 'settings' && section && SETTINGS_SECTIONS.includes(section)))
+        section = null;
+    return { type, section };
+}
+// The stored/display "url token" for an internal tab: 'settings', 'settings/appearance', …
+function internalTokenFor(fileUrl) {
+    let type = null;
+    if (fileUrl.includes('/Settings/index.html'))
+        type = 'settings';
+    else if (fileUrl.includes('/Bookmarks/index.html'))
+        type = 'bookmarks';
+    else if (fileUrl.includes('/History/index.html'))
+        type = 'history';
+    if (!type)
+        return null;
+    let section = '';
+    if (type === 'settings') {
+        try {
+            section = new URL(fileUrl).hash.replace(/^#/, '').toLowerCase();
+        }
+        catch { }
+        // 'general' is the default section — it stays the bare northstar://settings.
+        if (!SETTINGS_SECTIONS.includes(section) || section === 'general')
+            section = '';
+    }
+    return section ? `${type}/${section}` : type;
+}
 class Tabs {
     // ── Wiring ────────────────────────────────────────────────────────────
     mainWindow;
@@ -503,25 +547,20 @@ class Tabs {
         });
         if (shouldActivate) {
             this.showTab(tabIndex);
-            // A freshly opened blank tab should focus the address bar, like
-            // Chrome/Firefox. showTab() just gave OS focus to the tab's child
-            // WebContentsView, so we must pull focus back to the chrome view
-            // FIRST — otherwise the renderer's searchBar.focus() is a no-op and
-            // keystrokes go to the (blank) page. We fire once immediately and
-            // again after the newtab page finishes loading, because the page's
-            // own load can re-grab OS focus and undo the first attempt.
-            const focusAddressBar = () => {
+            // Give OS focus to the new tab's PAGE, not the chrome omnibox — the
+            // new-tab page then focuses its own search box (see NewTab/newtab.js).
+            // This replaces the old behavior of pulling focus to the chrome +
+            // address bar on every new tab / new window, which caused the "url bar
+            // sometimes focused on launch" race. Re-assert after load since the
+            // page's own load can drop focus. (Cmd+L still focuses the omnibox via
+            // the explicit 'focus-address-bar' shortcut handler.)
+            const focusPage = () => {
                 if (this.activeTabIndex !== tabIndex || this.mainWindow.isDestroyed())
                     return;
-                try {
-                    this.mainWindow.webContents.focus();
-                    this.mainWindow.webContents.send('focus-address-bar');
-                }
-                catch { }
+                try { tab.webContents.focus(); } catch { }
             };
-            setImmediate(focusAddressBar);
-            setTimeout(focusAddressBar, 200);
-            tab.webContents.once('did-finish-load', () => setTimeout(focusAddressBar, 0));
+            setImmediate(focusPage);
+            tab.webContents.once('did-finish-load', () => setTimeout(focusPage, 0));
         }
         else {
             const activeTab = this.tabMap.get(previousActiveTabIndex);
@@ -545,7 +584,27 @@ class Tabs {
         });
         return tabIndex;
     }
-    createTabWithPage(pagePath, pageType, pageTitle) {
+    // Open an internal page (settings/history/bookmarks) via the northstar://
+    // scheme. replaceActive replaces the current tab in place (used when a
+    // northstar:// url is typed, or when the current tab is the new-tab page) —
+    // internal pages can't just navigate an existing tab because Settings needs
+    // its own privileged preload, chosen at tab creation.
+    openInternalPage(type, section = null, replaceActive = false) {
+        const page = INTERNAL_PAGES[type];
+        if (!page)
+            return null;
+        const activeIdx = this.activeTabIndex;
+        const canReplace = replaceActive && this.tabMap.has(activeIdx);
+        const newIdx = this.createTabWithPage(page.file, type, page.title, {
+            section,
+            insertAfter: canReplace ? activeIdx : null,
+        });
+        if (canReplace && newIdx !== activeIdx)
+            this.removeTab(activeIdx);
+        return newIdx;
+    }
+    createTabWithPage(pagePath, pageType, pageTitle, opts = {}) {
+        const section = opts.section || null;
         const tabIndex = this.nextTabIndex;
         this.nextTabIndex++;
         const tab = new WebContentsView({
@@ -558,7 +617,7 @@ class Tabs {
         });
         try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch { }
         this.mainWindow.contentView.addChildView(tab);
-        tab.webContents.loadFile(resolveAppFile(pagePath));
+        tab.webContents.loadFile(resolveAppFile(pagePath), section ? { hash: section } : undefined);
         this.raiseFloatingViews();
         UserAgent.setupTab(tab);
         this._applyTabBackground(tab, pageType);
@@ -566,18 +625,26 @@ class Tabs {
         const bounds = this.getTabBounds();
         tab.setBounds(bounds);
         tab.lazyTitle = pageTitle || pageType;
+        const token = section ? `${pageType}/${section}` : pageType;
         this.tabMap.set(tabIndex, tab);
-        this.tabUrls.set(tabIndex, pageType);
-        this.tabOrder.push(tabIndex);
+        this.tabUrls.set(tabIndex, token);
+        // Position: after a given tab (for in-place replacement of the new-tab
+        // page), otherwise append.
+        const afterPos = (opts.insertAfter != null) ? this.tabOrder.indexOf(opts.insertAfter) : -1;
+        if (afterPos !== -1)
+            this.tabOrder.splice(afterPos + 1, 0, tabIndex);
+        else
+            this.tabOrder.push(tabIndex);
         this.activeTabIndex = tabIndex;
-        this.navigationHistory.initializeTab(tabIndex, pageType);
+        this.navigationHistory.initializeTab(tabIndex, token);
         this.setupTabListeners(tabIndex, tab);
         this.mainWindow.webContents.send('tab-created', {
             index: tabIndex,
             title: pageTitle || pageType,
-            totalTabs: this.tabMap.size
+            totalTabs: this.tabMap.size,
+            afterIndex: afterPos !== -1 ? opts.insertAfter : null
         });
-        this.sendTabUpdate(tabIndex, tab, pageType, pageTitle);
+        this.sendTabUpdate(tabIndex, tab, token, pageTitle);
         this.showTab(tabIndex);
         tab.webContents.on('did-finish-load', () => {
             const windowData = this.getWindowData();
@@ -612,6 +679,9 @@ class Tabs {
     // instead of filling the window edge-to-edge.
     static SHELL_PAD = 8;
     static PAGE_RADIUS = 12;
+    // Shell inset above the tab strip (matches body padding-top in
+    // Browser/styles.css) so the space above the tabs matches the space below.
+    static SHELL_TOP = 14;
 
     // 0 while a video (or the OS) is truly fullscreen — the page must be
     // edge-to-edge and square there; otherwise the rounded floating card.
@@ -625,9 +695,10 @@ class Tabs {
         if (this.mainWindow && (this.isHtmlFullScreen || this.mainWindow.isSimpleFullScreen())) {
             return { x: 0, y: 0, width: contentBounds.width, height: contentBounds.height };
         }
+        // shell top inset (see body padding-top in Browser/styles.css) +
         // tab-bar (42px) + utility-bar (52px) + optional bookmark-bar (30px)
         const pad = Tabs.SHELL_PAD;
-        const yOffset = 94 + (this.bookmarkBarHeight || 0);
+        const yOffset = 94 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
         let width = contentBounds.width - pad * 2;
         let height = contentBounds.height - yOffset - pad;
         if (width < 0)
@@ -729,23 +800,20 @@ class Tabs {
                 }
             }
             else if (url.startsWith('file://')) {
-                let resolvedType = 'newtab';
-                if (url.includes('/Settings/index.html'))
-                    resolvedType = 'settings';
-                else if (url.includes('/Bookmarks/index.html'))
-                    resolvedType = 'bookmarks';
-                else if (url.includes('/History/index.html'))
-                    resolvedType = 'history';
-                this.tabUrls.set(tabIndex, resolvedType);
-                lastAddedUrl = resolvedType;
+                // Internal page → a northstar:// token (e.g. 'settings/appearance'),
+                // else the plain new-tab page.
+                const token = internalTokenFor(url) || 'newtab';
+                const base = token.split('/')[0];
+                this.tabUrls.set(tabIndex, token);
+                lastAddedUrl = token;
                 let title = 'New Tab';
-                if (resolvedType === 'settings')
+                if (base === 'settings')
                     title = 'Settings';
-                else if (resolvedType === 'bookmarks')
+                else if (base === 'bookmarks')
                     title = 'Bookmarks';
-                else if (resolvedType === 'history')
+                else if (base === 'history')
                     title = 'History';
-                this.sendTabUpdate(tabIndex, tab, resolvedType, title);
+                this.sendTabUpdate(tabIndex, tab, token, title);
                 this.sendNavigationUpdate(tabIndex);
             }
             const windowData = this.getWindowData();
@@ -836,6 +904,17 @@ class Tabs {
                         this.addToHistory(url, tab.webContents.getTitle());
                     }
                     this.saveStateDebounced();
+                }
+            }
+            else if (url.startsWith('file://')) {
+                // Settings section changes drive location.hash → recompute the
+                // northstar://settings/<section> token so the omnibox stays live.
+                const token = internalTokenFor(url);
+                if (token && this.tabUrls.get(tabIndex) !== token) {
+                    this.tabUrls.set(tabIndex, token);
+                    lastAddedUrl = token;
+                    this.sendTabUpdate(tabIndex, tab, token);
+                    this.sendNavigationUpdate(tabIndex);
                 }
             }
             const windowData = this.getWindowData();
@@ -1026,17 +1105,31 @@ class Tabs {
     sendTabUpdate(tabIndex, tab, url, title, favicon) {
         let displayUrl = url;
         let displayTitle = title || this.computeDisplayTitleFor(tabIndex) || "New Tab";
-        let isInternal = ['newtab', 'settings', 'bookmarks', 'history'].includes(url) || (url && url.startsWith('file://'));
-        if (isInternal) {
+        // Internal pages: settings/bookmarks/history (and settings/<section>) keep
+        // their token so the omnibox can show it as a northstar:// url; the new-tab
+        // page and any bare file:// url show a blank address bar.
+        const base = (typeof url === 'string' ? url.split('/')[0] : '');
+        const isInternalToken = ['settings', 'bookmarks', 'history'].includes(base);
+        const isBlankInternal = url === 'newtab' || (url && url.startsWith('file://') && !isInternalToken);
+        if (isBlankInternal) {
             displayUrl = '';
-            if (url === 'settings' || (url && url.includes('/Settings/index.html')))
+            if (url && url.includes('/Settings/index.html'))
                 displayTitle = 'Settings';
-            else if (url === 'bookmarks' || (url && url.includes('/Bookmarks/index.html')))
+            else if (url && url.includes('/Bookmarks/index.html'))
                 displayTitle = 'Bookmarks';
-            else if (url === 'history' || (url && url.includes('/History/index.html')))
+            else if (url && url.includes('/History/index.html'))
                 displayTitle = 'History';
             else
                 displayTitle = 'New Tab';
+        }
+        else if (isInternalToken) {
+            displayUrl = url; // 'settings' / 'settings/appearance' / 'history' / 'bookmarks'
+            if (base === 'settings')
+                displayTitle = 'Settings';
+            else if (base === 'bookmarks')
+                displayTitle = 'Bookmarks';
+            else if (base === 'history')
+                displayTitle = 'History';
         }
         // Provide a default favicon instantly for http/https URLs to prevent empty gaps
         let resolvedFavicon = favicon;
@@ -1206,7 +1299,7 @@ class Tabs {
             const currentUrl = this.tabUrls.get(index) || '';
             this.mainWindow.webContents.send('tab-switched', {
                 index: index,
-                url: (currentUrl === 'newtab' || currentUrl === 'history') ? '' : currentUrl,
+                url: currentUrl === 'newtab' ? '' : currentUrl,
                 totalTabs: this.tabMap.size
             });
             this.sendNavigationUpdate(index);
@@ -1237,6 +1330,15 @@ class Tabs {
         }
     }
     loadUrl(index, url) {
+        // northstar:// internal pages: typing one navigates the current tab to
+        // the internal page (replace-in-place, since Settings needs its own
+        // preload chosen at tab creation).
+        const internal = parseNorthstarUrl(url);
+        if (internal) {
+            this.activeTabIndex = index;
+            this.openInternalPage(internal.type, internal.section, true);
+            return;
+        }
         if (this.tabMap.has(index)) {
             const tab = this.tabMap.get(index);
             tab.slept = false; // loading revives a slept (discarded) renderer
@@ -1670,4 +1772,5 @@ class Tabs {
     }
 }
 
+Tabs.parseNorthstarUrl = parseNorthstarUrl;
 module.exports = Tabs;

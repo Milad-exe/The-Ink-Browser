@@ -144,7 +144,50 @@ class Northstar {
             // mark. Overriding it at runtime with a full-bleed PNG made the dock
             // icon render edge-to-edge — larger than the padded bundle rendering —
             // so it visibly "expanded" the moment the app finished launching.
-            Menu.setApplicationMenu(null);
+            // macOS delivers standard keyboard shortcuts through the application
+            // menu's key-equivalents. With no menu (setApplicationMenu(null)) it
+            // silently drops some — notably Cmd+1-9 tab switching and Cmd+C/V/X/A
+            // in text fields. So on macOS we install a minimal menu: appMenu +
+            // editMenu roles (copy/paste/select-all fix) and a custom Tabs menu
+            // that drives the focused window's tab switching. We deliberately do
+            // NOT add File/View roles — Cmd+T/W/R/zoom stay on before-input-event
+            // so they keep acting on the active tab (not the focused webContents).
+            // Windows/Linux keep no menu (the in-window chrome is the UI and
+            // before-input-event already handles every shortcut there).
+            if (process.platform === 'darwin') {
+                const wm = this.windowManager;
+                const focusedWD = () => (wm.getMostRecentlyFocusedWindow && wm.getMostRecentlyFocusedWindow())
+                    || (wm.getPrimaryWindow && wm.getPrimaryWindow());
+                const switchTo = (n) => { const wd = focusedWD(); if (wd && wd.shortcuts) wd.shortcuts.switchToTabByNumber(n); };
+                const lastTab = () => {
+                    const wd = focusedWD();
+                    if (!wd || !wd.tabs) return;
+                    const idx = wd.tabs.tabOrder.filter(i => wd.tabs.tabMap.has(i));
+                    if (idx.length) wd.tabs.showTab(idx[idx.length - 1]);
+                };
+                const cycle = (dir) => { const wd = focusedWD(); if (wd && wd.shortcuts) (dir > 0 ? wd.shortcuts.switchToNextTab() : wd.shortcuts.switchToPreviousTab()); };
+                const tabItems = [1, 2, 3, 4, 5, 6, 7, 8].map(n => ({
+                    label: `Tab ${n}`, accelerator: `CmdOrCtrl+${n}`, click: () => switchTo(n),
+                }));
+                const template = [
+                    { role: 'appMenu' },
+                    { role: 'editMenu' },
+                    {
+                        label: 'Tabs',
+                        submenu: [
+                            ...tabItems,
+                            { label: 'Last Tab', accelerator: 'CmdOrCtrl+9', click: lastTab },
+                            { type: 'separator' },
+                            { label: 'Next Tab', accelerator: 'Ctrl+Tab', click: () => cycle(1) },
+                            { label: 'Previous Tab', accelerator: 'Ctrl+Shift+Tab', click: () => cycle(-1) },
+                        ],
+                    },
+                ];
+                Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+            }
+            else {
+                Menu.setApplicationMenu(null);
+            }
             // Spellchecker — enable and set languages (OS locale + English fallback).
             // Context-menu suggestions/add-to-dictionary are wired in tab-context-menu.js.
             try {

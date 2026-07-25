@@ -127,8 +127,11 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
     });
     ipcMain.handle('open-settings-tab', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        if (wd)
-            wd.tabs.createTabWithPage('renderer/Settings/index.html', 'settings', 'Settings');
+        if (wd?.tabs) {
+            const active = wd.tabs.activeTabIndex;
+            const onNewTab = wd.tabs.tabUrls.get(active) === 'newtab';
+            wd.tabs.openInternalPage('settings', null, onNewTab);
+        }
     });
     ipcMain.handle('google-login', async (_e, clientId, clientSecret) => {
         try {

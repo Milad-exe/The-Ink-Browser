@@ -21,7 +21,11 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-body { display: flex; flex-direction: column; }
+/* Shell top inset: gives the tab strip breathing room from the window edge so
+   the space above the tabs matches the space below them (down to the omnibox),
+   instead of hugging the top. -webkit-app-region:drag keeps this strip
+   draggable. Paired with getTabBounds() yOffset (Tabs.SHELL_TOP in tabs.js). */
+body { display: flex; flex-direction: column; padding-top: var(--shell-top, 14px); -webkit-app-region: drag; }
 
 /* macOS vibrancy: let a whisper of the window material through the shell. */
 html[data-vibrancy="true"],

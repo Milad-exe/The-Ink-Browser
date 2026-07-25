@@ -9,29 +9,47 @@
             settings = await window.northstarSettings.get();
         }
         catch { }
-        // ── Sidebar navigation ─────────────────────────────────────────────────
+        // ── Sidebar navigation (hash-driven: northstar://settings/<section>) ────
+        // The section lives in location.hash so the omnibox can show it as a
+        // northstar://settings/<section> url and typing one lands on that section.
         const navItems = document.querySelectorAll('.nav-item');
         const sections = document.querySelectorAll('.section');
-        // Restore last active section
-        const savedSection = settings.settingsPage || 'general';
-        const savedNavItem = document.querySelector(`.nav-item[data-section="${savedSection}"]`);
-        if (savedNavItem) {
-            navItems.forEach(n => n.classList.remove('active'));
+        const VALID = ['general', 'appearance', 'focus', 'privacy', 'passwords', 'extensions', 'about'];
+        function activateSection(section) {
+            if (!VALID.includes(section))
+                section = 'general';
+            navItems.forEach(n => n.classList.toggle('active', n.dataset.section === section));
             sections.forEach(s => s.classList.remove('active'));
-            savedNavItem.classList.add('active');
-            const savedSectionEl = document.getElementById('section-' + savedSection);
-            if (savedSectionEl)
-                savedSectionEl.classList.add('active');
+            const el = document.getElementById('section-' + section);
+            if (el)
+                el.classList.add('active');
+            save('settingsPage', section);
         }
+        function sectionFromHash() {
+            const h = (location.hash || '').replace(/^#/, '').toLowerCase();
+            return VALID.includes(h) ? h : null;
+        }
+        // Initial: a typed hash wins, else the last-used section.
+        const initial = sectionFromHash() || settings.settingsPage || 'general';
+        // 'general' is the bare northstar://settings (no hash); others reflect in
+        // the hash so the omnibox shows the section and did-navigate-in-page fires.
+        if (initial !== 'general' && (location.hash || '').replace(/^#/, '') !== initial)
+            location.hash = initial;
+        activateSection(initial);
         navItems.forEach(item => {
             item.addEventListener('click', () => {
-                navItems.forEach(n => n.classList.remove('active'));
-                sections.forEach(s => s.classList.remove('active'));
-                item.classList.add('active');
-                document.getElementById('section-' + item.dataset.section).classList.add('active');
-                save('settingsPage', item.dataset.section);
+                const s = item.dataset.section;
+                if (s === 'general') {
+                    if (location.hash)
+                        location.hash = '';
+                    else
+                        activateSection('general');
+                }
+                else
+                    location.hash = s;
             });
         });
+        window.addEventListener('hashchange', () => activateSection(sectionFromHash() || 'general'));
         // ── Toast helper ───────────────────────────────────────────────────────
         let toastTimer;
         function showToast(msg) {
