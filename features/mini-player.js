@@ -101,6 +101,7 @@ function show(wd, tabIndex) {
         },
     });
     view.setBackgroundColor('#00000000');
+    try { view.setBorderRadius(12); } catch { }
     wd.window.contentView.addChildView(view);
     view.webContents.loadFile(resolveAppFile('renderer/MiniPlayer/index.html'));
     view.setBounds(panelBounds(wd));

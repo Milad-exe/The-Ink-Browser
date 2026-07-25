@@ -121,6 +121,7 @@ function register(ipcMain, { wm, webContents }) {
                     },
                 });
                 wd.bookmarkPrompt.setBackgroundColor('#00000000');
+                try { wd.bookmarkPrompt.setBorderRadius(12); } catch { }
                 wd.window.contentView.addChildView(wd.bookmarkPrompt);
             }
             const x = Math.max(0, Math.floor(bounds.right) - PROMPT_W);

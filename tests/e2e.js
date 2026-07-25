@@ -168,7 +168,10 @@ async function omniboxNavigate(page, text) {
     // ── Cold start: measure a load in the first ~1s, while adblock is parsing ──
     section('Cold start (load during adblock parse)');
     await check('test hook present', async () => {
-        for (let i = 0; i < 40; i++) { const h = await app.evaluate(m_tabsHandle); if (h.ok) return true; await new Promise(r => setTimeout(r, 100)); }
+        // The main-process evaluate context is transiently torn down in the
+        // first ~300ms of startup; tolerate the throw and keep polling until the
+        // test hook is live (same intent as retrying on a non-ok result).
+        for (let i = 0; i < 40; i++) { try { const h = await app.evaluate(m_tabsHandle); if (h.ok) return true; } catch {} await new Promise(r => setTimeout(r, 100)); }
         return false;
     });
     const cold = await app.evaluate(m_navMeasure, { url: 'https://example.com', timeoutMs: 20000, fresh: true });

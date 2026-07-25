@@ -252,6 +252,7 @@ class Tabs {
             webPrefs.v8CacheOptions = 'none'; // disable V8 bytecode cache for private tabs
         }
         const tab = new WebContentsView({ webPreferences: webPrefs });
+        try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch { }
         if (makePrivate) {
             tab.webContents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
             tab.privateSession = webPrefs.session; // wiped when the tab closes
@@ -433,6 +434,7 @@ class Tabs {
             webPrefs.v8CacheOptions = 'none';
         }
         const tab = new WebContentsView({ webPreferences: webPrefs });
+        try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch { }
         if (makePrivate) {
             tab.webContents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
             tab.privateSession = webPrefs.session; // wiped when the tab closes
@@ -554,6 +556,7 @@ class Tabs {
                 nodeIntegration: false
             }
         });
+        try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch { }
         this.mainWindow.contentView.addChildView(tab);
         tab.webContents.loadFile(resolveAppFile(pagePath));
         this.raiseFloatingViews();
@@ -604,20 +607,34 @@ class Tabs {
         }
         catch { }
     }
+    // Shell margin around the floating page card (matches the shell padding in
+    // Browser/styles.css). The page floats in a rounded card on a tinted shell
+    // instead of filling the window edge-to-edge.
+    static SHELL_PAD = 8;
+    static PAGE_RADIUS = 12;
+
+    // 0 while a video (or the OS) is truly fullscreen — the page must be
+    // edge-to-edge and square there; otherwise the rounded floating card.
+    _pageRadius() {
+        const fs = this.isHtmlFullScreen || (this.mainWindow && this.mainWindow.isSimpleFullScreen && this.mainWindow.isSimpleFullScreen());
+        return fs ? 0 : Tabs.PAGE_RADIUS;
+    }
+
     getTabBounds() {
         const contentBounds = this.mainWindow.getContentBounds();
         if (this.mainWindow && (this.isHtmlFullScreen || this.mainWindow.isSimpleFullScreen())) {
             return { x: 0, y: 0, width: contentBounds.width, height: contentBounds.height };
         }
         // tab-bar (42px) + utility-bar (52px) + optional bookmark-bar (30px)
+        const pad = Tabs.SHELL_PAD;
         const yOffset = 94 + (this.bookmarkBarHeight || 0);
-        let width = contentBounds.width;
-        let height = contentBounds.height - yOffset;
+        let width = contentBounds.width - pad * 2;
+        let height = contentBounds.height - yOffset - pad;
         if (width < 0)
             width = 0;
         if (height < 0)
             height = 0;
-        return { x: 0, y: yOffset, width: Math.floor(width), height: Math.floor(height) };
+        return { x: pad, y: yOffset, width: Math.floor(width), height: Math.floor(height) };
     }
     isYouTubeUrl(url) {
         try {
@@ -1125,6 +1142,7 @@ class Tabs {
             // Background tabs skip live resizing (see resizeAllTabs) — catch up
             // on the current bounds before this one becomes visible.
             tab.setBounds(this.getTabBounds());
+            try { tab.setBorderRadius(this._pageRadius()); } catch { }
             tab.setVisible(true);
             // Sleep bookkeeping: the outgoing tab starts ageing now; the incoming
             // tab is fresh. Wake it if the sleep scan discarded its renderer.
@@ -1565,9 +1583,12 @@ class Tabs {
         // each relayout + repaint on every setBounds — with many tabs open
         // that turns window resizing into a jank festival. Hidden tabs get
         // their bounds applied in showTab() the moment they become visible.
+        const radius = this._pageRadius();
         this.tabMap.forEach((tab, index) => {
-            if (index === this.activeTabIndex)
+            if (index === this.activeTabIndex) {
                 tab.setBounds(bounds);
+                try { tab.setBorderRadius(radius); } catch { }
+            }
         });
     }
     collapseAllTabs() {

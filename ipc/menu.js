@@ -24,14 +24,15 @@ function register(ipcMain, { wm }) {
             },
         });
         wd.menu.setBackgroundColor('#00000000');
+        try { wd.menu.setBorderRadius(12); } catch { }
         wd.window.contentView.addChildView(wd.menu);
         wd.menu.webContents.loadFile(resolveAppFile('renderer/Menu/index.html'));
         const browserWidth = wd.window.getBounds().width;
         wd.menu.setBounds({
             height: MENU_HEIGHT,
             width: MENU_WIDTH,
-            x: browserWidth - 12 - MENU_WIDTH,
-            y: 40,
+            x: browserWidth - 10 - MENU_WIDTH,
+            y: 90,
         });
         // Close the menu the moment the user clicks outside it or the window
         // loses OS focus. Use a one-shot flag so cleanup only fires once.
