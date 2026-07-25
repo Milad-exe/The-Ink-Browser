@@ -16,7 +16,7 @@ body {
 .card {
   background: var(--surface);
   border: 1px solid var(--border-2);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 13px 14px 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
 }
@@ -25,7 +25,7 @@ body {
 .head { display: flex; align-items: flex-start; gap: 11px; }
 .icon {
   flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px; border-radius: 0;
+  width: 30px; height: 30px; border-radius: var(--radius);
   background: var(--active-bg); color: var(--text);
 }
 .icon svg { width: 17px; height: 17px; }
@@ -46,7 +46,7 @@ body {
 .remember input {
   appearance: none; -webkit-appearance: none;
   width: 15px; height: 15px; flex-shrink: 0;
-  border: 1.5px solid var(--border-2); border-radius: 0;
+  border: 1.5px solid var(--border-2); border-radius: var(--radius);
   background: transparent; cursor: pointer; position: relative;
   transition: background 0.1s, border-color 0.1s;
 }
@@ -60,7 +60,7 @@ body {
 /* ── Actions ── */
 .actions { display: flex; gap: 8px; }
 .btn {
-  flex: 1; padding: 8px 10px; border-radius: 0;
+  flex: 1; padding: 8px 10px; border-radius: var(--radius);
   font-family: inherit; font-size: 12px; font-weight: 600;
   cursor: pointer; border: 1px solid var(--border-2);
   background: transparent; color: var(--text);

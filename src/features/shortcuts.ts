@@ -91,7 +91,11 @@ class Shortcuts {
     }
 
     openInternalPage(filePath, type, title) {
-        this.tabManager.createTabWithPage(filePath, type, title);
+        // Reuse the current tab when it's the blank new-tab page; otherwise open
+        // a fresh tab. (filePath/title kept for call-site compatibility.)
+        const active = this.tabManager.activeTabIndex;
+        const onNewTab = this.tabManager.tabUrls.get(active) === 'newtab';
+        this.tabManager.openInternalPage(type, null, onNewTab);
     }
 
     reopenClosedTab() {

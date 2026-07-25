@@ -104,6 +104,7 @@ function register(ipcMain, { wm }) {
                     },
                 });
                 view.setBackgroundColor('#00000000');
+                try { view.setBorderRadius(12) } catch {}
                 wd.passwordPrompt = view;
                 wd.window.contentView.addChildView(view);
                 view.webContents.loadFile(resolveAppFile('renderer/PasswordPrompt/index.html'));

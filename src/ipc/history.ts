@@ -42,7 +42,11 @@ function register(ipcMain, { wm }) {
 
     ipcMain.handle('open-history-tab', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        if (wd) wd.tabs.createTabWithPage('renderer/History/index.html', 'history', 'History');
+        if (wd?.tabs) {
+            const active = wd.tabs.activeTabIndex;
+            const onNewTab = wd.tabs.tabUrls.get(active) === 'newtab';
+            wd.tabs.openInternalPage('history', null, onNewTab);
+        }
     });
 }
 

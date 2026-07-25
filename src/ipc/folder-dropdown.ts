@@ -40,6 +40,7 @@ function register(ipcMain, { wm, screen, webContents }) {
                 },
             });
             view.setBackgroundColor('#00000000');
+            try { view.setBorderRadius(12) } catch {}
             wd.window.contentView.addChildView(view);
             wd.folderDropdown   = view;
             wd.folderDropdownId = folderData.id;

@@ -17,13 +17,13 @@ body {
 .card {
   background: var(--surface);
   border: 1px solid var(--border-2);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 10px 12px 9px;
 }
 
 .ctl {
   width: 30px; height: 26px; flex-shrink: 0;
-  border: none; background: transparent; border-radius: 0;
+  border: none; background: transparent; border-radius: var(--radius);
   color: var(--text-2); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: color 0.1s, background 0.1s;
@@ -38,14 +38,14 @@ body {
 
 .art {
   width: 36px; height: 36px; flex-shrink: 0;
-  border-radius: 0; object-fit: cover;
+  border-radius: var(--radius); object-fit: cover;
   border: 1px solid var(--border);
 }
 
 .track {
   position: relative; flex: 1; min-width: 0; height: 32px;
   background: var(--active-bg);
-  border-radius: 0; overflow: hidden; cursor: pointer;
+  border-radius: var(--radius); overflow: hidden; cursor: pointer;
 }
 .fill {
   position: absolute; inset: 0 auto 0 0; width: 0%;
@@ -72,12 +72,12 @@ body {
 
 input[type="range"] {
   -webkit-appearance: none; appearance: none;
-  width: 74px; height: 4px; border-radius: 0;
+  width: 74px; height: 4px; border-radius: var(--radius);
   background: var(--active-bg); outline: none; cursor: pointer;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 11px; height: 11px; border-radius: 0;
+  width: 11px; height: 11px; border-radius: var(--radius);
   background: var(--text); border: none;
 }
 

@@ -120,7 +120,11 @@ function register(ipcMain, { wm, webContents }) {
 
     ipcMain.handle('open-bookmarks-tab', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        if (wd) wd.tabs.createTabWithPage('renderer/Bookmarks/index.html', 'bookmarks', 'Bookmarks');
+        if (wd?.tabs) {
+            const active = wd.tabs.activeTabIndex;
+            const onNewTab = wd.tabs.tabUrls.get(active) === 'newtab';
+            wd.tabs.openInternalPage('bookmarks', null, onNewTab);
+        }
     });
 
     // ── Bookmark-prompt overlay ───────────────────────────────────────────────
@@ -138,6 +142,7 @@ function register(ipcMain, { wm, webContents }) {
                     },
                 });
                 wd.bookmarkPrompt.setBackgroundColor('#00000000');
+                try { wd.bookmarkPrompt.setBorderRadius(12) } catch {}
                 wd.window.contentView.addChildView(wd.bookmarkPrompt);
             }
 

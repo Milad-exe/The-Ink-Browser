@@ -9,29 +9,24 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <canvas id="bg" aria-hidden="true"></canvas>
-  <main class="home">
-    <section class="hero">
-      <div class="meta">
-        <span id="greeting-text">Good afternoon</span>
-        <span class="sep">·</span>
-        <span id="date-display">SATURDAY, JULY 5</span>
-      </div>
+  <div class="scene">
+    <div class="scene-img" aria-hidden="true"></div>
+    <div class="scene-veil" aria-hidden="true"></div>
 
-      <div class="clock" id="time-display">00:00</div>
+    <main class="stage">
+      <div class="dateline" id="dateline">THURSDAY, JULY 23</div>
+      <h1 class="greeting" id="greeting">Good evening.</h1>
+      <p class="wordmark" aria-label="Northstar"><img class="brand-logo" src="../assets/icon.png" alt="">orthstar</p>
 
       <form class="search" id="search-form" autocomplete="off">
-        <svg class="search-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <circle cx="10.5" cy="10.5" r="6.5"/><line x1="15.5" y1="15.5" x2="21" y2="21"/>
+        <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
         </svg>
-        <input class="search-input" id="search-input" type="text" placeholder="Search or enter a URL" spellcheck="false">
+        <input class="search-input" id="search-input" type="text" placeholder="Search the web or enter an address" spellcheck="false">
+        <span class="search-kbd" id="search-kbd">⌘K</span>
       </form>
-    </section>
-  </main>
-
-  <footer class="wordmark" aria-hidden="true">
-    <span class="wm-star">✦</span> NORTHSTAR
-  </footer>
+    </main>
+  </div>
 
   <script src="newtab.js"></script>
 </body>

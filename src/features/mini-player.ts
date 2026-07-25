@@ -102,6 +102,7 @@ function show(wd, tabIndex) {
         },
     });
     view.setBackgroundColor('#00000000');
+    try { view.setBorderRadius(12) } catch {}
     wd.window.contentView.addChildView(view);
     view.webContents.loadFile(resolveAppFile('renderer/MiniPlayer/index.html'));
     view.setBounds(panelBounds(wd));
@@ -150,6 +151,13 @@ async function pushState(wd) {
     let s = null;
     try { s = await tab.webContents.executeJavaScript(READ_STATE_JS, true); } catch {}
     if (!s) {
+        // No media element or session left on the bound tab (it navigated away,
+        // or the media ended and was removed) and nothing is audible — the panel
+        // has nothing left to control, so dismiss it. The 1s poll (or a fresh
+        // media event) reopens it if audio starts again. This is the fix for the
+        // panel lingering after leaving a media page.
+        let audible = false; try { audible = tab.webContents.isCurrentlyAudible(); } catch {}
+        if (!tab.hasPlayingMedia && !audible) { hide(wd); return; }
         let title = ''; try { title = tab.webContents.getTitle() || ''; } catch {}
         s = { title, artist: '', cur: 0, dur: 0, paused: !tab.hasPlayingMedia };
     }

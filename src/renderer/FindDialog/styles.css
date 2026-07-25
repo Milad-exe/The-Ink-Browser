@@ -22,7 +22,7 @@ body {
   display: flex; flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border-2);
-  border-radius: 0; padding: 10px;
+  border-radius: var(--radius); padding: 10px;
   width: 100%; max-width: 264px; gap: 8px;
 }
 
@@ -30,7 +30,7 @@ body {
   width: 100%; border: 1px solid var(--border-2); outline: none;
   font-size: 12.5px; font-family: inherit; padding: 8px 11px;
   background: var(--bg); color: var(--text);
-  border-radius: 0; transition: border-color 0.14s, box-shadow 0.14s;
+  border-radius: var(--radius); transition: border-color 0.14s, box-shadow 0.14s;
 }
 #find-input::placeholder { color: var(--text-3); }
 #find-input:focus { border-color: color-mix(in srgb, var(--accent) 50%, var(--border-2)); }
@@ -43,7 +43,7 @@ body {
 
 .find-btn {
   background: transparent; border: 1px solid var(--border-2);
-  color: var(--text-2); cursor: pointer; padding: 5px 8px; border-radius: 0;
+  color: var(--text-2); cursor: pointer; padding: 5px 8px; border-radius: var(--radius);
   font-size: 11px; font-family: inherit;
   display: flex; align-items: center; justify-content: center;
   min-width: 26px; height: 26px; transition: color 0.1s, background 0.1s, border-color 0.1s;
@@ -55,7 +55,7 @@ body {
 
 .close-btn {
   color: var(--text-3); font-size: 13px; background: transparent; border: none;
-  cursor: pointer; padding: 4px 6px; border-radius: 0; transition: color 0.1s, background 0.1s;
+  cursor: pointer; padding: 4px 6px; border-radius: var(--radius); transition: color 0.1s, background 0.1s;
   font-family: inherit;
 }
 .close-btn:hover { color: var(--text); background: var(--active-bg); }

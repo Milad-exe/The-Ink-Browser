@@ -105,6 +105,44 @@ function preloadForPage(kind) {
     return path.join(base, 'preload.js');
 }
 
+// Internal pages addressable via the northstar:// scheme, e.g. northstar://settings
+// or northstar://settings/appearance. Shown in the omnibox and typeable to navigate.
+const INTERNAL_PAGES = {
+    settings:  { file: 'renderer/Settings/index.html',  title: 'Settings' },
+    history:   { file: 'renderer/History/index.html',   title: 'History' },
+    bookmarks: { file: 'renderer/Bookmarks/index.html', title: 'Bookmarks' },
+};
+const SETTINGS_SECTIONS = ['general', 'appearance', 'focus', 'privacy', 'passwords', 'extensions', 'about'];
+
+// Parse a northstar:// URL → { type, section } (section only for settings), or null.
+function parseNorthstarUrl(raw) {
+    const m = /^northstar:\/\/([a-z]+)(?:\/([a-z]+))?\/?$/i.exec((raw || '').trim());
+    if (!m) return null;
+    const type = m[1].toLowerCase();
+    if (!INTERNAL_PAGES[type]) return null;
+    let section = m[2] ? m[2].toLowerCase() : null;
+    if (!(type === 'settings' && section && SETTINGS_SECTIONS.includes(section))) section = null;
+    return { type, section };
+}
+
+// The stored/display "url token" for an internal tab: 'settings', 'settings/appearance', …
+function internalTokenFor(fileUrl) {
+    let type = null;
+    if (fileUrl.includes('/Settings/index.html'))       type = 'settings';
+    else if (fileUrl.includes('/Bookmarks/index.html')) type = 'bookmarks';
+    else if (fileUrl.includes('/History/index.html'))   type = 'history';
+    if (!type) return null;
+    let section = '';
+    if (type === 'settings') {
+        try { section = new URL(fileUrl).hash.replace(/^#/, '').toLowerCase(); } catch {}
+        // 'general' is the default section — it stays the bare northstar://settings.
+        if (!SETTINGS_SECTIONS.includes(section) || section === 'general') section = '';
+    }
+    return section ? `${type}/${section}` : type;
+}
+
+export { parseNorthstarUrl };
+
 // A browser tab is an Electron WebContentsView plus the tab-specific state the
 // browser attaches to it.
 export interface TabView extends WebContentsView {
@@ -281,6 +319,7 @@ class Tabs {
         }
 
         const tab: TabView = new WebContentsView({ webPreferences: webPrefs });
+        try { tab.setBorderRadius(Tabs.PAGE_RADIUS) } catch {}
         if (makePrivate) {
             tab.webContents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
             tab.privateSession = webPrefs.session; // wiped when the tab closes
@@ -469,6 +508,7 @@ class Tabs {
         }
 
         const tab: TabView = new WebContentsView({ webPreferences: webPrefs })
+        try { tab.setBorderRadius(Tabs.PAGE_RADIUS) } catch {}
         if (makePrivate) {
             tab.webContents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
             tab.privateSession = webPrefs.session; // wiped when the tab closes
@@ -585,7 +625,26 @@ class Tabs {
         return tabIndex
     }
 
-    createTabWithPage(pagePath, pageType, pageTitle) {
+    // Open an internal page (settings/history/bookmarks) via the northstar://
+    // scheme. replaceActive replaces the current tab in place (used when a
+    // northstar:// url is typed, or when the current tab is the new-tab page) —
+    // internal pages can't just navigate an existing tab because Settings needs
+    // its own privileged preload, chosen at tab creation.
+    openInternalPage(type, section = null, replaceActive = false) {
+        const page = INTERNAL_PAGES[type];
+        if (!page) return null;
+        const activeIdx = this.activeTabIndex;
+        const canReplace = replaceActive && this.tabMap.has(activeIdx);
+        const newIdx = this.createTabWithPage(page.file, type, page.title, {
+            section,
+            insertAfter: canReplace ? activeIdx : null,
+        });
+        if (canReplace && newIdx !== activeIdx) this.removeTab(activeIdx);
+        return newIdx;
+    }
+
+    createTabWithPage(pagePath, pageType, pageTitle, opts: any = {}) {
+        const section = opts.section || null;
         const tabIndex = this.nextTabIndex
         this.nextTabIndex++
 
@@ -597,8 +656,9 @@ class Tabs {
                 nodeIntegration: false
             }
         })
+        try { tab.setBorderRadius(Tabs.PAGE_RADIUS) } catch {}
         this.mainWindow.contentView.addChildView(tab)
-        tab.webContents.loadFile(resolveAppFile(pagePath))
+        tab.webContents.loadFile(resolveAppFile(pagePath), section ? { hash: section } : undefined)
         this.raiseFloatingViews()
 
         UserAgent.setupTab(tab)
@@ -610,20 +670,28 @@ class Tabs {
 
         tab.lazyTitle = pageTitle || pageType;
 
+        const token = section ? `${pageType}/${section}` : pageType;
         this.tabMap.set(tabIndex, tab)
-        this.tabUrls.set(tabIndex, pageType)
-        this.tabOrder.push(tabIndex)
+        this.tabUrls.set(tabIndex, token)
+
+        // Position: after a given tab (for in-place replacement of the new-tab
+        // page), otherwise append.
+        const afterPos = (opts.insertAfter != null) ? this.tabOrder.indexOf(opts.insertAfter) : -1;
+        if (afterPos !== -1) this.tabOrder.splice(afterPos + 1, 0, tabIndex);
+        else                 this.tabOrder.push(tabIndex);
+
         this.activeTabIndex = tabIndex
-        this.navigationHistory.initializeTab(tabIndex, pageType)
+        this.navigationHistory.initializeTab(tabIndex, token)
         this.setupTabListeners(tabIndex, tab)
-        
+
         this.mainWindow.webContents.send('tab-created', {
             index: tabIndex,
             title: pageTitle || pageType,
-            totalTabs: this.tabMap.size
+            totalTabs: this.tabMap.size,
+            afterIndex: afterPos !== -1 ? opts.insertAfter : null,
         })
-        
-        this.sendTabUpdate(tabIndex, tab, pageType, pageTitle);
+
+        this.sendTabUpdate(tabIndex, tab, token, pageTitle);
         
         this.showTab(tabIndex)
 
@@ -655,20 +723,34 @@ class Tabs {
         try { tab.setBackgroundColor(internal ? '#00000000' : '#ffffff'); } catch {}
     }
 
+    // Shell margin around the floating page card (matches the CSS shell padding
+    // in Browser/styles.css). Redesign: the page floats in a rounded card on a
+    // tinted shell, Arc-style, instead of filling the window edge-to-edge.
+    static SHELL_PAD = 8;
+    static PAGE_RADIUS = 12;
+
+    // 0 while a video (or the OS) is truly fullscreen — the page must be
+    // edge-to-edge and square there; otherwise the rounded floating card.
+    _pageRadius() {
+        const fs = this.isHtmlFullScreen || (this.mainWindow && this.mainWindow.isSimpleFullScreen && this.mainWindow.isSimpleFullScreen());
+        return fs ? 0 : Tabs.PAGE_RADIUS;
+    }
+
     getTabBounds() {
         const contentBounds = this.mainWindow.getContentBounds()
-        
+
         if (this.mainWindow && (this.isHtmlFullScreen || this.mainWindow.isSimpleFullScreen())) {
             return { x: 0, y: 0, width: contentBounds.width, height: contentBounds.height };
         }
-        
+
         // tab-bar (42px) + utility-bar (52px) + optional bookmark-bar (30px)
+        const pad = Tabs.SHELL_PAD;
         const yOffset = 94 + (this.bookmarkBarHeight || 0)
-        let width = contentBounds.width
-        let height = contentBounds.height - yOffset
+        let width = contentBounds.width - pad * 2
+        let height = contentBounds.height - yOffset - pad
         if (width < 0) width = 0;
         if (height < 0) height = 0;
-        return { x: 0, y: yOffset, width: Math.floor(width), height: Math.floor(height) }
+        return { x: pad, y: yOffset, width: Math.floor(width), height: Math.floor(height) }
     }
 
     isYouTubeUrl(url) {
@@ -768,21 +850,30 @@ class Tabs {
                     }
                     this.saveStateDebounced()
                 }
+            } else if (url.includes('/Error/index.html')) {
+                // Error page: keep the FAILED url in the address bar so the user
+                // can retry/edit it (Chrome/Firefox behavior) — never blank it.
+                let failed = '';
+                try { failed = new URL(url).searchParams.get('url') || ''; } catch {}
+                this.tabUrls.set(tabIndex, failed)
+                lastAddedUrl = failed;
+                this.sendTabUpdate(tabIndex, tab, failed, tab.webContents.getTitle() || 'Error')
+                this.sendNavigationUpdate(tabIndex)
             } else if (url.startsWith('file://')) {
-                let resolvedType = 'newtab';
-                if (url.includes('/Settings/index.html')) resolvedType = 'settings';
-                else if (url.includes('/Bookmarks/index.html')) resolvedType = 'bookmarks';
-                else if (url.includes('/History/index.html')) resolvedType = 'history';
+                // Internal page → a northstar:// token (e.g. 'settings/appearance'),
+                // else the plain new-tab page.
+                const token = internalTokenFor(url) || 'newtab';
+                const base = token.split('/')[0];
 
-                this.tabUrls.set(tabIndex, resolvedType)
-                lastAddedUrl = resolvedType;
+                this.tabUrls.set(tabIndex, token)
+                lastAddedUrl = token;
 
                 let title = 'New Tab';
-                if (resolvedType === 'settings') title = 'Settings';
-                else if (resolvedType === 'bookmarks') title = 'Bookmarks';
-                else if (resolvedType === 'history') title = 'History';
+                if (base === 'settings') title = 'Settings';
+                else if (base === 'bookmarks') title = 'Bookmarks';
+                else if (base === 'history') title = 'History';
 
-                this.sendTabUpdate(tabIndex, tab, resolvedType, title)
+                this.sendTabUpdate(tabIndex, tab, token, title)
                 this.sendNavigationUpdate(tabIndex)
             }
 
@@ -804,7 +895,16 @@ class Tabs {
         });
         
         tab.webContents.on('did-navigate-in-page', (event, url) => {
-            if (!url.startsWith('file://') && !isNavigatingProgrammatically) {
+            // Settings section switches change the hash — reflect the new
+            // northstar://settings/<section> token in the omnibox live.
+            const internalToken = url.startsWith('file://') ? internalTokenFor(url) : null;
+            if (internalToken) {
+                if (this.tabUrls.get(tabIndex) !== internalToken) {
+                    this.tabUrls.set(tabIndex, internalToken)
+                    lastAddedUrl = internalToken;
+                    this.sendTabUpdate(tabIndex, tab, internalToken, tab.webContents.getTitle())
+                }
+            } else if (!url.startsWith('file://') && !isNavigatingProgrammatically) {
                 const currentUrl = this.tabUrls.get(tabIndex);
                 if (currentUrl !== url && lastAddedUrl !== url) {
                     this.tabUrls.set(tabIndex, url)
@@ -987,14 +1087,24 @@ class Tabs {
         let displayUrl = url;
         let displayTitle = title || this.computeDisplayTitleFor(tabIndex) || "New Tab";
         
-        let isInternal = ['newtab', 'settings', 'bookmarks', 'history'].includes(url) || (url && url.startsWith('file://'));
+        // Internal pages: settings/bookmarks/history (and settings/<section>)
+        // keep their token so the omnibox can show it as a northstar:// url;
+        // the new-tab page and any bare file:// url show a blank address bar.
+        const base = (typeof url === 'string' ? url.split('/')[0] : '');
+        const isInternalToken = ['settings', 'bookmarks', 'history'].includes(base);
+        const isBlankInternal = url === 'newtab' || (url && url.startsWith('file://') && !isInternalToken);
 
-        if (isInternal) {
+        if (isBlankInternal) {
             displayUrl = '';
-            if (url === 'settings' || (url && url.includes('/Settings/index.html'))) displayTitle = 'Settings';
-            else if (url === 'bookmarks' || (url && url.includes('/Bookmarks/index.html'))) displayTitle = 'Bookmarks';
-            else if (url === 'history' || (url && url.includes('/History/index.html'))) displayTitle = 'History';
+            if (url && url.includes('/Settings/index.html')) displayTitle = 'Settings';
+            else if (url && url.includes('/Bookmarks/index.html')) displayTitle = 'Bookmarks';
+            else if (url && url.includes('/History/index.html')) displayTitle = 'History';
             else displayTitle = 'New Tab';
+        } else if (isInternalToken) {
+            displayUrl = url;   // 'settings' / 'settings/appearance' / 'history' / 'bookmarks'
+            if (base === 'settings') displayTitle = 'Settings';
+            else if (base === 'bookmarks') displayTitle = 'Bookmarks';
+            else if (base === 'history') displayTitle = 'History';
         }
         
         // Provide a default favicon instantly for http/https URLs to prevent empty gaps
@@ -1098,6 +1208,7 @@ class Tabs {
             // Background tabs skip live resizing (see resizeAllTabs) — catch up
             // on the current bounds before this one becomes visible.
             tab.setBounds(this.getTabBounds())
+            try { tab.setBorderRadius(this._pageRadius()) } catch {}
             tab.setVisible(true)
             // Sleep bookkeeping: the outgoing tab starts ageing now; the incoming
             // tab is fresh. Wake it if the sleep scan discarded its renderer.
@@ -1149,7 +1260,7 @@ class Tabs {
             
             this.mainWindow.webContents.send('tab-switched', {
                 index: index,
-                url: (currentUrl === 'newtab' || currentUrl === 'history') ? '' : currentUrl,
+                url: currentUrl === 'newtab' ? '' : currentUrl,
                 totalTabs: this.tabMap.size
             })
             
@@ -1181,6 +1292,17 @@ class Tabs {
     }
     
     loadUrl(index, url) {
+        // northstar:// internal pages: typing one navigates the current tab to
+        // that page (Settings/History/Bookmarks need their own preload, so the
+        // active tab is replaced in place rather than merely navigated).
+        const internal = parseNorthstarUrl(url);
+        if (internal) {
+            const prevActive = this.activeTabIndex;
+            this.activeTabIndex = index;
+            this.openInternalPage(internal.type, internal.section, true);
+            if (!this.tabMap.has(this.activeTabIndex)) this.activeTabIndex = prevActive;
+            return;
+        }
         if (this.tabMap.has(index)) {
             const tab = this.tabMap.get(index)
             tab.slept = false; // loading revives a slept (discarded) renderer
@@ -1275,8 +1397,17 @@ class Tabs {
             }
 
             if (this.tabMap.size === 0) {
-                this.allowClose = true;
-                this.mainWindow.close();
+                // Defer + re-check on the next tick: guards against a transient
+                // empty state during rapid tab operations (double-close races,
+                // replace-in-place) closing the whole window spuriously. If a tab
+                // exists again by then, the window stays. Imperceptible on a
+                // genuine last-tab close.
+                setImmediate(() => {
+                    if (!this.mainWindow.isDestroyed() && this.tabMap.size === 0) {
+                        this.allowClose = true;
+                        this.mainWindow.close();
+                    }
+                });
             }
             this.saveStateDebounced()
         }
@@ -1308,8 +1439,17 @@ class Tabs {
             });
             
             if (this.tabMap.size === 0) {
-                this.allowClose = true;
-                this.mainWindow.close();
+                // Defer + re-check on the next tick: guards against a transient
+                // empty state during rapid tab operations (double-close races,
+                // replace-in-place) closing the whole window spuriously. If a tab
+                // exists again by then, the window stays. Imperceptible on a
+                // genuine last-tab close.
+                setImmediate(() => {
+                    if (!this.mainWindow.isDestroyed() && this.tabMap.size === 0) {
+                        this.allowClose = true;
+                        this.mainWindow.close();
+                    }
+                });
             } else {
                 if (wasActive) {
                     const target = (nextActive !== null && this.tabMap.has(nextActive))
@@ -1487,8 +1627,12 @@ class Tabs {
         // each relayout + repaint on every setBounds — with many tabs open
         // that turns window resizing into a jank festival. Hidden tabs get
         // their bounds applied in showTab() the moment they become visible.
+        const radius = this._pageRadius();
         this.tabMap.forEach((tab, index) => {
-            if (index === this.activeTabIndex) tab.setBounds(bounds)
+            if (index === this.activeTabIndex) {
+                tab.setBounds(bounds)
+                try { tab.setBorderRadius(radius) } catch {}
+            }
         })
     }
 

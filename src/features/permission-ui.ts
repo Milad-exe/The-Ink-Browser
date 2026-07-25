@@ -86,6 +86,7 @@ async function showNext(wd) {
             },
         });
         view.setBackgroundColor('#00000000');
+        try { view.setBorderRadius(12) } catch {}
         wd.permView = view;
         wd.window.contentView.addChildView(view);
         view.webContents.loadFile(resolveAppFile('renderer/PermissionPrompt/index.html'));

@@ -128,6 +128,24 @@ document.addEventListener('DOMContentLoaded', () => {
     initExtensions();
     initUtilityBarConfig();
     initReaderAndPip();
+    initChromeClock();
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Chrome status clock (tab strip) — updates on the minute, no seconds timer
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function initChromeClock() {
+        const el = document.getElementById('chrome-clock');
+        if (!el) return;
+        const paint = () => {
+            const n = new Date();
+            const h = n.getHours(), m = n.getMinutes();
+            el.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        };
+        paint();
+        // Align to the top of the next minute, then tick each minute.
+        setTimeout(() => { paint(); setInterval(paint, 60000); }, (60 - new Date().getSeconds()) * 1000);
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Window controls
@@ -265,7 +283,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 // (Firefox preserves it until you actually navigate).
                 searchBar.select();
             } else {
-                if (currentTabUrl && searchBar.value !== currentTabUrl) searchBar.value = currentTabUrl;
+                const shown = restingValueFor(currentTabUrl);
+                if (currentTabUrl && searchBar.value !== shown) searchBar.value = shown;
                 searchBar.select();
             }
         });
@@ -427,11 +446,21 @@ document.addEventListener('DOMContentLoaded', () => {
             commitNavigation(searchBar.value);
             return;
         }
+        // Escape (single press): close suggestions AND revert the bar to the
+        // current page's URL, keeping focus — Firefox behavior.
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            hideSuggestions();
+            barEdited = false; userTyping = false;
+            searchBar.value = restingValueFor(currentTabUrl);
+            searchBar.select();
+            updateOmniboxIcon();
+            return;
+        }
         if (currentSuggestions.length) {
             if (e.key === 'ArrowDown')  { e.preventDefault(); setActiveSuggestion(activeSuggestionIndex + 1); return; }
             if (e.key === 'ArrowUp')    { e.preventDefault(); setActiveSuggestion(activeSuggestionIndex - 1); return; }
             if (e.key === 'Tab')        { e.preventDefault(); setActiveSuggestion(activeSuggestionIndex + (e.shiftKey ? -1 : 1)); return; }
-            if (e.key === 'Escape')     { e.preventDefault(); hideSuggestions(); return; }
             if (e.key === 'Enter' && activeSuggestionIndex >= 0) {
                 e.preventDefault();
                 const item = currentSuggestions[activeSuggestionIndex];
@@ -444,15 +473,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 handleSuggestionSelect(activeSuggestionIndex); return;
             }
-        } else if (e.key === 'Escape') {
-            // Popup already closed: a second Escape reverts the bar to the
-            // page URL, keeping focus (Firefox behaviour).
-            e.preventDefault();
-            barEdited = false; userTyping = false;
-            searchBar.value = currentTabUrl || '';
-            searchBar.select();
-            updateOmniboxIcon();
-            return;
         }
         if (e.key === 'Enter') {
             const url = searchBar.value.trim();
@@ -705,7 +725,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function loadUrlInActiveTab(url) {
         let formatted = url;
-        if (!/^https?:\/\//i.test(url)) {
+        if (/^northstar:\/\//i.test(url.trim())) {
+            formatted = url.trim();   // internal page — navigate, don't search
+        } else if (!/^https?:\/\//i.test(url)) {
             if (url.includes('.') && !url.includes(' ')) {
                 formatted = 'https://' + url;
             } else {
@@ -724,6 +746,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function getDomainDisplay(url) {
         if (!url || url === 'newtab' || url.startsWith('file://')) return url || '';
         return window.urlUtils?.getDomain(url) || url;
+    }
+
+    // Internal pages carry a token like 'settings' / 'settings/appearance' /
+    // 'history' / 'bookmarks' — shown in the omnibox as a northstar:// URL.
+    // Also passes through an already-formed northstar:// url (optimistic value
+    // set the instant one is typed, before the tab reports its token back).
+    function northstarDisplay(token) {
+        if (!token) return null;
+        const t = String(token);
+        if (/^northstar:\/\//i.test(t)) return t;
+        const base = t.split('/')[0];
+        return (base === 'settings' || base === 'history' || base === 'bookmarks')
+            ? 'northstar://' + t : null;
     }
 
     // ── Firefox-style resting URL display ─────────────────────────────────────
@@ -749,7 +784,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Resting input value: the full URL for http(s) pages, the legacy domain
     // fallback for internal pages (newtab, file://).
     function restingValueFor(url) {
-        return urlDisplayParts(url) ? url : getDomainDisplay(url);
+        return northstarDisplay(url) || (urlDisplayParts(url) ? url : getDomainDisplay(url));
     }
 
     function updateUrlDisplay() {
@@ -777,11 +812,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (barEdited && url === currentTabUrl) return;
         barEdited = false;
         currentTabUrl = url || ''; // callers re-assign right after; needed here so the display check is coherent
-        if (document.activeElement !== searchBar) {
-            searchBar.value = restingValueFor(url);
-        } else {
-            searchBar.value = url;
-        }
+        // Internal tokens surface as their northstar:// url in both states.
+        searchBar.value = restingValueFor(url);
         updateUrlDisplay();
         updateOmniboxIcon();
         hideSuggestions();
@@ -2438,6 +2470,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Close the panel AND any open action popup on clicks outside
         // (chrome or page content) — mirrors Firefox dismissal behavior.
+        // Capture phase: other toolbar buttons (menu, downloads…) stopPropagation
+        // in their own handlers, so a bubble-phase listener would never see the
+        // click. Capture runs first, so opening the menu also dismisses us.
         // Clicks inside the action strip (or our synthetic activation clicks)
         // are the ones OPENING a popup — those must not dismiss it.
         window.addEventListener('click', (e: any) => {
@@ -2445,7 +2480,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const insideActionStrip = typeof e.composedPath === 'function' &&
                 e.composedPath().some((n: any) => n && n.tagName === 'BROWSER-ACTION-LIST');
             if (!insideActionStrip) window.extensionsUI.closeActionPopup();
-        });
+        }, true);
         if (window.contentInteraction) {
             window.contentInteraction.onClicked(() => {
                 if (panelOpen) window.extensionsUI.closePanel();
@@ -2493,10 +2528,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (item && item.state === 'completed' && !panelOpen) btn.classList.add('has-new');
         });
 
-        // Close the panel on clicks outside the button (chrome or page content)
+        // Close the panel on clicks outside the button (chrome or page content).
+        // Capture phase so other toolbar buttons' stopPropagation can't shield us.
         window.addEventListener('click', (e) => {
             if (panelOpen && !btn.contains(e.target)) window.downloads.closePanel();
-        });
+        }, true);
         if (window.contentInteraction) {
             window.contentInteraction.onClicked(() => { if (panelOpen) window.downloads.closePanel(); });
         }

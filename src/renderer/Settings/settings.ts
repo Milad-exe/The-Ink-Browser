@@ -7,28 +7,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     try { settings = await window.northstarSettings.get(); } catch {}
 
     // ── Sidebar navigation ─────────────────────────────────────────────────
+    // Sections are addressable as northstar://settings/<section>. The URL hash
+    // is the source of truth: switching a nav item sets location.hash, which the
+    // main process turns into the omnibox token; opening a section URL sets the
+    // hash, which selects the section here.
     const navItems = document.querySelectorAll('.nav-item');
     const sections = document.querySelectorAll('.section');
+    const hasSection = (s) => !!document.querySelector(`.nav-item[data-section="${s}"]`);
 
-    // Restore last active section
-    const savedSection = settings.settingsPage || 'general';
-    const savedNavItem = document.querySelector(`.nav-item[data-section="${savedSection}"]`);
-    if (savedNavItem) {
+    function activateSection(section) {
+        if (!hasSection(section)) return;
         navItems.forEach(n => n.classList.remove('active'));
         sections.forEach(s => s.classList.remove('active'));
-        savedNavItem.classList.add('active');
-        const savedSectionEl = document.getElementById('section-' + savedSection);
-        if (savedSectionEl) savedSectionEl.classList.add('active');
+        document.querySelector(`.nav-item[data-section="${section}"]`).classList.add('active');
+        document.getElementById('section-' + section)?.classList.add('active');
     }
+    const currentHash = () => (location.hash || '').replace(/^#/, '').toLowerCase();
+
+    // Initial section: URL hash wins (northstar://settings/<section>), else the
+    // base 'general' — so the northstar:// URLs stay deterministic.
+    const initial = (currentHash() && hasSection(currentHash())) ? currentHash() : 'general';
+    activateSection(initial);
+    if (currentHash() !== initial) location.hash = initial;
 
     navItems.forEach(item => {
         item.addEventListener('click', () => {
-            navItems.forEach(n => n.classList.remove('active'));
-            sections.forEach(s => s.classList.remove('active'));
-            item.classList.add('active');
-            document.getElementById('section-' + item.dataset.section).classList.add('active');
-            save('settingsPage', item.dataset.section);
+            const section = item.dataset.section;
+            activateSection(section);
+            save('settingsPage', section);
+            if (currentHash() !== section) location.hash = section; // updates the omnibox
         });
+    });
+
+    window.addEventListener('hashchange', () => {
+        const s = currentHash();
+        if (s && hasSection(s)) activateSection(s);
     });
 
     // ── Toast helper ───────────────────────────────────────────────────────

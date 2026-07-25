@@ -1,93 +1,127 @@
 /* renderer/themes.css
  *
- * Four palettes, one brutalist aesthetic: airy surfaces, hard square edges,
- * quiet borders, mono micro-labels, tight heavy display type.
+ * Northstar redesign — a soft, cinematic "floating shell" language:
+ * the chrome sits on a tinted shell, the page floats in a rounded card with a
+ * gentle shadow, tabs are rounded pills, and one accent gradient (blue→violet
+ * by default) threads through the brand mark, active states, and focus rings.
  *
- *   default   — Northstar · ink black, faded silver, blood-wine accent (dark)
+ *   default   — Northstar · slate shell, blue→violet aurora (dark)
  *   fathom    — Fathom    · abyssal navy, arctic mist (dark)
- *   porcelain — Porcelain · warm grey-lilac (light)
- *   dune      — Dune      · cream & silent navy, sandy amber (light)
+ *   porcelain — Porcelain · warm paper light, blue accent (light)
+ *   dune      — Dune      · cream & silent navy, amber accent (light)
+ *
+ * Token groups:
+ *   --shell / --page          the floating-shell surfaces (see Browser/styles)
+ *   --bg/--surface/--surface-2 layered fills (bg = deepest)
+ *   --text/-2/-3              primary / secondary / tertiary ink
+ *   --border/-2, --hover, --active-bg   hairlines & interaction washes
+ *   --accent/--accent-2, --accent-wash  the aurora gradient + its soft halo
+ *   --radius / --radius-lg / --radius-pill   the rounded-corner scale
  */
 
 :root {
-  /* Northstar (default) — ink black; sleek, high-contrast, wine accent */
-  --bg:        #090909;
-  --surface:   #131111;
-  --surface-2: #1c1919;
-  --text:      #e6e4e4;
-  --text-2:    #acacac;
-  --text-3:    #4a4747;
-  --border:    rgba(172,172,172,0.09);
-  --border-2:  rgba(172,172,172,0.16);
-  --hover:     rgba(172,172,172,0.06);
-  --active-bg: rgba(172,172,172,0.11);
-  --accent:    #a63d4a;
-  --danger:    #c94f5c;
+  /* Northstar (default) — deep slate shell, aurora blue→violet */
+  --shell:     #14161d;
+  --page:      #1b1e27;
+  --bg:        #1b1e27;
+  --surface:   #22262f;
+  --surface-2: #2b2f3a;
+  --text:      #eceef4;
+  --text-2:    #9498a8;
+  --text-3:    #5a5f6e;
+  --border:    rgba(255,255,255,0.08);
+  --border-2:  rgba(255,255,255,0.14);
+  --hover:     rgba(255,255,255,0.06);
+  --active-bg: rgba(255,255,255,0.10);
+  --accent:    #5e7cff;
+  --accent-2:  #9d7bff;
+  --accent-wash: rgba(94,124,255,0.22);
+  --danger:    #f4635e;
   --font:      'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --mono:      'Space Mono', 'SF Mono', monospace;
+  --mono:      'Space Mono', 'SF Mono', ui-monospace, monospace;
+
+  --radius:      10px;   /* tabs, buttons, rails */
+  --radius-lg:   16px;   /* page card, panels */
+  --radius-pill: 999px;
 }
 
 html[data-theme="fathom"] {
-  /* Fathom — abyssal navy, cold current, arctic mist */
-  --bg:        #01162b;
-  --surface:   #082036;
-  --surface-2: #0e2a44;
-  --text:      #d2dbeb;
-  --text-2:    #94a2bf;
-  --text-3:    #46618a;
-  --border:    rgba(148,162,191,0.10);
-  --border-2:  rgba(148,162,191,0.18);
-  --hover:     rgba(148,162,191,0.07);
-  --active-bg: rgba(148,162,191,0.13);
-  --accent:    #6a90b4;
-  --danger:    #e05c6e;
+  /* Fathom — abyssal navy shell, cold cyan current */
+  --shell:     #061321;
+  --page:      #0a1a2c;
+  --bg:        #0a1a2c;
+  --surface:   #10233a;
+  --surface-2: #173047;
+  --text:      #d8e2f0;
+  --text-2:    #8aa0bd;
+  --text-3:    #4f6684;
+  --border:    rgba(160,190,225,0.10);
+  --border-2:  rgba(160,190,225,0.18);
+  --hover:     rgba(160,190,225,0.07);
+  --active-bg: rgba(160,190,225,0.13);
+  --accent:    #43c7e8;
+  --accent-2:  #5e7cff;
+  --accent-wash: rgba(67,199,232,0.20);
+  --danger:    #f0687a;
 }
 
 html[data-theme="porcelain"] {
-  /* Porcelain — soft warm grey-lilac light; gentle contrast, paper-like */
-  --bg:        #eceaee;
-  --surface:   #f8f7fa;
-  --surface-2: #e2dfe5;
-  --text:      #1c1b1f;
-  --text-2:    #6d6a75;
-  --text-3:    #a9a6b1;
-  --border:    rgba(28,27,31,0.08);
-  --border-2:  rgba(28,27,31,0.14);
-  --hover:     rgba(28,27,31,0.05);
-  --active-bg: rgba(28,27,31,0.08);
-  --accent:    #3f7ce0;
-  --danger:    #d24d43;
+  /* Porcelain — warm paper light, blue→violet accent */
+  --shell:     #e7e9ef;
+  --page:      #ffffff;
+  --bg:        #ffffff;
+  --surface:   #f5f6fa;
+  --surface-2: #eceef4;
+  --text:      #1a1c26;
+  --text-2:    #6b6f7e;
+  --text-3:    #a2a6b4;
+  --border:    rgba(16,20,40,0.09);
+  --border-2:  rgba(16,20,40,0.14);
+  --hover:     rgba(16,20,40,0.05);
+  --active-bg: rgba(16,20,40,0.07);
+  --accent:    #5e7cff;
+  --accent-2:  #9d7bff;
+  --accent-wash: rgba(94,124,255,0.14);
+  --danger:    #f4635e;
 }
 
 html[data-theme="dune"] {
-  /* Dune — light cream, silent navy ink, sandy amber warmth */
-  --bg:        #fcedd3;
-  --surface:   #fdf4e2;
-  --surface-2: #f3e2c4;
-  --text:      #102a6b;
-  --text-2:    #4a5c94;
-  --text-3:    #a5987f;
-  --border:    rgba(16,42,107,0.12);
-  --border-2:  rgba(16,42,107,0.20);
-  --hover:     rgba(16,42,107,0.06);
-  --active-bg: rgba(16,42,107,0.10);
-  --accent:    #015185;
-  --danger:    #b8442f;
+  /* Dune — light cream shell, silent navy ink, sandy amber warmth */
+  --shell:     #f0e2c8;
+  --page:      #fdf6ea;
+  --bg:        #fdf6ea;
+  --surface:   #f7edd9;
+  --surface-2: #efe1c5;
+  --text:      #14306b;
+  --text-2:    #55689a;
+  --text-3:    #a99a7d;
+  --border:    rgba(20,48,107,0.12);
+  --border-2:  rgba(20,48,107,0.20);
+  --hover:     rgba(20,48,107,0.06);
+  --active-bg: rgba(20,48,107,0.10);
+  --accent:    #e0872f;
+  --accent-2:  #c25d3a;
+  --accent-wash: rgba(224,135,47,0.18);
+  --danger:    #c2492f;
 }
 
-/* ── Private mode — polar-opposite lavender/violet palette ── */
+/* ── Private mode — lavender/violet, unmistakably distinct ── */
 html[data-private-window="true"],
 html[data-private-tab="true"] {
-  --bg:        #f0ebff;
-  --surface:   #e6deff;
-  --surface-2: #dcd4ff;
-  --text:      #180a40;
-  --text-2:    #6b4da8;
-  --text-3:    #c4b0e8;
-  --border:    rgba(110,70,200,0.14);
-  --border-2:  rgba(110,70,200,0.24);
-  --hover:     rgba(110,70,200,0.07);
-  --active-bg: rgba(110,70,200,0.13);
-  --accent:    #7c3aed;
-  --danger:    #c03060;
+  --shell:     #241a3d;
+  --page:      #2c2148;
+  --bg:        #2c2148;
+  --surface:   #362a56;
+  --surface-2: #413466;
+  --text:      #ece4ff;
+  --text-2:    #b3a2d8;
+  --text-3:    #7a6aa8;
+  --border:    rgba(180,150,240,0.14);
+  --border-2:  rgba(180,150,240,0.24);
+  --hover:     rgba(180,150,240,0.09);
+  --active-bg: rgba(180,150,240,0.15);
+  --accent:    #a78bfa;
+  --accent-2:  #7c3aed;
+  --accent-wash: rgba(167,139,250,0.22);
+  --danger:    #f0688a;
 }

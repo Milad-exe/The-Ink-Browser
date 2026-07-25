@@ -32,6 +32,7 @@ async function ensureView(wd) {
         },
     });
     view.setBackgroundColor('#00000000');
+    try { view.setBorderRadius(12) } catch {}
     view.setVisible(false);
     wd.suggestions = view;
     wd.window.contentView.addChildView(view);

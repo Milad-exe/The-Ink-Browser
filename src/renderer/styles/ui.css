@@ -44,6 +44,8 @@
   --color-*: initial;
 
   --color-base:      var(--bg);
+  --color-shell:     var(--shell);
+  --color-page:      var(--page);
   --color-surface:   var(--surface);
   --color-surface-2: var(--surface-2);
   --color-primary:   var(--text);
@@ -54,8 +56,13 @@
   --color-hover:     var(--hover);
   --color-active:    var(--active-bg);
   --color-accent:    var(--accent);
+  --color-accent-2:  var(--accent-2);
   --color-danger:    var(--danger);
 
   --font-sans: var(--font);
   --font-mono: var(--mono);
+
+  --radius-DEFAULT: var(--radius);
+  --radius-lg:      var(--radius-lg);
+  --radius-pill:    var(--radius-pill);
 }

@@ -39,6 +39,7 @@ async function ensurePanel(wd) {
         },
     });
     view.setBackgroundColor('#00000000');
+    try { view.setBorderRadius(12) } catch {}
     view.setVisible(false);
     wd.downloadsPanel = view;
     wd.window.contentView.addChildView(view);
