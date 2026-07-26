@@ -33,9 +33,9 @@
   --border-2:  rgba(255,255,255,0.14);
   --hover:     rgba(255,255,255,0.06);
   --active-bg: rgba(255,255,255,0.10);
-  --accent:    #5e7cff;
-  --accent-2:  #9d7bff;
-  --accent-wash: rgba(94,124,255,0.22);
+  --accent:    #e0894a;
+  --accent-2:  #c8613a;
+  --accent-wash: rgba(224,137,74,0.20);
   --danger:    #f4635e;
   --font:      'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono:      'Space Mono', 'SF Mono', ui-monospace, monospace;
@@ -59,9 +59,9 @@ html[data-theme="fathom"] {
   --border-2:  rgba(160,190,225,0.18);
   --hover:     rgba(160,190,225,0.07);
   --active-bg: rgba(160,190,225,0.13);
-  --accent:    #43c7e8;
-  --accent-2:  #5e7cff;
-  --accent-wash: rgba(67,199,232,0.20);
+  --accent:    #e0894a;
+  --accent-2:  #c8613a;
+  --accent-wash: rgba(224,137,74,0.20);
   --danger:    #f0687a;
 }
 
@@ -79,9 +79,9 @@ html[data-theme="porcelain"] {
   --border-2:  rgba(16,20,40,0.14);
   --hover:     rgba(16,20,40,0.05);
   --active-bg: rgba(16,20,40,0.07);
-  --accent:    #5e7cff;
-  --accent-2:  #9d7bff;
-  --accent-wash: rgba(94,124,255,0.14);
+  --accent:    #cf7338;
+  --accent-2:  #b0502c;
+  --accent-wash: rgba(207,115,56,0.14);
   --danger:    #f4635e;
 }
 
