@@ -389,6 +389,7 @@ class Tabs {
         if (eager && /^https?:/i.test(url || '')) {
             tab.lazyLoaded = true;
             tab.mutedUntilShown = true;
+            tab.bgHoldMedia = true; // hold background autoplay until first viewed
             try {
                 tab.webContents.audioMuted = true;
             }
@@ -567,6 +568,13 @@ class Tabs {
             if (activeTab) {
                 activeTab.setVisible(true);
             }
+            // Opened in the background (e.g. a link/video opened in a new tab):
+            // keep it muted and HOLD any media until the user actually views it,
+            // so it can't autoplay in the background. Both flags clear on first
+            // showTab. (media-started-playing pauses held media.)
+            tab.mutedUntilShown = true;
+            tab.bgHoldMedia = true;
+            try { tab.webContents.audioMuted = true; } catch { }
         }
         this.saveStateDebounced();
         this.sendTabUpdate(tabIndex, tab, '', 'New Tab');
@@ -1040,6 +1048,18 @@ class Tabs {
         // Picture-in-Picture is only offered while media is actually playing.
         // Track a per-tab flag and tell the chrome to show/hide the PiP button.
         tab.webContents.on('media-started-playing', () => {
+            // A background-opened tab the user hasn't viewed yet must not play
+            // media on its own — muted autoplay, or user-activation inherited from
+            // the click that opened the tab, can otherwise start a video in the
+            // background. Pause it and don't mark it as playing; showTab clears the
+            // hold, so it plays normally once the user actually opens the tab.
+            if (tab.bgHoldMedia && tabIndex !== this.activeTabIndex) {
+                try {
+                    tab.webContents.executeJavaScript("(()=>{try{document.querySelectorAll('video,audio').forEach(m=>{try{m.pause();}catch(e){}});}catch(e){}})()", true).catch(() => { });
+                }
+                catch { }
+                return;
+            }
             tab.hasPlayingMedia = true;
             if (tabIndex === this.activeTabIndex) {
                 try {
@@ -1256,6 +1276,9 @@ class Tabs {
                 }
                 catch { }
             }
+            // Viewing the tab releases the background-media hold, so media may
+            // play now that the user is actually looking at it.
+            tab.bgHoldMedia = false;
             // Mini player: hide when arriving at the media tab; show when
             // walking away from a tab that is still playing. createTab pre-sets
             // activeTabIndex, so prefer the explicit previous index it stashes.
