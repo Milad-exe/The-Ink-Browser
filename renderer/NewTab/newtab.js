@@ -226,31 +226,6 @@
             clearTimeout(bgTimer);
             bgTimer = setTimeout(renderBackground, 150);
         });
-        // Keyboard hint matches the platform's focus-address-bar shortcut.
-        const kbd = document.getElementById('search-kbd');
-        if (kbd && !/mac/i.test(navigator.platform))
-            kbd.textContent = 'Ctrl L';
-        const form = document.getElementById('search-form');
-        const input = document.getElementById('search-input');
-        if (form) {
-            form.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const url = resolveQuery(input.value);
-                if (url) {
-                    // Yield the page immediately — don't sit under the incoming site.
-                    document.documentElement.classList.add('leaving');
-                    window.location.href = url;
-                }
-            });
-        }
-        // The new-tab page owns focus on open (the chrome omnibox no longer grabs
-        // it). Focus our own search box so the user can type immediately.
-        if (input) {
-            const grab = () => { try { input.focus(); } catch { } };
-            grab();
-            requestAnimationFrame(grab);
-            window.addEventListener('focus', grab);
-        }
         // Let clicks on the page dismiss any open chrome overlay (menu, prompts).
         if (window.electronAPI && window.electronAPI.windowClick) {
             window.addEventListener('click', (e) => {

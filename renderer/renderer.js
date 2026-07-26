@@ -126,24 +126,6 @@
         initUtilityBarConfig();
         initReaderAndPip();
         initChromeClock();
-        // Startup / new-window focus guard: a browser normally focuses the address
-        // bar on a new tab, but our new-tab page has its OWN search box that should
-        // own focus instead. Chromium's native focus-restore can still pull focus
-        // to the omnibox when the window first opens; bounce it back for a short
-        // window after load — but only when the active tab is the blank new-tab
-        // page and the user hasn't intentionally focused the bar (click / Cmd+L).
-        searchBar.addEventListener('mousedown', () => { omniFocusIntent = true; });
-        (function guardStartupFocus() {
-            let tries = 0;
-            const iv = setInterval(() => {
-                const blankTab = !currentTabUrl || currentTabUrl === 'newtab';
-                if (blankTab && !omniFocusIntent && !userTyping && !barEdited &&
-                    document.activeElement === searchBar) {
-                    try { searchBar.blur(); } catch { }
-                }
-                if (++tries >= 12) clearInterval(iv);
-            }, 50);
-        })();
         // ─────────────────────────────────────────────────────────────────────────
         // Chrome status clock (tab strip) — updates on the minute, no seconds timer
         // ─────────────────────────────────────────────────────────────────────────

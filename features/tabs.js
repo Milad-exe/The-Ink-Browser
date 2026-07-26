@@ -548,20 +548,21 @@ class Tabs {
         });
         if (shouldActivate) {
             this.showTab(tabIndex);
-            // Give OS focus to the new tab's PAGE, not the chrome omnibox — the
-            // new-tab page then focuses its own search box (see NewTab/newtab.js).
-            // This replaces the old behavior of pulling focus to the chrome +
-            // address bar on every new tab / new window, which caused the "url bar
-            // sometimes focused on launch" race. Re-assert after load since the
-            // page's own load can drop focus. (Cmd+L still focuses the omnibox via
-            // the explicit 'focus-address-bar' shortcut handler.)
-            const focusPage = () => {
+            // A freshly opened blank tab focuses the address bar (standard browser
+            // behavior). showTab() gave OS focus to the tab's view, so pull focus
+            // back to the chrome first, then focus the omnibox; fire again after the
+            // page loads since its own load can re-grab OS focus.
+            const focusOmnibox = () => {
                 if (this.activeTabIndex !== tabIndex || this.mainWindow.isDestroyed())
                     return;
-                try { tab.webContents.focus(); } catch { }
+                try {
+                    this.mainWindow.webContents.focus();
+                    this.mainWindow.webContents.send('focus-address-bar');
+                } catch { }
             };
-            setImmediate(focusPage);
-            tab.webContents.once('did-finish-load', () => setTimeout(focusPage, 0));
+            setImmediate(focusOmnibox);
+            setTimeout(focusOmnibox, 200);
+            tab.webContents.once('did-finish-load', () => setTimeout(focusOmnibox, 0));
         }
         else {
             const activeTab = this.tabMap.get(previousActiveTabIndex);
