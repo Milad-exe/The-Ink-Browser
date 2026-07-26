@@ -22,13 +22,10 @@
     const pad = (n) => String(n).padStart(2, '0');
     function tick() {
         const now = new Date();
-        const t = document.getElementById('time-display');
-        const g = document.getElementById('greeting-text');
-        const d = document.getElementById('date-display');
-        if (t)
-            t.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        const g = document.getElementById('greeting');
+        const d = document.getElementById('dateline');
         if (g)
-            g.textContent = greetingForHour(now.getHours());
+            g.textContent = greetingForHour(now.getHours()) + '.';
         if (d)
             d.textContent = `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
     }
