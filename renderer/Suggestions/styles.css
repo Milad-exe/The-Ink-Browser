@@ -17,7 +17,11 @@ body {
   display: flex;
   flex-direction: column;
   padding: 5px;
-  max-height: calc(100% - 8px);
+  /* Fill the body's content box (body already insets 4px top/bottom). The view
+     is sized to fit exactly (count*ITEM_HEIGHT + chrome in ipc/suggestions.js);
+     subtracting extra here clipped the last row's bottom padding, worst with a
+     single row. */
+  max-height: 100%;
   overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--border-2);
