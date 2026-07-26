@@ -23,9 +23,12 @@ html, body {
 
 /* Shell top inset: gives the tab strip breathing room from the window edge so
    the space above the tabs matches the space below them (down to the omnibox),
-   instead of hugging the top. -webkit-app-region:drag keeps this strip
-   draggable. Paired with getTabBounds() yOffset (Tabs.SHELL_TOP in tabs.js). */
-body { display: flex; flex-direction: column; padding-top: var(--shell-top, 6px); -webkit-app-region: drag; }
+   instead of hugging the top. Paired with getTabBounds() yOffset (Tabs.SHELL_TOP
+   in tabs.js). NOTE: the body must NOT be a drag region — only #tab-bar /
+   #utility-bar are (with no-drag on their interactive bits). Making the whole
+   body draggable turns every chrome element without an explicit no-drag into a
+   window-drag handle, so left-clicks drag the window instead of clicking. */
+body { display: flex; flex-direction: column; padding-top: var(--shell-top, 6px); }
 
 /* macOS vibrancy: let a whisper of the window material through the shell. */
 html[data-vibrancy="true"],
