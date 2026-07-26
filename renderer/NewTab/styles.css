@@ -59,25 +59,24 @@ html, body {
   color: var(--text-2); margin-top: 12px;
 }
 
-/* Brand wordmark — echoes the app icon (serif "N" + copper 4-point star) as
-   clean text instead of pasting the square badge inline: the star sits on the
-   "N", the rest reads "orthstar". Serif ties it to the icon; the star colour is
-   the icon's copper, held fixed so the brand mark stays consistent per theme. */
+/* Brand lockup: the actual app icon (the real N-with-star logo) as a mark, next
+   to the "Northstar" wordmark. Using the icon itself guarantees it matches the
+   logo exactly and never drifts with the system font — the star is part of the
+   artwork, not an overlay. The dark badge is a self-contained logo tile, so it
+   reads as an intentional mark (not a letter) on every theme. */
 .wordmark {
   margin-top: 18px;
-  display: inline-block; line-height: 1;
-  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
-  font-size: 24px; font-weight: 600; letter-spacing: 0.005em;
-  color: var(--text);
+  display: inline-flex; align-items: center; gap: 11px;
 }
-/* "N" and "orthstar" stay tight so it reads as one word; the star is an overlay
-   on the N's top-right shoulder (icon-style) and takes no layout space. */
-.wm-n { position: relative; }
-.wm-star {
-  position: absolute; top: -0.10em; right: -0.24em;
-  width: 0.5em; height: 0.5em;
-  fill: #cb7a54;
-  filter: drop-shadow(0 1px 3px color-mix(in srgb, #cb7a54 50%, transparent));
+.brand-logo {
+  width: 30px; height: 30px; border-radius: 9px;
+  object-fit: cover; flex-shrink: 0;
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--shell) 35%, transparent);
+}
+.brand-name {
+  font-family: var(--font);
+  font-size: 21px; font-weight: 600; letter-spacing: -0.015em;
+  color: var(--text);
 }
 
 /* Glass search / launcher — token-driven so it fits every theme. */
