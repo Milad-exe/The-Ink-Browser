@@ -81,8 +81,8 @@ html, body {
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 .search:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 12px 40px color-mix(in srgb, var(--shell) 50%, transparent), 0 0 0 3px var(--accent-wash);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-2));
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--shell) 50%, transparent), 0 0 0 2px var(--accent-wash);
 }
 .search-icon { color: var(--text-2); flex-shrink: 0; }
 .search-input {
