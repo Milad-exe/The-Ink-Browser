@@ -226,6 +226,21 @@
             clearTimeout(bgTimer);
             bgTimer = setTimeout(renderBackground, 150);
         });
+        // Centered search box: submits to the resolved URL. It is intentionally
+        // NOT auto-focused — a new tab focuses the top address bar (standard); this
+        // box is here to click into if you prefer it.
+        const form = document.getElementById('search-form');
+        const input = document.getElementById('search-input');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const url = resolveQuery(input.value);
+                if (url) {
+                    document.documentElement.classList.add('leaving');
+                    window.location.href = url;
+                }
+            });
+        }
         // Let clicks on the page dismiss any open chrome overlay (menu, prompts).
         if (window.electronAPI && window.electronAPI.windowClick) {
             window.addEventListener('click', (e) => {
