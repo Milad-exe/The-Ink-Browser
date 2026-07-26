@@ -160,6 +160,15 @@
             // Align to the top of the next minute, then tick each minute.
             setTimeout(() => { paint(); setInterval(paint, 60000); }, (60 - new Date().getSeconds()) * 1000);
         }
+        // Mono "TABS·N" micro-label in the chrome status. Prefers the count the
+        // main process sends; falls back to counting the rendered tab buttons.
+        function updateChromeTabs(n) {
+            const el = document.getElementById('chrome-tabs');
+            if (!el)
+                return;
+            const count = (typeof n === 'number' && n > 0) ? n : document.querySelectorAll('.tab-button').length;
+            el.textContent = 'TABS·' + count;
+        }
         // ─────────────────────────────────────────────────────────────────────────
         // Window controls
         // ─────────────────────────────────────────────────────────────────────────
@@ -1880,6 +1889,7 @@
             window.tab.onTabCreated((_e, data) => {
                 tabPrivate.set(data.index, !!data.private);
                 createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private);
+                updateChromeTabs(data.totalTabs);
                 setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
             });
             // Speaker on audible tabs; mic/camera in danger colour while recording.
@@ -1890,6 +1900,7 @@
                 tabLoading.delete(data.index);
                 removeTabButton(data.index);
                 hideSuggestions();
+                updateChromeTabs(data.totalTabs);
                 setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
             });
             window.tab.onTabSwitched((_e, data) => {

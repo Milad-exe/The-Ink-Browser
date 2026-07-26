@@ -23,8 +23,10 @@
          to the window controls / private badge. Collapses to 0 once tabs fill
          the strip, so the + falls back to the far right. -->
     <div id="tab-drag-spacer"></div>
-    <!-- Clock (right of the strip) -->
+    <!-- Mono status micro-labels (right of the strip): tab count + clock -->
     <div id="chrome-status" class="chrome-status" aria-hidden="true">
+      <span id="chrome-tabs" class="cs-tabs">TABS·1</span>
+      <span class="cs-sep"></span>
       <span id="chrome-clock" class="cs-clock">00:00</span>
     </div>
     <div id="private-window-badge" class="private-badge">
