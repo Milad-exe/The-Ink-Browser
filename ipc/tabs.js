@@ -7,6 +7,7 @@
  */
 const { Menu, net } = require('electron');
 const { sanitizeUrl } = require('../features/url-security');
+const faviconStore = require('../features/favicon-store');
 // Favicon fetch cache: page/favicon URL → data-URL (or '' for a known failure).
 // Bounded; cleared wholesale when full. Lives for the process lifetime.
 const _faviconCache = new Map();
@@ -653,6 +654,10 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     // Fallback favicon loader for the tab strip — used when the renderer's own
     // <img src=faviconUrl> fails to load (see renderer setFaviconFallback).
     ipcMain.handle('favicon-fetch', (_e, url) => fetchFaviconDataUrl(url));
+    // Cached favicon for a host (from sites you've visited) — NO network fetch.
+    // Used for omnibox suggestions / bookmarks so typing can't fire a favicon
+    // request to every suggested domain.
+    ipcMain.handle('favicon-cached', (_e, host) => faviconStore.getForHost(host));
 }
 
 module.exports = { register };

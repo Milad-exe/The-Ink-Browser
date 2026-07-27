@@ -21,6 +21,7 @@ ipcRenderer.on('theme-changed', (_e, theme) => {
 // Preload for the Suggestions Overlay WebContentsView
 contextBridge.exposeInMainWorld('overlaySuggestions', {
     onData: (callback) => ipcRenderer.on('suggestions-data', (_e, payload) => callback(payload)),
+    cachedFavicon: (host) => ipcRenderer.invoke('favicon-cached', host),
     close: () => ipcRenderer.invoke('suggestions-close'),
     select: (item) => ipcRenderer.invoke('suggestions-select', item),
     pointerDown: () => ipcRenderer.invoke('suggestions-pointer-down')

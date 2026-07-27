@@ -25,19 +25,25 @@
         db.cancel = () => clearTimeout(t);
         return db;
     }
-    /** The site's OWN favicon URL for a page URL — never a third-party aggregator
-     *  (Google's s2 service would leak every visited/typed domain to Google).
-     *  Returns '' for non-http urls. */
-    function faviconFor(url) {
+    /** Paint a cached favicon (from sites you've actually visited) onto an <img>,
+     *  or remove the <img> if we have none — NO network fetch. This is why typing
+     *  in the omnibox / rendering the bookmark bar never pings a site's favicon. */
+    function paintCachedFavicon(imgEl, url) {
+        let host = '';
         try {
-            const u = new URL(url);
-            if (u.protocol !== 'http:' && u.protocol !== 'https:')
-                return '';
-            return `${u.origin}/favicon.ico`;
+            host = new URL(url).host;
         }
-        catch {
-            return '';
+        catch { }
+        if (!host || !window.tab?.cachedFavicon) {
+            imgEl.remove();
+            return;
         }
+        window.tab.cachedFavicon(host).then((d) => {
+            if (d)
+                imgEl.src = d;
+            else
+                imgEl.remove();
+        }).catch(() => imgEl.remove());
     }
     /** Folder SVG markup (Material Design folder shape). */
     const FOLDER_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="11" viewBox="0 0 24 20" fill="currentColor"><path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"/></svg>';
@@ -546,7 +552,7 @@
                     return;
                 if (!url.toLowerCase().includes(ql) && !title.toLowerCase().includes(ql))
                     return;
-                results.push({ type: 'switch-tab', tabIndex: index, title: title || url, url, favicon: faviconFor(url) });
+                results.push({ type: 'switch-tab', tabIndex: index, title: title || url, url });
             });
             return results;
         }
@@ -562,7 +568,7 @@
                         continue;
                     if (!e.url.toLowerCase().includes(ql) && !(e.title || '').toLowerCase().includes(ql))
                         continue;
-                    results.push({ type: 'bookmark', title: e.title || e.url, url: e.url, favicon: faviconFor(e.url) });
+                    results.push({ type: 'bookmark', title: e.title || e.url, url: e.url });
                     if (results.length >= limit)
                         break;
                 }
@@ -588,7 +594,7 @@
                     if (seen.has(key))
                         continue;
                     seen.add(key);
-                    results.push({ type: 'history', title: e.title || e.url, url: e.url, favicon: faviconFor(e.url) });
+                    results.push({ type: 'history', title: e.title || e.url, url: e.url });
                     if (results.length >= limit)
                         break;
                 }
@@ -1063,14 +1069,10 @@
                 });
             }
             else {
-                const fav = faviconFor(entry.url);
-                if (fav) {
-                    const img = document.createElement('img');
-                    img.className = 'bookmark-bar-favicon';
-                    img.src = fav;
-                    img.onerror = () => img.remove();
-                    item.appendChild(img);
-                }
+                const img = document.createElement('img');
+                img.className = 'bookmark-bar-favicon';
+                item.appendChild(img);
+                paintCachedFavicon(img, entry.url);
                 const lbl = document.createElement('span');
                 try {
                     lbl.textContent = entry.title || new URL(entry.url).hostname;
@@ -1169,14 +1171,10 @@
                     });
                 }
                 else {
-                    const fav = faviconFor(child.url);
-                    if (fav) {
-                        const img = document.createElement('img');
-                        img.className = 'bookmark-bar-favicon';
-                        img.src = fav;
-                        img.onerror = () => img.remove();
-                        row.appendChild(img);
-                    }
+                    const img = document.createElement('img');
+                    img.className = 'bookmark-bar-favicon';
+                    row.appendChild(img);
+                    paintCachedFavicon(img, child.url);
                     const lbl = document.createElement('span');
                     try {
                         lbl.textContent = child.title || new URL(child.url).hostname;
@@ -1631,14 +1629,10 @@
             else {
                 btn.className = 'bookmark-bar-item';
                 btn.title = entry.title || entry.url;
-                const fav = faviconFor(entry.url);
-                if (fav) {
-                    const img = document.createElement('img');
-                    img.className = 'bookmark-bar-favicon';
-                    img.src = fav;
-                    img.onerror = () => img.remove();
-                    btn.appendChild(img);
-                }
+                const img = document.createElement('img');
+                img.className = 'bookmark-bar-favicon';
+                btn.appendChild(img);
+                paintCachedFavicon(img, entry.url);
                 const lbl = document.createElement('span');
                 lbl.className = 'bookmark-bar-label';
                 try {

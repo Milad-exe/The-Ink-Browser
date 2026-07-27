@@ -17,6 +17,7 @@ ipcRenderer.on('theme-changed', (_e, theme) => {
         document.documentElement.removeAttribute('data-theme');
 });
 contextBridge.exposeInMainWorld('folderDropdown', {
+    cachedFavicon: (host) => ipcRenderer.invoke('favicon-cached', host),
     onInit: (cb) => ipcRenderer.on('folder-dropdown-init', (_e, data) => cb(data)),
     onRefreshPanel: (cb) => ipcRenderer.on('folder-dropdown-refresh-panel', (_e, data) => cb(data)),
     onStartRename: (cb) => ipcRenderer.on('folder-dropdown-start-rename', (_e, data) => cb(data)),

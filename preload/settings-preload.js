@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('northstarSettings', {
     toggleBookmarkBar: () => ipcRenderer.send('toggle-bookmark-bar'),
     openHistoryTab: () => ipcRenderer.invoke('open-history-tab'),
     openBookmarksTab: () => ipcRenderer.invoke('open-bookmarks-tab'),
+    cachedFavicon: (host) => ipcRenderer.invoke('favicon-cached', host),
 });
 contextBridge.exposeInMainWorld('northstarPasswords', {
     list: () => ipcRenderer.invoke('passwords-list'),

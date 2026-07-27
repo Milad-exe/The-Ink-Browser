@@ -21,16 +21,17 @@
             bookmarks.forEach(entry => {
                 const row = document.createElement('div');
                 row.className = 'bookmark-entry';
-                let favicon = null;
-                try {
-                    // Site's own favicon, not Google's aggregator (privacy).
-                    favicon = `${new URL(entry.url).origin}/favicon.ico`;
-                }
-                catch { }
                 const icon = document.createElement('img');
                 icon.className = 'bookmark-favicon';
-                icon.src = favicon || '';
-                icon.onerror = () => { icon.style.display = 'none'; };
+                icon.style.display = 'none';
+                // From the local favicon cache (visited sites) — no network fetch.
+                try {
+                    const host = new URL(entry.url).host;
+                    window.northstarSettings?.cachedFavicon?.(host).then((d) => {
+                        if (d) { icon.src = d; icon.style.display = ''; }
+                    }).catch(() => { });
+                }
+                catch { }
                 const content = document.createElement('div');
                 content.className = 'bookmark-content';
                 const title = document.createElement('div');

@@ -513,10 +513,12 @@
     function buildBookmarkItem(btn, entry) {
         try {
             const img = document.createElement('img');
-            // Site's own favicon, not Google's aggregator (privacy).
-            img.src = `${new URL(entry.url).origin}/favicon.ico`;
-            img.onerror = () => img.remove();
             btn.appendChild(img);
+            // From the local favicon cache (visited sites) — no network fetch.
+            const host = new URL(entry.url).host;
+            window.folderDropdown?.cachedFavicon?.(host).then((d) => {
+                if (d) img.src = d; else img.remove();
+            }).catch(() => img.remove());
         }
         catch { }
         const lbl = document.createElement('span');

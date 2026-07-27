@@ -200,6 +200,7 @@ exposeInternal("tab", {
     pin: (index) => ipcRenderer.invoke("pinTab", index),
     toggleMute: (index) => ipcRenderer.invoke("muteTab", index),
     fetchFavicon: (url) => ipcRenderer.invoke('favicon-fetch', url),
+    cachedFavicon: (host) => ipcRenderer.invoke('favicon-cached', host),
     reorder: (order) => ipcRenderer.invoke('reorderTabs', order),
     onTabCreated: (callback) => ipcRenderer.on('tab-created', callback),
     onTabRemoved: (callback) => ipcRenderer.on('tab-removed', callback),

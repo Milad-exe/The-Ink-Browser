@@ -2,6 +2,7 @@ const { WebContentsView, Menu } = require('electron');
 const { resolveAppFile } = require('../app-paths');
 const path = require('path');
 const UserAgent = require('./user-agent');
+const faviconStore = require('./favicon-store');
 const contextMenu = require('./tab-context-menu');
 const NavigationHistory = require('./navigation-history');
 const FindDialogManager = require('./find-dialog');
@@ -1013,6 +1014,10 @@ class Tabs {
             if (currentUrl !== 'newtab' && currentUrl !== 'history' && !currentUrl.startsWith('file://')) {
                 const favicon = favicons && favicons.length > 0 ? favicons[0] : null;
                 this.sendTabUpdate(tabIndex, tab, currentUrl, tab.webContents.getTitle(), favicon);
+                // Cache this visited site's favicon by host so suggestions/bookmarks
+                // can show it later with no network fetch (features/favicon-store.js).
+                if (!this.privateTabs.has(tabIndex))
+                    faviconStore.remember(currentUrl, favicon);
             }
         });
         tab.webContents.on('did-start-loading', () => {

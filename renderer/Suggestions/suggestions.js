@@ -40,20 +40,21 @@
             push(text.slice(i + q.length), true);
             return frag;
         }
-        // The site's own favicon — never Google's aggregator (which would leak
-        // every typed/suggested domain to Google).
-        function faviconFor(url) {
+        // Favicons come from the local cache (sites you've visited) only — never a
+        // network fetch from the suggestions overlay. hostOf() derives the lookup
+        // key for a suggestion.
+        function hostOf(item) {
             try {
-                const u = new URL(url);
-                if (u.protocol === 'http:' || u.protocol === 'https:')
-                    return `${u.origin}/favicon.ico`;
+                if (item.url)
+                    return new URL(item.url).host;
             }
             catch { }
-            return null;
-        }
-        function faviconForDomain(q) {
-            const host = String(q || '').replace(/^https?:\/\//, '').split(/[/?#]/)[0];
-            return /\.[a-z]{2,}$/i.test(host) ? `https://${host}/favicon.ico` : null;
+            if (item.type === 'navigate' && item.query) {
+                const h = String(item.query).replace(/^https?:\/\//, '').split(/[/?#]/)[0];
+                if (/\.[a-z]{2,}$/i.test(h))
+                    return h;
+            }
+            return '';
         }
         function render(payload) {
             const { items = [], activeIndex = -1, query = '', engine = 'google' } = payload || {};
@@ -75,10 +76,22 @@
                     fallback = SVG_BKMK;
                 else if (item.type === 'switch-tab')
                     fallback = SVG_TAB;
-                const fav = item.favicon
-                    || (item.url ? faviconFor(item.url) : (item.type === 'navigate' ? faviconForDomain(item.query) : null));
-                icon.src = search ? SVG_SEARCH : (fav || fallback);
-                icon.onerror = () => { icon.onerror = null; icon.src = fallback; };
+                // Placeholder first, then fill from the local favicon cache (visited
+                // sites) — no network fetch here, so typing can't ping every domain.
+                icon.src = search ? SVG_SEARCH : fallback;
+                if (!search) {
+                    if (item.favicon && /^data:/.test(item.favicon)) {
+                        icon.src = item.favicon;
+                    }
+                    else {
+                        const host = hostOf(item);
+                        if (host && window.overlaySuggestions.cachedFavicon) {
+                            window.overlaySuggestions.cachedFavicon(host)
+                                .then(d => { if (d) icon.src = d; })
+                                .catch(() => { });
+                        }
+                    }
+                }
                 el.appendChild(icon);
                 // ── Label: primary (highlighted) + dim secondary ──────────────────────
                 const main = document.createElement('span');
