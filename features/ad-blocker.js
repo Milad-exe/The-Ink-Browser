@@ -20,8 +20,13 @@ const path = require('path');
 const { app, net } = require('electron');
 const { parse: parseTld } = require('tldts');
 // ── Filter list sources ───────────────────────────────────────────────────────
-// Steven Black's unified hosts (ads + tracking only variant, ~160 k domains).
-const HOSTS_URL = 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts';
+// Steven Black's unified hosts (~90 k domains). Served via the jsDelivr CDN
+// mirror rather than raw.githubusercontent.com on purpose: GitHub rate-limits
+// raw fetches per-IP across ALL of GitHub, so a browser that re-downloads this
+// list (e.g. every fresh profile) can trip GitHub's secondary rate limit and
+// then get "too many requests" when the user simply visits github.com. jsDelivr
+// serves the identical file from a CDN with no such limit.
+const HOSTS_URL = 'https://cdn.jsdelivr.net/gh/StevenBlack/hosts@master/hosts';
 // EasyList — primary ABP-format filter list (~80 k rules).
 const EASYLIST_URL = 'https://easylist.to/easylist/easylist.txt';
 // EasyPrivacy — dedicated tracker / analytics / beacon blocklist. This is the
