@@ -61,18 +61,14 @@ function fetchFaviconOnce(url) {
         }
     });
 }
-// Candidate favicon URLs to try in order. When handed Google's s2 service URL
-// (our last-resort fallback, which rate-limits under load), try the site's OWN
-// /favicon.ico first — more reliable and no third-party dependency.
+// Candidate favicon URLs to try in order. Only the site itself — never a
+// third-party aggregator (Google's s2 service would leak every domain to
+// Google). Try the given icon, then the site's root /favicon.ico as a fallback.
 function faviconCandidates(url) {
     try {
         const u = new URL(url);
-        if (/(^|\.)google\.com$/i.test(u.hostname) && u.pathname.includes('/s2/favicons')) {
-            const domain = (u.searchParams.get('domain') || u.searchParams.get('domain_url') || '')
-                .replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-            if (domain)
-                return [`https://${domain}/favicon.ico`, url];
-        }
+        const root = `${u.origin}/favicon.ico`;
+        return url === root ? [url] : [url, root];
     }
     catch { }
     return [url];

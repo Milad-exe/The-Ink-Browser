@@ -1155,14 +1155,17 @@ class Tabs {
         // Provide a default favicon instantly for http/https URLs to prevent empty gaps
         let resolvedFavicon = favicon;
         if (this.privateTabs.has(tabIndex)) {
-            // The chrome renderer loads favicons through the DEFAULT session —
-            // fetching one for a private tab (especially via Google's favicon
-            // service) would leak the hostname outside the private session.
+            // The chrome renderer loads favicons through the DEFAULT session, so
+            // fetching one for a private tab would leak the hostname outside the
+            // private session.
             resolvedFavicon = null;
         }
         else if (!resolvedFavicon && url && url.startsWith('http')) {
+            // The site's OWN favicon — not Google's aggregator (which would leak
+            // every domain to Google). The real declared icon arrives shortly via
+            // page-favicon-updated and replaces this.
             try {
-                resolvedFavicon = `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=32`;
+                resolvedFavicon = `${new URL(url).origin}/favicon.ico`;
             }
             catch (e) { }
         }

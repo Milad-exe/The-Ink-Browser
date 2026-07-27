@@ -513,7 +513,8 @@
     function buildBookmarkItem(btn, entry) {
         try {
             const img = document.createElement('img');
-            img.src = `https://www.google.com/s2/favicons?domain=${new URL(entry.url).hostname}`;
+            // Site's own favicon, not Google's aggregator (privacy).
+            img.src = `${new URL(entry.url).origin}/favicon.ico`;
             img.onerror = () => img.remove();
             btn.appendChild(img);
         }

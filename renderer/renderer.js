@@ -25,10 +25,15 @@
         db.cancel = () => clearTimeout(t);
         return db;
     }
-    /** Build a Google favicon URL for a given page URL. Returns '' on failure. */
+    /** The site's OWN favicon URL for a page URL — never a third-party aggregator
+     *  (Google's s2 service would leak every visited/typed domain to Google).
+     *  Returns '' for non-http urls. */
     function faviconFor(url) {
         try {
-            return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}`;
+            const u = new URL(url);
+            if (u.protocol !== 'http:' && u.protocol !== 'https:')
+                return '';
+            return `${u.origin}/favicon.ico`;
         }
         catch {
             return '';
@@ -2353,9 +2358,8 @@
                 setFaviconFallback(index, el);
             }
         }
-        // Letter placeholder — derived from the PAGE host, not the favicon URL. The
-        // fallback service URL is https://www.google.com/s2/… so the old code showed
-        // "W" (from www.google.com) for every site whose icon failed to load.
+        // Letter placeholder — derived from the PAGE host, not the favicon URL, so
+        // a site whose /favicon.ico fails still shows its own initial.
         function setFaviconFallback(index, el) {
             const div = document.createElement('div');
             div.className = 'tab-favicon default';

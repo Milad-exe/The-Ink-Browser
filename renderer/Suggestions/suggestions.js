@@ -40,18 +40,20 @@
             push(text.slice(i + q.length), true);
             return frag;
         }
+        // The site's own favicon — never Google's aggregator (which would leak
+        // every typed/suggested domain to Google).
         function faviconFor(url) {
             try {
                 const u = new URL(url);
                 if (u.protocol === 'http:' || u.protocol === 'https:')
-                    return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=32`;
+                    return `${u.origin}/favicon.ico`;
             }
             catch { }
             return null;
         }
         function faviconForDomain(q) {
             const host = String(q || '').replace(/^https?:\/\//, '').split(/[/?#]/)[0];
-            return /\.[a-z]{2,}$/i.test(host) ? `https://www.google.com/s2/favicons?domain=${host}&sz=32` : null;
+            return /\.[a-z]{2,}$/i.test(host) ? `https://${host}/favicon.ico` : null;
         }
         function render(payload) {
             const { items = [], activeIndex = -1, query = '', engine = 'google' } = payload || {};

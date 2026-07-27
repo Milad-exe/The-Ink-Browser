@@ -23,7 +23,8 @@
                 row.className = 'bookmark-entry';
                 let favicon = null;
                 try {
-                    favicon = `https://www.google.com/s2/favicons?domain=${new URL(entry.url).hostname}&sz=32`;
+                    // Site's own favicon, not Google's aggregator (privacy).
+                    favicon = `${new URL(entry.url).origin}/favicon.ico`;
                 }
                 catch { }
                 const icon = document.createElement('img');
