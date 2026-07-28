@@ -82,6 +82,9 @@ class TabContextMenu {
             this.contextTemplate.push({
                 label: 'Copy Page URL',
                 click: () => clipboard.writeText(currentUrl),
+            }, { type: 'separator' }, {
+                label: 'Open in New Container',
+                click: () => this.tabManager.openInNewContainer(currentUrl),
             });
         }
     }
@@ -151,6 +154,9 @@ class TabContextMenu {
         this.contextTemplate.push({
             label: 'Open Link in New Tab',
             click: () => this.openInNewTab(params.linkURL),
+        }, {
+            label: 'Open Link in New Container',
+            click: () => this.tabManager.openInNewContainer(params.linkURL),
         }, {
             label: 'Open Link in New Window',
             click: () => { if (isSafeExternal(params.linkURL))

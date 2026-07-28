@@ -21,7 +21,7 @@ const UserAgent = require('./user-agent');
 const adBlocker = require('./ad-blocker');
 const downloadManager = require('./download-manager');
 const permissionPrompt = require('./permission-prompt');
-function setup(sess) {
+function setup(sess, opts = {}) {
     const ua = UserAgent.generate();
     sess.setUserAgent(ua);
     // ── Single combined outbound-header handler ───────────────────────────────
@@ -70,7 +70,7 @@ function setup(sess) {
     // persist:false → a private tab's decision is never written to disk and
     // stored site decisions are never consulted, so each private tab decides
     // independently and nothing carries over.
-    permissionPrompt.attach(sess, { persist: false });
+    permissionPrompt.attach(sess, { persist: opts.persist === true });
 }
 // ── Per-tab isolated sessions ─────────────────────────────────────────────────
 let seq = 0;

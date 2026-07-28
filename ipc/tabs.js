@@ -142,6 +142,13 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (wd)
             wd.tabs.createTab(null, true, true);
     });
+    // Container tab: a fresh persistent isolated cookie jar. sanitizeUrl'd if a
+    // url is given; blank new-tab otherwise.
+    ipcMain.handle('addContainerTab', (_e, url) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd)
+            wd.tabs.openInNewContainer(url ? sanitizeUrl(url) : null);
+    });
     // Open a URL in a new background tab without loading it until the user switches to it
     ipcMain.handle('addTabLazy', (_e, url) => {
         const wd = wm.getWindowByWebContents(_e.sender);

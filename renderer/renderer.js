@@ -1869,7 +1869,7 @@
             // ── IPC events from main process ──────────────────────────────────────
             window.tab.onTabCreated((_e, data) => {
                 tabPrivate.set(data.index, !!data.private);
-                createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private);
+                createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private, data.containerColor || null);
                 updateChromeTabs(data.totalTabs);
                 setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
             });
@@ -2057,7 +2057,7 @@
             } }, 100);
         }
         // ── Tab DOM helpers ───────────────────────────────────────────────────────
-        function createTabButton(index, title, afterIndex = null, shouldActivate = true, isPrivate = false) {
+        function createTabButton(index, title, afterIndex = null, shouldActivate = true, isPrivate = false, containerColor = null) {
             if (tabs.has(index))
                 return;
             const btn = document.createElement('div');
@@ -2068,6 +2068,10 @@
             btn.tabIndex = -1;
             if (isPrivate)
                 btn.dataset.private = 'true';
+            if (containerColor) {
+                btn.dataset.container = 'true';
+                btn.style.setProperty('--ctr-color', containerColor);
+            }
             const titleSpan = document.createElement('span');
             titleSpan.className = 'tab-title';
             titleSpan.textContent = title || `Tab ${index + 1}`;
@@ -2082,6 +2086,12 @@
                 shield.title = 'Private tab';
                 shield.innerHTML = '<svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><path d="M8 1L2 3.5V8c0 3.3 2.5 5.7 6 7 3.5-1.3 6-3.7 6-7V3.5L8 1zm0 6.5h4c-.3 2.2-1.8 4-4 5.1V7.5H4V5l4-1.7V7.5z"/></svg>';
                 btn.appendChild(shield);
+            }
+            if (containerColor) {
+                const dot = document.createElement('span');
+                dot.className = 'tab-container-dot';
+                dot.title = 'Container tab — isolated session';
+                btn.appendChild(dot);
             }
             btn.appendChild(titleSpan);
             btn.appendChild(closeBtn);

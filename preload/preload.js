@@ -186,6 +186,7 @@ window.addEventListener('blur', () => {
 exposeInternal("tab", {
     add: () => ipcRenderer.invoke("addTab"),
     addPrivate: () => ipcRenderer.invoke("addPrivateTab"),
+    addContainer: (url) => ipcRenderer.invoke("addContainerTab", url),
     addLazy: (url) => ipcRenderer.invoke("addTabLazy", url),
     remove: (index) => ipcRenderer.invoke("removeTab", index),
     switch: (index) => ipcRenderer.invoke("switchTab", index),

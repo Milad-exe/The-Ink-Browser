@@ -3,6 +3,7 @@ const { resolveAppFile } = require('../app-paths');
 const path = require('path');
 const UserAgent = require('./user-agent');
 const faviconStore = require('./favicon-store');
+const containers = require('./containers');
 const contextMenu = require('./tab-context-menu');
 const NavigationHistory = require('./navigation-history');
 const FindDialogManager = require('./find-dialog');
@@ -207,6 +208,8 @@ class Tabs {
         this.userFullScreenActive = false;
         this.pinnedTabs = new Set();
         this.privateTabs = new Set();
+        this.tabContainers = new Map(); // tabIndex → container id
+        this.nextContainerId = 1;
         this.isPrivateWindow = options?.private ?? false;
         this.tabOrder = [];
         this.closedTabHistory = []; // stack of {url, title} for "Reopen Closed Tab"
@@ -465,10 +468,15 @@ class Tabs {
     setShortcuts(shortcuts) {
         this.shortcuts = shortcuts;
     }
-    createTab(insertAfterIndex = null, shouldActivate = true, isPrivate = false) {
+    createTab(insertAfterIndex = null, shouldActivate = true, isPrivate = false, containerId = null) {
         const tabIndex = this.nextTabIndex;
         this.nextTabIndex++;
         const makePrivate = isPrivate || this.isPrivateWindow;
+        // A container = a persistent isolated cookie jar (features/containers.js).
+        // Private tabs are already isolated (in-memory), so container only applies
+        // to normal tabs. Two tabs in different containers can hold independent
+        // logins to the same site without one clobbering the other.
+        const container = (!makePrivate && containerId != null) ? String(containerId) : null;
         const webPrefs = {
             autoplayPolicy: 'user-gesture-required',
             preload: path.join(__dirname, '../preload/preload.js'),
@@ -478,6 +486,9 @@ class Tabs {
         if (makePrivate) {
             webPrefs.session = this._getPrivateSession();
             webPrefs.v8CacheOptions = 'none';
+        }
+        else if (container) {
+            webPrefs.session = containers.get(container);
         }
         const tab = new WebContentsView({ webPreferences: webPrefs });
         try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch { }
@@ -490,7 +501,9 @@ class Tabs {
         this.raiseFloatingViews();
         UserAgent.setupTab(tab);
         this._applyTabBackground(tab, 'newtab');
-        if (!makePrivate)
+        // Container tabs run on their own session (no extensions loaded there),
+        // like private tabs, so they skip extension registration.
+        if (!makePrivate && !container)
             extensions.addTab(tab.webContents, this.mainWindow);
         tab.webContents.on("context-menu", async (_event, params) => {
             let menuParams = params;
@@ -515,6 +528,9 @@ class Tabs {
             this.privateTabs.add(tabIndex);
         }
         tab.isPrivate = makePrivate;
+        tab.containerId = container;
+        if (container)
+            this.tabContainers.set(tabIndex, container);
         // insertAfterIndex: existing tab index to insert after, -1 for the
         // front of the order (cross-window drop before the first tab), else end.
         const afterPos = (insertAfterIndex !== null && insertAfterIndex !== undefined && insertAfterIndex !== -1)
@@ -546,6 +562,8 @@ class Tabs {
             afterIndex: insertAfterIndex === -1 ? -1 : (afterPos !== -1 ? insertAfterIndex : null),
             active: shouldActivate,
             private: makePrivate,
+            container: container,
+            containerColor: container ? containers.colorFor(container) : null,
         });
         if (shouldActivate) {
             this.showTab(tabIndex);
@@ -593,6 +611,23 @@ class Tabs {
             }
         });
         return tabIndex;
+    }
+    // Open (url) in a BRAND-NEW container — a fresh persistent isolated cookie
+    // jar. Two of these to the same site hold fully independent logins, so
+    // switching tabs never carries one tab's session over to the other.
+    openInNewContainer(url, insertAfterIndex = null) {
+        const id = String(this.nextContainerId++);
+        const idx = this.createTab(insertAfterIndex, true, false, id);
+        if (url)
+            this.loadUrl(idx, url);
+        return idx;
+    }
+    // Open (url) in an EXISTING container (shares that container's session).
+    openInContainer(url, containerId, insertAfterIndex = null) {
+        const idx = this.createTab(insertAfterIndex, true, false, containerId);
+        if (url)
+            this.loadUrl(idx, url);
+        return idx;
     }
     // Open an internal page (settings/history/bookmarks) via the northstar://
     // scheme. replaceActive replaces the current tab in place (used when a
@@ -1468,6 +1503,7 @@ class Tabs {
             this.tabUrls.delete(index);
             this.pinnedTabs.delete(index);
             this.privateTabs.delete(index); // session wipe happens in destroyTab()
+            this.tabContainers.delete(index); // container SESSION persists (shared, reusable)
             this.tabOrder = this.tabOrder.filter(i => i !== index);
             this.tabLastActive.delete(index);
             try {
@@ -1513,6 +1549,7 @@ class Tabs {
             this.tabUrls.delete(index);
             this.pinnedTabs.delete(index);
             this.privateTabs.delete(index); // session wipe happens in destroyTab()
+            this.tabContainers.delete(index); // container SESSION persists (shared, reusable)
             this.tabOrder = this.tabOrder.filter(i => i !== index);
             this.tabLastActive.delete(index);
             try {
