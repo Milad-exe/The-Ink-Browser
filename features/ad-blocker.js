@@ -196,7 +196,7 @@ class AdBlocker {
      */
     enableBlockingInSession(sess) {
         // Lazy require to avoid a load-order cycle (site-permissions ⇄ features).
-        const sitePermissions = require('./site-permissions').default;
+        const sitePermissions = require('./site-permissions');
         sess.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, cb) => {
             // Per-site protections shield (lock-icon panel). Fast path: skip the
             // URL/eTLD parsing entirely while no site has protections disabled.
