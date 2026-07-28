@@ -4,6 +4,7 @@ const path = require('path');
 const UserAgent = require('./user-agent');
 const faviconStore = require('./favicon-store');
 const containers = require('./containers');
+const captivePortal = require('./captive-portal');
 const contextMenu = require('./tab-context-menu');
 const NavigationHistory = require('./navigation-history');
 const FindDialogManager = require('./find-dialog');
@@ -629,6 +630,19 @@ class Tabs {
             this.loadUrl(idx, url);
         return idx;
     }
+    // A captive portal was detected → open its sign-in page in a new tab on the
+    // DEFAULT session so the network's auth cookie applies to normal browsing.
+    openCaptivePortalSignIn(url) {
+        try {
+            if (!this.mainWindow || this.mainWindow.isDestroyed())
+                return;
+            const idx = this.createTab(this.activeTabIndex, true, false);
+            this.loadUrl(idx, url || 'http://neverssl.com/');
+            try { this.mainWindow.webContents.send('captive-portal', { url: url || null }); }
+            catch { }
+        }
+        catch { }
+    }
     // Open an internal page (settings/history/bookmarks) via the northstar://
     // scheme. replaceActive replaces the current tab in place (used when a
     // northstar:// url is typed, or when the current tab is the new-tab page) —
@@ -1030,6 +1044,10 @@ class Tabs {
             });
             isNavigatingProgrammatically = true;
             tab.webContents.loadFile(path.join(__dirname, '../renderer/Error/index.html'), { search: '?' + params.toString() });
+            // A failed http(s) load may mean a captive portal intercepted us
+            // (redirect / TLS block) — probe and, if so, auto-open its sign-in page.
+            if ((validatedURL || '').startsWith('http'))
+                captivePortal.check((loginUrl) => this.openCaptivePortalSignIn(loginUrl));
         });
         tab.webContents.on('found-in-page', (event, result) => {
             if (this.findDialog) {

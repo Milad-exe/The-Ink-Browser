@@ -247,6 +247,21 @@ class Northstar {
             // (USB/serial/HID/bluetooth, storage-access, …) are denied outright.
             permissionPrompt.attach(session.defaultSession);
             this.windowManager.createWindow();
+            // Captive-portal check on startup: public Wi-Fi that needs a sign-in
+            // is caught before the user tries to browse, and its login page opens
+            // automatically. (Also re-checked whenever a page load fails — see
+            // tabs.js did-fail-load.)
+            setTimeout(() => {
+                try {
+                    const captivePortal = require('./features/captive-portal');
+                    captivePortal.check((loginUrl) => {
+                        const wd = this.windowManager.getPrimaryWindow && this.windowManager.getPrimaryWindow();
+                        if (wd && wd.tabs)
+                            wd.tabs.openCaptivePortalSignIn(loginUrl);
+                    });
+                }
+                catch { }
+            }, 2500);
             // Dev live reload (--dev): edits under app/renderer refresh the UI
             // instantly — internal pages reload; the chrome hot-swaps CSS only
             // (a full chrome reload would drop the tab strip's runtime state).
