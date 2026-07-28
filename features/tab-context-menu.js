@@ -1,6 +1,7 @@
 const { clipboard, shell } = require('electron');
 const { sanitizeUrl, isSafeExternal } = require('./url-security');
 const downloadManager = require('./download-manager');
+const containers = require('./containers');
 class TabContextMenu {
     tab; // the TabView the menu was opened on
     tabManager; // Tabs instance
@@ -43,6 +44,20 @@ class TabContextMenu {
         catch { }
         this.tabManager.createLazyTab(safe, title, false, false, true, true);
     }
+    // "Open in Container ▸" submenu: every container + New Container. Each opens
+    // (url) in a fresh tab on that container's isolated session.
+    containerSubmenu(url) {
+        const safe = sanitizeUrl(url);
+        const items = containers.list().map(c => ({
+            label: (c.icon ? c.icon + '  ' : '') + c.name,
+            click: () => this.tabManager.openInContainer(safe, c.id),
+        }));
+        items.push({ type: 'separator' }, {
+            label: 'New Container…',
+            click: () => this.tabManager.openInNewContainer(safe),
+        });
+        return items;
+    }
     addPageItems(params) {
         const wc = this.tab.webContents;
         const currentUrl = wc.getURL ? wc.getURL() : '';
@@ -83,8 +98,8 @@ class TabContextMenu {
                 label: 'Copy Page URL',
                 click: () => clipboard.writeText(currentUrl),
             }, { type: 'separator' }, {
-                label: 'Open in New Container',
-                click: () => this.tabManager.openInNewContainer(currentUrl),
+                label: 'Open in Container',
+                submenu: this.containerSubmenu(currentUrl),
             });
         }
     }
@@ -155,8 +170,8 @@ class TabContextMenu {
             label: 'Open Link in New Tab',
             click: () => this.openInNewTab(params.linkURL),
         }, {
-            label: 'Open Link in New Container',
-            click: () => this.tabManager.openInNewContainer(params.linkURL),
+            label: 'Open Link in Container',
+            submenu: this.containerSubmenu(params.linkURL),
         }, {
             label: 'Open Link in New Window',
             click: () => { if (isSafeExternal(params.linkURL))

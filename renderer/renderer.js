@@ -68,6 +68,7 @@
         let tabs = new Map(); // tabIndex → <div.tab-button>
         let tabUrls = new Map(); // tabIndex → url string
         let tabPrivate = new Map(); // tabIndex → boolean (private flag)
+        let tabContainer = new Map(); // tabIndex → container meta {id,name,color,icon}
         let tabLoading = new Set(); // tabIndexes currently loading
         let activeTabIndex = 0;
         let currentTabUrl = '';
@@ -137,6 +138,7 @@
         initUtilityBarConfig();
         initReaderAndPip();
         initChromeClock();
+        initContainers();
         // ─────────────────────────────────────────────────────────────────────────
         // Chrome status clock (tab strip) — updates on the minute, no seconds timer
         // ─────────────────────────────────────────────────────────────────────────
@@ -1869,7 +1871,9 @@
             // ── IPC events from main process ──────────────────────────────────────
             window.tab.onTabCreated((_e, data) => {
                 tabPrivate.set(data.index, !!data.private);
-                createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private, data.containerColor || null);
+                if (data.containerMeta)
+                    tabContainer.set(data.index, data.containerMeta);
+                createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private, data.containerMeta || (data.containerColor ? { color: data.containerColor } : null));
                 updateChromeTabs(data.totalTabs);
                 setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
             });
@@ -1878,6 +1882,7 @@
             window.tab.onTabRemoved((_e, data) => {
                 tabUrls.delete(data.index);
                 tabPrivate.delete(data.index);
+                tabContainer.delete(data.index);
                 tabLoading.delete(data.index);
                 removeTabButton(data.index);
                 hideSuggestions();
@@ -1904,12 +1909,17 @@
                         document.documentElement.removeAttribute('data-private-tab');
                     }
                 }
+                updateContainerChip(data.index);
             });
             window.tab.onUrlUpdated((_e, data) => {
                 if (data.url)
                     tabUrls.set(data.index, data.url);
                 if (data.private !== undefined)
                     tabPrivate.set(data.index, !!data.private);
+                if (data.containerMeta)
+                    tabContainer.set(data.index, data.containerMeta);
+                else if (data.container === null)
+                    tabContainer.delete(data.index);
                 if (data.index === activeTabIndex) {
                     updateSearchBarUrl(data.url);
                     currentTabUrl = data.url || '';
@@ -1924,6 +1934,7 @@
                             document.documentElement.removeAttribute('data-private-tab');
                         }
                     }
+                    updateContainerChip(data.index);
                 }
                 updateTabTitle(data.index, data.title || data.url, data.favicon);
             });
@@ -2056,10 +2067,161 @@
                 updateScrollShadows();
             } }, 100);
         }
+        // ── Containers (named, reusable isolated sessions) ────────────────────────
+        // Toolbar chip by the reload icon reflects the active tab's container and
+        // opens a menu to switch it / open a new container tab / manage. A modal
+        // handles create/rename/recolor/delete. The registry lives in main
+        // (features/containers.js); we mirror it here via window.containers.
+        const CONTAINER_SWATCHES = ['#e0894a', '#4a9eff', '#3fbf7f', '#c86fe0', '#e05a7a', '#e0c341', '#5ad0d0', '#9a7bff'];
+        let containerList = [];
+        function initContainers() {
+            const chip = document.getElementById('container-chip');
+            const modal = document.getElementById('containers-modal');
+            if (!chip || !modal)
+                return;
+            const refreshList = async () => {
+                try { containerList = (await window.containers.list()) || []; }
+                catch { containerList = []; }
+            };
+            // ── Chip / + button → native dropdown (drawn above the page view) ──────
+            // 'move' puts the active tab into a container; 'new' opens a fresh tab
+            // in one. The menu itself is built in main (ipc/tabs.js).
+            chip.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const r = chip.getBoundingClientRect();
+                window.containers.menu('move', r.left, r.bottom + 4);
+            });
+            const addBtn = document.getElementById('new-tab-btn');
+            if (addBtn) {
+                addBtn.addEventListener('contextmenu', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    const r = addBtn.getBoundingClientRect();
+                    window.containers.menu('new', r.left, r.bottom + 4);
+                });
+            }
+            window.containers.onOpenModal(() => openModal());
+
+            // ── Manage modal ────────────────────────────────────────────────────────
+            // The modal fills the window, overlapping the page's WebContentsView, so
+            // collapse the tab views while it's open (same trick the pomodoro card
+            // uses) — otherwise the native page paints over the chrome DOM.
+            const listEl = document.getElementById('cm-list');
+            let modalOpen = false;
+            const closeModal = () => {
+                if (!modalOpen)
+                    return;
+                modalOpen = false;
+                modal.classList.add('hidden');
+                try { window.focusMode.overlayClose(); } catch { }
+            };
+            const openModal = async () => {
+                await refreshList();
+                renderModal();
+                modal.classList.remove('hidden');
+                modalOpen = true;
+                try { window.focusMode.overlayOpen(); } catch { }
+            };
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+            function renderModal() {
+                listEl.innerHTML = '';
+                if (!containerList.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'cm-empty';
+                    empty.textContent = 'No containers yet.';
+                    listEl.appendChild(empty);
+                }
+                for (const c of containerList) {
+                    const rowEl = document.createElement('div');
+                    rowEl.className = 'cm-row';
+                    const swatches = CONTAINER_SWATCHES.map(col =>
+                        `<button class="cm-swatch${col === c.color ? ' sel' : ''}" data-color="${col}" style="--s:${col}" tabindex="-1"></button>`).join('');
+                    rowEl.innerHTML =
+                        `<input class="cm-name-input" value="${escapeHtml(c.name)}" maxlength="24" tabindex="-1">
+                         <div class="cm-swatches">${swatches}</div>
+                         <button class="cm-del" tabindex="-1" title="Delete container">✕</button>`;
+                    const nameInput = rowEl.querySelector('.cm-name-input');
+                    nameInput.addEventListener('change', () => window.containers.update(c.id, { name: nameInput.value }));
+                    rowEl.querySelectorAll('.cm-swatch').forEach(sw => {
+                        sw.addEventListener('click', () => {
+                            rowEl.querySelectorAll('.cm-swatch').forEach(s => s.classList.remove('sel'));
+                            sw.classList.add('sel');
+                            window.containers.update(c.id, { color: sw.dataset.color });
+                        });
+                    });
+                    rowEl.querySelector('.cm-del').addEventListener('click', () => window.containers.remove(c.id));
+                    listEl.appendChild(rowEl);
+                }
+            }
+            document.getElementById('cm-close').addEventListener('click', closeModal);
+            document.getElementById('cm-add').addEventListener('click', async () => {
+                await window.containers.create({});
+            });
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+            // ── React to registry changes (rename/recolor/delete/create) ────────────
+            window.containers.onChanged(async () => {
+                await refreshList();
+                // Update the chip and any open tab pills bound to a container.
+                updateContainerChip(activeTabIndex);
+                document.querySelectorAll('#tabs-container .tab-button[data-container-id]').forEach(btn => {
+                    const meta = containerList.find(c => String(c.id) === btn.dataset.containerId);
+                    const idx = parseInt(btn.dataset.index);
+                    if (meta) {
+                        btn.style.setProperty('--ctr-color', meta.color);
+                        const lbl = btn.querySelector('.tab-container-label');
+                        if (lbl) lbl.textContent = (meta.icon ? meta.icon + ' ' : '') + meta.name;
+                        tabContainer.set(idx, meta);
+                    }
+                    else {
+                        // Container was deleted — drop the identity styling.
+                        btn.removeAttribute('data-container');
+                        btn.removeAttribute('data-container-id');
+                        btn.querySelector('.tab-container-dot')?.remove();
+                        btn.querySelector('.tab-container-label')?.remove();
+                        tabContainer.delete(idx);
+                    }
+                });
+                if (!modal.classList.contains('hidden'))
+                    renderModal();
+            });
+            refreshList();
+        }
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+        // Reflect the active tab's container in the toolbar chip. Contained → a
+        // coloured named pill; un-contained → a minimal ghost chip (create hint).
+        function updateContainerChip(index) {
+            if (index !== activeTabIndex)
+                return;
+            const chip = document.getElementById('container-chip');
+            if (!chip)
+                return;
+            const meta = tabContainer.get(index);
+            const nameEl = chip.querySelector('.cc-name');
+            if (meta) {
+                chip.classList.remove('hidden');
+                chip.classList.add('is-set');
+                chip.style.setProperty('--cc-color', meta.color);
+                if (nameEl)
+                    nameEl.textContent = (meta.icon ? meta.icon + ' ' : '') + meta.name;
+                chip.title = `Container: ${meta.name}`;
+            }
+            else {
+                chip.classList.remove('hidden');
+                chip.classList.remove('is-set');
+                chip.style.removeProperty('--cc-color');
+                if (nameEl)
+                    nameEl.textContent = '';
+                chip.title = 'Open this tab in a container';
+            }
+        }
         // ── Tab DOM helpers ───────────────────────────────────────────────────────
-        function createTabButton(index, title, afterIndex = null, shouldActivate = true, isPrivate = false, containerColor = null) {
+        function createTabButton(index, title, afterIndex = null, shouldActivate = true, isPrivate = false, containerMeta = null) {
             if (tabs.has(index))
                 return;
+            const containerColor = containerMeta ? containerMeta.color : null;
             const btn = document.createElement('div');
             btn.className = 'tab-button';
             btn.dataset.index = index;
@@ -2071,6 +2233,8 @@
             if (containerColor) {
                 btn.dataset.container = 'true';
                 btn.style.setProperty('--ctr-color', containerColor);
+                if (containerMeta && containerMeta.id != null)
+                    btn.dataset.containerId = containerMeta.id;
             }
             const titleSpan = document.createElement('span');
             titleSpan.className = 'tab-title';
@@ -2090,10 +2254,18 @@
             if (containerColor) {
                 const dot = document.createElement('span');
                 dot.className = 'tab-container-dot';
-                dot.title = 'Container tab — isolated session';
+                dot.title = containerMeta && containerMeta.name
+                    ? `${containerMeta.name} — isolated session`
+                    : 'Container tab — isolated session';
                 btn.appendChild(dot);
             }
             btn.appendChild(titleSpan);
+            if (containerMeta && containerMeta.name) {
+                const clabel = document.createElement('span');
+                clabel.className = 'tab-container-label';
+                clabel.textContent = (containerMeta.icon ? containerMeta.icon + ' ' : '') + containerMeta.name;
+                btn.appendChild(clabel);
+            }
             btn.appendChild(closeBtn);
             btn.addEventListener('mousedown', (e) => {
                 if (e.button !== 1)

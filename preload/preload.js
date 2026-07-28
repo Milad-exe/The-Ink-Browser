@@ -187,6 +187,8 @@ exposeInternal("tab", {
     add: () => ipcRenderer.invoke("addTab"),
     addPrivate: () => ipcRenderer.invoke("addPrivateTab"),
     addContainer: (url) => ipcRenderer.invoke("addContainerTab", url),
+    duplicate: (index) => ipcRenderer.invoke("tab:duplicate", index),
+    reopenInContainer: (index, id) => ipcRenderer.invoke("containers:reopenTab", index, id),
     addLazy: (url) => ipcRenderer.invoke("addTabLazy", url),
     remove: (index) => ipcRenderer.invoke("removeTab", index),
     switch: (index) => ipcRenderer.invoke("switchTab", index),
@@ -210,6 +212,18 @@ exposeInternal("tab", {
     onNavigationUpdated: (callback) => ipcRenderer.on('navigation-updated', callback),
     onTabLoading: (callback) => ipcRenderer.on('tab-loading', callback),
     onMediaIndicator: (callback) => ipcRenderer.on('tab-media-indicator', callback)
+});
+// Named containers (Firefox Multi-Account Containers) — registry + tab ops.
+exposeInternal('containers', {
+    list: () => ipcRenderer.invoke('containers:list'),
+    create: (data) => ipcRenderer.invoke('containers:create', data),
+    update: (id, patch) => ipcRenderer.invoke('containers:update', id, patch),
+    remove: (id) => ipcRenderer.invoke('containers:remove', id),
+    openTab: (id, url) => ipcRenderer.invoke('containers:openTab', id, url),
+    reopenTab: (index, id) => ipcRenderer.invoke('containers:reopenTab', index, id),
+    menu: (mode, x, y) => ipcRenderer.send('containers:menu', mode, x, y),
+    onChanged: (cb) => ipcRenderer.on('containers:changed', () => cb()),
+    onOpenModal: (cb) => ipcRenderer.on('open-containers-modal', () => cb()),
 });
 exposeInternal('northstarPrivate', {
     newPrivateWindow: () => ipcRenderer.invoke('newPrivateWindow'),

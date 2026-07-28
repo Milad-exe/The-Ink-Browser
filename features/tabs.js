@@ -565,6 +565,7 @@ class Tabs {
             private: makePrivate,
             container: container,
             containerColor: container ? containers.colorFor(container) : null,
+            containerMeta: container ? containers.meta(container) : null,
         });
         if (shouldActivate) {
             this.showTab(tabIndex);
@@ -616,18 +617,48 @@ class Tabs {
     // Open (url) in a BRAND-NEW container — a fresh persistent isolated cookie
     // jar. Two of these to the same site hold fully independent logins, so
     // switching tabs never carries one tab's session over to the other.
+    // Create a brand-new named container identity and open (url) in it.
     openInNewContainer(url, insertAfterIndex = null) {
-        const id = String(this.nextContainerId++);
-        const idx = this.createTab(insertAfterIndex, true, false, id);
-        if (url)
-            this.loadUrl(idx, url);
-        return idx;
+        const c = containers.create({});
+        return this.openInContainer(url, c.id, insertAfterIndex);
     }
     // Open (url) in an EXISTING container (shares that container's session).
     openInContainer(url, containerId, insertAfterIndex = null) {
         const idx = this.createTab(insertAfterIndex, true, false, containerId);
         if (url)
             this.loadUrl(idx, url);
+        return idx;
+    }
+    // Move a tab into a container (or out to the default session when
+    // containerId is null). A tab's session is fixed at creation, so this opens a
+    // fresh tab in the target session at the same position and closes the old one
+    // — Firefox's "Reopen in Container".
+    reopenInContainer(index, containerId) {
+        if (!this.tabMap.has(index))
+            return null;
+        const url = this.tabUrls.get(index);
+        const httpUrl = (typeof url === 'string' && /^https?:/i.test(url)) ? url : null;
+        const orderPos = this.tabOrder.indexOf(index);
+        const insertAfter = orderPos > 0 ? this.tabOrder[orderPos - 1] : -1;
+        const id = (containerId != null && String(containerId) !== '') ? String(containerId) : null;
+        const idx = this.createTab(insertAfter, true, false, id);
+        if (httpUrl)
+            this.loadUrl(idx, httpUrl);
+        this.removeTab(index);
+        return idx;
+    }
+    // Duplicate a tab into a NEW tab in the SAME container (or default) session.
+    duplicateTab(index) {
+        if (!this.tabMap.has(index))
+            return null;
+        const url = this.tabUrls.get(index);
+        const httpUrl = (typeof url === 'string' && /^https?:/i.test(url)) ? url : null;
+        const orderPos = this.tabOrder.indexOf(index);
+        const insertAfter = orderPos !== -1 ? index : null;
+        const id = this.tabContainers.get(index) || null;
+        const idx = this.createTab(insertAfter, true, this.privateTabs.has(index), id);
+        if (httpUrl)
+            this.loadUrl(idx, httpUrl);
         return idx;
     }
     // A captive portal was detected → open its sign-in page in a new tab on the
@@ -1227,12 +1258,15 @@ class Tabs {
             }
             catch (e) { }
         }
+        const ctrId = this.tabContainers.get(tabIndex) || null;
         this.mainWindow.webContents.send('url-updated', {
             index: tabIndex,
             url: displayUrl,
             title: displayTitle,
             favicon: resolvedFavicon,
             private: this.privateTabs.has(tabIndex),
+            container: ctrId,
+            containerMeta: ctrId ? containers.meta(ctrId) : null,
         });
         // Keep the window title in sync with the active tab
         if (tabIndex === this.activeTabIndex) {

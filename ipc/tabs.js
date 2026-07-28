@@ -149,6 +149,96 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (wd)
             wd.tabs.openInNewContainer(url ? sanitizeUrl(url) : null);
     });
+    // ── Named containers (Firefox Multi-Account Containers) ───────────────────
+    const containers = require('../features/containers');
+    // Tell every window's chrome to refresh its container UI (chip, menus, modal).
+    const broadcastContainers = () => {
+        try {
+            for (const wd of wm.windows.values())
+                wd.window?.webContents?.send('containers:changed');
+        }
+        catch { }
+    };
+    ipcMain.handle('containers:list', () => containers.list());
+    ipcMain.handle('containers:create', (_e, data) => {
+        const c = containers.create(data || {});
+        broadcastContainers();
+        return c;
+    });
+    ipcMain.handle('containers:update', (_e, id, patch) => {
+        const c = containers.update(id, patch || {});
+        broadcastContainers();
+        return c;
+    });
+    ipcMain.handle('containers:remove', (_e, id) => {
+        const ok = containers.remove(id);
+        broadcastContainers();
+        return ok;
+    });
+    // Open a new tab in an EXISTING container (blank, or a sanitized url).
+    ipcMain.handle('containers:openTab', (_e, id, url) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd)
+            wd.tabs.openInContainer(url ? sanitizeUrl(url) : null, id);
+    });
+    // Move a tab into a container (id null → back to the default session).
+    ipcMain.handle('containers:reopenTab', (_e, index, id) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd)
+            wd.tabs.reopenInContainer(index, id);
+    });
+    // Duplicate a tab (same container/session, new tab).
+    ipcMain.handle('tab:duplicate', (_e, index) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd)
+            wd.tabs.duplicateTab(index);
+    });
+    // Native dropdown popped from the toolbar container chip (mode 'move' → put
+    // the active tab into a container) or the + button (mode 'new' → open a fresh
+    // tab in a container). A native menu draws above the page's WebContentsView,
+    // which an in-chrome DOM menu can't (invariant #4).
+    ipcMain.on('containers:menu', (_e, mode, x, y) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (!wd)
+            return;
+        const tabs = wd.tabs;
+        const idx = tabs.activeTabIndex;
+        const current = tabs.tabContainers.get(idx) || null;
+        const template = [
+            { label: mode === 'move' ? 'Move this tab to' : 'Open new tab in', enabled: false },
+            { type: 'separator' },
+        ];
+        if (mode === 'move') {
+            template.push({
+                label: 'None (default)', type: 'checkbox', checked: current === null,
+                click: () => { if (current !== null) tabs.reopenInContainer(idx, null); },
+            });
+        }
+        for (const c of containers.list()) {
+            const checked = current === c.id;
+            template.push({
+                label: (c.icon ? c.icon + '  ' : '') + c.name, type: 'checkbox', checked,
+                click: () => {
+                    if (mode === 'move') { if (!checked) tabs.reopenInContainer(idx, c.id); }
+                    else tabs.openInContainer(null, c.id);
+                },
+            });
+        }
+        template.push({ type: 'separator' }, {
+            label: 'New Container…',
+            click: () => {
+                const c = containers.create({});
+                broadcastContainers();
+                if (mode === 'move') tabs.reopenInContainer(idx, c.id);
+                else tabs.openInContainer(null, c.id);
+            },
+        }, {
+            label: 'Manage Containers…',
+            click: () => { try { wd.window.webContents.send('open-containers-modal'); } catch { } },
+        });
+        try { Menu.buildFromTemplate(template).popup({ window: wd.window, x: Math.round(x), y: Math.round(y) }); }
+        catch { }
+    });
     // Open a URL in a new background tab without loading it until the user switches to it
     ipcMain.handle('addTabLazy', (_e, url) => {
         const wd = wm.getWindowByWebContents(_e.sender);

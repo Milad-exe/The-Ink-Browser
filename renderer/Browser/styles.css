@@ -176,14 +176,108 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
   pointer-events: none;
 }
 
-/* Container tabs: a coloured dot + matching underline so an isolated-session tab
-   is distinguishable at a glance (features/containers.js colorFor). */
+/* Container tabs: a coloured dot + name label + left stripe + underline so an
+   isolated-session tab reads as its named identity (features/containers.js). */
 .tab-container-dot {
   width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
   background: var(--ctr-color, var(--accent));
   box-shadow: 0 0 5px color-mix(in srgb, var(--ctr-color, var(--accent)) 60%, transparent);
 }
-.tab-button[data-container] { box-shadow: inset 0 -2px 0 -0.5px var(--ctr-color, var(--accent)), 0 1px 2px rgba(8,10,20,0.07); }
+.tab-container-label {
+  font-family: var(--mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; flex-shrink: 0;
+  color: var(--ctr-color, var(--accent));
+  opacity: 0.9; margin-left: 1px; margin-right: 2px;
+  max-width: 74px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Coloured left stripe + soft underline mark the container identity. */
+.tab-button[data-container] {
+  box-shadow:
+    inset 3px 0 0 -0.5px var(--ctr-color, var(--accent)),
+    inset 0 -2px 0 -0.5px var(--ctr-color, var(--accent)),
+    0 1px 2px rgba(8,10,20,0.07);
+}
+.tab-button[data-container].active {
+  box-shadow:
+    inset 3px 0 0 -0.5px var(--ctr-color, var(--accent)),
+    inset 0 -2px 0 -0.5px var(--ctr-color, var(--accent)),
+    0 1px 3px rgba(8,10,20,0.12);
+}
+
+/* ── Container chip (toolbar, by the reload icon) ─────────────────────────── */
+.container-chip {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+  height: 26px; padding: 0 8px; margin-left: 3px;
+  border: 1px solid var(--border); border-radius: var(--radius-pill, 999px);
+  background: var(--surface); color: var(--text-2);
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  cursor: pointer; white-space: nowrap; transition: background .12s, border-color .12s, color .12s;
+}
+.container-chip:hover { background: var(--hover); }
+.container-chip.hidden { display: none; }
+.container-chip .cc-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: var(--cc-color, var(--text-3));
+  box-shadow: 0 0 5px color-mix(in srgb, var(--cc-color, transparent) 65%, transparent);
+}
+.container-chip .cc-name { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
+.container-chip .cc-caret { opacity: 0.6; flex-shrink: 0; }
+/* Un-contained (ghost) state: no name, just the container glyph + caret. */
+.container-chip:not(.is-set) { color: var(--text-3); padding: 0 7px; }
+.container-chip:not(.is-set) .cc-name { display: none; }
+.container-chip:not(.is-set) .cc-dot {
+  width: 9px; height: 9px; border-radius: 3px; background: transparent;
+  border: 1.5px solid currentColor; box-shadow: none;
+}
+.container-chip.is-set {
+  color: var(--ctr-text, var(--text));
+  border-color: color-mix(in srgb, var(--cc-color) 45%, var(--border));
+  background: color-mix(in srgb, var(--cc-color) 12%, var(--surface));
+}
+
+/* ── Manage Containers modal ──────────────────────────────────────────────── */
+.cm-overlay {
+  position: fixed; inset: 0; z-index: 1300;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(8,10,20,0.42);
+}
+.cm-overlay.hidden { display: none; }
+.cm-card {
+  width: 460px; max-width: calc(100vw - 40px); max-height: 72vh; overflow: auto;
+  padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg, 14px);
+  background: var(--surface); box-shadow: 0 24px 60px rgba(8,10,20,0.4);
+}
+.cm-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.cm-title {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-2);
+}
+.cm-x { border: none; background: transparent; color: var(--text-3); font-size: 15px; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.cm-x:hover { background: var(--hover); color: var(--text); }
+.cm-empty { color: var(--text-3); font-size: 12.5px; padding: 8px 2px; }
+.cm-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+.cm-name-input {
+  flex: 0 0 128px; height: 30px; padding: 0 9px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--page); color: var(--text); font-size: 12.5px;
+}
+.cm-name-input:focus { outline: none; border-color: var(--accent); }
+.cm-swatches { display: flex; gap: 5px; flex: 1; flex-wrap: wrap; }
+.cm-swatch {
+  width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
+  background: var(--s); border: 2px solid transparent;
+}
+.cm-swatch.sel { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface) inset; }
+.cm-del { border: none; background: transparent; color: var(--text-3); cursor: pointer; font-size: 13px; padding: 4px 6px; border-radius: 6px; flex-shrink: 0; }
+.cm-del:hover { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
+.cm-add {
+  margin-top: 12px; width: 100%; height: 34px;
+  border: 1px dashed var(--border-2); border-radius: 9px;
+  background: transparent; color: var(--text-2);
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.cm-add:hover { background: var(--hover); color: var(--text); border-color: var(--accent); }
 
 .tab-favicon {
   width: 16px; height: 16px; flex-shrink: 0; border-radius: 5px; object-fit: cover;

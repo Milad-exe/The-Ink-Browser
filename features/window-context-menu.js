@@ -1,3 +1,33 @@
+const containers = require('./containers');
+// Build a "Reopen in Container ▸" submenu: None + every container (checkmark on
+// the tab's current one) + New Container. Reopening recreates the tab in the
+// target session (see Tabs.reopenInContainer).
+function containerSubmenu(tabsMgr, tabIndex) {
+    const current = tabsMgr.tabContainers.get(tabIndex) || null;
+    const items = [{
+        label: 'None (default)',
+        type: 'checkbox',
+        checked: current === null,
+        click: () => { if (current !== null) tabsMgr.reopenInContainer(tabIndex, null); },
+    }, { type: 'separator' }];
+    for (const c of containers.list()) {
+        items.push({
+            label: (c.icon ? c.icon + '  ' : '') + c.name,
+            type: 'checkbox',
+            checked: current === c.id,
+            click: () => { if (current !== c.id) tabsMgr.reopenInContainer(tabIndex, c.id); },
+        });
+    }
+    items.push({ type: 'separator' }, {
+        label: 'New Container…',
+        click: () => {
+            const c = containers.create({});
+            try { tabsMgr.mainWindow?.webContents?.send('containers:changed'); } catch { }
+            tabsMgr.reopenInContainer(tabIndex, c.id);
+        },
+    });
+    return items;
+}
 class WindowContextMenu {
     window; // BrowserWindow the menu belongs to
     windowManager;
@@ -78,16 +108,10 @@ class WindowContextMenu {
             click: () => windowData.tabs.reload(tabIndex),
         }, {
             label: 'Duplicate Tab',
-            click: () => {
-                const url = windowData.tabs.tabUrls.get(tabIndex);
-                if (url && url !== 'newtab') {
-                    const newIndex = windowData.tabs.createTab(tabIndex);
-                    windowData.tabs.loadUrl(newIndex, url);
-                }
-                else {
-                    windowData.tabs.createTab(tabIndex);
-                }
-            },
+            click: () => windowData.tabs.duplicateTab(tabIndex),
+        }, {
+            label: 'Reopen in Container',
+            submenu: containerSubmenu(windowData.tabs, tabIndex),
         }, {
             label: isPinned ? 'Unpin Tab' : 'Pin Tab',
             click: () => windowData.tabs.pinTab(tabIndex),
