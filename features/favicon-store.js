@@ -17,6 +17,22 @@
 const fs = require('fs');
 const path = require('path');
 const { app, net } = require('electron');
+const { getDomain } = require('tldts');
+
+// Key by registrable domain (eTLD+1), not the full host, so youtube.com,
+// www.youtube.com and m.youtube.com share one favicon — a site typed/bookmarked
+// as the bare domain still finds the icon cached when you visited "www". Falls
+// back to the host for things without a registrable domain (IPs, localhost).
+function keyFor(host) {
+    if (!host)
+        return '';
+    try {
+        return getDomain(host) || host;
+    }
+    catch {
+        return host;
+    }
+}
 
 const MAX_HOSTS = 1000;      // ~1000 data-URLs ≈ a few MB on disk/in memory
 const FETCH_CAP = 256 * 1024; // ignore anything larger than a real favicon
@@ -49,10 +65,12 @@ function save() {
         catch { }
     }, 3000);
 }
-/** Cached favicon for a host, or '' — never triggers a fetch. */
+/** Cached favicon for a host (matched by registrable domain), or '' — never
+ *  triggers a fetch. */
 function getForHost(host) {
     load();
-    return (host && store.get(host)) || '';
+    const key = keyFor(host);
+    return (key && store.get(key)) || '';
 }
 /** Fetch one URL over Electron's net stack → data: URL (or '' on any failure). */
 function fetchDataUrl(url) {
@@ -108,23 +126,24 @@ async function remember(pageUrl, faviconUrl) {
         ico = (faviconUrl && /^https?:\/\//i.test(faviconUrl)) ? faviconUrl : `${u.origin}/favicon.ico`;
     }
     catch { return; }
-    if (!host)
+    const key = keyFor(host);
+    if (!key)
         return;
     load();
-    if (store.has(host)) {
+    if (store.has(key)) {
         // Touch for rough LRU (move to newest) — no refetch.
-        const v = store.get(host);
-        store.delete(host);
-        store.set(host, v);
+        const v = store.get(key);
+        store.delete(key);
+        store.set(key, v);
         return;
     }
-    if (inflight.has(host))
+    if (inflight.has(key))
         return;
-    inflight.add(host);
+    inflight.add(key);
     try {
         const data = await fetchDataUrl(ico);
         if (data) {
-            store.set(host, data);
+            store.set(key, data);
             while (store.size > MAX_HOSTS) {
                 const oldest = store.keys().next().value;
                 store.delete(oldest);
@@ -133,7 +152,7 @@ async function remember(pageUrl, faviconUrl) {
         }
     }
     finally {
-        inflight.delete(host);
+        inflight.delete(key);
     }
 }
 
