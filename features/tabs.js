@@ -286,10 +286,13 @@ class Tabs {
         // The session is wiped in destroyTab() the moment the tab closes.
         return privateSessions.createTabSession();
     }
-    createLazyTab(url, title, isPinned, isPrivate = false, insertAfterActive = false, eager = false) {
+    createLazyTab(url, title, isPinned, isPrivate = false, insertAfterActive = false, eager = false, containerId = null) {
         const tabIndex = this.nextTabIndex;
         this.nextTabIndex++;
         const makePrivate = isPrivate || this.isPrivateWindow;
+        // Container binding is fixed here (chosen at creation, like private) and
+        // only applies to non-private tabs.
+        const container = (!makePrivate && containerId != null && String(containerId) !== '') ? String(containerId) : null;
         const webPrefs = {
             autoplayPolicy: 'user-gesture-required',
             preload: preloadForPage(url),
@@ -299,6 +302,9 @@ class Tabs {
         if (makePrivate) {
             webPrefs.session = this._getPrivateSession();
             webPrefs.v8CacheOptions = 'none'; // disable V8 bytecode cache for private tabs
+        }
+        else if (container) {
+            webPrefs.session = containers.get(container);
         }
         const tab = new WebContentsView({ webPreferences: webPrefs });
         try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch { }
@@ -311,7 +317,8 @@ class Tabs {
         tab.setVisible(false); // Do not show initially
         UserAgent.setupTab(tab);
         this._applyTabBackground(tab, url || 'newtab');
-        if (!makePrivate)
+        // Container tabs run on their own session (no extensions), like private.
+        if (!makePrivate && !container)
             extensions.addTab(tab.webContents, this.mainWindow);
         // Setup context menu
         tab.webContents.on("context-menu", async (_event, params) => {
@@ -351,6 +358,9 @@ class Tabs {
             this.privateTabs.add(tabIndex);
         }
         tab.isPrivate = makePrivate;
+        tab.containerId = container;
+        if (container)
+            this.tabContainers.set(tabIndex, container);
         tab.lazyLoaded = false;
         let tempTitle = title || url || 'New Tab';
         if ((!title || title === 'New Tab' || title === '') && url && url.startsWith('http')) {
@@ -381,6 +391,9 @@ class Tabs {
             afterIndex: afterPos !== -1 ? afterIdx : null,
             active: false,
             private: makePrivate,
+            container: container,
+            containerColor: container ? containers.colorFor(container) : null,
+            containerMeta: container ? containers.meta(container) : null,
         });
         this.sendTabUpdate(tabIndex, tab, url || 'newtab', tab.lazyTitle);
         // Eager background load (user-initiated "open in new tab"): start loading
@@ -629,24 +642,10 @@ class Tabs {
             this.loadUrl(idx, url);
         return idx;
     }
-    // Move a tab into a container (or out to the default session when
-    // containerId is null). A tab's session is fixed at creation, so this opens a
-    // fresh tab in the target session at the same position and closes the old one
-    // — Firefox's "Reopen in Container".
-    reopenInContainer(index, containerId) {
-        if (!this.tabMap.has(index))
-            return null;
-        const url = this.tabUrls.get(index);
-        const httpUrl = (typeof url === 'string' && /^https?:/i.test(url)) ? url : null;
-        const orderPos = this.tabOrder.indexOf(index);
-        const insertAfter = orderPos > 0 ? this.tabOrder[orderPos - 1] : -1;
-        const id = (containerId != null && String(containerId) !== '') ? String(containerId) : null;
-        const idx = this.createTab(insertAfter, true, false, id);
-        if (httpUrl)
-            this.loadUrl(idx, httpUrl);
-        this.removeTab(index);
-        return idx;
-    }
+    // A tab's container is fixed at creation and never changes (its isolated
+    // session is chosen then) — there is deliberately no "move tab to container".
+    // To use a different container you open a NEW tab in it (openInContainer).
+    //
     // Duplicate a tab into a NEW tab in the SAME container (or default) session.
     duplicateTab(index) {
         if (!this.tabMap.has(index))
@@ -1871,7 +1870,8 @@ class Tabs {
             return {
                 url,
                 title,
-                pinned: this.pinnedTabs.has(idx)
+                pinned: this.pinnedTabs.has(idx),
+                container: this.tabContainers.get(idx) || null,
             };
         });
         // Map active to its ordinal within the SAVED list (selected), not the

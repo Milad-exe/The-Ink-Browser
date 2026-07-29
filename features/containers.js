@@ -139,6 +139,19 @@ function remove(id) {
     return true;
 }
 
+/** Reorder identities to match the given id order (unlisted ids keep trailing). */
+function reorder(ids) {
+    const reg = load();
+    const rank = new Map((ids || []).map((id, i) => [String(id), i]));
+    reg.list.sort((a, b) => {
+        const ra = rank.has(a.id) ? rank.get(a.id) : Infinity;
+        const rb = rank.has(b.id) ? rank.get(b.id) : Infinity;
+        return ra - rb;
+    });
+    save();
+    return list();
+}
+
 // ── Sessions ──────────────────────────────────────────────────────────────────
 /** Get (creating once) the persistent session for a container id. */
 function get(id) {
@@ -174,4 +187,4 @@ function colorFor(id) {
     return COLORS[n % COLORS.length];
 }
 
-module.exports = { get, colorFor, list, meta, create, update, remove, COLORS, ICONS };
+module.exports = { get, colorFor, list, meta, create, update, remove, reorder, COLORS, ICONS };

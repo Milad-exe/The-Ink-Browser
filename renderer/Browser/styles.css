@@ -256,13 +256,22 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
 .cm-x { border: none; background: transparent; color: var(--text-3); font-size: 15px; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
 .cm-x:hover { background: var(--hover); color: var(--text); }
 .cm-empty { color: var(--text-3); font-size: 12.5px; padding: 8px 2px; }
-.cm-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+.cm-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-radius: 8px; }
+.cm-row.dragging { opacity: 0.5; }
+.cm-grip { color: var(--text-3); cursor: grab; font-size: 13px; flex-shrink: 0; user-select: none; line-height: 1; }
+.cm-grip:active { cursor: grabbing; }
 .cm-name-input {
-  flex: 0 0 128px; height: 30px; padding: 0 9px;
+  flex: 0 0 116px; height: 30px; padding: 0 9px;
   border: 1px solid var(--border); border-radius: 8px;
   background: var(--page); color: var(--text); font-size: 12.5px;
 }
 .cm-name-input:focus { outline: none; border-color: var(--accent); }
+.cm-icon-select {
+  flex: 0 0 44px; height: 30px; padding: 0 4px; text-align: center;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--page); color: var(--text); font-size: 13px; cursor: pointer;
+}
+.cm-icon-select:focus { outline: none; border-color: var(--accent); }
 .cm-swatches { display: flex; gap: 5px; flex: 1; flex-wrap: wrap; }
 .cm-swatch {
   width: 18px; height: 18px; border-radius: 50%; cursor: pointer;

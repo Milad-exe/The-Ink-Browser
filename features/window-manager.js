@@ -270,9 +270,9 @@ class WindowManager {
             const state = (!this.restored && this.persistence.hasState()) ? this.persistence.loadState() : null;
             if (state && state.tabs && state.tabs.length > 0) {
                 try {
-                    // Create in saved order
+                    // Create in saved order, restoring each tab's container binding.
                     state.tabs.forEach((t) => {
-                        tabs.createLazyTab(t.url, t.title, t.pinned);
+                        tabs.createLazyTab(t.url, t.title, t.pinned, false, false, false, t.container || null);
                     });
                     // Focus saved active if valid
                     if (typeof state.activeIndex === 'number') {

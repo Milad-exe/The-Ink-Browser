@@ -175,17 +175,16 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         broadcastContainers();
         return ok;
     });
+    ipcMain.handle('containers:reorder', (_e, ids) => {
+        containers.reorder(ids || []);
+        broadcastContainers();
+        return containers.list();
+    });
     // Open a new tab in an EXISTING container (blank, or a sanitized url).
     ipcMain.handle('containers:openTab', (_e, id, url) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd)
             wd.tabs.openInContainer(url ? sanitizeUrl(url) : null, id);
-    });
-    // Move a tab into a container (id null → back to the default session).
-    ipcMain.handle('containers:reopenTab', (_e, index, id) => {
-        const wd = wm.getWindowByWebContents(_e.sender);
-        if (wd)
-            wd.tabs.reopenInContainer(index, id);
     });
     // Duplicate a tab (same container/session, new tab).
     ipcMain.handle('tab:duplicate', (_e, index) => {
@@ -193,45 +192,28 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (wd)
             wd.tabs.duplicateTab(index);
     });
-    // Native dropdown popped from the toolbar container chip (mode 'move' → put
-    // the active tab into a container) or the + button (mode 'new' → open a fresh
-    // tab in a container). A native menu draws above the page's WebContentsView,
-    // which an in-chrome DOM menu can't (invariant #4).
-    ipcMain.on('containers:menu', (_e, mode, x, y) => {
+    // Native dropdown from the toolbar container chip or the + button: open a NEW
+    // tab in a container (a tab's own container is fixed at creation and never
+    // changes). A native menu draws above the page's WebContentsView, which an
+    // in-chrome DOM menu can't (invariant #4).
+    ipcMain.on('containers:menu', (_e, _mode, x, y) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd)
             return;
         const tabs = wd.tabs;
-        const idx = tabs.activeTabIndex;
-        const current = tabs.tabContainers.get(idx) || null;
         const template = [
-            { label: mode === 'move' ? 'Move this tab to' : 'Open new tab in', enabled: false },
+            { label: 'Open new tab in', enabled: false },
             { type: 'separator' },
         ];
-        if (mode === 'move') {
-            template.push({
-                label: 'None (default)', type: 'checkbox', checked: current === null,
-                click: () => { if (current !== null) tabs.reopenInContainer(idx, null); },
-            });
-        }
         for (const c of containers.list()) {
-            const checked = current === c.id;
             template.push({
-                label: (c.icon ? c.icon + '  ' : '') + c.name, type: 'checkbox', checked,
-                click: () => {
-                    if (mode === 'move') { if (!checked) tabs.reopenInContainer(idx, c.id); }
-                    else tabs.openInContainer(null, c.id);
-                },
+                label: (c.icon ? c.icon + '  ' : '') + c.name,
+                click: () => tabs.openInContainer(null, c.id),
             });
         }
         template.push({ type: 'separator' }, {
             label: 'New Container…',
-            click: () => {
-                const c = containers.create({});
-                broadcastContainers();
-                if (mode === 'move') tabs.reopenInContainer(idx, c.id);
-                else tabs.openInContainer(null, c.id);
-            },
+            click: () => { const c = containers.create({}); broadcastContainers(); tabs.openInContainer(null, c.id); },
         }, {
             label: 'Manage Containers…',
             click: () => { try { wd.window.webContents.send('open-containers-modal'); } catch { } },
@@ -692,13 +674,13 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (!src || !dst)
             return false;
         try {
-            if (!url || url === 'newtab') {
-                dst.tabs.createTab();
-            }
-            else {
-                const idx = dst.tabs.createTab();
+            // Carry the tab's identity across: container (shared session, so the
+            // jar is preserved) and private flag stay with the tab.
+            const containerId = src.tabs.tabContainers.get(tabIndex) || null;
+            const isPrivate = src.tabs.privateTabs.has(tabIndex);
+            const idx = dst.tabs.createTab(null, true, isPrivate, containerId);
+            if (url && url !== 'newtab')
                 dst.tabs.loadUrl(idx, sanitizeUrl(url));
-            }
             src.tabs.removeTab(tabIndex);
             // The tab now lives in the destination window — focus follows it
             // (Chrome does the same), otherwise the move looks like nothing
@@ -721,25 +703,37 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             return false;
         try {
             const { x, y } = dropPoint(screenX, screenY);
+            const containerId = src.tabs.tabContainers.get(tabIndex) || null;
+            const isPrivate = src.tabs.privateTabs.has(tabIndex);
             const newWin = wm.createWindow(800, 600);
             newWin.window.setBounds({
                 x: Math.max(0, Math.floor(x - 400)),
                 y: Math.max(0, Math.floor(y - 300)),
                 width: 800, height: 600,
             });
-            if (url && url !== 'newtab') {
-                const safeUrl = sanitizeUrl(url);
-                newWin.window.webContents.once('did-finish-load', () => {
-                    try {
-                        if (newWin.window.isDestroyed())
-                            return;
+            const safeUrl = (url && url !== 'newtab') ? sanitizeUrl(url) : null;
+            newWin.window.webContents.once('did-finish-load', () => {
+                try {
+                    if (newWin.window.isDestroyed())
+                        return;
+                    // Detached tab keeps its container/private identity: open a
+                    // matching tab and drop the window's default one.
+                    if (containerId || isPrivate) {
+                        const firstIdx = Array.from(newWin.tabs.tabMap.keys())[0];
+                        const idx = newWin.tabs.createTab(null, true, isPrivate, containerId);
+                        if (safeUrl)
+                            newWin.tabs.loadUrl(idx, safeUrl);
+                        if (firstIdx !== undefined && firstIdx !== idx)
+                            newWin.tabs.removeTab(firstIdx);
+                    }
+                    else if (safeUrl) {
                         const firstIdx = Array.from(newWin.tabs.tabMap.keys())[0];
                         if (firstIdx !== undefined)
                             newWin.tabs.loadUrl(firstIdx, safeUrl);
                     }
-                    catch { }
-                });
-            }
+                }
+                catch { }
+            });
             src.tabs.removeTab(tabIndex);
             return true;
         }

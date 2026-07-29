@@ -2073,6 +2073,7 @@
         // handles create/rename/recolor/delete. The registry lives in main
         // (features/containers.js); we mirror it here via window.containers.
         const CONTAINER_SWATCHES = ['#e0894a', '#4a9eff', '#3fbf7f', '#c86fe0', '#e05a7a', '#e0c341', '#5ad0d0', '#9a7bff'];
+        const CONTAINER_ICONS = ['', '●', '◆', '★', '⬢', '▲', '⚑', '⬤'];
         let containerList = [];
         function initContainers() {
             const chip = document.getElementById('container-chip');
@@ -2084,12 +2085,12 @@
                 catch { containerList = []; }
             };
             // ── Chip / + button → native dropdown (drawn above the page view) ──────
-            // 'move' puts the active tab into a container; 'new' opens a fresh tab
-            // in one. The menu itself is built in main (ipc/tabs.js).
+            // Opens a NEW tab in a chosen container (a tab's own container never
+            // changes). The menu itself is built in main (ipc/tabs.js).
             chip.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const r = chip.getBoundingClientRect();
-                window.containers.menu('move', r.left, r.bottom + 4);
+                window.containers.menu('new', r.left, r.bottom + 4);
             });
             const addBtn = document.getElementById('new-tab-btn');
             if (addBtn) {
@@ -2122,6 +2123,11 @@
                 try { window.focusMode.overlayOpen(); } catch { }
             };
             document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+            let dragId = null;
+            function commitOrder() {
+                const ids = [...listEl.querySelectorAll('.cm-row')].map(r => r.dataset.id);
+                window.containers.reorder(ids);
+            }
             function renderModal() {
                 listEl.innerHTML = '';
                 if (!containerList.length) {
@@ -2133,14 +2139,21 @@
                 for (const c of containerList) {
                     const rowEl = document.createElement('div');
                     rowEl.className = 'cm-row';
+                    rowEl.dataset.id = c.id;
+                    rowEl.draggable = true;
                     const swatches = CONTAINER_SWATCHES.map(col =>
                         `<button class="cm-swatch${col === c.color ? ' sel' : ''}" data-color="${col}" style="--s:${col}" tabindex="-1"></button>`).join('');
+                    const icons = CONTAINER_ICONS.map(ic =>
+                        `<option value="${ic}"${ic === (c.icon || '') ? ' selected' : ''}>${ic || '—'}</option>`).join('');
                     rowEl.innerHTML =
-                        `<input class="cm-name-input" value="${escapeHtml(c.name)}" maxlength="24" tabindex="-1">
+                        `<span class="cm-grip" title="Drag to reorder">⠿</span>
+                         <input class="cm-name-input" value="${escapeHtml(c.name)}" maxlength="24" tabindex="-1">
+                         <select class="cm-icon-select" title="Icon">${icons}</select>
                          <div class="cm-swatches">${swatches}</div>
                          <button class="cm-del" tabindex="-1" title="Delete container">✕</button>`;
                     const nameInput = rowEl.querySelector('.cm-name-input');
                     nameInput.addEventListener('change', () => window.containers.update(c.id, { name: nameInput.value }));
+                    rowEl.querySelector('.cm-icon-select').addEventListener('change', (e) => window.containers.update(c.id, { icon: e.target.value }));
                     rowEl.querySelectorAll('.cm-swatch').forEach(sw => {
                         sw.addEventListener('click', () => {
                             rowEl.querySelectorAll('.cm-swatch').forEach(s => s.classList.remove('sel'));
@@ -2149,6 +2162,18 @@
                         });
                     });
                     rowEl.querySelector('.cm-del').addEventListener('click', () => window.containers.remove(c.id));
+                    // Drag-to-reorder.
+                    rowEl.addEventListener('dragstart', (e) => { dragId = c.id; rowEl.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+                    rowEl.addEventListener('dragend', () => { rowEl.classList.remove('dragging'); if (dragId) commitOrder(); dragId = null; });
+                    rowEl.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        const dragging = listEl.querySelector('.cm-row.dragging');
+                        if (!dragging || dragging === rowEl)
+                            return;
+                        const r = rowEl.getBoundingClientRect();
+                        const after = e.clientY > r.top + r.height / 2;
+                        listEl.insertBefore(dragging, after ? rowEl.nextSibling : rowEl);
+                    });
                     listEl.appendChild(rowEl);
                 }
             }
@@ -2206,7 +2231,7 @@
                 chip.style.setProperty('--cc-color', meta.color);
                 if (nameEl)
                     nameEl.textContent = (meta.icon ? meta.icon + ' ' : '') + meta.name;
-                chip.title = `Container: ${meta.name}`;
+                chip.title = `Container: ${meta.name} — open a new container tab`;
             }
             else {
                 chip.classList.remove('hidden');
@@ -2214,7 +2239,7 @@
                 chip.style.removeProperty('--cc-color');
                 if (nameEl)
                     nameEl.textContent = '';
-                chip.title = 'Open this tab in a container';
+                chip.title = 'Open a new container tab';
             }
         }
         // ── Tab DOM helpers ───────────────────────────────────────────────────────
