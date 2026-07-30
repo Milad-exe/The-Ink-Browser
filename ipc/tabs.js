@@ -142,16 +142,14 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (wd)
             wd.tabs.createTab(null, true, true);
     });
-    // Container tab: a fresh persistent isolated cookie jar. sanitizeUrl'd if a
-    // url is given; blank new-tab otherwise.
+    // Open a new isolated instance (auto-named from the url if given).
     ipcMain.handle('addContainerTab', (_e, url) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd)
-            wd.tabs.openInNewContainer(url ? sanitizeUrl(url) : null);
+            wd.tabs.openIsolatedInstance(url ? sanitizeUrl(url) : null);
     });
-    // ── Named containers (Firefox Multi-Account Containers) ───────────────────
+    // ── Isolated instances (on-demand, auto-named isolated sessions) ──────────
     const containers = require('../features/containers');
-    // Tell every window's chrome to refresh its container UI (chip, menus, modal).
     const broadcastContainers = () => {
         try {
             for (const wd of wm.windows.values())
@@ -160,64 +158,79 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         catch { }
     };
     ipcMain.handle('containers:list', () => containers.list());
-    ipcMain.handle('containers:create', (_e, data) => {
-        const c = containers.create(data || {});
-        broadcastContainers();
-        return c;
+    // Open (url) in a brand-new isolated instance.
+    ipcMain.handle('containers:openIsolated', (_e, url) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd)
+            wd.tabs.openIsolatedInstance(url ? sanitizeUrl(url) : null);
     });
-    ipcMain.handle('containers:update', (_e, id, patch) => {
-        const c = containers.update(id, patch || {});
-        broadcastContainers();
-        return c;
-    });
-    ipcMain.handle('containers:remove', (_e, id) => {
-        const ok = containers.remove(id);
-        broadcastContainers();
-        return ok;
-    });
-    ipcMain.handle('containers:reorder', (_e, ids) => {
-        containers.reorder(ids || []);
-        broadcastContainers();
-        return containers.list();
-    });
-    // Open a new tab in an EXISTING container (blank, or a sanitized url).
+    // Reopen an existing instance: a new tab on its (still signed-in) session.
     ipcMain.handle('containers:openTab', (_e, id, url) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd)
             wd.tabs.openInContainer(url ? sanitizeUrl(url) : null, id);
     });
-    // Duplicate a tab (same container/session, new tab).
+    // Rename an instance.
+    ipcMain.handle('containers:update', (_e, id, patch) => {
+        const c = containers.update(id, patch || {});
+        broadcastContainers();
+        return c;
+    });
+    // Close an instance everywhere: shut its tabs in every window, then wipe its
+    // data (full sign-out) and drop it from the reopen list.
+    ipcMain.handle('containers:closeInstance', (_e, id) => {
+        try {
+            for (const wd of wm.windows.values())
+                wd.tabs?.closeTabsForContainer(id);
+        }
+        catch { }
+        const ok = containers.remove(id);
+        broadcastContainers();
+        return ok;
+    });
+    // Duplicate a tab (same instance/session, new tab).
     ipcMain.handle('tab:duplicate', (_e, index) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd)
             wd.tabs.duplicateTab(index);
     });
-    // Native dropdown from the toolbar container chip or the + button: open a NEW
-    // tab in a container (a tab's own container is fixed at creation and never
-    // changes). A native menu draws above the page's WebContentsView, which an
-    // in-chrome DOM menu can't (invariant #4).
+    // Native dropdown from the toolbar instance chip / the + button. Context-aware:
+    // when the active tab is in an instance it offers that instance's actions;
+    // always offers "new isolated tab" + reopen of existing instances. A native
+    // menu draws above the page's WebContentsView, which chrome DOM can't (inv. #4).
     ipcMain.on('containers:menu', (_e, _mode, x, y) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd)
             return;
         const tabs = wd.tabs;
-        const template = [
-            { label: 'Open new tab in', enabled: false },
-            { type: 'separator' },
-        ];
-        for (const c of containers.list()) {
-            template.push({
-                label: (c.icon ? c.icon + '  ' : '') + c.name,
-                click: () => tabs.openInContainer(null, c.id),
-            });
+        const idx = tabs.activeTabIndex;
+        const currentId = tabs.tabContainers.get(idx) || null;
+        const url = tabs.tabUrls.get(idx);
+        const httpUrl = (typeof url === 'string' && /^https?:/i.test(url)) ? url : null;
+        const template = [];
+        if (currentId) {
+            const m = containers.meta(currentId);
+            template.push({ label: m ? m.name : 'Isolated instance', enabled: false }, { type: 'separator' },
+                { label: 'New tab in this instance', click: () => tabs.openInContainer(null, currentId) },
+                { label: 'Rename instance…', click: () => { try { wd.window.webContents.send('rename-instance', currentId); } catch { } } },
+                { label: 'Close instance (sign out)', click: () => {
+                    try { for (const w of wm.windows.values()) w.tabs?.closeTabsForContainer(currentId); } catch { }
+                    containers.remove(currentId); broadcastContainers();
+                } },
+                { type: 'separator' });
         }
-        template.push({ type: 'separator' }, {
-            label: 'New Container…',
-            click: () => { const c = containers.create({}); broadcastContainers(); tabs.openInContainer(null, c.id); },
-        }, {
-            label: 'Manage Containers…',
-            click: () => { try { wd.window.webContents.send('open-containers-modal'); } catch { } },
+        template.push({
+            label: httpUrl ? 'Open this site in a new isolated instance' : 'New isolated tab',
+            click: () => tabs.openIsolatedInstance(httpUrl),
         });
+        if (httpUrl)
+            template.push({ label: 'New isolated tab', click: () => tabs.openIsolatedInstance(null) });
+        const others = containers.list().filter(c => c.id !== currentId);
+        if (others.length) {
+            template.push({ type: 'separator' }, { label: 'Reopen instance', enabled: false });
+            for (const c of others)
+                template.push({ label: c.name, click: () => tabs.openInContainer(null, c.id) });
+        }
         try { Menu.buildFromTemplate(template).popup({ window: wd.window, x: Math.round(x), y: Math.round(y) }); }
         catch { }
     });

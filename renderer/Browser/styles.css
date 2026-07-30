@@ -221,72 +221,45 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
   background: var(--cc-color, var(--text-3));
   box-shadow: 0 0 5px color-mix(in srgb, var(--cc-color, transparent) 65%, transparent);
 }
-.container-chip .cc-name { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
+.container-chip .cc-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
 .container-chip .cc-caret { opacity: 0.6; flex-shrink: 0; }
-/* Un-contained (ghost) state: no name, just the container glyph + caret. */
-.container-chip:not(.is-set) { color: var(--text-3); padding: 0 7px; }
-.container-chip:not(.is-set) .cc-name { display: none; }
-.container-chip:not(.is-set) .cc-dot {
-  width: 9px; height: 9px; border-radius: 3px; background: transparent;
-  border: 1.5px solid currentColor; box-shadow: none;
-}
+/* Shown only on isolated-instance tabs — tinted to the instance colour. */
 .container-chip.is-set {
-  color: var(--ctr-text, var(--text));
+  color: var(--text);
   border-color: color-mix(in srgb, var(--cc-color) 45%, var(--border));
   background: color-mix(in srgb, var(--cc-color) 12%, var(--surface));
 }
 
-/* ── Manage Containers modal ──────────────────────────────────────────────── */
+/* ── Rename-instance modal ────────────────────────────────────────────────── */
 .cm-overlay {
   position: fixed; inset: 0; z-index: 1300;
   display: flex; align-items: center; justify-content: center;
   background: rgba(8,10,20,0.42);
 }
 .cm-overlay.hidden { display: none; }
-.cm-card {
-  width: 460px; max-width: calc(100vw - 40px); max-height: 72vh; overflow: auto;
-  padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg, 14px);
+.ri-card {
+  width: 320px; max-width: calc(100vw - 40px); padding: 18px;
+  border: 1px solid var(--border); border-radius: var(--radius-lg, 14px);
   background: var(--surface); box-shadow: 0 24px 60px rgba(8,10,20,0.4);
 }
-.cm-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.cm-title {
-  font-family: var(--mono); font-size: 12px; font-weight: 700;
-  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-2);
+.ri-title {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-2); margin-bottom: 10px;
 }
-.cm-x { border: none; background: transparent; color: var(--text-3); font-size: 15px; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
-.cm-x:hover { background: var(--hover); color: var(--text); }
-.cm-empty { color: var(--text-3); font-size: 12.5px; padding: 8px 2px; }
-.cm-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-radius: 8px; }
-.cm-row.dragging { opacity: 0.5; }
-.cm-grip { color: var(--text-3); cursor: grab; font-size: 13px; flex-shrink: 0; user-select: none; line-height: 1; }
-.cm-grip:active { cursor: grabbing; }
-.cm-name-input {
-  flex: 0 0 116px; height: 30px; padding: 0 9px;
-  border: 1px solid var(--border); border-radius: 8px;
-  background: var(--page); color: var(--text); font-size: 12.5px;
+.ri-input {
+  width: 100%; height: 34px; padding: 0 10px; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: 9px;
+  background: var(--page); color: var(--text); font-size: 13px;
 }
-.cm-name-input:focus { outline: none; border-color: var(--accent); }
-.cm-icon-select {
-  flex: 0 0 44px; height: 30px; padding: 0 4px; text-align: center;
-  border: 1px solid var(--border); border-radius: 8px;
-  background: var(--page); color: var(--text); font-size: 13px; cursor: pointer;
+.ri-input:focus { outline: none; border-color: var(--accent); }
+.ri-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.ri-btn {
+  height: 32px; padding: 0 14px; border-radius: 8px; cursor: pointer; font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--border); background: transparent; color: var(--text-2);
 }
-.cm-icon-select:focus { outline: none; border-color: var(--accent); }
-.cm-swatches { display: flex; gap: 5px; flex: 1; flex-wrap: wrap; }
-.cm-swatch {
-  width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
-  background: var(--s); border: 2px solid transparent;
-}
-.cm-swatch.sel { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface) inset; }
-.cm-del { border: none; background: transparent; color: var(--text-3); cursor: pointer; font-size: 13px; padding: 4px 6px; border-radius: 6px; flex-shrink: 0; }
-.cm-del:hover { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
-.cm-add {
-  margin-top: 12px; width: 100%; height: 34px;
-  border: 1px dashed var(--border-2); border-radius: 9px;
-  background: transparent; color: var(--text-2);
-  font-size: 12.5px; font-weight: 600; cursor: pointer;
-}
-.cm-add:hover { background: var(--hover); color: var(--text); border-color: var(--accent); }
+.ri-btn:hover { background: var(--hover); color: var(--text); }
+.ri-btn-primary { border-color: transparent; background: var(--accent); color: #1a1206; }
+.ri-btn-primary:hover { background: var(--accent); filter: brightness(1.06); color: #1a1206; }
 
 .tab-favicon {
   width: 16px; height: 16px; flex-shrink: 0; border-radius: 5px; object-fit: cover;

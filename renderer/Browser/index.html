@@ -179,15 +179,15 @@
     </div>
   </div>
 
-  <!-- Manage Containers modal -->
-  <div id="containers-modal" class="cm-overlay hidden">
-    <div class="cm-card" role="dialog" aria-label="Manage containers">
-      <div class="cm-head">
-        <span class="cm-title">Containers</span>
-        <button id="cm-close" class="cm-x" tabindex="-1" title="Close">✕</button>
+  <!-- Rename isolated-instance modal (one field) -->
+  <div id="rename-instance-modal" class="cm-overlay hidden">
+    <div class="ri-card" role="dialog" aria-label="Rename instance">
+      <div class="ri-title">Rename instance</div>
+      <input id="ri-input" class="ri-input" maxlength="32" placeholder="Instance name" tabindex="-1">
+      <div class="ri-actions">
+        <button id="ri-cancel" class="ri-btn" tabindex="-1">Cancel</button>
+        <button id="ri-save" class="ri-btn ri-btn-primary" tabindex="-1">Save</button>
       </div>
-      <div id="cm-list" class="cm-list"></div>
-      <button id="cm-add" class="cm-add" tabindex="-1">+ New container</button>
     </div>
   </div>
 

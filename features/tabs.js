@@ -627,24 +627,35 @@ class Tabs {
         });
         return tabIndex;
     }
-    // Open (url) in a BRAND-NEW container — a fresh persistent isolated cookie
-    // jar. Two of these to the same site hold fully independent logins, so
-    // switching tabs never carries one tab's session over to the other.
-    // Create a brand-new named container identity and open (url) in it.
-    openInNewContainer(url, insertAfterIndex = null) {
-        const c = containers.create({});
+    // Open (url) in a BRAND-NEW isolated instance — a fresh persistent isolated
+    // session auto-named from the site. Two of these to the same site hold fully
+    // independent logins, so switching tabs never carries one session over to the
+    // other. This is the primary "open an isolated instance" action.
+    openIsolatedInstance(url, insertAfterIndex = null) {
+        const c = containers.createForUrl(url);
         return this.openInContainer(url, c.id, insertAfterIndex);
     }
-    // Open (url) in an EXISTING container (shares that container's session).
+    // Open (url) in an EXISTING instance (reuse its session — stay signed in).
     openInContainer(url, containerId, insertAfterIndex = null) {
         const idx = this.createTab(insertAfterIndex, true, false, containerId);
         if (url)
             this.loadUrl(idx, url);
         return idx;
     }
-    // A tab's container is fixed at creation and never changes (its isolated
-    // session is chosen then) — there is deliberately no "move tab to container".
-    // To use a different container you open a NEW tab in it (openInContainer).
+    // Close every tab in THIS window that belongs to an instance (used when the
+    // instance itself is closed; the caller clears the instance's data).
+    closeTabsForContainer(containerId) {
+        const key = String(containerId);
+        const toClose = [];
+        for (const [idx, cid] of this.tabContainers)
+            if (cid === key)
+                toClose.push(idx);
+        toClose.forEach(i => this.removeTab(i));
+        return toClose.length;
+    }
+    // A tab's instance is fixed at creation and never changes (its isolated
+    // session is chosen then) — there is deliberately no "move tab to instance".
+    // To use a different instance you open a NEW tab in it (openInContainer).
     //
     // Duplicate a tab into a NEW tab in the SAME container (or default) session.
     duplicateTab(index) {

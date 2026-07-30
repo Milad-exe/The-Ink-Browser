@@ -1,50 +1,38 @@
 'use strict';
 /**
- * Containers — named, colour-coded, reusable isolated sessions (Firefox
- * Multi-Account Containers).
+ * Isolated instances — on-demand, auto-named, isolated sessions.
  *
- * A "container" is a persistent identity (name + colour + optional glyph) backed
- * by its own Electron session on a persist: partition. Unlike private tabs
- * (in-memory, wiped on close) a container's cookies/storage SURVIVE, so you stay
- * signed in. Tabs in the SAME container share that jar; tabs in DIFFERENT
- * containers (or the default, un-contained tabs) are fully independent.
+ * The need is concrete: run several separate copies of the same web app (e.g.
+ * multiple SuccessFactors logins) without their sessions bleeding into each
+ * other. So an "instance" is created on the spot from a single action ("open an
+ * isolated instance"), NOT pre-declared: it gets a fresh persistent session, a
+ * name auto-derived from the site, and a colour. It persists (you stay signed
+ * in) and can be reopened later; you can rename or close it, but you never have
+ * to set anything up first.
  *
- * This is what stops one tab's session "carrying over" to another for sites that
- * key everything off cookies (SuccessFactors, Salesforce, any multi-tenant SaaS):
- * open the same site in two containers and you get two truly separate logins that
- * never clobber each other, no matter which tab you switch to.
- *
- * The identity list is persisted to userData/northstar/containers.json; each
- * session gets the same hardening a private session does (UA + client-hints +
- * privacy headers + ad blocking + downloads + chrome-spoof), but with PERSISTENT
- * permission decisions — it behaves like a normal tab with its own jar.
+ * Each instance is backed by its own Electron session on a persist: partition
+ * (so cookies/storage survive), hardened exactly like a private session (UA +
+ * client-hints + privacy headers + ad blocking + downloads + chrome-spoof) but
+ * with PERSISTENT permission decisions. The identity list is persisted to
+ * userData/northstar/containers.json. (Internally these are still called
+ * "containers" — the session partition scheme — but the user sees "instances".)
  */
 const path = require('path');
 const fs = require('fs');
 const { app } = require('electron');
+const { parse: parseTld } = require('tldts');
 const { setup } = require('./private-session');
 const adBlocker = require('./ad-blocker');
 const downloadManager = require('./download-manager');
 
-const sessions = new Map(); // container id (string) → Electron Session
+const sessions = new Map(); // instance id (string) → Electron Session
 
-// A fixed accent palette new containers cycle through (also the manager's swatches).
+// Colours new instances cycle through, so two copies of a site look distinct.
 const COLORS = ['#e0894a', '#4a9eff', '#3fbf7f', '#c86fe0', '#e05a7a', '#e0c341', '#5ad0d0', '#9a7bff'];
-// Optional single-glyph icons that fit the mono aesthetic ('' = colour dot only).
-const ICONS = ['', '●', '◆', '★', '⬢', '▲', '⚑', '⬤'];
 
 // ── Registry (persisted identities) ───────────────────────────────────────────
-let _registry = null; // { nextId, list: [{id,name,color,icon}] }
+let _registry = null; // { nextId, list: [{id,name,color,site}] }
 function file() { return path.join(app.getPath('userData'), 'northstar', 'containers.json'); }
-
-const DEFAULTS = () => ({
-    nextId: 4,
-    list: [
-        { id: '1', name: 'Personal', color: COLORS[0], icon: '' },
-        { id: '2', name: 'Work', color: COLORS[1], icon: '' },
-        { id: '3', name: 'Banking', color: COLORS[2], icon: '' },
-    ],
-});
 
 function load() {
     if (_registry)
@@ -57,8 +45,7 @@ function load() {
         }
     }
     catch { }
-    _registry = DEFAULTS();
-    save();
+    _registry = { nextId: 1, list: [] }; // start empty — instances are made on demand
     return _registry;
 }
 
@@ -70,7 +57,7 @@ function save() {
     catch { }
 }
 
-/** All container identities (safe copies). */
+/** All instances (safe copies), newest last. */
 function list() {
     return load().list.map(c => ({ ...c }));
 }
@@ -87,39 +74,63 @@ function _sanitizeColor(color) {
     return (typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color)) ? color : null;
 }
 
-/** Create a new container identity. Returns it. */
-function create({ name, color, icon } = {}) {
+// Human label for a url: the site's own name, Title-cased ("SuccessFactors"
+// from perf.successfactors.com). Falls back to "Instance" for blanks/IPs.
+function labelForUrl(url) {
+    try {
+        const base = parseTld(url, { allowPrivateDomains: true }).domainWithoutSuffix;
+        if (base && /[a-z]/i.test(base))
+            return base.charAt(0).toUpperCase() + base.slice(1);
+    }
+    catch { }
+    return 'Instance';
+}
+
+// Dedupe a base label within the list: "Site", then "Site · 2", "Site · 3"…
+function _uniqueName(base) {
+    const reg = load();
+    const family = reg.list.filter(c => c.name === base || c.name.startsWith(base + ' · '));
+    return family.length === 0 ? base : `${base} · ${family.length + 1}`;
+}
+
+/**
+ * Create a fresh instance auto-named from (url). This is the primary entry
+ * point — every "open an isolated instance" mints a new one.
+ */
+function createForUrl(url) {
+    return _create(_uniqueName(labelForUrl(url)), url);
+}
+
+function _create(name, site) {
     const reg = load();
     const id = String(reg.nextId++);
     const c = {
         id,
-        name: (typeof name === 'string' && name.trim()) ? name.trim().slice(0, 24) : `Container ${id}`,
-        color: _sanitizeColor(color) || COLORS[(reg.list.length) % COLORS.length],
-        icon: ICONS.includes(icon) ? icon : '',
+        name: (name || 'Instance').slice(0, 32),
+        color: COLORS[reg.list.length % COLORS.length],
+        site: (typeof site === 'string' && /^https?:/i.test(site)) ? (() => { try { return new URL(site).hostname; } catch { return null; } })() : null,
     };
     reg.list.push(c);
     save();
     return { ...c };
 }
 
-/** Patch an existing container's name/color/icon. Returns the updated meta or null. */
+/** Rename / recolor an instance. Returns updated meta or null. */
 function update(id, patch = {}) {
     const reg = load();
     const c = reg.list.find(x => x.id === String(id));
     if (!c)
         return null;
     if (typeof patch.name === 'string' && patch.name.trim())
-        c.name = patch.name.trim().slice(0, 24);
+        c.name = patch.name.trim().slice(0, 32);
     const col = _sanitizeColor(patch.color);
     if (col)
         c.color = col;
-    if (patch.icon !== undefined && ICONS.includes(patch.icon))
-        c.icon = patch.icon;
     save();
     return { ...c };
 }
 
-/** Delete a container identity and wipe its stored data. */
+/** Delete an instance and wipe its stored data (full sign-out). */
 function remove(id) {
     const reg = load();
     const key = String(id);
@@ -128,7 +139,6 @@ function remove(id) {
         return false;
     reg.list.splice(i, 1);
     save();
-    // Wipe the jar so a future container with the same numeric id can't inherit it.
     try {
         const sess = sessions.get(key) || require('electron').session.fromPartition(`persist:container-${key}`);
         sess.clearStorageData();
@@ -139,21 +149,8 @@ function remove(id) {
     return true;
 }
 
-/** Reorder identities to match the given id order (unlisted ids keep trailing). */
-function reorder(ids) {
-    const reg = load();
-    const rank = new Map((ids || []).map((id, i) => [String(id), i]));
-    reg.list.sort((a, b) => {
-        const ra = rank.has(a.id) ? rank.get(a.id) : Infinity;
-        const rb = rank.has(b.id) ? rank.get(b.id) : Infinity;
-        return ra - rb;
-    });
-    save();
-    return list();
-}
-
 // ── Sessions ──────────────────────────────────────────────────────────────────
-/** Get (creating once) the persistent session for a container id. */
+/** Get (creating once) the persistent session for an instance id. */
 function get(id) {
     const key = String(id);
     if (sessions.has(key))
@@ -178,7 +175,7 @@ function get(id) {
     return sess;
 }
 
-/** The colour for a container id (from its identity, else palette fallback). */
+/** The colour for an instance id (from its identity, else palette fallback). */
 function colorFor(id) {
     const m = meta(id);
     if (m)
@@ -187,4 +184,4 @@ function colorFor(id) {
     return COLORS[n % COLORS.length];
 }
 
-module.exports = { get, colorFor, list, meta, create, update, remove, reorder, COLORS, ICONS };
+module.exports = { get, colorFor, list, meta, createForUrl, labelForUrl, update, remove, COLORS };

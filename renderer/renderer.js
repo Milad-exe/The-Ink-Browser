@@ -2068,137 +2068,66 @@
             } }, 100);
         }
         // ── Containers (named, reusable isolated sessions) ────────────────────────
-        // Toolbar chip by the reload icon reflects the active tab's container and
-        // opens a menu to switch it / open a new container tab / manage. A modal
-        // handles create/rename/recolor/delete. The registry lives in main
-        // (features/containers.js); we mirror it here via window.containers.
-        const CONTAINER_SWATCHES = ['#e0894a', '#4a9eff', '#3fbf7f', '#c86fe0', '#e05a7a', '#e0c341', '#5ad0d0', '#9a7bff'];
-        const CONTAINER_ICONS = ['', '●', '◆', '★', '⬢', '▲', '⚑', '⬤'];
-        let containerList = [];
+        // Isolated instances. The chip by the reload icon appears ONLY when the
+        // active tab is in an instance (a pure indicator). Clicking it — or
+        // right-clicking the + button — opens a native menu (built in ipc/tabs.js)
+        // to open a new isolated instance / new tab in this one / reopen / rename /
+        // close. A tiny modal handles rename. No pre-set identities to manage.
         function initContainers() {
             const chip = document.getElementById('container-chip');
-            const modal = document.getElementById('containers-modal');
-            if (!chip || !modal)
+            if (!chip)
                 return;
-            const refreshList = async () => {
-                try { containerList = (await window.containers.list()) || []; }
-                catch { containerList = []; }
-            };
-            // ── Chip / + button → native dropdown (drawn above the page view) ──────
-            // Opens a NEW tab in a chosen container (a tab's own container never
-            // changes). The menu itself is built in main (ipc/tabs.js).
             chip.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const r = chip.getBoundingClientRect();
-                window.containers.menu('new', r.left, r.bottom + 4);
+                window.containers.menu('chip', r.left, r.bottom + 4);
             });
             const addBtn = document.getElementById('new-tab-btn');
             if (addBtn) {
                 addBtn.addEventListener('contextmenu', (e) => {
                     e.preventDefault(); e.stopPropagation();
                     const r = addBtn.getBoundingClientRect();
-                    window.containers.menu('new', r.left, r.bottom + 4);
+                    window.containers.menu('add', r.left, r.bottom + 4);
                 });
             }
-            window.containers.onOpenModal(() => openModal());
-
-            // ── Manage modal ────────────────────────────────────────────────────────
-            // The modal fills the window, overlapping the page's WebContentsView, so
-            // collapse the tab views while it's open (same trick the pomodoro card
-            // uses) — otherwise the native page paints over the chrome DOM.
-            const listEl = document.getElementById('cm-list');
-            let modalOpen = false;
-            const closeModal = () => {
-                if (!modalOpen)
-                    return;
-                modalOpen = false;
-                modal.classList.add('hidden');
-                try { window.focusMode.overlayClose(); } catch { }
-            };
-            const openModal = async () => {
-                await refreshList();
-                renderModal();
-                modal.classList.remove('hidden');
-                modalOpen = true;
+            // Rename: a minimal one-field modal, invoked from the chip menu.
+            const rn = document.getElementById('rename-instance-modal');
+            const rnInput = document.getElementById('ri-input');
+            let renameId = null;
+            const closeRename = () => { rn.classList.add('hidden'); renameId = null; try { window.focusMode.overlayClose(); } catch { } };
+            const saveRename = () => { if (renameId && rnInput.value.trim()) window.containers.rename(renameId, rnInput.value.trim()); closeRename(); };
+            window.containers.onRenameInstance(async (id) => {
+                renameId = id;
+                let name = '';
+                try { name = ((await window.containers.list()) || []).find(c => String(c.id) === String(id))?.name || ''; }
+                catch { }
+                rnInput.value = name;
+                rn.classList.remove('hidden');
                 try { window.focusMode.overlayOpen(); } catch { }
-            };
-            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
-            let dragId = null;
-            function commitOrder() {
-                const ids = [...listEl.querySelectorAll('.cm-row')].map(r => r.dataset.id);
-                window.containers.reorder(ids);
-            }
-            function renderModal() {
-                listEl.innerHTML = '';
-                if (!containerList.length) {
-                    const empty = document.createElement('div');
-                    empty.className = 'cm-empty';
-                    empty.textContent = 'No containers yet.';
-                    listEl.appendChild(empty);
-                }
-                for (const c of containerList) {
-                    const rowEl = document.createElement('div');
-                    rowEl.className = 'cm-row';
-                    rowEl.dataset.id = c.id;
-                    rowEl.draggable = true;
-                    const swatches = CONTAINER_SWATCHES.map(col =>
-                        `<button class="cm-swatch${col === c.color ? ' sel' : ''}" data-color="${col}" style="--s:${col}" tabindex="-1"></button>`).join('');
-                    const icons = CONTAINER_ICONS.map(ic =>
-                        `<option value="${ic}"${ic === (c.icon || '') ? ' selected' : ''}>${ic || '—'}</option>`).join('');
-                    rowEl.innerHTML =
-                        `<span class="cm-grip" title="Drag to reorder">⠿</span>
-                         <input class="cm-name-input" value="${escapeHtml(c.name)}" maxlength="24" tabindex="-1">
-                         <select class="cm-icon-select" title="Icon">${icons}</select>
-                         <div class="cm-swatches">${swatches}</div>
-                         <button class="cm-del" tabindex="-1" title="Delete container">✕</button>`;
-                    const nameInput = rowEl.querySelector('.cm-name-input');
-                    nameInput.addEventListener('change', () => window.containers.update(c.id, { name: nameInput.value }));
-                    rowEl.querySelector('.cm-icon-select').addEventListener('change', (e) => window.containers.update(c.id, { icon: e.target.value }));
-                    rowEl.querySelectorAll('.cm-swatch').forEach(sw => {
-                        sw.addEventListener('click', () => {
-                            rowEl.querySelectorAll('.cm-swatch').forEach(s => s.classList.remove('sel'));
-                            sw.classList.add('sel');
-                            window.containers.update(c.id, { color: sw.dataset.color });
-                        });
-                    });
-                    rowEl.querySelector('.cm-del').addEventListener('click', () => window.containers.remove(c.id));
-                    // Drag-to-reorder.
-                    rowEl.addEventListener('dragstart', (e) => { dragId = c.id; rowEl.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
-                    rowEl.addEventListener('dragend', () => { rowEl.classList.remove('dragging'); if (dragId) commitOrder(); dragId = null; });
-                    rowEl.addEventListener('dragover', (e) => {
-                        e.preventDefault();
-                        const dragging = listEl.querySelector('.cm-row.dragging');
-                        if (!dragging || dragging === rowEl)
-                            return;
-                        const r = rowEl.getBoundingClientRect();
-                        const after = e.clientY > r.top + r.height / 2;
-                        listEl.insertBefore(dragging, after ? rowEl.nextSibling : rowEl);
-                    });
-                    listEl.appendChild(rowEl);
-                }
-            }
-            document.getElementById('cm-close').addEventListener('click', closeModal);
-            document.getElementById('cm-add').addEventListener('click', async () => {
-                await window.containers.create({});
+                rnInput.focus(); rnInput.select();
             });
-            modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+            document.getElementById('ri-save').addEventListener('click', saveRename);
+            document.getElementById('ri-cancel').addEventListener('click', closeRename);
+            rnInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') closeRename(); });
+            rn.addEventListener('click', (e) => { if (e.target === rn) closeRename(); });
 
-            // ── React to registry changes (rename/recolor/delete/create) ────────────
+            // Registry changed (rename / close): refresh the chip + open tab pills.
             window.containers.onChanged(async () => {
-                await refreshList();
-                // Update the chip and any open tab pills bound to a container.
+                let list = [];
+                try { list = (await window.containers.list()) || []; }
+                catch { }
                 updateContainerChip(activeTabIndex);
                 document.querySelectorAll('#tabs-container .tab-button[data-container-id]').forEach(btn => {
-                    const meta = containerList.find(c => String(c.id) === btn.dataset.containerId);
+                    const meta = list.find(c => String(c.id) === btn.dataset.containerId);
                     const idx = parseInt(btn.dataset.index);
                     if (meta) {
                         btn.style.setProperty('--ctr-color', meta.color);
                         const lbl = btn.querySelector('.tab-container-label');
-                        if (lbl) lbl.textContent = (meta.icon ? meta.icon + ' ' : '') + meta.name;
+                        if (lbl) lbl.textContent = meta.name;
                         tabContainer.set(idx, meta);
                     }
                     else {
-                        // Container was deleted — drop the identity styling.
+                        // Instance was closed — drop the styling (its tabs are gone too).
                         btn.removeAttribute('data-container');
                         btn.removeAttribute('data-container-id');
                         btn.querySelector('.tab-container-dot')?.remove();
@@ -2206,17 +2135,9 @@
                         tabContainer.delete(idx);
                     }
                 });
-                if (!modal.classList.contains('hidden'))
-                    renderModal();
             });
-            refreshList();
         }
-        function escapeHtml(s) {
-            return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
-                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-        }
-        // Reflect the active tab's container in the toolbar chip. Contained → a
-        // coloured named pill; un-contained → a minimal ghost chip (create hint).
+        // Toolbar chip: shown only when the active tab is in an isolated instance.
         function updateContainerChip(index) {
             if (index !== activeTabIndex)
                 return;
@@ -2230,16 +2151,11 @@
                 chip.classList.add('is-set');
                 chip.style.setProperty('--cc-color', meta.color);
                 if (nameEl)
-                    nameEl.textContent = (meta.icon ? meta.icon + ' ' : '') + meta.name;
-                chip.title = `Container: ${meta.name} — open a new container tab`;
+                    nameEl.textContent = meta.name;
+                chip.title = `Isolated instance: ${meta.name}`;
             }
             else {
-                chip.classList.remove('hidden');
-                chip.classList.remove('is-set');
-                chip.style.removeProperty('--cc-color');
-                if (nameEl)
-                    nameEl.textContent = '';
-                chip.title = 'Open a new container tab';
+                chip.classList.add('hidden');
             }
         }
         // ── Tab DOM helpers ───────────────────────────────────────────────────────
@@ -2288,7 +2204,7 @@
             if (containerMeta && containerMeta.name) {
                 const clabel = document.createElement('span');
                 clabel.className = 'tab-container-label';
-                clabel.textContent = (containerMeta.icon ? containerMeta.icon + ' ' : '') + containerMeta.name;
+                clabel.textContent = containerMeta.name;
                 btn.appendChild(clabel);
             }
             btn.appendChild(closeBtn);

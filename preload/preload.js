@@ -212,17 +212,16 @@ exposeInternal("tab", {
     onTabLoading: (callback) => ipcRenderer.on('tab-loading', callback),
     onMediaIndicator: (callback) => ipcRenderer.on('tab-media-indicator', callback)
 });
-// Named containers (Firefox Multi-Account Containers) — registry + tab ops.
+// Isolated instances (on-demand, auto-named isolated sessions).
 exposeInternal('containers', {
     list: () => ipcRenderer.invoke('containers:list'),
-    create: (data) => ipcRenderer.invoke('containers:create', data),
-    update: (id, patch) => ipcRenderer.invoke('containers:update', id, patch),
-    remove: (id) => ipcRenderer.invoke('containers:remove', id),
+    openIsolated: (url) => ipcRenderer.invoke('containers:openIsolated', url),
     openTab: (id, url) => ipcRenderer.invoke('containers:openTab', id, url),
-    reorder: (ids) => ipcRenderer.invoke('containers:reorder', ids),
+    rename: (id, name) => ipcRenderer.invoke('containers:update', id, { name }),
+    close: (id) => ipcRenderer.invoke('containers:closeInstance', id),
     menu: (mode, x, y) => ipcRenderer.send('containers:menu', mode, x, y),
     onChanged: (cb) => ipcRenderer.on('containers:changed', () => cb()),
-    onOpenModal: (cb) => ipcRenderer.on('open-containers-modal', () => cb()),
+    onRenameInstance: (cb) => ipcRenderer.on('rename-instance', (_e, id) => cb(id)),
 });
 exposeInternal('northstarPrivate', {
     newPrivateWindow: () => ipcRenderer.invoke('newPrivateWindow'),

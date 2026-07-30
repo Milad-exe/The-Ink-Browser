@@ -1,22 +1,3 @@
-const containers = require('./containers');
-// "New Tab in Container ▸" submenu — opens a fresh tab in the chosen container.
-// (A tab's own container is fixed at creation and never changes; there is no
-// move-between-containers.)
-function containerSubmenu(tabsMgr) {
-    const items = containers.list().map(c => ({
-        label: (c.icon ? c.icon + '  ' : '') + c.name,
-        click: () => tabsMgr.openInContainer(null, c.id),
-    }));
-    items.push({ type: 'separator' }, {
-        label: 'New Container…',
-        click: () => {
-            const c = containers.create({});
-            try { tabsMgr.mainWindow?.webContents?.send('containers:changed'); } catch { }
-            tabsMgr.openInContainer(null, c.id);
-        },
-    });
-    return items;
-}
 class WindowContextMenu {
     window; // BrowserWindow the menu belongs to
     windowManager;
@@ -99,8 +80,12 @@ class WindowContextMenu {
             label: 'Duplicate Tab',
             click: () => windowData.tabs.duplicateTab(tabIndex),
         }, {
-            label: 'New Tab in Container',
-            submenu: containerSubmenu(windowData.tabs),
+            // Open this tab's site as a separate isolated instance (fresh session).
+            label: 'Open Isolated Instance',
+            click: () => {
+                const u = windowData.tabs.tabUrls.get(tabIndex);
+                windowData.tabs.openIsolatedInstance(/^https?:/i.test(u || '') ? u : null);
+            },
         }, {
             label: isPinned ? 'Unpin Tab' : 'Pin Tab',
             click: () => windowData.tabs.pinTab(tabIndex),
