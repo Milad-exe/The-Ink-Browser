@@ -2192,21 +2192,9 @@
                 shield.innerHTML = '<svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><path d="M8 1L2 3.5V8c0 3.3 2.5 5.7 6 7 3.5-1.3 6-3.7 6-7V3.5L8 1zm0 6.5h4c-.3 2.2-1.8 4-4 5.1V7.5H4V5l4-1.7V7.5z"/></svg>';
                 btn.appendChild(shield);
             }
-            if (containerColor) {
-                const dot = document.createElement('span');
-                dot.className = 'tab-container-dot';
-                dot.title = containerMeta && containerMeta.name
-                    ? `${containerMeta.name} — isolated session`
-                    : 'Container tab — isolated session';
-                btn.appendChild(dot);
-            }
+            if (containerColor && containerMeta && containerMeta.name)
+                btn.title = `Isolated instance: ${containerMeta.name}`;
             btn.appendChild(titleSpan);
-            if (containerMeta && containerMeta.name) {
-                const clabel = document.createElement('span');
-                clabel.className = 'tab-container-label';
-                clabel.textContent = containerMeta.name;
-                btn.appendChild(clabel);
-            }
             btn.appendChild(closeBtn);
             btn.addEventListener('mousedown', (e) => {
                 if (e.button !== 1)
