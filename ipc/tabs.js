@@ -257,10 +257,13 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (wd)
             wd.tabs.showTab(index);
     });
+    // User-initiated open (omnibox / bookmark / history): may auto-route a flagged
+    // site into its isolated tenant instance (openUrlUserInitiated), unlike the
+    // internal wd.tabs.loadUrl used for programmatic loads.
     ipcMain.handle('loadUrl', (_e, index, url) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd)
-            wd.tabs.loadUrl(index, sanitizeUrl(url));
+            wd.tabs.openUrlUserInitiated(index, sanitizeUrl(url));
     });
     ipcMain.handle('goBack', (_e, index) => {
         const wd = wm.getWindowByWebContents(_e.sender);

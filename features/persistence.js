@@ -156,6 +156,14 @@ class Persistence {
         }
         catch { }
     }
+    // Durable save for the last-window-close / quit paths: writes synchronously so
+    // the file is complete before the process exits. (The async saveState() can be
+    // interrupted mid-write by quit, leaving a truncated, unparseable file — which
+    // silently drops the whole restore-on-launch state.)
+    saveStateSync(state) {
+        this._pendingState = state;
+        this.flushStateSync();
+    }
 }
 
 module.exports = Persistence;

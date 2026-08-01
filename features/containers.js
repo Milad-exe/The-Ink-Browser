@@ -94,11 +94,53 @@ function _uniqueName(base) {
 }
 
 /**
- * Create a fresh instance auto-named from (url). This is the primary entry
- * point — every "open an isolated instance" mints a new one.
+ * Create a fresh instance auto-named from (url). Used by the MANUAL "Open
+ * Isolated Instance" action — every call mints a new one (so you can hold two
+ * separate logins to the same site on purpose).
  */
 function createForUrl(url) {
     return _create(_uniqueName(labelForUrl(url)), url);
+}
+
+// The distinguishing subdomain of a host ("acme" from acme.successfactors.com),
+// ignoring a leading www. Empty when there's no tenant subdomain.
+function subdomainOf(host) {
+    try {
+        const sub = (parseTld(host, { allowPrivateDomains: true }).subdomain || '').replace(/^www\.?/, '');
+        return sub;
+    }
+    catch {
+        return '';
+    }
+}
+
+/**
+ * Get (reuse or create) the AUTONOMOUS instance for a url's tenant — keyed by the
+ * full hostname, so acme.successfactors.com always maps to one instance ("stay
+ * signed in") while globex.successfactors.com gets its own. Named by tenant:
+ * "SuccessFactors — acme", falling back to the site label + "· N".
+ */
+function instanceForHost(url) {
+    let host = null;
+    try { host = new URL(url).hostname; }
+    catch { }
+    if (!host)
+        return createForUrl(url);
+    const reg = load();
+    const existing = reg.list.find(x => x.tenantHost === host);
+    if (existing)
+        return { ...existing };
+    const label = labelForUrl(url);
+    const sub = subdomainOf(host);
+    const c = _create(_uniqueName(sub ? `${label} — ${sub}` : label), url);
+    // Tag it tenant-keyed so a later open of the same host reuses it.
+    const rec = load().list.find(x => x.id === c.id);
+    if (rec) {
+        rec.tenantHost = host;
+        save();
+        return { ...rec };
+    }
+    return c;
 }
 
 function _create(name, site) {
@@ -184,4 +226,4 @@ function colorFor(id) {
     return COLORS[n % COLORS.length];
 }
 
-module.exports = { get, colorFor, list, meta, createForUrl, labelForUrl, update, remove, COLORS };
+module.exports = { get, colorFor, list, meta, createForUrl, instanceForHost, labelForUrl, update, remove, COLORS };

@@ -212,7 +212,7 @@ class WindowManager {
                 this._persistWindowBounds(window);
                 try {
                     if (tabs.tabMap.size > 0 && !tabs.isPrivateWindow) {
-                        this.persistence.saveState(tabs.buildSerializableState());
+                        this.persistence.saveStateSync(tabs.buildSerializableState());
                     }
                 }
                 catch { }
@@ -408,7 +408,7 @@ class WindowManager {
             if (!primary || !primary.tabs)
                 return false;
             const state = primary.tabs.buildSerializableState();
-            this.persistence.saveState(state);
+            this.persistence.saveStateSync(state);
             return true;
         }
         catch (e) {

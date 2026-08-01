@@ -4,6 +4,8 @@ const path = require('path');
 const UserAgent = require('./user-agent');
 const faviconStore = require('./favicon-store');
 const containers = require('./containers');
+const isolationRules = require('./isolation-rules');
+const permissionUI = require('./permission-ui');
 const captivePortal = require('./captive-portal');
 const contextMenu = require('./tab-context-menu');
 const NavigationHistory = require('./navigation-history');
@@ -642,6 +644,85 @@ class Tabs {
             this.loadUrl(idx, url);
         return idx;
     }
+    // ── Autonomous isolation routing ──────────────────────────────────────────
+    // Decide how a user-opened url should be sessioned. Never re-routes something
+    // already in an instance (stickiness) or a private tab; only http(s) sites.
+    //   → { mode: 'default' | 'keep' | 'isolate' | 'ask' }
+    resolveIsolation(index, url, sourceContainerId) {
+        if (!/^https?:/i.test(url || ''))
+            return { mode: 'default' };
+        if (this.isPrivateWindow || (index != null && this.privateTabs.has(index)))
+            return { mode: 'default' };
+        const pol = isolationRules.policyFor(url);
+        // A decided-isolate site ALWAYS goes to its own tenant instance — even
+        // from inside another instance — so a different tenant never loads into
+        // the wrong session. Same-tenant tab → keep (no-op).
+        if (pol === 'isolate') {
+            let destHost = null;
+            try { destHost = new URL(url).hostname; }
+            catch { }
+            if (sourceContainerId && containers.meta(sourceContainerId)?.tenantHost === destHost)
+                return { mode: 'keep' };
+            return { mode: 'isolate' };
+        }
+        // Not a decided-isolate site: stay in the current instance if we're in one
+        // (stickiness); otherwise prompt for built-ins ('ask') or use the default.
+        if (sourceContainerId)
+            return { mode: 'keep' };
+        if (pol === 'ask')
+            return { mode: 'ask' };
+        return { mode: 'default' };
+    }
+    // First-open doorhanger. Returns 'isolate' | 'no' | 'dismissed' and records the
+    // decision (except dismiss). Reuses the permission doorhanger overlay.
+    async _promptIsolate(wc, url) {
+        let origin = url;
+        try { origin = new URL(url).origin; }
+        catch { }
+        let res;
+        try {
+            res = await permissionUI.request(wc, {
+                origin,
+                title: "Keep this site's logins separate?",
+                action: 'keep its logins separate',
+                allowLabel: 'Isolate',
+                blockLabel: 'Use one session',
+                iconType: 'shield',
+                checkbox: false,
+            });
+        }
+        catch {
+            return 'dismissed';
+        }
+        if (res.dismissed)
+            return 'dismissed';
+        if (res.allowed) { isolationRules.set(url, 'isolate'); return 'isolate'; }
+        isolationRules.set(url, 'no');
+        return 'no';
+    }
+    // Replace tab (index) with a fresh tab in url's tenant instance, in place.
+    _routeTypedToInstance(index, url) {
+        const inst = containers.instanceForHost(url);
+        const orderPos = this.tabOrder.indexOf(index);
+        const insertAfter = orderPos > 0 ? this.tabOrder[orderPos - 1] : -1;
+        const newIdx = this.openInContainer(url, inst.id, insertAfter);
+        this.removeTab(index);
+        return newIdx;
+    }
+    // User-initiated open (typed URL / bookmark / history). Routes flagged sites
+    // into their isolated tenant instance (prompting the first time), else loads
+    // normally in place. THE entry point ipc/tabs.js 'loadUrl' calls.
+    async openUrlUserInitiated(index, url) {
+        const r = this.resolveIsolation(index, url, this.tabContainers.get(index) || null);
+        if (r.mode === 'isolate')
+            return this._routeTypedToInstance(index, url);
+        if (r.mode === 'ask') {
+            const decision = await this._promptIsolate(this.tabMap.get(index)?.webContents, url);
+            if (decision === 'isolate')
+                return this._routeTypedToInstance(index, url);
+        }
+        this.loadUrl(index, url);
+    }
     // Close every tab in THIS window that belongs to an instance (used when the
     // instance itself is closed; the caller clears the instance's data).
     closeTabsForContainer(containerId) {
@@ -857,6 +938,23 @@ class Tabs {
         };
         tab.webContents.on('will-navigate', blockDangerousNav);
         tab.webContents.on('will-redirect', blockDangerousNav);
+        // Same-tab link click to a site the user has DECIDED to isolate (rule set,
+        // not 'ask') → hand it off to its tenant instance instead of loading it in
+        // this default-session tab. Only for main-frame, non-instance, non-private
+        // tabs; 'ask' sites are handled on the typed/new-tab paths (no mid-click
+        // prompt), and redirects (will-redirect) are never re-routed so SSO chains
+        // complete.
+        tab.webContents.on('will-navigate', (event, url) => {
+            try {
+                if (this.isPrivateWindow || this.privateTabs.has(tabIndex) || this.tabContainers.get(tabIndex))
+                    return;
+                if (!/^https?:/i.test(url) || isolationRules.policyFor(url) !== 'isolate')
+                    return;
+                event.preventDefault();
+                this.openInContainer(url, containers.instanceForHost(url).id, tabIndex);
+            }
+            catch { }
+        });
         tab.webContents.on('did-navigate', (event, url) => {
             // Keep the view backing in sync: frosted (transparent) for internal
             // pages, opaque for web content so vibrancy doesn't bleed through.
@@ -964,9 +1062,26 @@ class Tabs {
                     },
                 };
             }
-            setImmediate(() => {
+            setImmediate(async () => {
                 const isPriv = this.privateTabs.has(tabIndex);
-                const newIndex = this.createTab(tabIndex, false, isPriv);
+                const srcContainer = this.tabContainers.get(tabIndex) || null;
+                const r = this.resolveIsolation(tabIndex, url, srcContainer);
+                if (r.mode === 'isolate') {
+                    this.openInContainer(url, containers.instanceForHost(url).id, tabIndex);
+                    return;
+                }
+                if (r.mode === 'ask') {
+                    const decision = await this._promptIsolate(this.tabMap.get(tabIndex)?.webContents, url);
+                    if (decision === 'isolate') {
+                        this.openInContainer(url, containers.instanceForHost(url).id, tabIndex);
+                        return;
+                    }
+                    const ni = this.createTab(tabIndex, false, isPriv);
+                    this.loadUrl(ni, url);
+                    return;
+                }
+                // 'keep' carries the opener's instance; 'default' → default session.
+                const newIndex = this.createTab(tabIndex, false, isPriv, srcContainer);
                 this.loadUrl(newIndex, url);
             });
             return { action: 'deny' };

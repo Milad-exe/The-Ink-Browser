@@ -13,6 +13,7 @@
             clipboard: `<svg viewBox="0 0 24 24" ${S}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>`,
             midi: `<svg viewBox="0 0 24 24" ${S}><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="6" x2="6" y2="14"/><line x1="10" y1="6" x2="10" y2="14"/><line x1="14" y1="6" x2="14" y2="14"/><line x1="18" y1="6" x2="18" y2="14"/></svg>`,
             external: `<svg viewBox="0 0 24 24" ${S}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
+            shield: `<svg viewBox="0 0 24 24" ${S}><path d="M12 2 4 5v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V5l-8-3z"/><path d="M9.5 12l1.8 1.8L15 10"/></svg>`,
             generic: `<svg viewBox="0 0 24 24" ${S}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
         };
         const iconEl = document.getElementById('icon');
@@ -43,7 +44,11 @@
         function render(data) {
             current = data;
             iconEl.innerHTML = ICONS[data.iconType] || ICONS.generic;
-            qEl.textContent = `Allow this site to ${data.action}?`;
+            // Callers may override the question + button labels (e.g. the isolate
+            // doorhanger). Default to the permission "Allow this site to X?" form.
+            qEl.textContent = data.title || `Allow this site to ${data.action}?`;
+            allowBtn.textContent = data.allowLabel || 'Allow';
+            blockBtn.textContent = data.blockLabel || 'Block';
             hostEl.textContent = hostOf(data.origin);
             // The "Remember" checkbox is meaningless in private tabs (nothing persists)
             // and for ask-every-time permissions — hide it there.
