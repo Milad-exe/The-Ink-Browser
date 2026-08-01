@@ -723,17 +723,6 @@ class Tabs {
         }
         this.loadUrl(index, url);
     }
-    // Close every tab in THIS window that belongs to an instance (used when the
-    // instance itself is closed; the caller clears the instance's data).
-    closeTabsForContainer(containerId) {
-        const key = String(containerId);
-        const toClose = [];
-        for (const [idx, cid] of this.tabContainers)
-            if (cid === key)
-                toClose.push(idx);
-        toClose.forEach(i => this.removeTab(i));
-        return toClose.length;
-    }
     // A tab's instance is fixed at creation and never changes (its isolated
     // session is chosen then) — there is deliberately no "move tab to instance".
     // To use a different instance you open a NEW tab in it (openInContainer).

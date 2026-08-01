@@ -186,8 +186,6 @@ window.addEventListener('blur', () => {
 exposeInternal("tab", {
     add: () => ipcRenderer.invoke("addTab"),
     addPrivate: () => ipcRenderer.invoke("addPrivateTab"),
-    addContainer: (url) => ipcRenderer.invoke("addContainerTab", url),
-    duplicate: (index) => ipcRenderer.invoke("tab:duplicate", index),
     addLazy: (url) => ipcRenderer.invoke("addTabLazy", url),
     remove: (index) => ipcRenderer.invoke("removeTab", index),
     switch: (index) => ipcRenderer.invoke("switchTab", index),
@@ -211,17 +209,6 @@ exposeInternal("tab", {
     onNavigationUpdated: (callback) => ipcRenderer.on('navigation-updated', callback),
     onTabLoading: (callback) => ipcRenderer.on('tab-loading', callback),
     onMediaIndicator: (callback) => ipcRenderer.on('tab-media-indicator', callback)
-});
-// Isolated instances (on-demand, auto-named isolated sessions).
-exposeInternal('containers', {
-    list: () => ipcRenderer.invoke('containers:list'),
-    openIsolated: (url) => ipcRenderer.invoke('containers:openIsolated', url),
-    openTab: (id, url) => ipcRenderer.invoke('containers:openTab', id, url),
-    rename: (id, name) => ipcRenderer.invoke('containers:update', id, { name }),
-    close: (id) => ipcRenderer.invoke('containers:closeInstance', id),
-    menu: (mode, x, y) => ipcRenderer.send('containers:menu', mode, x, y),
-    onChanged: (cb) => ipcRenderer.on('containers:changed', () => cb()),
-    onRenameInstance: (cb) => ipcRenderer.on('rename-instance', (_e, id) => cb(id)),
 });
 exposeInternal('northstarPrivate', {
     newPrivateWindow: () => ipcRenderer.invoke('newPrivateWindow'),

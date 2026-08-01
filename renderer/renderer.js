@@ -68,7 +68,6 @@
         let tabs = new Map(); // tabIndex → <div.tab-button>
         let tabUrls = new Map(); // tabIndex → url string
         let tabPrivate = new Map(); // tabIndex → boolean (private flag)
-        let tabContainer = new Map(); // tabIndex → container meta {id,name,color,icon}
         let tabLoading = new Set(); // tabIndexes currently loading
         let activeTabIndex = 0;
         let currentTabUrl = '';
@@ -138,7 +137,6 @@
         initUtilityBarConfig();
         initReaderAndPip();
         initChromeClock();
-        initContainers();
         // ─────────────────────────────────────────────────────────────────────────
         // Chrome status clock (tab strip) — updates on the minute, no seconds timer
         // ─────────────────────────────────────────────────────────────────────────
@@ -1871,9 +1869,7 @@
             // ── IPC events from main process ──────────────────────────────────────
             window.tab.onTabCreated((_e, data) => {
                 tabPrivate.set(data.index, !!data.private);
-                if (data.containerMeta)
-                    tabContainer.set(data.index, data.containerMeta);
-                createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private, data.containerMeta || (data.containerColor ? { color: data.containerColor } : null));
+                createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private, !!data.container);
                 updateChromeTabs(data.totalTabs);
                 setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
             });
@@ -1882,7 +1878,6 @@
             window.tab.onTabRemoved((_e, data) => {
                 tabUrls.delete(data.index);
                 tabPrivate.delete(data.index);
-                tabContainer.delete(data.index);
                 tabLoading.delete(data.index);
                 removeTabButton(data.index);
                 hideSuggestions();
@@ -1909,17 +1904,12 @@
                         document.documentElement.removeAttribute('data-private-tab');
                     }
                 }
-                updateContainerChip(data.index);
             });
             window.tab.onUrlUpdated((_e, data) => {
                 if (data.url)
                     tabUrls.set(data.index, data.url);
                 if (data.private !== undefined)
                     tabPrivate.set(data.index, !!data.private);
-                if (data.containerMeta)
-                    tabContainer.set(data.index, data.containerMeta);
-                else if (data.container === null)
-                    tabContainer.delete(data.index);
                 if (data.index === activeTabIndex) {
                     updateSearchBarUrl(data.url);
                     currentTabUrl = data.url || '';
@@ -1934,7 +1924,6 @@
                             document.documentElement.removeAttribute('data-private-tab');
                         }
                     }
-                    updateContainerChip(data.index);
                 }
                 updateTabTitle(data.index, data.title || data.url, data.favicon);
             });
@@ -2067,102 +2056,12 @@
                 updateScrollShadows();
             } }, 100);
         }
-        // ── Containers (named, reusable isolated sessions) ────────────────────────
-        // Isolated instances. The chip by the reload icon appears ONLY when the
-        // active tab is in an instance (a pure indicator). Clicking it — or
-        // right-clicking the + button — opens a native menu (built in ipc/tabs.js)
-        // to open a new isolated instance / new tab in this one / reopen / rename /
-        // close. A tiny modal handles rename. No pre-set identities to manage.
-        function initContainers() {
-            const chip = document.getElementById('container-chip');
-            if (!chip)
-                return;
-            chip.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const r = chip.getBoundingClientRect();
-                window.containers.menu('chip', r.left, r.bottom + 4);
-            });
-            const addBtn = document.getElementById('new-tab-btn');
-            if (addBtn) {
-                addBtn.addEventListener('contextmenu', (e) => {
-                    e.preventDefault(); e.stopPropagation();
-                    const r = addBtn.getBoundingClientRect();
-                    window.containers.menu('add', r.left, r.bottom + 4);
-                });
-            }
-            // Rename: a minimal one-field modal, invoked from the chip menu.
-            const rn = document.getElementById('rename-instance-modal');
-            const rnInput = document.getElementById('ri-input');
-            let renameId = null;
-            const closeRename = () => { rn.classList.add('hidden'); renameId = null; try { window.focusMode.overlayClose(); } catch { } };
-            const saveRename = () => { if (renameId && rnInput.value.trim()) window.containers.rename(renameId, rnInput.value.trim()); closeRename(); };
-            window.containers.onRenameInstance(async (id) => {
-                renameId = id;
-                let name = '';
-                try { name = ((await window.containers.list()) || []).find(c => String(c.id) === String(id))?.name || ''; }
-                catch { }
-                rnInput.value = name;
-                rn.classList.remove('hidden');
-                try { window.focusMode.overlayOpen(); } catch { }
-                rnInput.focus(); rnInput.select();
-            });
-            document.getElementById('ri-save').addEventListener('click', saveRename);
-            document.getElementById('ri-cancel').addEventListener('click', closeRename);
-            rnInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') closeRename(); });
-            rn.addEventListener('click', (e) => { if (e.target === rn) closeRename(); });
-
-            // Registry changed (rename / close): refresh the chip + open tab pills.
-            window.containers.onChanged(async () => {
-                let list = [];
-                try { list = (await window.containers.list()) || []; }
-                catch { }
-                updateContainerChip(activeTabIndex);
-                document.querySelectorAll('#tabs-container .tab-button[data-container-id]').forEach(btn => {
-                    const meta = list.find(c => String(c.id) === btn.dataset.containerId);
-                    const idx = parseInt(btn.dataset.index);
-                    if (meta) {
-                        btn.style.setProperty('--ctr-color', meta.color);
-                        const lbl = btn.querySelector('.tab-container-label');
-                        if (lbl) lbl.textContent = meta.name;
-                        tabContainer.set(idx, meta);
-                    }
-                    else {
-                        // Instance was closed — drop the styling (its tabs are gone too).
-                        btn.removeAttribute('data-container');
-                        btn.removeAttribute('data-container-id');
-                        btn.querySelector('.tab-container-dot')?.remove();
-                        btn.querySelector('.tab-container-label')?.remove();
-                        tabContainer.delete(idx);
-                    }
-                });
-            });
-        }
-        // Toolbar chip: shown only when the active tab is in an isolated instance.
-        function updateContainerChip(index) {
-            if (index !== activeTabIndex)
-                return;
-            const chip = document.getElementById('container-chip');
-            if (!chip)
-                return;
-            const meta = tabContainer.get(index);
-            const nameEl = chip.querySelector('.cc-name');
-            if (meta) {
-                chip.classList.remove('hidden');
-                chip.classList.add('is-set');
-                chip.style.setProperty('--cc-color', meta.color);
-                if (nameEl)
-                    nameEl.textContent = meta.name;
-                chip.title = `Isolated instance: ${meta.name}`;
-            }
-            else {
-                chip.classList.add('hidden');
-            }
-        }
         // ── Tab DOM helpers ───────────────────────────────────────────────────────
-        function createTabButton(index, title, afterIndex = null, shouldActivate = true, isPrivate = false, containerMeta = null) {
+        // Isolation is invisible except a small dot on tabs running in their own
+        // isolated (per-tenant) session — see .tab-button[data-container] in CSS.
+        function createTabButton(index, title, afterIndex = null, shouldActivate = true, isPrivate = false, isolated = false) {
             if (tabs.has(index))
                 return;
-            const containerColor = containerMeta ? containerMeta.color : null;
             const btn = document.createElement('div');
             btn.className = 'tab-button';
             btn.dataset.index = index;
@@ -2171,11 +2070,9 @@
             btn.tabIndex = -1;
             if (isPrivate)
                 btn.dataset.private = 'true';
-            if (containerColor) {
+            if (isolated) {
                 btn.dataset.container = 'true';
-                btn.style.setProperty('--ctr-color', containerColor);
-                if (containerMeta && containerMeta.id != null)
-                    btn.dataset.containerId = containerMeta.id;
+                btn.title = 'Isolated session';
             }
             const titleSpan = document.createElement('span');
             titleSpan.className = 'tab-title';
@@ -2192,8 +2089,6 @@
                 shield.innerHTML = '<svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><path d="M8 1L2 3.5V8c0 3.3 2.5 5.7 6 7 3.5-1.3 6-3.7 6-7V3.5L8 1zm0 6.5h4c-.3 2.2-1.8 4-4 5.1V7.5H4V5l4-1.7V7.5z"/></svg>';
                 btn.appendChild(shield);
             }
-            if (containerColor && containerMeta && containerMeta.name)
-                btn.title = `Isolated instance: ${containerMeta.name}`;
             btn.appendChild(titleSpan);
             btn.appendChild(closeBtn);
             btn.addEventListener('mousedown', (e) => {
