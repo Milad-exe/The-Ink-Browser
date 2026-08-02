@@ -31,6 +31,8 @@ const DEFAULTS = {
     utilityBar: {},
     // Extension pinning: extension id → false when unpinned from the toolbar
     extPinned: {},
+    // One-time hint shown the first time a tab runs in an isolated session
+    isolationHintSeen: false,
 };
 class Persistence {
     dir; // ~/<userData>/northstar

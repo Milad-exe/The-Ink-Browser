@@ -2056,6 +2056,29 @@
                 updateScrollShadows();
             } }, 100);
         }
+        // First time an isolated tab ever appears, explain the dot once, then
+        // remember (persisted) so it never shows again.
+        let isoHintShownThisSession = false;
+        function maybeShowIsolationHint() {
+            if (isoHintShownThisSession)
+                return;
+            let seen = true;
+            try { seen = !!(window.northstarSettings.getSync() || {}).isolationHintSeen; }
+            catch { }
+            if (seen)
+                return;
+            isoHintShownThisSession = true;
+            try { window.northstarSettings.set('isolationHintSeen', true); }
+            catch { }
+            const el = document.getElementById('iso-hint');
+            if (!el)
+                return;
+            el.classList.remove('hidden');
+            let timer = null;
+            const dismiss = () => { el.classList.add('hidden'); clearTimeout(timer); };
+            el.querySelector('.iso-hint-close')?.addEventListener('click', dismiss, { once: true });
+            timer = setTimeout(dismiss, 7000);
+        }
         // ── Tab DOM helpers ───────────────────────────────────────────────────────
         // Isolation is invisible except a small dot on tabs running in their own
         // isolated (per-tenant) session — see .tab-button[data-container] in CSS.
@@ -2073,6 +2096,7 @@
             if (isolated) {
                 btn.dataset.container = 'true';
                 btn.title = 'Isolated session';
+                maybeShowIsolationHint();
             }
             const titleSpan = document.createElement('span');
             titleSpan.className = 'tab-title';

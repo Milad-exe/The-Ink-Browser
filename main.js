@@ -262,6 +262,19 @@ class Northstar {
                 }
                 catch { }
             }, 2500);
+            // Housekeeping: once tabs have restored, drop dormant isolated sessions
+            // (no open tab + no stored login) so they don't accumulate on disk.
+            setTimeout(() => {
+                try {
+                    const containers = require('./features/containers');
+                    const active = new Set();
+                    for (const wd of this.windowManager.windows.values())
+                        for (const id of (wd.tabs?.tabContainers?.values?.() || []))
+                            active.add(id);
+                    containers.gc(active);
+                }
+                catch { }
+            }, 6000);
             // Dev live reload (--dev): edits under app/renderer refresh the UI
             // instantly — internal pages reload; the chrome hot-swaps CSS only
             // (a full chrome reload would drop the tab strip's runtime state).

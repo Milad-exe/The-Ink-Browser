@@ -109,6 +109,14 @@ class Shortcuts {
         this.registerShortcut('CmdOrCtrl+Alt+T', () => {
             this.tabManager.createTab(null, true, true);
         });
+        // Open the current site in a fresh isolated (persistent) session — the
+        // quick, keyboard path to the "Open Isolated Instance" action. Blank tab
+        // if the current one isn't a real page.
+        this.registerShortcut('CmdOrCtrl+Alt+I', () => {
+            const url = this.tabManager.tabUrls.get(this.tabManager.activeTabIndex);
+            const httpUrl = (typeof url === 'string' && /^https?:/i.test(url)) ? url : null;
+            this.tabManager.openIsolatedInstance(httpUrl);
+        });
         // New window
         this.registerShortcut('CmdOrCtrl+N', () => {
             if (this.windowManager)

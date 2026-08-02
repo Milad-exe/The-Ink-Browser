@@ -217,6 +217,28 @@ function get(id) {
     return sess;
 }
 
+/**
+ * Housekeeping: drop instances that are dormant — no open tabs (activeIds) AND no
+ * stored cookies (a session cookie-less jar means nothing is signed in there).
+ * Keeps the registry + disk from accumulating dead isolated sessions over time.
+ * Best-effort and silent; call on startup once tabs are restored.
+ */
+async function gc(activeIds) {
+    const { session } = require('electron');
+    const active = new Set([...(activeIds || [])].map(String));
+    for (const c of [...load().list]) {
+        if (active.has(c.id))
+            continue;
+        try {
+            const sess = session.fromPartition(`persist:container-${c.id}`);
+            const cookies = await sess.cookies.get({});
+            if (!cookies || cookies.length === 0)
+                remove(c.id);
+        }
+        catch { }
+    }
+}
+
 /** The colour for an instance id (from its identity, else palette fallback). */
 function colorFor(id) {
     const m = meta(id);
@@ -226,4 +248,4 @@ function colorFor(id) {
     return COLORS[n % COLORS.length];
 }
 
-module.exports = { get, colorFor, list, meta, createForUrl, instanceForHost, labelForUrl, update, remove, COLORS };
+module.exports = { get, colorFor, list, meta, createForUrl, instanceForHost, labelForUrl, update, remove, gc, COLORS };

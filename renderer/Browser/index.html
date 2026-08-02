@@ -172,6 +172,13 @@
     </div>
   </div>
 
+  <!-- One-time hint the first time a tab runs in an isolated session -->
+  <div id="iso-hint" class="iso-hint hidden">
+    <span class="iso-hint-dot"></span>
+    <span class="iso-hint-text">This tab's logins stay separate here.</span>
+    <button class="iso-hint-close" tabindex="-1">Got it</button>
+  </div>
+
   <script src="../../node_modules/dompurify/dist/purify.min.js"></script>
   <script src="../renderer.js"></script>
 </body>
