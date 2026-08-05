@@ -187,6 +187,26 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         else
             wd.tabs.openIsolatedInstance(safe);
     });
+    // ── Persona naming (optional rename; auto-numbered by default) ─────────────
+    // id → current display name, so history/suggestions can label personas live
+    // (a rename reflects everywhere without rewriting stored entries).
+    ipcMain.handle('personas:map', () => {
+        const containers = require('../features/containers');
+        const m = {};
+        for (const c of containers.list())
+            m[c.id] = c.name;
+        return m;
+    });
+    ipcMain.handle('personas:rename', (_e, id, name) => {
+        const containers = require('../features/containers');
+        const c = containers.update(id, { name });
+        try {
+            for (const wd of wm.windows.values())
+                wd.window?.webContents?.send('personas:changed');
+        }
+        catch { }
+        return c;
+    });
     ipcMain.handle('goBack', (_e, index) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd)

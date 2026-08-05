@@ -27,17 +27,23 @@ function register(ipcMain, { wm, webContents }) {
     ipcMain.handle('bookmarks-get', async () => {
         return wm.bookmarks.getAll();
     });
+    // The star acts on the ACTIVE tab's page, so its persona (if any) tags the
+    // favourite — a page starred in a persona is that persona's favourite.
+    const activePersona = (senderWc) => {
+        const wd = wm.getWindowByWebContents(senderWc);
+        return wd?.tabs ? (wd.tabs.tabContainers.get(wd.tabs.activeTabIndex) || null) : null;
+    };
     ipcMain.handle('bookmarks-has', async (_e, url) => {
-        return wm.bookmarks.has(url);
+        return wm.bookmarks.has(url, activePersona(_e.sender));
     });
     // ── Write ─────────────────────────────────────────────────────────────────
     ipcMain.handle('bookmarks-add', async (_e, url, title) => {
-        const added = await wm.bookmarks.add(sanitizeUrl(url), title);
+        const added = await wm.bookmarks.add(sanitizeUrl(url), title, activePersona(_e.sender));
         broadcast();
         return added;
     });
     ipcMain.handle('bookmarks-remove', async (_e, url) => {
-        const ok = await wm.bookmarks.remove(url);
+        const ok = await wm.bookmarks.remove(url, activePersona(_e.sender));
         broadcast();
         return ok;
     });

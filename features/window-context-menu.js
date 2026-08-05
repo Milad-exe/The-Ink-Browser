@@ -86,7 +86,16 @@ class WindowContextMenu {
                 const u = windowData.tabs.tabUrls.get(tabIndex);
                 windowData.tabs.openIsolatedInstance(/^https?:/i.test(u || '') ? u : null);
             },
-        }, {
+        });
+        // Optional persona name (auto-numbered by default). Only on persona tabs.
+        const personaId = windowData.tabs.tabContainers.get(tabIndex);
+        if (personaId) {
+            this.contextTemplate.push({
+                label: 'Name This Persona…',
+                click: () => { try { windowData.window.webContents.send('rename-persona', personaId); } catch { } },
+            });
+        }
+        this.contextTemplate.push({
             label: isPinned ? 'Unpin Tab' : 'Pin Tab',
             click: () => windowData.tabs.pinTab(tabIndex),
         }, {

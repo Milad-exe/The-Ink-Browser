@@ -69,6 +69,7 @@
         let tabUrls = new Map(); // tabIndex → url string
         let tabPrivate = new Map(); // tabIndex → boolean (private flag)
         let tabLoading = new Set(); // tabIndexes currently loading
+        let personaNames = {}; // persona id → current display name (for labelling)
         let activeTabIndex = 0;
         let currentTabUrl = '';
         // True once the user (click) or Cmd+L/Cmd+K intentionally focuses the
@@ -137,6 +138,7 @@
         initUtilityBarConfig();
         initReaderAndPip();
         initChromeClock();
+        initPersonas();
         // ─────────────────────────────────────────────────────────────────────────
         // Chrome status clock (tab strip) — updates on the minute, no seconds timer
         // ─────────────────────────────────────────────────────────────────────────
@@ -570,7 +572,9 @@
                         continue;
                     if (!e.url.toLowerCase().includes(ql) && !(e.title || '').toLowerCase().includes(ql))
                         continue;
-                    results.push({ type: 'bookmark', title: e.title || e.url, url: e.url });
+                    const base = e.title || e.url;
+                    const pName = e.persona ? (personaNames[e.persona] || 'persona') : null;
+                    results.push({ type: 'bookmark', url: e.url, title: pName ? `${base}  ·  ${pName}` : base, persona: e.persona || null });
                     if (results.length >= limit)
                         break;
                 }
@@ -599,9 +603,10 @@
                         continue;
                     seen.add(key);
                     const base = e.title || e.url;
+                    const pName = e.persona ? (personaNames[e.persona] || e.personaName || 'persona') : null;
                     results.push({
                         type: 'history', url: e.url,
-                        title: e.persona ? `${base}  ·  ${e.personaName || 'persona'}` : base,
+                        title: pName ? `${base}  ·  ${pName}` : base,
                         persona: e.persona || null,
                     });
                     if (results.length >= limit)
@@ -1651,7 +1656,14 @@
                     lbl.textContent = entry.url;
                 }
                 btn.appendChild(lbl);
-                btn.addEventListener('click', () => window.tab.loadUrl(activeTabIndex, entry.url));
+                if (entry.persona)
+                    lbl.textContent += '  ·  ' + (personaNames[entry.persona] || 'persona');
+                btn.addEventListener('click', () => {
+                    if (entry.persona)
+                        window.tab.openInPersona(entry.persona, entry.url);
+                    else
+                        window.tab.loadUrl(activeTabIndex, entry.url);
+                });
                 btn.addEventListener('auxclick', (e) => {
                     if (e.button !== 1)
                         return;
@@ -2087,6 +2099,43 @@
             const dismiss = () => { el.classList.add('hidden'); clearTimeout(timer); };
             el.querySelector('.iso-hint-close')?.addEventListener('click', dismiss, { once: true });
             timer = setTimeout(dismiss, 7000);
+        }
+        // ── Personas ──────────────────────────────────────────────────────────────
+        // Personas are auto-numbered; a persona tab can be optionally renamed via
+        // right-click → "Name This Persona…". Names are resolved live (personaNames
+        // map) so a rename reflects in history/suggestions without rewriting entries.
+        async function refreshPersonaNames() {
+            try { personaNames = (await window.personas.map()) || {}; }
+            catch { personaNames = {}; }
+        }
+        function initPersonas() {
+            refreshPersonaNames();
+            try { window.personas.onChanged(() => refreshPersonaNames()); }
+            catch { }
+            const modal = document.getElementById('persona-rename-modal');
+            const input = document.getElementById('pr-input');
+            if (!modal || !input)
+                return;
+            let renameId = null;
+            const close = () => { modal.classList.add('hidden'); renameId = null; };
+            const save = async () => {
+                const name = input.value.trim();
+                if (renameId && name) { await window.personas.rename(renameId, name); await refreshPersonaNames(); }
+                close();
+            };
+            try {
+                window.personas.onRename((id) => {
+                    renameId = String(id);
+                    input.value = personaNames[renameId] || '';
+                    modal.classList.remove('hidden');
+                    input.focus(); input.select();
+                });
+            }
+            catch { }
+            document.getElementById('pr-save')?.addEventListener('click', save);
+            document.getElementById('pr-cancel')?.addEventListener('click', close);
+            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') close(); });
+            modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
         }
         // ── Tab DOM helpers ───────────────────────────────────────────────────────
         // Isolation is invisible except a small dot on tabs running in their own

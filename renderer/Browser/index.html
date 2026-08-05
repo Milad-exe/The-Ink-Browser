@@ -179,6 +179,18 @@
     <button class="iso-hint-close" tabindex="-1">Got it</button>
   </div>
 
+  <!-- Optional persona rename (auto-numbered by default) -->
+  <div id="persona-rename-modal" class="cm-overlay hidden">
+    <div class="ri-card" role="dialog" aria-label="Name this persona">
+      <div class="ri-title">Name this persona</div>
+      <input id="pr-input" class="ri-input" maxlength="24" placeholder="e.g. Work" tabindex="-1">
+      <div class="ri-actions">
+        <button id="pr-cancel" class="ri-btn" tabindex="-1">Cancel</button>
+        <button id="pr-save" class="ri-btn ri-btn-primary" tabindex="-1">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../../node_modules/dompurify/dist/purify.min.js"></script>
   <script src="../renderer.js"></script>
 </body>

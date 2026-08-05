@@ -49,18 +49,22 @@ class Bookmarks {
     async getAll() {
         return this.load();
     }
-    async add(url, title) {
+    async add(url, title, persona = null) {
+        const p = persona || null;
         const bookmarks = await this.load();
-        const exists = bookmarks.some(b => b.type === 'bookmark' && b.url === url);
+        // Keyed by URL *and persona* — a page bookmarked under a persona is a
+        // distinct favourite that reopens in that persona.
+        const exists = bookmarks.some(b => b.type === 'bookmark' && b.url === url && (b.persona || null) === p);
         if (!exists) {
-            bookmarks.push({ type: 'bookmark', id: this.genId(), url, title: title || url, addedAt: Date.now() });
+            bookmarks.push({ type: 'bookmark', id: this.genId(), url, title: title || url, addedAt: Date.now(), ...(p ? { persona: p } : {}) });
             await this.save();
         }
         return !exists;
     }
-    async remove(url) {
+    async remove(url, persona = null) {
+        const p = persona || null;
         const bookmarks = await this.load();
-        const idx = bookmarks.findIndex(b => b.url === url);
+        const idx = bookmarks.findIndex(b => b.url === url && (b.persona || null) === p);
         if (idx !== -1) {
             bookmarks.splice(idx, 1);
             await this.save();
@@ -78,9 +82,10 @@ class Bookmarks {
         }
         return false;
     }
-    async has(url) {
+    async has(url, persona = null) {
+        const p = persona || null;
         const bookmarks = await this.load();
-        return bookmarks.some(b => b.type === 'bookmark' && b.url === url);
+        return bookmarks.some(b => b.type === 'bookmark' && b.url === url && (b.persona || null) === p);
     }
     async updateTitle(url, title) {
         const bookmarks = await this.load();

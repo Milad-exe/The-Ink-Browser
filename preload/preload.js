@@ -211,6 +211,13 @@ exposeInternal("tab", {
     onTabLoading: (callback) => ipcRenderer.on('tab-loading', callback),
     onMediaIndicator: (callback) => ipcRenderer.on('tab-media-indicator', callback)
 });
+// Personas — optional rename + live id→name map for labelling history/suggestions.
+exposeInternal('personas', {
+    map: () => ipcRenderer.invoke('personas:map'),
+    rename: (id, name) => ipcRenderer.invoke('personas:rename', id, name),
+    onChanged: (cb) => ipcRenderer.on('personas:changed', () => cb()),
+    onRename: (cb) => ipcRenderer.on('rename-persona', (_e, id) => cb(id)),
+});
 exposeInternal('northstarPrivate', {
     newPrivateWindow: () => ipcRenderer.invoke('newPrivateWindow'),
     isPrivateWindow: () => ipcRenderer.invoke('isPrivateWindow'),
