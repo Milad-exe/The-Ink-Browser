@@ -23,19 +23,29 @@ const { app } = require('electron');
 const { parse: parseTld } = require('tldts');
 const { encrypt, decrypt, isEncrypted } = require('./encryption');
 
-// Known multi-tenant SaaS whose tenants live on distinct hosts and commonly need
-// separate concurrent logins. Registrable (eTLD+1) domains. Deliberately EXCLUDES
-// pure identity providers (Google/Microsoft/Okta sign-in) so SSO redirect chains
-// that begin on the default session complete normally.
+// Sites people commonly hold more than one account on — so opening one is a good
+// moment to offer a separate persona. Registrable (eTLD+1) domains, both consumer
+// and enterprise. Isolation only ever triggers on a USER-INITIATED open (typed /
+// bookmark / link), never on a redirect, so "Sign in with Google/Facebook" flows
+// on other sites are unaffected even though google/facebook appear here.
 const BUILTIN_ISOLATE = new Set([
+    // Consumer — multiple personal/work/side accounts
+    'google.com', 'gmail.com', 'youtube.com',
+    'instagram.com', 'facebook.com', 'threads.net',
+    'x.com', 'twitter.com',
+    'reddit.com', 'tiktok.com', 'pinterest.com', 'snapchat.com',
+    'linkedin.com',
+    'amazon.com', 'ebay.com', 'etsy.com',
+    'github.com', 'gitlab.com',
+    'notion.so', 'figma.com', 'discord.com', 'twitch.tv',
+    'spotify.com', 'netflix.com',
+    'paypal.com',
+    // Enterprise — multi-tenant SaaS (multiple orgs/tenants)
     'successfactors.com', 'successfactors.eu', 'sapsf.com', 'sapsf.eu',
     'salesforce.com', 'force.com',
     'workday.com', 'myworkday.com',
-    'servicenow.com',
-    'zendesk.com',
-    'atlassian.net',
-    'box.com',
-    'docusign.net',
+    'servicenow.com', 'zendesk.com', 'atlassian.net',
+    'box.com', 'docusign.net', 'slack.com',
 ]);
 
 class IsolationRules extends EventEmitter {

@@ -173,6 +173,20 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (wd)
             wd.tabs.openUrlUserInitiated(index, sanitizeUrl(url));
     });
+    // Reopen a persona-tagged history/bookmark/suggestion in its persona (a new tab
+    // on that persona's session — so you land back in the right account). If the
+    // persona was cleaned up, fall back to a fresh persona for the site.
+    ipcMain.handle('tab:openInPersona', (_e, personaId, url) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (!wd)
+            return;
+        const containers = require('../features/containers');
+        const safe = sanitizeUrl(url);
+        if (personaId != null && containers.meta(String(personaId)))
+            wd.tabs.openInContainer(safe, String(personaId));
+        else
+            wd.tabs.openIsolatedInstance(safe);
+    });
     ipcMain.handle('goBack', (_e, index) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd)

@@ -190,6 +190,7 @@ exposeInternal("tab", {
     remove: (index) => ipcRenderer.invoke("removeTab", index),
     switch: (index) => ipcRenderer.invoke("switchTab", index),
     loadUrl: (index, url) => ipcRenderer.invoke("loadUrl", index, url),
+    openInPersona: (personaId, url) => ipcRenderer.invoke("tab:openInPersona", personaId, url),
     goBack: (index) => ipcRenderer.invoke("goBack", index),
     goForward: (index) => ipcRenderer.invoke("goForward", index),
     showNavHistoryMenu: (index, x, y) => ipcRenderer.invoke("show-nav-history-menu", index, x, y),

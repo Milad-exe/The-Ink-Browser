@@ -80,8 +80,8 @@ class WindowContextMenu {
             label: 'Duplicate Tab',
             click: () => windowData.tabs.duplicateTab(tabIndex),
         }, {
-            // Open this tab's site as a separate isolated instance (fresh session).
-            label: 'Open Isolated Instance',
+            // Open this tab's site as a separate persona (fresh session).
+            label: 'Open in New Persona',
             click: () => {
                 const u = windowData.tabs.tabUrls.get(tabIndex);
                 windowData.tabs.openIsolatedInstance(/^https?:/i.test(u || '') ? u : null);

@@ -103,15 +103,17 @@ class History {
     async loadHistory() {
         return this.load();
     }
-    async addToHistory(url, title) {
+    async addToHistory(url, title, persona = null, personaName = null) {
         if (isSearchResultUrl(url))
             return;
+        const p = persona || null;
         const history = await this.load();
-        // Dedup by URL, keep the fresh timestamp at the top.
-        const i = history.findIndex(e => e.url === url);
+        // Dedup by URL *and persona* — the same page under two personas (e.g. Gmail
+        // as Work vs Personal) is treated as two distinct entries, not one.
+        const i = history.findIndex(e => e.url === url && (e.persona || null) === p);
         if (i !== -1)
             history.splice(i, 1);
-        history.unshift({ url, title, timestamp: new Date().toISOString() });
+        history.unshift({ url, title, timestamp: new Date().toISOString(), ...(p ? { persona: p, personaName: personaName || null } : {}) });
         if (history.length > MAX_ENTRIES)
             history.length = MAX_ENTRIES;
         this._scheduleWrite();

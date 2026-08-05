@@ -439,6 +439,7 @@
                 window.tab.switch(item.tabIndex);
             }
             else if ((item.type === 'history' || item.type === 'bookmark') && item.url) {
+                if (item.persona) { hideSuggestions(); searchBar.blur(); window.tab.openInPersona(item.persona, item.url); return; }
                 searchBar.value = item.url;
                 commitNavigation(item.url);
             }
@@ -463,6 +464,7 @@
                 return;
             }
             if ((item.type === 'history' || item.type === 'bookmark') && item.url) {
+                if (item.persona) { hideSuggestions(); searchBar.blur(); window.tab.openInPersona(item.persona, item.url); return; }
                 searchBar.value = item.url;
                 commitNavigation(item.url);
             }
@@ -590,11 +592,18 @@
                 for (const e of entries) {
                     if (!e.url)
                         continue;
-                    const key = normalizeUrl(e.url);
+                    // Key by URL *and persona* so the same page under two personas
+                    // stays as two distinct suggestions.
+                    const key = normalizeUrl(e.url) + '|' + (e.persona || '');
                     if (seen.has(key))
                         continue;
                     seen.add(key);
-                    results.push({ type: 'history', title: e.title || e.url, url: e.url });
+                    const base = e.title || e.url;
+                    results.push({
+                        type: 'history', url: e.url,
+                        title: e.persona ? `${base}  ·  ${e.personaName || 'persona'}` : base,
+                        persona: e.persona || null,
+                    });
                     if (results.length >= limit)
                         break;
                 }
@@ -2095,7 +2104,7 @@
                 btn.dataset.private = 'true';
             if (isolated) {
                 btn.dataset.container = 'true';
-                btn.title = 'Isolated session';
+                btn.title = 'Separate persona — its own login & history';
                 maybeShowIsolationHint();
             }
             const titleSpan = document.createElement('span');

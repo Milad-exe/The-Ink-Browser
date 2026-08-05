@@ -683,10 +683,10 @@ class Tabs {
         try {
             res = await permissionUI.request(wc, {
                 origin,
-                title: "Keep this site's logins separate?",
-                action: 'keep its logins separate',
-                allowLabel: 'Isolate',
-                blockLabel: 'Use one session',
+                title: 'Open this in its own persona?',
+                action: 'open in its own persona',
+                allowLabel: 'New persona',
+                blockLabel: 'Use my main',
                 iconType: 'shield',
                 checkbox: false,
             });
@@ -981,7 +981,7 @@ class Tabs {
                     this.sendTabUpdate(tabIndex, tab, url);
                     this.sendNavigationUpdate(tabIndex);
                     if (!this.privateTabs.has(tabIndex)) {
-                        this.addToHistory(url, tab.webContents.getTitle());
+                        this.addToHistory(url, tab.webContents.getTitle(), this.tabContainers.get(tabIndex) || null);
                     }
                     this.saveStateDebounced();
                 }
@@ -1105,7 +1105,7 @@ class Tabs {
                     this.sendTabUpdate(tabIndex, tab, url);
                     this.sendNavigationUpdate(tabIndex);
                     if (!this.privateTabs.has(tabIndex)) {
-                        this.addToHistory(url, tab.webContents.getTitle());
+                        this.addToHistory(url, tab.webContents.getTitle(), this.tabContainers.get(tabIndex) || null);
                     }
                     this.saveStateDebounced();
                 }
@@ -1450,9 +1450,10 @@ class Tabs {
             }
         }
     }
-    addToHistory(url, title) {
+    addToHistory(url, title, persona = null) {
         if (this.history && url && !url.startsWith('file://')) {
-            this.history.addToHistory(url, title || url).catch(error => {
+            const personaName = persona ? (containers.meta(persona)?.name || null) : null;
+            this.history.addToHistory(url, title || url, persona || null, personaName).catch(error => {
             });
         }
     }
