@@ -211,6 +211,12 @@ exposeInternal("tab", {
     onTabLoading: (callback) => ipcRenderer.on('tab-loading', callback),
     onMediaIndicator: (callback) => ipcRenderer.on('tab-media-indicator', callback)
 });
+// Essentials — pinned favourites at the top of the tab sidebar.
+exposeInternal('essentials', {
+    list: () => ipcRenderer.invoke('essentials:list'),
+    remove: (url, persona) => ipcRenderer.invoke('essentials:remove', url, persona),
+    onChanged: (cb) => ipcRenderer.on('essentials-changed', () => cb()),
+});
 // Profiles — Chrome-style browsing selves; each window belongs to one.
 exposeInternal('profiles', {
     current: () => ipcRenderer.invoke('profiles:current'),
@@ -242,6 +248,7 @@ exposeInternal('northstarPrivate', {
 // Bridge for UI events emitted from main (via Tabs.pinTab -> 'pin-tab')
 exposeInternal('tabsUI', {
     onPinTab: (handler) => ipcRenderer.on('pin-tab', (_e, { index }) => handler(index)),
+    onTabBarSide: (handler) => ipcRenderer.on('tabbar-side-changed', (_e, v) => handler(v)),
 });
 // Reader mode + Picture-in-Picture
 exposeInternal('reader', {

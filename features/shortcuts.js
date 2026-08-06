@@ -338,6 +338,23 @@ class Shortcuts {
         this.registerShortcut('CmdOrCtrl+Shift+B', () => {
             this.mainWindow.webContents.send('toggle-bookmark-bar');
         });
+        // Toggle tab bar side (left sidebar ⇄ classic top strip).
+        // Applies to every window: chrome reflows + page bounds resize.
+        this.registerShortcut('CmdOrCtrl+Shift+S', () => {
+            const p = this.tabManager?.persistence;
+            if (!p)
+                return;
+            const next = (p.get('tabBarSide') ?? 'side') === 'top' ? 'side' : 'top';
+            p.set('tabBarSide', next);
+            const all = this.windowManager ? this.windowManager.getAllWindows() : [];
+            for (const wd of all) {
+                try {
+                    wd.window.webContents.send('tabbar-side-changed', next);
+                    wd.tabs.resizeAllTabs();
+                }
+                catch { }
+            }
+        });
         // Toggle focus mode
         this.registerShortcut('CmdOrCtrl+Shift+F', () => {
             const wd = this.getWindowData();

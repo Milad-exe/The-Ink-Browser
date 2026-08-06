@@ -239,6 +239,20 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         try { Menu.buildFromTemplate(template).popup({ window: wd.window, x: Math.round(x), y: Math.round(y) }); }
         catch { }
     });
+    // ── Essentials (pinned favourites; per profile) ────────────────────────────
+    const broadcastEssentials = () => {
+        try {
+            for (const w of wm.windows.values())
+                w.window?.webContents?.send('essentials-changed');
+        }
+        catch { }
+    };
+    ipcMain.handle('essentials:list', (_e) => profiles.essentials(wm.profileOf(_e.sender)));
+    ipcMain.handle('essentials:remove', (_e, url, persona) => {
+        const ok = profiles.removeEssential(wm.profileOf(_e.sender), url, persona || null);
+        broadcastEssentials();
+        return ok;
+    });
     // ── Persona naming (optional rename; auto-numbered by default) ─────────────
     // id → current display name, so history/suggestions can label personas live
     // (a rename reflects everywhere without rewriting stored entries).

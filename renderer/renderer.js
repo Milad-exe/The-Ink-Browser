@@ -126,6 +126,7 @@
         const bookmarkBar = document.getElementById('bookmark-bar');
         const bookmarkBarItems = document.getElementById('bookmark-bar-items');
         // ── Init sequence ─────────────────────────────────────────────────────────
+        initTabBarSide(); // set side/top layout BEFORE anything measures the strip
         initTabBar(); // registers all tab IPC listeners
         initWindowControls();
         initNavButtons();
@@ -140,6 +141,7 @@
         initChromeClock();
         initPersonas();
         initProfiles();
+        initEssentials();
         // ─────────────────────────────────────────────────────────────────────────
         // Chrome status clock (tab strip) — updates on the minute, no seconds timer
         // ─────────────────────────────────────────────────────────────────────────
@@ -2138,6 +2140,86 @@
             input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') close(); });
             modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
         }
+        // ── Tab bar placement (left sidebar ⇄ classic top strip) ──────────────────
+        function sideTabs() { return document.documentElement.dataset.tabbar !== 'top'; }
+        function initTabBarSide() {
+            let mode = 'side';
+            try { mode = (window.northstarSettings.getSync().tabBarSide ?? 'side'); }
+            catch { }
+            document.documentElement.dataset.tabbar = mode === 'top' ? 'top' : 'side';
+            try {
+                window.tabsUI.onTabBarSide((v) => {
+                    document.documentElement.dataset.tabbar = v === 'top' ? 'top' : 'side';
+                    updateTabWidths(tabs.size);
+                    updateScrollShadows();
+                });
+            }
+            catch { }
+        }
+        // ── Essentials (pinned favourites; sidebar top, per profile) ──────────────
+        function initEssentials() {
+            const grid = document.getElementById('essentials');
+            if (!grid)
+                return;
+            const render = async () => {
+                let items = [];
+                try { items = (await window.essentials.list()) || []; }
+                catch { }
+                grid.innerHTML = '';
+                for (const it of items) {
+                    const tile = document.createElement('button');
+                    tile.className = 'essential-tile';
+                    tile.tabIndex = -1;
+                    tile.title = it.title || it.url;
+                    let letter = '•';
+                    try { letter = new URL(it.url).hostname.replace(/^www\./, '').charAt(0).toUpperCase(); }
+                    catch { }
+                    const fb = document.createElement('span');
+                    fb.className = 'ess-fallback';
+                    fb.textContent = letter;
+                    const img = document.createElement('img');
+                    img.style.display = 'none';
+                    img.addEventListener('load', () => { img.style.display = ''; fb.style.display = 'none'; });
+                    paintCachedFavicon(img, it.url);
+                    tile.appendChild(img);
+                    tile.appendChild(fb);
+                    const rm = document.createElement('button');
+                    rm.className = 'ess-remove';
+                    rm.tabIndex = -1;
+                    rm.textContent = '×';
+                    rm.title = 'Remove from Essentials';
+                    rm.addEventListener('click', (e) => { e.stopPropagation(); window.essentials.remove(it.url, it.persona || null); });
+                    tile.appendChild(rm);
+                    // Click: focus an already-open tab of this site, else open one
+                    // (persona-bound essentials reopen in their persona).
+                    tile.addEventListener('click', () => {
+                        if (it.persona) {
+                            window.tab.openInPersona(it.persona, it.url);
+                            return;
+                        }
+                        let origin = null;
+                        try { origin = new URL(it.url).origin; }
+                        catch { }
+                        if (origin) {
+                            for (const [idx, u] of tabUrls) {
+                                try {
+                                    if (new URL(u).origin === origin) {
+                                        window.tab.switch(idx);
+                                        return;
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                        window.browserBookmarks.openInNewTab(it.url, true);
+                    });
+                    grid.appendChild(tile);
+                }
+            };
+            render();
+            try { window.essentials.onChanged(render); }
+            catch { }
+        }
         // ── Profiles ──────────────────────────────────────────────────────────────
         // The toolbar badge shows this window's profile (coloured initial); click
         // opens the native switcher menu (built in ipc/tabs.js). Rename via modal.
@@ -2292,8 +2374,8 @@
                         stopEdgeScroll();
                         return;
                     }
-                    edgeAutoScroll(ev.clientX);
-                    placeDraggedTab(btn, ev.clientX);
+                    edgeAutoScroll(ev.clientX, ev.clientY);
+                    placeDraggedTab(btn, sideTabs() ? ev.clientY : ev.clientX);
                 };
                 const cleanup = () => {
                     document.removeEventListener('pointermove', onMove);
@@ -2525,6 +2607,16 @@
             const count = tabs.size;
             if (!count)
                 return;
+            // Sidebar mode: tabs are full-width rows — clear any inline widths the
+            // top-strip layout applied and let CSS drive.
+            if (sideTabs()) {
+                for (const t of tabs.values()) {
+                    t.style.width = t.style.minWidth = t.style.maxWidth = '';
+                    t.style.flex = '';
+                }
+                tabsContainer.style.overflowX = '';
+                return;
+            }
             requestAnimationFrame(() => {
                 // The container is content-sized now, so its own width isn't the
                 // space available for tabs. container + spacer is the full slack
@@ -2560,18 +2652,25 @@
         function updateScrollShadows() {
             if (!tabsContainer)
                 return;
+            if (sideTabs()) {
+                tabBar.classList.remove('scrollable-left', 'scrollable-right');
+                return;
+            }
             const max = tabsContainer.scrollWidth - tabsContainer.clientWidth;
             const left = tabsContainer.scrollLeft;
             tabBar.classList.toggle('scrollable-left', left > 2);
             tabBar.classList.toggle('scrollable-right', max - left > 2);
         }
-        function getDragAfterElement(container, x, pinned = false) {
+        function getDragAfterElement(container, coord, pinned = false) {
             // Only consider tabs in the dragged tab's own group — pinned tabs
             // reorder within the pinned block, unpinned within the rest.
+            // `coord` is x in the top strip, y in the sidebar (vertical list).
             const sel = pinned ? '.tab-button.pinned:not(.dragging)'
                 : '.tab-button:not(.pinned):not(.dragging)';
+            const vertical = sideTabs();
             return [...container.querySelectorAll(sel)].reduce((closest, child) => {
-                const offset = x - child.getBoundingClientRect().left - child.getBoundingClientRect().width / 2;
+                const r = child.getBoundingClientRect();
+                const offset = vertical ? coord - r.top - r.height / 2 : coord - r.left - r.width / 2;
                 return (offset < 0 && offset > closest.offset) ? { offset, element: child } : closest;
             }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
@@ -2597,16 +2696,25 @@
         // other in a single gesture.
         let edgeScrollDir = 0;
         let edgeScrollTimer = null;
-        function edgeAutoScroll(x) {
+        function edgeAutoScroll(x, y = null) {
             const r = tabsContainer.getBoundingClientRect();
-            const dir = x < r.left + 24 ? -1 : (x > r.right - 24 ? 1 : 0);
+            const vertical = sideTabs();
+            const c = vertical ? (y ?? x) : x;
+            const dir = vertical
+                ? (c < r.top + 24 ? -1 : (c > r.bottom - 24 ? 1 : 0))
+                : (c < r.left + 24 ? -1 : (c > r.right - 24 ? 1 : 0));
             if (dir === edgeScrollDir)
                 return;
             edgeScrollDir = dir;
             clearInterval(edgeScrollTimer);
             edgeScrollTimer = null;
             if (dir)
-                edgeScrollTimer = setInterval(() => { tabsContainer.scrollLeft += dir * 12; }, 16);
+                edgeScrollTimer = setInterval(() => {
+                    if (sideTabs())
+                        tabsContainer.scrollTop += dir * 12;
+                    else
+                        tabsContainer.scrollLeft += dir * 12;
+                }, 16);
         }
         function stopEdgeScroll() {
             edgeScrollDir = 0;

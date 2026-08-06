@@ -861,6 +861,8 @@ class Tabs {
     // instead of filling the window edge-to-edge.
     static SHELL_PAD = 8;
     static PAGE_RADIUS = 12;
+    // Width of the left tab sidebar (tabBarSide: 'side').
+    static SIDEBAR_W = 224;
     // Shell inset above the tab strip (matches body padding-top in
     // Browser/styles.css) so the space above the tabs matches the space below.
     static SHELL_TOP = 6;
@@ -877,9 +879,21 @@ class Tabs {
         if (this.mainWindow && (this.isHtmlFullScreen || this.mainWindow.isSimpleFullScreen())) {
             return { x: 0, y: 0, width: contentBounds.width, height: contentBounds.height };
         }
+        const pad = Tabs.SHELL_PAD;
+        // Sidebar mode: tabs live in a left column, so the page starts after it
+        // and only the utility bar (+ optional bookmark bar) sits above.
+        if ((this.persistence?.get('tabBarSide') ?? 'side') !== 'top') {
+            const yOffset = 52 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
+            let width = contentBounds.width - Tabs.SIDEBAR_W - pad;
+            let height = contentBounds.height - yOffset - pad;
+            if (width < 0)
+                width = 0;
+            if (height < 0)
+                height = 0;
+            return { x: Tabs.SIDEBAR_W, y: yOffset, width: Math.floor(width), height: Math.floor(height) };
+        }
         // shell top inset (see body padding-top in Browser/styles.css) +
         // tab-bar (38px) + utility-bar (50px) + optional bookmark-bar (30px)
-        const pad = Tabs.SHELL_PAD;
         const yOffset = 90 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
         let width = contentBounds.width - pad * 2;
         let height = contentBounds.height - yOffset - pad;

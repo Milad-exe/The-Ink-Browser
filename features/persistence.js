@@ -33,6 +33,8 @@ const DEFAULTS = {
     extPinned: {},
     // One-time hint shown the first time a tab runs in an isolated session
     isolationHintSeen: false,
+    // Tab strip placement: 'side' (left sidebar, default) or 'top'
+    tabBarSide: 'side',
 };
 class Persistence {
     dir; // ~/<userData>/northstar

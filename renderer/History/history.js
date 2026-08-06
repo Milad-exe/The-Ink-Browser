@@ -41,6 +41,14 @@
         const titleElement = document.createElement('div');
         titleElement.textContent = entry.title || 'Untitled';
         titleElement.className = 'history-title';
+        // Persona-tagged entries are distinct visits — label them and reopen in
+        // their persona (so you land back in the right account).
+        if (entry.persona) {
+            const badge = document.createElement('span');
+            badge.className = 'history-persona';
+            badge.textContent = entry.personaName || 'persona';
+            titleElement.appendChild(badge);
+        }
         const urlElement = document.createElement('div');
         urlElement.textContent = entry.url;
         urlElement.className = 'history-url';
@@ -62,9 +70,13 @@
             catch { }
         });
         contentDiv.addEventListener('click', () => {
-            if (entry.url) {
-                window.electronAPI.navigateActiveTab(entry.url);
+            if (!entry.url)
+                return;
+            if (entry.persona && window.tab?.openInPersona) {
+                window.tab.openInPersona(entry.persona, entry.url);
+                return;
             }
+            window.electronAPI.navigateActiveTab(entry.url);
         });
         contentDiv.style.cursor = 'pointer';
         contentDiv.appendChild(titleElement);

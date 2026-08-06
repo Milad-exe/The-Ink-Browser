@@ -87,6 +87,28 @@ class WindowContextMenu {
                 windowData.tabs.openIsolatedInstance(/^https?:/i.test(u || '') ? u : null);
             },
         });
+        // Pin this site into the sidebar's Essentials grid (per profile; a
+        // persona tab's essential keeps its persona).
+        {
+            const u = windowData.tabs.tabUrls.get(tabIndex);
+            if (/^https?:/i.test(u || '')) {
+                this.contextTemplate.push({
+                    label: 'Add to Essentials',
+                    click: () => {
+                        const profiles = require('./profiles');
+                        let title = u;
+                        try { title = new URL(u).hostname.replace(/^www\./, ''); }
+                        catch { }
+                        profiles.addEssential(windowData.tabs.profileId || '1', {
+                            url: u, title,
+                            persona: windowData.tabs.tabContainers.get(tabIndex) || null,
+                        });
+                        try { windowData.window.webContents.send('essentials-changed'); }
+                        catch { }
+                    },
+                });
+            }
+        }
         // Optional persona name (auto-numbered by default). Only on persona tabs.
         const personaId = windowData.tabs.tabContainers.get(tabIndex);
         if (personaId) {
