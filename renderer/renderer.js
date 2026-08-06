@@ -2226,6 +2226,9 @@
         function initProfiles() {
             const btn = document.getElementById('profile-btn');
             const badge = document.getElementById('profile-badge');
+            const sbBtn = document.getElementById('sb-profile');
+            const sbBadge = document.getElementById('sb-profile-badge');
+            const sbName = document.getElementById('sb-profile-name');
             if (!btn || !badge)
                 return;
             const refresh = async () => {
@@ -2236,6 +2239,12 @@
                     badge.textContent = (p.name || 'P').charAt(0);
                     badge.style.setProperty('--pf-color', p.color || '');
                     btn.title = `Profile: ${p.name}`;
+                    if (sbBadge) {
+                        sbBadge.textContent = (p.name || 'P').charAt(0);
+                        sbBadge.style.setProperty('--pf-color', p.color || '');
+                    }
+                    if (sbName)
+                        sbName.textContent = p.name || 'Profile';
                 }
                 catch { }
             };
@@ -2246,6 +2255,18 @@
                 e.stopPropagation();
                 const r = btn.getBoundingClientRect();
                 window.profiles.menu(r.left, r.bottom + 4);
+            });
+            // Sidebar foot: profile switcher (menu opens upward from the chip) +
+            // settings gear.
+            if (sbBtn) {
+                sbBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const r = sbBtn.getBoundingClientRect();
+                    window.profiles.menu(r.left, r.top - 4);
+                });
+            }
+            document.getElementById('sb-settings')?.addEventListener('click', () => {
+                window.tab.loadUrl(activeTabIndex, 'northstar://settings');
             });
             // Rename modal
             const modal = document.getElementById('profile-rename-modal');
