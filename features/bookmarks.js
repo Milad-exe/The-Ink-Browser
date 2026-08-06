@@ -5,8 +5,9 @@ const { encrypt, decrypt, isEncrypted } = require('./encryption');
 class Bookmarks {
     file; // encrypted JSON store path (userData)
     cache; // decrypted bookmark tree once loaded
-    constructor() {
-        this.file = path.join(app.getPath('userData'), 'bookmarks.json');
+    // fileSuffix scopes the store per profile ('' = profile 1's legacy file).
+    constructor(fileSuffix = '') {
+        this.file = path.join(app.getPath('userData'), `bookmarks${fileSuffix}.json`);
         this.cache = null;
     }
     genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }

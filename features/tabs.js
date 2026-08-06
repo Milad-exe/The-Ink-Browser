@@ -4,6 +4,7 @@ const path = require('path');
 const UserAgent = require('./user-agent');
 const faviconStore = require('./favicon-store');
 const containers = require('./containers');
+const profiles = require('./profiles');
 const isolationRules = require('./isolation-rules');
 const permissionUI = require('./permission-ui');
 const captivePortal = require('./captive-portal');
@@ -214,6 +215,9 @@ class Tabs {
         this.tabContainers = new Map(); // tabIndex → container id
         this.nextContainerId = 1;
         this.isPrivateWindow = options?.private ?? false;
+        // Which profile this window's tabs browse as ('1' = default session +
+        // legacy stores). Personas scope within it.
+        this.profileId = options?.profile ? String(options.profile) : '1';
         this.tabOrder = [];
         this.closedTabHistory = []; // stack of {url, title} for "Reopen Closed Tab"
         this.readerMode = new Set(); // tab indices currently showing the reader view
@@ -308,6 +312,9 @@ class Tabs {
         else if (container) {
             webPrefs.session = containers.get(container);
         }
+        else if (this.profileId !== '1') {
+            webPrefs.session = profiles.sessionFor(this.profileId);
+        }
         const tab = new WebContentsView({ webPreferences: webPrefs });
         try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch { }
         if (makePrivate) {
@@ -319,8 +326,9 @@ class Tabs {
         tab.setVisible(false); // Do not show initially
         UserAgent.setupTab(tab);
         this._applyTabBackground(tab, url || 'newtab');
-        // Container tabs run on their own session (no extensions), like private.
-        if (!makePrivate && !container)
+        // Own-session tabs (persona / private / non-default profile) skip
+        // extension registration — extensions live on the default session.
+        if (!makePrivate && !container && this.profileId === '1')
             extensions.addTab(tab.webContents, this.mainWindow);
         // Setup context menu
         tab.webContents.on("context-menu", async (_event, params) => {
@@ -506,6 +514,9 @@ class Tabs {
         else if (container) {
             webPrefs.session = containers.get(container);
         }
+        else if (this.profileId !== '1') {
+            webPrefs.session = profiles.sessionFor(this.profileId);
+        }
         const tab = new WebContentsView({ webPreferences: webPrefs });
         try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch { }
         if (makePrivate) {
@@ -517,9 +528,10 @@ class Tabs {
         this.raiseFloatingViews();
         UserAgent.setupTab(tab);
         this._applyTabBackground(tab, 'newtab');
-        // Container tabs run on their own session (no extensions loaded there),
-        // like private tabs, so they skip extension registration.
-        if (!makePrivate && !container)
+        // Persona/private/non-default-profile tabs run on their own session —
+        // extensions are loaded on the default session only, so they skip
+        // extension registration.
+        if (!makePrivate && !container && this.profileId === '1')
             extensions.addTab(tab.webContents, this.mainWindow);
         tab.webContents.on("context-menu", async (_event, params) => {
             let menuParams = params;
@@ -634,7 +646,7 @@ class Tabs {
     // independent logins, so switching tabs never carries one session over to the
     // other. This is the primary "open an isolated instance" action.
     openIsolatedInstance(url, insertAfterIndex = null) {
-        const c = containers.createForUrl(url);
+        const c = containers.createForUrl(url, this.profileId);
         return this.openInContainer(url, c.id, insertAfterIndex);
     }
     // Open (url) in an EXISTING instance (reuse its session — stay signed in).
@@ -702,7 +714,7 @@ class Tabs {
     }
     // Replace tab (index) with a fresh tab in url's tenant instance, in place.
     _routeTypedToInstance(index, url) {
-        const inst = containers.instanceForHost(url);
+        const inst = containers.instanceForHost(url, this.profileId);
         const orderPos = this.tabOrder.indexOf(index);
         const insertAfter = orderPos > 0 ? this.tabOrder[orderPos - 1] : -1;
         const newIdx = this.openInContainer(url, inst.id, insertAfter);
@@ -940,7 +952,7 @@ class Tabs {
                 if (!/^https?:/i.test(url) || isolationRules.policyFor(url) !== 'isolate')
                     return;
                 event.preventDefault();
-                this.openInContainer(url, containers.instanceForHost(url).id, tabIndex);
+                this.openInContainer(url, containers.instanceForHost(url, this.profileId).id, tabIndex);
             }
             catch { }
         });
@@ -1056,13 +1068,13 @@ class Tabs {
                 const srcContainer = this.tabContainers.get(tabIndex) || null;
                 const r = this.resolveIsolation(tabIndex, url, srcContainer);
                 if (r.mode === 'isolate') {
-                    this.openInContainer(url, containers.instanceForHost(url).id, tabIndex);
+                    this.openInContainer(url, containers.instanceForHost(url, this.profileId).id, tabIndex);
                     return;
                 }
                 if (r.mode === 'ask') {
                     const decision = await this._promptIsolate(this.tabMap.get(tabIndex)?.webContents, url);
                     if (decision === 'isolate') {
-                        this.openInContainer(url, containers.instanceForHost(url).id, tabIndex);
+                        this.openInContainer(url, containers.instanceForHost(url, this.profileId).id, tabIndex);
                         return;
                     }
                     const ni = this.createTab(tabIndex, false, isPriv);
@@ -1994,7 +2006,7 @@ class Tabs {
         // full tab order — filtered-out tabs (private / unpinned) would shift
         // the index and the wrong tab would be focused on restore.
         const activeOrdinal = Math.max(0, selected.indexOf(this.activeTabIndex));
-        return { tabs, activeIndex: activeOrdinal, persistAllTabs: includeAll };
+        return { tabs, activeIndex: activeOrdinal, persistAllTabs: includeAll, profile: this.profileId };
     }
     saveStateDebounced() {
         if (!this.persistence)

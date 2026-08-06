@@ -14,6 +14,8 @@ const PROMPT_W = 320;
 const PROMPT_H = 260;
 function register(ipcMain, { wm, webContents }) {
     const broadcast = () => broadcastBookmarksChanged(webContents);
+    // Bookmarks store of the SENDER's window's profile.
+    const bmFor = (e) => wm.bookmarksFor(wm.profileOf(e.sender));
     const getSenderTabIndex = (wd, senderWebContents) => {
         if (!wd?.tabs?.tabMap)
             return null;
@@ -25,7 +27,7 @@ function register(ipcMain, { wm, webContents }) {
     };
     // ── Read ─────────────────────────────────────────────────────────────────
     ipcMain.handle('bookmarks-get', async () => {
-        return wm.bookmarks.getAll();
+        return bmFor(_e).getAll();
     });
     // The star acts on the ACTIVE tab's page, so its persona (if any) tags the
     // favourite — a page starred in a persona is that persona's favourite.
@@ -34,64 +36,64 @@ function register(ipcMain, { wm, webContents }) {
         return wd?.tabs ? (wd.tabs.tabContainers.get(wd.tabs.activeTabIndex) || null) : null;
     };
     ipcMain.handle('bookmarks-has', async (_e, url) => {
-        return wm.bookmarks.has(url, activePersona(_e.sender));
+        return bmFor(_e).has(url, activePersona(_e.sender));
     });
     // ── Write ─────────────────────────────────────────────────────────────────
     ipcMain.handle('bookmarks-add', async (_e, url, title) => {
-        const added = await wm.bookmarks.add(sanitizeUrl(url), title, activePersona(_e.sender));
+        const added = await bmFor(_e).add(sanitizeUrl(url), title, activePersona(_e.sender));
         broadcast();
         return added;
     });
     ipcMain.handle('bookmarks-remove', async (_e, url) => {
-        const ok = await wm.bookmarks.remove(url, activePersona(_e.sender));
+        const ok = await bmFor(_e).remove(url, activePersona(_e.sender));
         broadcast();
         return ok;
     });
     ipcMain.handle('bookmarks-remove-by-id', async (_e, id) => {
-        const ok = await wm.bookmarks.removeById(id);
+        const ok = await bmFor(_e).removeById(id);
         broadcast();
         return ok;
     });
     ipcMain.handle('bookmarks-update-title', async (_e, url, title) => {
-        await wm.bookmarks.updateTitle(url, title);
+        await bmFor(_e).updateTitle(url, title);
         broadcast();
         return true;
     });
     ipcMain.handle('bookmarks-update-by-id', async (_e, id, updates) => {
-        const ok = await wm.bookmarks.updateById(id, updates);
+        const ok = await bmFor(_e).updateById(id, updates);
         broadcast();
         return ok;
     });
     // ── Folders & structure ───────────────────────────────────────────────────
     ipcMain.handle('bookmarks-add-folder', async (_e, title) => {
-        const id = await wm.bookmarks.addFolder(title);
+        const id = await bmFor(_e).addFolder(title);
         broadcast();
         return id;
     });
     ipcMain.handle('bookmarks-add-divider', async () => {
-        const id = await wm.bookmarks.addDivider();
+        const id = await bmFor(_e).addDivider();
         broadcast();
         return id;
     });
     ipcMain.handle('bookmarks-reorder', async (_e, ids) => {
-        await wm.bookmarks.reorder(ids);
+        await bmFor(_e).reorder(ids);
         broadcast();
         return true;
     });
     ipcMain.handle('bookmarks-reorder-in-folder', async (_e, folderId, orderedIds) => {
-        const ok = await wm.bookmarks.reorderInFolder(folderId, orderedIds);
+        const ok = await bmFor(_e).reorderInFolder(folderId, orderedIds);
         if (ok)
             broadcast();
         return ok;
     });
     ipcMain.handle('bookmarks-move-into-folder', async (_e, itemId, folderId, insertBeforeId) => {
-        const ok = await wm.bookmarks.moveIntoFolder(itemId, folderId, insertBeforeId);
+        const ok = await bmFor(_e).moveIntoFolder(itemId, folderId, insertBeforeId);
         if (ok)
             broadcast();
         return ok;
     });
     ipcMain.handle('bookmarks-move-out-of-folder', async (_e, itemId, folderId, insertBeforeId) => {
-        const ok = await wm.bookmarks.moveOutOfFolder(itemId, folderId, insertBeforeId);
+        const ok = await bmFor(_e).moveOutOfFolder(itemId, folderId, insertBeforeId);
         if (ok)
             broadcast();
         return ok;
@@ -181,7 +183,7 @@ function register(ipcMain, { wm, webContents }) {
             { type: 'separator' },
             { label: 'Copy URL', click: () => { require('electron').clipboard.writeText(url); } },
             { type: 'separator' },
-            { label: 'Remove Bookmark', click: async () => { await wm.bookmarks.remove(url); broadcast(); } },
+            { label: 'Remove Bookmark', click: async () => { await bmFor(_e).remove(url); broadcast(); } },
         ]).popup({ window: wd.window });
     });
 }
@@ -193,7 +195,7 @@ function showBookmarkBarContextMenu(wd, item, wm, webContents) {
         { type: 'separator' },
         { label: 'Add Bookmark', click: () => wd.window.webContents.send('bookmark-add-from-bar') },
         { label: 'Add Folder', click: () => wd.window.webContents.send('bookmark-new-folder-prompt') },
-        { label: 'Add Divider', click: async () => { await wm.bookmarks.addDivider(); broadcast(); } },
+        { label: 'Add Divider', click: async () => { await wm.bookmarksFor(wd.profileId || "1").addDivider(); broadcast(); } },
     ];
     let template = [];
     if (type === 'bookmark') {
@@ -203,14 +205,14 @@ function showBookmarkBarContextMenu(wd, item, wm, webContents) {
             { label: 'Open in Background', click: () => { const i = wd.tabs.createTab(null, false); wd.tabs.loadUrl(i, url); } },
             { type: 'separator' },
             { label: 'Edit', click: () => wd.window.webContents.send('bookmark-edit-prompt', { id, url, title }) },
-            { label: 'Delete', click: async () => { await wm.bookmarks.removeById(id); broadcast(); } },
+            { label: 'Delete', click: async () => { await wm.bookmarksFor(wd.profileId || "1").removeById(id); broadcast(); } },
             ...addItems,
         ];
     }
     else if (type === 'folder') {
         template = [
             { label: 'Open All in New Tabs', click: async () => {
-                    const all = await wm.bookmarks.getAll();
+                    const all = await wm.bookmarksFor(wd.profileId || "1").getAll();
                     const folder = all.find(b => b.id === id);
                     if (folder?.children) {
                         folder.children.filter(c => c.type === 'bookmark').forEach(c => {
@@ -221,13 +223,13 @@ function showBookmarkBarContextMenu(wd, item, wm, webContents) {
                 } },
             { type: 'separator' },
             { label: 'Rename', click: () => wd.window.webContents.send('bookmark-folder-rename', { id, title }) },
-            { label: 'Delete', click: async () => { await wm.bookmarks.removeById(id); broadcast(); } },
+            { label: 'Delete', click: async () => { await wm.bookmarksFor(wd.profileId || "1").removeById(id); broadcast(); } },
             ...addItems,
         ];
     }
     else if (type === 'divider') {
         template = [
-            { label: 'Delete Divider', click: async () => { await wm.bookmarks.removeById(id); broadcast(); } },
+            { label: 'Delete Divider', click: async () => { await wm.bookmarksFor(wd.profileId || "1").removeById(id); broadcast(); } },
         ];
     }
     else {
@@ -235,7 +237,7 @@ function showBookmarkBarContextMenu(wd, item, wm, webContents) {
         template = [
             { label: 'Add Bookmark', click: () => wd.window.webContents.send('bookmark-add-from-bar') },
             { label: 'Add Folder', click: () => wd.window.webContents.send('bookmark-new-folder-prompt') },
-            { label: 'Add Divider', click: async () => { await wm.bookmarks.addDivider(); broadcast(); } },
+            { label: 'Add Divider', click: async () => { await wm.bookmarksFor(wd.profileId || "1").addDivider(); broadcast(); } },
             { type: 'separator' },
             { label: 'Show Bookmark Bar', type: 'checkbox', checked: !!barVisible,
                 click: () => wd.window.webContents.send('toggle-bookmark-bar') },

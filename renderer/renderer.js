@@ -139,6 +139,7 @@
         initReaderAndPip();
         initChromeClock();
         initPersonas();
+        initProfiles();
         // ─────────────────────────────────────────────────────────────────────────
         // Chrome status clock (tab strip) — updates on the minute, no seconds timer
         // ─────────────────────────────────────────────────────────────────────────
@@ -2134,6 +2135,61 @@
             catch { }
             document.getElementById('pr-save')?.addEventListener('click', save);
             document.getElementById('pr-cancel')?.addEventListener('click', close);
+            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') close(); });
+            modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+        }
+        // ── Profiles ──────────────────────────────────────────────────────────────
+        // The toolbar badge shows this window's profile (coloured initial); click
+        // opens the native switcher menu (built in ipc/tabs.js). Rename via modal.
+        function initProfiles() {
+            const btn = document.getElementById('profile-btn');
+            const badge = document.getElementById('profile-badge');
+            if (!btn || !badge)
+                return;
+            const refresh = async () => {
+                try {
+                    const p = await window.profiles.current();
+                    if (!p)
+                        return;
+                    badge.textContent = (p.name || 'P').charAt(0);
+                    badge.style.setProperty('--pf-color', p.color || '');
+                    btn.title = `Profile: ${p.name}`;
+                }
+                catch { }
+            };
+            refresh();
+            try { window.profiles.onChanged(refresh); }
+            catch { }
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const r = btn.getBoundingClientRect();
+                window.profiles.menu(r.left, r.bottom + 4);
+            });
+            // Rename modal
+            const modal = document.getElementById('profile-rename-modal');
+            const input = document.getElementById('prf-input');
+            if (!modal || !input)
+                return;
+            let renameId = null;
+            const close = () => { modal.classList.add('hidden'); renameId = null; };
+            const save = async () => {
+                const name = input.value.trim();
+                if (renameId && name)
+                    await window.profiles.rename(renameId, name);
+                close();
+            };
+            try {
+                window.profiles.onRename(async (id) => {
+                    renameId = String(id);
+                    try { input.value = (await window.profiles.current())?.name || ''; }
+                    catch { input.value = ''; }
+                    modal.classList.remove('hidden');
+                    input.focus(); input.select();
+                });
+            }
+            catch { }
+            document.getElementById('prf-save')?.addEventListener('click', save);
+            document.getElementById('prf-cancel')?.addEventListener('click', close);
             input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') close(); });
             modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
         }

@@ -98,7 +98,7 @@ class Northstar {
         // Test seam — exposes internals to the Playwright harness only when
         // NORTHSTAR_TEST=1. No-op (and not even referenced) in normal runs.
         if (process.env.NORTHSTAR_TEST === '1') {
-            global.__northstarTest = { wm: this.windowManager, focusMode, privacy, adBlocker, containers: require('./features/containers'), isolationRules: require('./features/isolation-rules') };
+            global.__northstarTest = { wm: this.windowManager, focusMode, privacy, adBlocker, containers: require('./features/containers'), isolationRules: require('./features/isolation-rules'), profiles: require('./features/profiles') };
         }
     }
     registerIpc() {
@@ -246,7 +246,12 @@ class Northstar {
             // lock-icon site-info panel. Sensitive unprompted permissions
             // (USB/serial/HID/bluetooth, storage-access, …) are denied outright.
             permissionPrompt.attach(session.defaultSession);
-            this.windowManager.createWindow();
+            // First window opens as the profile the tab state was saved under, so
+            // restore lands in the right profile.
+            let startProfile = '1';
+            try { startProfile = String(this.windowManager.persistence.loadState()?.profile || '1'); }
+            catch { }
+            this.windowManager.createWindow(800, 600, { profile: startProfile });
             // Captive-portal check on startup: public Wi-Fi that needs a sign-in
             // is caught before the user tries to browse, and its login page opens
             // automatically. (Also re-checked whenever a page load fails — see

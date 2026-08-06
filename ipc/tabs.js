@@ -187,6 +187,58 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         else
             wd.tabs.openIsolatedInstance(safe);
     });
+    // ── Profiles (Chrome-style browsing selves; windows belong to one) ─────────
+    const profiles = require('../features/profiles');
+    const broadcastProfiles = () => {
+        try {
+            for (const w of wm.windows.values())
+                w.window?.webContents?.send('profiles:changed');
+        }
+        catch { }
+    };
+    ipcMain.handle('profiles:current', (_e) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        return profiles.meta(wd?.profileId || '1');
+    });
+    ipcMain.handle('profiles:rename', (_e, id, name) => {
+        const p = profiles.rename(id, name);
+        broadcastProfiles();
+        return p;
+    });
+    // Toolbar switcher: native menu listing profiles — pick one to focus an
+    // existing window of it (or open one), create a new profile, or rename.
+    ipcMain.on('profiles:menu', (_e, x, y) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (!wd)
+            return;
+        const current = wd.profileId || '1';
+        const openProfile = (id) => {
+            for (const w of wm.windows.values()) {
+                if ((w.profileId || '1') === id && w.window && !w.window.isDestroyed()) {
+                    w.window.focus();
+                    w.window.moveTop();
+                    return;
+                }
+            }
+            wm.createWindow(1000, 700, { profile: id });
+        };
+        const template = [{ label: 'Browse as', enabled: false }, { type: 'separator' }];
+        for (const p of profiles.list()) {
+            template.push({
+                label: p.name, type: 'checkbox', checked: p.id === current,
+                click: () => { if (p.id !== current) openProfile(p.id); },
+            });
+        }
+        template.push({ type: 'separator' }, {
+            label: 'New Profile…',
+            click: () => { const p = profiles.create(); broadcastProfiles(); openProfile(p.id); },
+        }, {
+            label: 'Rename This Profile…',
+            click: () => { try { wd.window.webContents.send('rename-profile', current); } catch { } },
+        });
+        try { Menu.buildFromTemplate(template).popup({ window: wd.window, x: Math.round(x), y: Math.round(y) }); }
+        catch { }
+    });
     // ── Persona naming (optional rename; auto-numbered by default) ─────────────
     // id → current display name, so history/suggestions can label personas live
     // (a rename reflects everywhere without rewriting stored entries).

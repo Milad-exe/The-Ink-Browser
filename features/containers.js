@@ -86,20 +86,21 @@ function labelForUrl(url) {
     return 'Instance';
 }
 
-// Dedupe a base label within the list: "Site", then "Site · 2", "Site · 3"…
-function _uniqueName(base) {
+// Dedupe a base label within one profile: "Site", then "Site · 2", "Site · 3"…
+function _uniqueName(base, profile = '1') {
     const reg = load();
-    const family = reg.list.filter(c => c.name === base || c.name.startsWith(base + ' · '));
+    const family = reg.list.filter(c => ((c.profile || '1') === String(profile)) &&
+        (c.name === base || c.name.startsWith(base + ' · ')));
     return family.length === 0 ? base : `${base} · ${family.length + 1}`;
 }
 
 /**
- * Create a fresh instance auto-named from (url). Used by the MANUAL "Open
- * Isolated Instance" action — every call mints a new one (so you can hold two
- * separate logins to the same site on purpose).
+ * Create a fresh persona auto-named from (url), scoped to (profile). Used by the
+ * MANUAL "Open in New Persona" action — every call mints a new one (so you can
+ * hold two separate logins to the same site on purpose).
  */
-function createForUrl(url) {
-    return _create(_uniqueName(labelForUrl(url)), url);
+function createForUrl(url, profile = '1') {
+    return _create(_uniqueName(labelForUrl(url), profile), url, profile);
 }
 
 // The distinguishing subdomain of a host ("acme" from acme.successfactors.com),
@@ -120,19 +121,21 @@ function subdomainOf(host) {
  * signed in") while globex.successfactors.com gets its own. Named by tenant:
  * "SuccessFactors — acme", falling back to the site label + "· N".
  */
-function instanceForHost(url) {
+function instanceForHost(url, profile = '1') {
     let host = null;
     try { host = new URL(url).hostname; }
     catch { }
     if (!host)
-        return createForUrl(url);
+        return createForUrl(url, profile);
     const reg = load();
-    const existing = reg.list.find(x => x.tenantHost === host);
+    // Tenant-keyed WITHIN the profile — Work's acme.foo.com persona is separate
+    // from Personal's acme.foo.com persona.
+    const existing = reg.list.find(x => x.tenantHost === host && (x.profile || '1') === String(profile));
     if (existing)
         return { ...existing };
     const label = labelForUrl(url);
     const sub = subdomainOf(host);
-    const c = _create(_uniqueName(sub ? `${label} — ${sub}` : label), url);
+    const c = _create(_uniqueName(sub ? `${label} — ${sub}` : label, profile), url, profile);
     // Tag it tenant-keyed so a later open of the same host reuses it.
     const rec = load().list.find(x => x.id === c.id);
     if (rec) {
@@ -143,7 +146,7 @@ function instanceForHost(url) {
     return c;
 }
 
-function _create(name, site) {
+function _create(name, site, profile = '1') {
     const reg = load();
     const id = String(reg.nextId++);
     const c = {
@@ -151,6 +154,7 @@ function _create(name, site) {
         name: (name || 'Instance').slice(0, 32),
         color: COLORS[reg.list.length % COLORS.length],
         site: (typeof site === 'string' && /^https?:/i.test(site)) ? (() => { try { return new URL(site).hostname; } catch { return null; } })() : null,
+        ...(String(profile) !== '1' ? { profile: String(profile) } : {}),
     };
     reg.list.push(c);
     save();

@@ -211,6 +211,14 @@ exposeInternal("tab", {
     onTabLoading: (callback) => ipcRenderer.on('tab-loading', callback),
     onMediaIndicator: (callback) => ipcRenderer.on('tab-media-indicator', callback)
 });
+// Profiles — Chrome-style browsing selves; each window belongs to one.
+exposeInternal('profiles', {
+    current: () => ipcRenderer.invoke('profiles:current'),
+    menu: (x, y) => ipcRenderer.send('profiles:menu', x, y),
+    rename: (id, name) => ipcRenderer.invoke('profiles:rename', id, name),
+    onChanged: (cb) => ipcRenderer.on('profiles:changed', () => cb()),
+    onRename: (cb) => ipcRenderer.on('rename-profile', (_e, id) => cb(id)),
+});
 // Personas — optional rename + live id→name map for labelling history/suggestions.
 exposeInternal('personas', {
     map: () => ipcRenderer.invoke('personas:map'),

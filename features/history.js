@@ -21,20 +21,23 @@ class History {
     initialized;
     _writeTimer; // debounced flush
     _quitHooked;
-    constructor() {
+    // fileSuffix scopes the store per profile ('' = profile 1's legacy file,
+    // '-p2' etc. for other profiles — each profile has its OWN history).
+    constructor(fileSuffix = '') {
         this.file = null;
         this.initialized = false;
         this.cache = null; // Array — the single source of truth once loaded
         this._writeTimer = null;
         this._quitHooked = false;
-        this.initPath();
+        this.initPath(fileSuffix);
     }
-    initPath() {
+    initPath(fileSuffix = '') {
+        const name = `browsing-history${fileSuffix}.json`;
         try {
-            this.file = path.join(app.getPath('userData'), 'browsing-history.json');
+            this.file = path.join(app.getPath('userData'), name);
         }
         catch {
-            this.file = path.join(process.cwd(), 'browsing-history.json');
+            this.file = path.join(process.cwd(), name);
         }
     }
     async ensureFile() {

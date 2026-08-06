@@ -5,9 +5,9 @@
  * (writes happen inside Features/tabs.js as pages load).
  */
 function register(ipcMain, { wm }) {
-    ipcMain.handle('history-get', async () => {
+    ipcMain.handle('history-get', async (_e) => {
         try {
-            return await wm.history.loadHistory();
+            return await wm.historyFor(wm.profileOf(_e.sender)).loadHistory();
         }
         catch {
             return [];
@@ -15,7 +15,7 @@ function register(ipcMain, { wm }) {
     });
     ipcMain.handle('history-search', async (_e, query, limit = 50) => {
         try {
-            const items = await wm.history.loadHistory();
+            const items = await wm.historyFor(wm.profileOf(_e.sender)).loadHistory();
             if (!query?.trim())
                 return [];
             const q = query.trim().toLowerCase();
@@ -40,7 +40,7 @@ function register(ipcMain, { wm }) {
     });
     ipcMain.handle('remove-history-entry', async (_e, url, timestamp) => {
         try {
-            return await wm.history.removeFromHistory(url, timestamp);
+            return await wm.historyFor(wm.profileOf(_e.sender)).removeFromHistory(url, timestamp);
         }
         catch {
             return false;

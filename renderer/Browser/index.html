@@ -94,6 +94,10 @@
     </div>
 
     <div class="trailing-icons">
+      <!-- Profile switcher: coloured initial of this window's profile -->
+      <button id="profile-btn" tabindex="-1" class="icon-btn" title="Profiles">
+        <span id="profile-badge" class="profile-badge">P</span>
+      </button>
       <!-- Extension browser-action buttons (electron-chrome-extensions) -->
       <browser-action-list id="ext-actions"></browser-action-list>
       <!-- Extensions: lists installed extensions; links to the Chrome Web Store -->
@@ -177,6 +181,18 @@
     <span class="iso-hint-dot"></span>
     <span class="iso-hint-text">Separate persona — its own login &amp; history.</span>
     <button class="iso-hint-close" tabindex="-1">Got it</button>
+  </div>
+
+  <!-- Rename this window's profile -->
+  <div id="profile-rename-modal" class="cm-overlay hidden">
+    <div class="ri-card" role="dialog" aria-label="Rename profile">
+      <div class="ri-title">Rename profile</div>
+      <input id="prf-input" class="ri-input" maxlength="24" placeholder="e.g. Work" tabindex="-1">
+      <div class="ri-actions">
+        <button id="prf-cancel" class="ri-btn" tabindex="-1">Cancel</button>
+        <button id="prf-save" class="ri-btn ri-btn-primary" tabindex="-1">Save</button>
+      </div>
+    </div>
   </div>
 
   <!-- Optional persona rename (auto-numbered by default) -->

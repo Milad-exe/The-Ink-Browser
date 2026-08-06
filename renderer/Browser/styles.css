@@ -340,6 +340,15 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
 #reload-btn.loading .nav-reload { display: none; }
 #reload-btn.loading .nav-stop   { display: block; }
 
+/* Profile switcher badge: coloured circle with the profile's initial. */
+.profile-badge {
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--pf-color, var(--accent)); color: #fff;
+  font-family: var(--mono); font-size: 9.5px; font-weight: 700; line-height: 1;
+  text-transform: uppercase; pointer-events: none;
+}
+
 /* ── Address bar (omnibox) ───────────────── */
 .omnibox-wrapper { flex: 1; min-width: 0; }
 .omnibox {

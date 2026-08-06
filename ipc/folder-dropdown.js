@@ -181,7 +181,7 @@ function showFolderDropdownContextMenu(wd, item, wm, webContents) {
             return;
         broadcast();
         try {
-            const all = await wm.bookmarks.getAll();
+            const all = await wm.bookmarksFor(wd.profileId || "1").getAll();
             const folder = findFolderDeep(all, folderId);
             if (!folder)
                 return;
@@ -205,12 +205,12 @@ function showFolderDropdownContextMenu(wd, item, wm, webContents) {
     const addHereItems = parentFolderId ? [
         { type: 'separator' },
         { label: 'New Folder Here', click: async () => {
-                const newId = await wm.bookmarks.addFolderInto('New Folder', parentFolderId);
+                const newId = await wm.bookmarksFor(wd.profileId || "1").addFolderInto('New Folder', parentFolderId);
                 if (newId)
                     await refreshPanel(parentFolderId, newId);
             } },
         { label: 'New Divider Here', click: async () => {
-                await wm.bookmarks.addDividerInto(parentFolderId);
+                await wm.bookmarksFor(wd.profileId || "1").addDividerInto(parentFolderId);
                 await refreshPanel(parentFolderId);
             } },
     ] : [];
@@ -223,7 +223,7 @@ function showFolderDropdownContextMenu(wd, item, wm, webContents) {
             { type: 'separator' },
             { label: 'Edit', click: () => { closeAndFocus(); wd.window.webContents.send('bookmark-edit-prompt', { id, url, title }); } },
             { label: 'Delete', click: async () => {
-                    await wm.bookmarks.removeById(id);
+                    await wm.bookmarksFor(wd.profileId || "1").removeById(id);
                     if (parentFolderId)
                         await refreshPanel(parentFolderId);
                     else
@@ -235,7 +235,7 @@ function showFolderDropdownContextMenu(wd, item, wm, webContents) {
     else if (type === 'folder') {
         template = [
             { label: 'Open All in New Tabs', click: async () => {
-                    const all = await wm.bookmarks.getAll();
+                    const all = await wm.bookmarksFor(wd.profileId || "1").getAll();
                     const folder = findFolderDeep(all, id);
                     if (folder?.children) {
                         folder.children.filter(c => c.type === 'bookmark').forEach(c => {
@@ -247,7 +247,7 @@ function showFolderDropdownContextMenu(wd, item, wm, webContents) {
             { type: 'separator' },
             { label: 'Rename', click: () => startInlineRename(id, title) },
             { label: 'Delete', click: async () => {
-                    await wm.bookmarks.removeById(id);
+                    await wm.bookmarksFor(wd.profileId || "1").removeById(id);
                     if (parentFolderId)
                         await refreshPanel(parentFolderId);
                     else {
@@ -261,18 +261,18 @@ function showFolderDropdownContextMenu(wd, item, wm, webContents) {
     else if (type === 'folder-bg') {
         template = [
             { label: 'New Folder Here', click: async () => {
-                    const newId = await wm.bookmarks.addFolderInto('New Folder', id);
+                    const newId = await wm.bookmarksFor(wd.profileId || "1").addFolderInto('New Folder', id);
                     if (newId)
                         await refreshPanel(id, newId);
                 } },
             { label: 'New Divider Here', click: async () => {
-                    await wm.bookmarks.addDividerInto(id);
+                    await wm.bookmarksFor(wd.profileId || "1").addDividerInto(id);
                     await refreshPanel(id);
                 } },
             { type: 'separator' },
             { label: 'Rename', click: () => startInlineRename(id, title) },
             { label: 'Delete', click: async () => {
-                    await wm.bookmarks.removeById(id);
+                    await wm.bookmarksFor(wd.profileId || "1").removeById(id);
                     broadcast();
                     closeAndFocus();
                 } },
@@ -281,7 +281,7 @@ function showFolderDropdownContextMenu(wd, item, wm, webContents) {
     else if (type === 'divider') {
         template = [
             { label: 'Delete Divider', click: async () => {
-                    await wm.bookmarks.removeById(id);
+                    await wm.bookmarksFor(wd.profileId || "1").removeById(id);
                     if (parentFolderId)
                         await refreshPanel(parentFolderId);
                     else

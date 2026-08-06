@@ -43,6 +43,34 @@ class WindowManager {
         }
         return this.cachedBookmarks;
     }
+    // ── Per-profile stores ────────────────────────────────────────────────────
+    // Profile 1 keeps the legacy files (no migration); other profiles get their
+    // own '-p<id>'-suffixed history/bookmark files.
+    historyFor(profileId) {
+        const pid = String(profileId || '1');
+        if (pid === '1')
+            return this.history;
+        if (!this.profileHistories)
+            this.profileHistories = new Map();
+        if (!this.profileHistories.has(pid))
+            this.profileHistories.set(pid, new History(`-p${pid}`));
+        return this.profileHistories.get(pid);
+    }
+    bookmarksFor(profileId) {
+        const pid = String(profileId || '1');
+        if (pid === '1')
+            return this.bookmarks;
+        if (!this.profileBookmarks)
+            this.profileBookmarks = new Map();
+        if (!this.profileBookmarks.has(pid))
+            this.profileBookmarks.set(pid, new Bookmarks(`-p${pid}`));
+        return this.profileBookmarks.get(pid);
+    }
+    // Profile of the window owning `sender` (chrome, overlay, or tab wc).
+    profileOf(sender) {
+        const wd = this.getWindowByWebContents(sender);
+        return wd?.profileId || '1';
+    }
     _clampBoundsToDisplays(bounds) {
         try {
             const displays = screen.getAllDisplays();
@@ -222,7 +250,10 @@ class WindowManager {
         window.on('focus', () => {
             this.lastFocusedWindowId = windowId;
         });
-        const tabs = new Tabs(window, this.history, this.persistence, { private: !!options?.private });
+        // Each window belongs to one profile: its tabs browse on that profile's
+        // session and record into that profile's history/bookmarks.
+        const profileId = String(options?.profile || '1');
+        const tabs = new Tabs(window, this.historyFor(profileId), this.persistence, { private: !!options?.private, profile: profileId });
         const shortcuts = new Shortcuts(window, tabs, this);
         tabs.setShortcuts(shortcuts);
         tabs.setWindowManager(this);
@@ -258,6 +289,7 @@ class WindowManager {
             window: window,
             tabs: tabs,
             shortcuts: shortcuts,
+            profileId: profileId,
             menu: null
         };
         this.windows.set(windowId, windowData);
@@ -266,9 +298,10 @@ class WindowManager {
             if (options?.private) {
                 window.webContents.send('set-private-window', true);
             }
-            // Restore only once into the first opened window (if any state exists)
+            // Restore only once into the first opened window (if any state exists),
+            // and only into a window of the profile the state was saved under.
             const state = (!this.restored && this.persistence.hasState()) ? this.persistence.loadState() : null;
-            if (state && state.tabs && state.tabs.length > 0) {
+            if (state && state.tabs && state.tabs.length > 0 && String(state.profile || '1') === profileId) {
                 try {
                     // Create in saved order, restoring each tab's container binding.
                     state.tabs.forEach((t) => {
