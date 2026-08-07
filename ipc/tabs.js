@@ -313,7 +313,12 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         }
         template.push({ type: 'separator' }, {
             label: 'New Workspace…',
-            click: () => { const p = profiles.create(); broadcastProfiles(); wm.switchWorkspace(wd, p.id); },
+            click: () => {
+                const p = profiles.create();
+                broadcastProfiles();
+                wm.switchWorkspace(wd, p.id);
+                try { wd.window.webContents.send('rename-profile', p.id); } catch { } // prompt to name it
+            },
         }, {
             label: 'Open in New Window',
             submenu: profiles.list().map(p => ({ label: p.name, click: () => wm.createWindow(1000, 700, { profile: p.id }) })),

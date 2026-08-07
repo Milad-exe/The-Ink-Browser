@@ -2368,7 +2368,10 @@
                     window.profiles.menu(r.left, r.bottom + 4);
                 });
             }
-            document.getElementById('sb-add-ws')?.addEventListener('click', () => window.profiles.create());
+            document.getElementById('sb-add-ws')?.addEventListener('click', async () => {
+                const p = await window.profiles.create();
+                if (p?.id) openProfileModal(p.id); // prompt to name the new profile
+            });
             document.getElementById('sb-settings')?.addEventListener('click', () => {
                 window.tab.loadUrl(activeTabIndex, 'northstar://settings');
             });
@@ -2394,7 +2397,13 @@
             const emojiInput = document.getElementById('prf-emoji');
             if (!modal || !input)
                 return;
-            const close = () => { modal.classList.add('hidden'); modal.dataset.editId = ''; };
+            const close = () => {
+                modal.classList.add('hidden');
+                modal.dataset.editId = '';
+                // Bring the page (native view) back up from behind the chrome.
+                try { window.focusMode.overlayClose(); }
+                catch { }
+            };
             const save = async () => {
                 const id = modal.dataset.editId;
                 if (id)
@@ -2414,6 +2423,10 @@
                 if (emojiInput)
                     emojiInput.value = p?.emoji || '';
                 modal.classList.remove('hidden');
+                // The page is a native view that paints OVER the chrome DOM, so
+                // collapse it while the modal is up or the modal hides behind it.
+                try { window.focusMode.overlayOpen(); }
+                catch { }
                 input.focus(); input.select();
             };
             try { window.profiles.onRename((id) => openProfileModal(id)); }

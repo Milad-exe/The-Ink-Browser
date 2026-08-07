@@ -405,8 +405,9 @@ html[data-tabbar="side"] .sidebar-foot {
 .sb-settings, .sb-downloads { flex-shrink: 0; width: 30px; height: 30px; }
 .sb-downloads.hidden { display: none; }
 /* Edit-profile modal: emoji + name row. */
-.prf-row { display: flex; gap: 8px; }
-.prf-emoji { width: 52px; flex: 0 0 auto; text-align: center; font-size: 18px; padding-left: 0; padding-right: 0; }
+.prf-row { display: flex; gap: 8px; align-items: center; }
+.prf-row .prf-emoji { flex: 0 0 52px; width: 52px; text-align: center; font-size: 18px; padding: 0; }
+.prf-row .ri-input:not(.prf-emoji) { flex: 1 1 auto; width: auto; min-width: 0; }
 .prf-hint { margin-top: 7px; font-size: 11px; color: var(--text-3); }
 #tab-bar.merge-target::after {
   content: ''; position: absolute; inset: 4px 6px;
