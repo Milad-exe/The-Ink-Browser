@@ -2305,6 +2305,7 @@
             const btn = document.getElementById('profile-btn');
             const badge = document.getElementById('profile-badge');
             const wsRow = document.getElementById('sb-workspaces');
+            let openProfileModal = () => {}; // assigned when the modal wires up below
             const refresh = async () => {
                 let cur = null, all = [];
                 try { cur = await window.profiles.current(); }
@@ -2337,10 +2338,11 @@
                             av.textContent = p.emoji;
                         b.appendChild(av);
                         b.addEventListener('click', () => { if (p.id !== activeWorkspace) window.profiles.switch(p.id); });
+                        b.addEventListener('dblclick', (e) => { e.preventDefault(); openProfileModal(p.id); });
                         b.addEventListener('contextmenu', (e) => {
                             e.preventDefault();
                             const r = b.getBoundingClientRect();
-                            window.profiles.menu(r.left, r.top - 4);
+                            window.profiles.menu(r.left, r.top - 4, p.id);
                         });
                         wsRow.appendChild(b);
                     }
@@ -2392,29 +2394,29 @@
             const emojiInput = document.getElementById('prf-emoji');
             if (!modal || !input)
                 return;
-            let renameId = null;
-            const close = () => { modal.classList.add('hidden'); renameId = null; };
+            const close = () => { modal.classList.add('hidden'); modal.dataset.editId = ''; };
             const save = async () => {
-                if (renameId)
-                    await window.profiles.update(renameId, {
+                const id = modal.dataset.editId;
+                if (id)
+                    await window.profiles.update(id, {
                         name: input.value.trim(),
                         emoji: (emojiInput?.value || '').trim(), // blank → coloured dot
                     });
                 close();
             };
-            try {
-                window.profiles.onRename(async (id) => {
-                    renameId = String(id);
-                    let p = null;
-                    try { p = ((await window.profiles.list()) || []).find(x => x.id === renameId); }
-                    catch { }
-                    input.value = p?.name || '';
-                    if (emojiInput)
-                        emojiInput.value = p?.emoji || '';
-                    modal.classList.remove('hidden');
-                    input.focus(); input.select();
-                });
-            }
+            // Reused by double-click on an avatar and the context-menu "Rename".
+            openProfileModal = async (id) => {
+                modal.dataset.editId = String(id);
+                let p = null;
+                try { p = ((await window.profiles.list()) || []).find(x => x.id === String(id)); }
+                catch { }
+                input.value = p?.name || '';
+                if (emojiInput)
+                    emojiInput.value = p?.emoji || '';
+                modal.classList.remove('hidden');
+                input.focus(); input.select();
+            };
+            try { window.profiles.onRename((id) => openProfileModal(id)); }
             catch { }
             document.getElementById('prf-save')?.addEventListener('click', save);
             document.getElementById('prf-cancel')?.addEventListener('click', close);

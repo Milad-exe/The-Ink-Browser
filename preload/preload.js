@@ -226,7 +226,7 @@ exposeInternal('glance', {
 exposeInternal('profiles', {
     current: () => ipcRenderer.invoke('profiles:current'),
     list: () => ipcRenderer.invoke('profiles:list'),
-    menu: (x, y) => ipcRenderer.send('profiles:menu', x, y),
+    menu: (x, y, id) => ipcRenderer.send('profiles:menu', x, y, id),
     rename: (id, name) => ipcRenderer.invoke('profiles:rename', id, name),
     update: (id, patch) => ipcRenderer.invoke('profiles:update', id, patch),
     switch: (id) => ipcRenderer.invoke('workspaces:switch', id),

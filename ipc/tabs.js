@@ -298,11 +298,12 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     });
     // Switcher menu: pick a workspace (switches in place), open one in a NEW
     // window, add a workspace, or rename the current one.
-    ipcMain.on('profiles:menu', (_e, x, y) => {
+    ipcMain.on('profiles:menu', (_e, x, y, targetId) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd)
             return;
         const current = wd.profileId || '1';
+        const renameTarget = targetId || current;
         const template = [{ label: 'Workspace', enabled: false }, { type: 'separator' }];
         for (const p of profiles.list()) {
             template.push({
@@ -318,7 +319,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             submenu: profiles.list().map(p => ({ label: p.name, click: () => wm.createWindow(1000, 700, { profile: p.id }) })),
         }, {
             label: 'Rename Workspace…',
-            click: () => { try { wd.window.webContents.send('rename-profile', current); } catch { } },
+            click: () => { try { wd.window.webContents.send('rename-profile', renameTarget); } catch { } },
         });
         try { Menu.buildFromTemplate(template).popup({ window: wd.window, x: Math.round(x), y: Math.round(y) }); }
         catch { }
