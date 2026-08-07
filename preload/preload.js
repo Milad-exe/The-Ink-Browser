@@ -254,6 +254,7 @@ exposeInternal('tabsUI', {
     onPinTab: (handler) => ipcRenderer.on('pin-tab', (_e, { index }) => handler(index)),
     onTabBarSide: (handler) => ipcRenderer.on('tabbar-side-changed', (_e, v) => handler(v)),
     onCompact: (handler) => ipcRenderer.on('sidebar-compact-changed', (_e, v) => handler(v)),
+    startSidebarResize: () => ipcRenderer.invoke('sidebar:resize-start'),
     resizeSidebar: (w) => ipcRenderer.invoke('sidebar:resize', w),
     commitSidebarWidth: (w) => ipcRenderer.invoke('sidebar:resize-commit', w),
     onSidebarWidth: (handler) => ipcRenderer.on('sidebar-width-changed', (_e, w) => handler(w)),

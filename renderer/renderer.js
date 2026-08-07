@@ -2195,6 +2195,9 @@
                 dragging = true;
                 handle.setPointerCapture(e.pointerId);
                 document.documentElement.classList.add('sidebar-resizing');
+                // Park the page view so the whole drag stays over chrome DOM
+                // (keeps pointer capture, so release actually ends the drag).
+                try { window.tabsUI.startSidebarResize(); } catch { }
                 e.preventDefault();
             });
             handle.addEventListener('pointermove', (e) => {

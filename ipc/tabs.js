@@ -208,12 +208,19 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     });
     // ── Sidebar resize (live drag → this window; commit → persist + all) ──────
     const clampW = (w) => Math.max(180, Math.min(460, Math.round(Number(w) || 232)));
-    ipcMain.handle('sidebar:resize', (_e, w) => {
+    // Drag start: park the page view at max width so the cursor stays over chrome
+    // DOM for the whole drag (else the page's native view eats the pointer-up).
+    ipcMain.handle('sidebar:resize-start', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd?.tabs) {
-            wd.tabs.sidebarWidth = clampW(w);
+            wd.tabs._sidebarResizing = true;
             wd.tabs.resizeAllTabs();
         }
+    });
+    ipcMain.handle('sidebar:resize', (_e, w) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd?.tabs)
+            wd.tabs.sidebarWidth = clampW(w); // page stays parked; only the width updates
     });
     ipcMain.handle('sidebar:resize-commit', (_e, w) => {
         const width = clampW(w);
@@ -222,6 +229,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         // Width is a global setting — apply to every window so they stay in sync.
         for (const wd of wm.windows.values()) {
             try {
+                wd.tabs._sidebarResizing = false; // un-park
                 wd.tabs.sidebarWidth = width;
                 wd.tabs.resizeAllTabs();
                 wd.window.webContents.send('sidebar-width-changed', width);
