@@ -317,9 +317,19 @@ html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
    (Arc). Labels, close buttons and the "New Tab" caption fall away; every
    control centres in the strip. */
 html[data-tabbar="side"][data-rail="on"] #tab-bar { padding: 0 6px 8px; }
-html[data-tabbar="side"][data-rail="on"] .tab-button { justify-content: center; padding: 0; gap: 0; }
-html[data-tabbar="side"][data-rail="on"] .tab-button .tab-title,
-html[data-tabbar="side"][data-rail="on"] .tab-button .tab-close { display: none; }
+html[data-tabbar="side"][data-rail="on"] .tab-button { justify-content: center; padding: 0; gap: 0; position: relative; }
+html[data-tabbar="side"][data-rail="on"] .tab-button .tab-title { display: none; }
+/* Close hides until you hover the tab, then a corner badge appears (the rest of
+   the tile still selects the tab). Kept inside the tile so the overflow-hidden
+   strip doesn't clip it. */
+html[data-tabbar="side"][data-rail="on"] .tab-button .tab-close {
+  position: absolute; top: 1px; right: 1px; margin: 0;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--surface); box-shadow: 0 1px 3px rgba(8,10,20,0.3);
+  color: var(--text-3); font-size: 10px; opacity: 0;
+}
+html[data-tabbar="side"][data-rail="on"] .tab-button:hover .tab-close { opacity: 1; }
+html[data-tabbar="side"][data-rail="on"] .tab-button .tab-close:hover { color: var(--danger); background: var(--surface); }
 html[data-tabbar="side"][data-rail="on"] .tab-favicon { width: 18px; height: 18px; }
 /* Tabs with no favicon (e.g. New Tab) still get a mark so the row isn't blank. */
 html[data-tabbar="side"][data-rail="on"] .tab-button:not(.has-favicon)::after {
