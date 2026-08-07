@@ -879,7 +879,7 @@ class Tabs {
     static PAGE_RADIUS = 12;
     // Width of the left tab sidebar (tabBarSide: 'side').
     static SIDEBAR_W = 224;
-    static SIDEBAR_MAX = 460; // resize clamp + park position during a drag
+    static SIDEBAR_MAX = 460; // resize clamp (min 180)
     // Shell inset above the tab strip (matches body padding-top in
     // Browser/styles.css) so the space above the tabs matches the space below.
     static SHELL_TOP = 6;
@@ -902,12 +902,7 @@ class Tabs {
         if ((this.persistence?.get('tabBarSide') ?? 'side') !== 'top') {
             const yOffset = 52 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
             // Compact mode: the sidebar is hidden, so the page spans full width.
-            // While the user is dragging the resize handle, PARK the native page
-            // view at the max sidebar width so the cursor's whole drag range stays
-            // over chrome DOM — otherwise the page view under the cursor steals the
-            // pointer-up and the drag never ends.
-            const leftInset = this.sidebarCompact ? pad
-                : (this._sidebarResizing ? Tabs.SIDEBAR_MAX : this.sidebarWidth);
+            const leftInset = this.sidebarCompact ? pad : this.sidebarWidth;
             let width = contentBounds.width - leftInset - pad;
             let height = contentBounds.height - yOffset - pad;
             if (width < 0)

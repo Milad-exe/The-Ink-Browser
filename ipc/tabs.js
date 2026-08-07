@@ -206,36 +206,70 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         broadcastProfiles();
         return p;
     });
-    // ── Sidebar resize (live drag → this window; commit → persist + all) ──────
-    const clampW = (w) => Math.max(180, Math.min(460, Math.round(Number(w) || 232)));
-    // Drag start: park the page view at max width so the cursor stays over chrome
-    // DOM for the whole drag (else the page's native view eats the pointer-up).
-    ipcMain.handle('sidebar:resize-start', (_e) => {
-        const wd = wm.getWindowByWebContents(_e.sender);
-        if (wd?.tabs) {
-            wd.tabs._sidebarResizing = true;
-            wd.tabs.resizeAllTabs();
+    // ── Sidebar resize ────────────────────────────────────────────────────────
+    // The page is a native view layered over the chrome. While the cursor is over
+    // the sidebar the renderer drives the drag (pointermove → sidebar:resize); the
+    // moment it crosses onto the page view the renderer goes deaf, so we ALSO drive
+    // the drag from the page view's own input-event stream. The page stays visible
+    // and resizes live under the cursor, and mouseUp there ends the drag (the
+    // renderer is told via 'sidebar-resize-ended' since its pointerup never fires).
+    const MIN_W = 180, MAX_W = 460;
+    const clampW = (w) => Math.max(MIN_W, Math.min(MAX_W, Math.round(Number(w) || 232)));
+    function applyWidthLive(wd, width) {
+        const t = wd.tabs;
+        if (width === t.sidebarWidth) return;
+        t.sidebarWidth = width;
+        try { t.resizeAllTabs(); } catch { }
+        try { wd.window.webContents.send('sidebar-width-changed', width); } catch { }
+    }
+    function endResize(wd, width) {
+        const t = wd?.tabs;
+        if (!t || !t._sidebarResizing) return;
+        t._sidebarResizing = false;
+        if (t._sidebarInput) {
+            try { t._sidebarInput.wc.removeListener('input-event', t._sidebarInput.onInput); } catch { }
+            t._sidebarInput = null;
         }
-    });
-    ipcMain.handle('sidebar:resize', (_e, w) => {
-        const wd = wm.getWindowByWebContents(_e.sender);
-        if (wd?.tabs)
-            wd.tabs.sidebarWidth = clampW(w); // page stays parked; only the width updates
-    });
-    ipcMain.handle('sidebar:resize-commit', (_e, w) => {
-        const width = clampW(w);
-        try { wm.persistence.set('sidebarWidth', width); }
-        catch { }
+        const final = clampW(width);
+        try { wm.persistence.set('sidebarWidth', final); } catch { }
         // Width is a global setting — apply to every window so they stay in sync.
-        for (const wd of wm.windows.values()) {
+        for (const w of wm.windows.values()) {
             try {
-                wd.tabs._sidebarResizing = false; // un-park
-                wd.tabs.sidebarWidth = width;
-                wd.tabs.resizeAllTabs();
-                wd.window.webContents.send('sidebar-width-changed', width);
+                w.tabs.sidebarWidth = final;
+                w.tabs.resizeAllTabs();
+                w.window.webContents.send('sidebar-width-changed', final);
+                // Release may have landed on the page view, so the renderer's own
+                // pointerup never fired — force it to drop its drag state.
+                w.window.webContents.send('sidebar-resize-ended', final);
             }
             catch { }
         }
+    }
+    ipcMain.handle('sidebar:resize-start', (_e) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        const t = wd?.tabs;
+        if (!t) return;
+        t._sidebarResizing = true;
+        const wc = t.tabMap.get(t.activeTabIndex)?.webContents;
+        if (!wc) return;
+        // input.x is relative to the view's left edge, which sits at the current
+        // sidebar width — so the cursor's window-x is sidebarWidth + input.x.
+        const onInput = (_ev, input) => {
+            if (!t._sidebarResizing) return;
+            if (input.type === 'mouseMove')
+                applyWidthLive(wd, clampW(t.sidebarWidth + input.x));
+            else if (input.type === 'mouseUp' || input.type === 'mouseLeave')
+                endResize(wd, t.sidebarWidth);
+        };
+        t._sidebarInput = { wc, onInput };
+        try { wc.on('input-event', onInput); } catch { }
+    });
+    ipcMain.handle('sidebar:resize', (_e, w) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd?.tabs?._sidebarResizing) applyWidthLive(wd, clampW(w));
+    });
+    ipcMain.handle('sidebar:resize-commit', (_e, w) => {
+        endResize(wm.getWindowByWebContents(_e.sender), w);
     });
     // Switch this window to a workspace IN PLACE.
     ipcMain.handle('workspaces:switch', (_e, id) => {

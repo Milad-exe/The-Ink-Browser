@@ -2187,16 +2187,15 @@
             const handle = document.getElementById('sidebar-resizer');
             if (!handle)
                 return;
-            let dragging = false, raf = null, pending = 232;
+            let dragging = false, raf = null, pending = 232, pid = null;
             const clamp = (w) => Math.max(180, Math.min(460, Math.round(w)));
             handle.addEventListener('pointerdown', (e) => {
                 if (sideTabs() === false)
                     return;
                 dragging = true;
+                pid = e.pointerId;
                 handle.setPointerCapture(e.pointerId);
                 document.documentElement.classList.add('sidebar-resizing');
-                // Park the page view so the whole drag stays over chrome DOM
-                // (keeps pointer capture, so release actually ends the drag).
                 try { window.tabsUI.startSidebarResize(); } catch { }
                 e.preventDefault();
             });
@@ -2208,16 +2207,21 @@
                 if (!raf)
                     raf = requestAnimationFrame(() => { raf = null; window.tabsUI.resizeSidebar(pending); });
             });
-            const end = (e) => {
+            // Drop the drag. `commit` false when the main process already ended it
+            // (release landed on the page view; its mouseUp finished + persisted).
+            const stop = (commit) => {
                 if (!dragging)
                     return;
                 dragging = false;
-                try { handle.releasePointerCapture(e.pointerId); } catch { }
+                try { if (pid != null) handle.releasePointerCapture(pid); } catch { }
                 document.documentElement.classList.remove('sidebar-resizing');
-                window.tabsUI.commitSidebarWidth(pending);
+                if (commit)
+                    window.tabsUI.commitSidebarWidth(pending);
             };
-            handle.addEventListener('pointerup', end);
-            handle.addEventListener('pointercancel', end);
+            handle.addEventListener('pointerup', () => stop(true));
+            handle.addEventListener('pointercancel', () => stop(true));
+            // Main fires this when the release happened over the page view.
+            try { window.tabsUI.onSidebarResizeEnded((w) => { pending = clamp(w); stop(false); }); } catch { }
         }
         // ── Essentials (pinned favourites; sidebar top, per profile) ──────────────
         function initEssentials() {

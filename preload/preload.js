@@ -258,6 +258,7 @@ exposeInternal('tabsUI', {
     resizeSidebar: (w) => ipcRenderer.invoke('sidebar:resize', w),
     commitSidebarWidth: (w) => ipcRenderer.invoke('sidebar:resize-commit', w),
     onSidebarWidth: (handler) => ipcRenderer.on('sidebar-width-changed', (_e, w) => handler(w)),
+    onSidebarResizeEnded: (handler) => ipcRenderer.on('sidebar-resize-ended', (_e, w) => handler(w)),
 });
 // Reader mode + Picture-in-Picture
 exposeInternal('reader', {
