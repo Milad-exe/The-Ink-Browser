@@ -215,9 +215,16 @@ class Tabs {
         this.tabContainers = new Map(); // tabIndex → container id
         this.nextContainerId = 1;
         this.isPrivateWindow = options?.private ?? false;
-        // Which profile this window's tabs browse as ('1' = default session +
-        // legacy stores). Personas scope within it.
+        // Which workspace/profile this window is currently browsing as ('1' =
+        // default session + legacy stores). Personas scope within it. Tabs are
+        // tagged with the workspace they were opened in (tabProfiles) so
+        // switching workspaces swaps the visible tab set IN PLACE.
         this.profileId = options?.profile ? String(options.profile) : '1';
+        this.tabProfiles = new Map(); // tabIndex → workspace/profile id
+        this.splitPair = null; // [leftIdx, rightIdx] when split view is active
+        this.glanceView = null; // floating page-preview overlay ("glance")
+        this.glanceUrl = null;
+        this.sidebarCompact = false; // side mode: sidebar hidden, page full-bleed
         this.tabOrder = [];
         this.closedTabHistory = []; // stack of {url, title} for "Reopen Closed Tab"
         this.readerMode = new Set(); // tab indices currently showing the reader view
@@ -292,10 +299,13 @@ class Tabs {
         // The session is wiped in destroyTab() the moment the tab closes.
         return privateSessions.createTabSession();
     }
-    createLazyTab(url, title, isPinned, isPrivate = false, insertAfterActive = false, eager = false, containerId = null) {
+    createLazyTab(url, title, isPinned, isPrivate = false, insertAfterActive = false, eager = false, containerId = null, workspaceId = null) {
         const tabIndex = this.nextTabIndex;
         this.nextTabIndex++;
         const makePrivate = isPrivate || this.isPrivateWindow;
+        // Restore may rebuild tabs of a non-active workspace — honour the saved
+        // workspace tag; live-created lazy tabs use the current one.
+        const workspace = workspaceId ? String(workspaceId) : this.profileId;
         // Container binding is fixed here (chosen at creation, like private) and
         // only applies to non-private tabs.
         const container = (!makePrivate && containerId != null && String(containerId) !== '') ? String(containerId) : null;
@@ -371,6 +381,7 @@ class Tabs {
         tab.containerId = container;
         if (container)
             this.tabContainers.set(tabIndex, container);
+        this.tabProfiles.set(tabIndex, workspace);
         tab.lazyLoaded = false;
         let tempTitle = title || url || 'New Tab';
         if ((!title || title === 'New Tab' || title === '') && url && url.startsWith('http')) {
@@ -404,6 +415,7 @@ class Tabs {
             container: container,
             containerColor: container ? containers.colorFor(container) : null,
             containerMeta: container ? containers.meta(container) : null,
+            workspace: workspace,
         });
         this.sendTabUpdate(tabIndex, tab, url || 'newtab', tab.lazyTitle);
         // Eager background load (user-initiated "open in new tab"): start loading
@@ -559,6 +571,7 @@ class Tabs {
         tab.containerId = container;
         if (container)
             this.tabContainers.set(tabIndex, container);
+        this.tabProfiles.set(tabIndex, this.profileId);
         // insertAfterIndex: existing tab index to insert after, -1 for the
         // front of the order (cross-window drop before the first tab), else end.
         const afterPos = (insertAfterIndex !== null && insertAfterIndex !== undefined && insertAfterIndex !== -1)
@@ -593,6 +606,7 @@ class Tabs {
             container: container,
             containerColor: container ? containers.colorFor(container) : null,
             containerMeta: container ? containers.meta(container) : null,
+            workspace: this.profileId,
         });
         if (shouldActivate) {
             this.showTab(tabIndex);
@@ -1483,6 +1497,26 @@ class Tabs {
             });
         }
     }
+    // ── Workspaces (a workspace IS a profile, switched in place) ───────────────
+    // The window keeps tabs of every workspace alive in tabMap; only the active
+    // workspace's tabs are shown/counted. Switching swaps the visible set.
+    tabsInWorkspace(id) {
+        const key = String(id);
+        return this.tabOrder.filter(i => this.tabMap.has(i) && (this.tabProfiles.get(i) || '1') === key);
+    }
+    // Focus the active workspace after a switch: show its most-recent tab, or
+    // open a fresh one if it has none. (this.profileId already points at it.)
+    applyWorkspace() {
+        const mine = this.tabsInWorkspace(this.profileId);
+        if (!mine.length) {
+            this.createTab(); // lands in the new workspace (uses this.profileId)
+            return;
+        }
+        let target = mine.includes(this.activeTabIndex) ? this.activeTabIndex : null;
+        if (target == null)
+            target = mine.reduce((a, b) => ((this.tabLastActive.get(b) || 0) > (this.tabLastActive.get(a) || 0) ? b : a), mine[0]);
+        this.showTab(target);
+    }
     showTab(index) {
         this.tabMap.forEach((tab, i) => {
             tab.setVisible(false);
@@ -1697,6 +1731,7 @@ class Tabs {
             this.pinnedTabs.delete(index);
             this.privateTabs.delete(index); // session wipe happens in destroyTab()
             this.tabContainers.delete(index); // container SESSION persists (shared, reusable)
+            this.tabProfiles.delete(index);
             this.tabOrder = this.tabOrder.filter(i => i !== index);
             this.tabLastActive.delete(index);
             try {
@@ -1743,6 +1778,7 @@ class Tabs {
             this.pinnedTabs.delete(index);
             this.privateTabs.delete(index); // session wipe happens in destroyTab()
             this.tabContainers.delete(index); // container SESSION persists (shared, reusable)
+            this.tabProfiles.delete(index);
             this.tabOrder = this.tabOrder.filter(i => i !== index);
             this.tabLastActive.delete(index);
             try {
@@ -2014,13 +2050,14 @@ class Tabs {
                 title,
                 pinned: this.pinnedTabs.has(idx),
                 container: this.tabContainers.get(idx) || null,
+                workspace: this.tabProfiles.get(idx) || '1',
             };
         });
         // Map active to its ordinal within the SAVED list (selected), not the
         // full tab order — filtered-out tabs (private / unpinned) would shift
         // the index and the wrong tab would be focused on restore.
         const activeOrdinal = Math.max(0, selected.indexOf(this.activeTabIndex));
-        return { tabs, activeIndex: activeOrdinal, persistAllTabs: includeAll, profile: this.profileId };
+        return { tabs, activeIndex: activeOrdinal, persistAllTabs: includeAll, profile: this.profileId, activeWorkspace: this.profileId };
     }
     saveStateDebounced() {
         if (!this.persistence)

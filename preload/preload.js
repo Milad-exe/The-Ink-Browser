@@ -220,9 +220,13 @@ exposeInternal('essentials', {
 // Profiles — Chrome-style browsing selves; each window belongs to one.
 exposeInternal('profiles', {
     current: () => ipcRenderer.invoke('profiles:current'),
+    list: () => ipcRenderer.invoke('profiles:list'),
     menu: (x, y) => ipcRenderer.send('profiles:menu', x, y),
     rename: (id, name) => ipcRenderer.invoke('profiles:rename', id, name),
+    switch: (id) => ipcRenderer.invoke('workspaces:switch', id),
+    create: () => ipcRenderer.invoke('workspaces:create'),
     onChanged: (cb) => ipcRenderer.on('profiles:changed', () => cb()),
+    onSwitched: (cb) => ipcRenderer.on('workspace-switched', (_e, id) => cb(id)),
     onRename: (cb) => ipcRenderer.on('rename-profile', (_e, id) => cb(id)),
 });
 // Personas — optional rename + live id→name map for labelling history/suggestions.

@@ -71,6 +71,29 @@ class WindowManager {
         const wd = this.getWindowByWebContents(sender);
         return wd?.profileId || '1';
     }
+    // Switch a window to another workspace IN PLACE: repoint its
+    // profile + history store, reveal that workspace's tabs, and tell the chrome
+    // to filter the strip + refresh essentials/bookmarks/profile chip.
+    switchWorkspace(wd, id) {
+        id = String(id);
+        if (!wd?.tabs || (wd.profileId || '1') === id)
+            return;
+        wd.profileId = id;
+        wd.tabs.profileId = id;
+        wd.tabs.history = this.historyFor(id);
+        try {
+            wd.tabs.applyWorkspace();
+        }
+        catch { }
+        try {
+            wd.window.webContents.send('workspace-switched', id);
+            // These views are per-workspace — re-emit their change events so the
+            // bookmark bar + Essentials reload for the new workspace.
+            wd.window.webContents.send('bookmarks-changed');
+            wd.window.webContents.send('essentials-changed');
+        }
+        catch { }
+    }
     _clampBoundsToDisplays(bounds) {
         try {
             const displays = screen.getAllDisplays();
@@ -303,23 +326,28 @@ class WindowManager {
             const state = (!this.restored && this.persistence.hasState()) ? this.persistence.loadState() : null;
             if (state && state.tabs && state.tabs.length > 0 && String(state.profile || '1') === profileId) {
                 try {
-                    // Create in saved order, restoring each tab's container binding.
+                    // Rebuild every workspace's tabs (each tagged with its own
+                    // workspace + container); only the active workspace's show.
+                    const tabKeys = [];
                     state.tabs.forEach((t) => {
-                        tabs.createLazyTab(t.url, t.title, t.pinned, false, false, false, t.container || null);
+                        tabs.createLazyTab(t.url, t.title, t.pinned, false, false, false, t.container || null, t.workspace || '1');
+                        tabKeys.push(tabs.nextTabIndex - 1);
                     });
-                    // Focus saved active if valid
-                    if (typeof state.activeIndex === 'number') {
-                        const tabKeys = Array.from(tabs.tabMap.keys()).sort((a, b) => a - b);
-                        const focusIdx = tabKeys[state.activeIndex] ?? tabKeys[0];
-                        if (typeof focusIdx === 'number')
-                            tabs.showTab(focusIdx);
+                    const activeWs = String(state.activeWorkspace || state.profile || '1');
+                    if (activeWs !== profileId) {
+                        tabs.profileId = activeWs;
+                        windowData.profileId = activeWs;
+                        tabs.history = this.historyFor(activeWs);
                     }
-                    else {
-                        // Show first tab by default
-                        const tabKeys = Array.from(tabs.tabMap.keys()).sort((a, b) => a - b);
-                        if (tabKeys.length > 0)
-                            tabs.showTab(tabKeys[0]);
-                    }
+                    // Focus the saved active tab if it's in the active workspace,
+                    // else the active workspace's first tab.
+                    const inWs = tabs.tabsInWorkspace(tabs.profileId);
+                    const savedActive = (typeof state.activeIndex === 'number') ? tabKeys[state.activeIndex] : undefined;
+                    const focusIdx = (savedActive != null && inWs.includes(savedActive)) ? savedActive : inWs[0];
+                    if (typeof focusIdx === 'number')
+                        tabs.showTab(focusIdx);
+                    else
+                        tabs.createTab();
                 }
                 catch {
                     // Fallback: at least one tab

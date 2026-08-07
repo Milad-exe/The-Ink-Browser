@@ -273,27 +273,33 @@ html[data-tabbar="side"] .essentials:empty { display: none; }
 .essential-tile:hover .ess-remove { display: flex; }
 .essential-tile .ess-remove:hover { color: var(--danger); }
 
-/* ── Sidebar foot: profile switcher + settings (bottom bar) ────────────────── */
+/* Tabs not in the active workspace are hidden from the strip. */
+.tab-button.ws-hidden { display: none !important; }
+
+/* ── Sidebar foot: workspace switcher + settings (bottom bar) ──────────────── */
 .sidebar-foot { display: none; }
 html[data-tabbar="side"] .sidebar-foot {
   display: flex; align-items: center; gap: 4px; flex-shrink: 0;
   padding: 7px 2px 0; border-top: 1px solid var(--border);
   -webkit-app-region: no-drag;
 }
-.sb-profile {
-  flex: 1; min-width: 0; height: 32px;
-  display: flex; align-items: center; gap: 8px;
-  border: none; border-radius: 9px; background: transparent;
-  padding: 0 7px; cursor: pointer; text-align: left;
-  transition: background 0.12s;
+.sb-workspaces { display: flex; align-items: center; gap: 3px; flex: 1; min-width: 0; overflow: hidden; }
+.sb-ws {
+  display: flex; align-items: center; gap: 7px; flex-shrink: 0;
+  height: 32px; padding: 0 6px; border: none; border-radius: 9px;
+  background: transparent; cursor: pointer; transition: background 0.12s;
 }
-.sb-profile:hover { background: var(--hover); }
-.sb-profile .profile-badge { width: 20px; height: 20px; font-size: 10px; }
-.sb-profile-name {
-  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--text-2);
+.sb-ws:hover { background: var(--hover); }
+.sb-ws.active { background: var(--surface); box-shadow: inset 0 0 0 0.5px var(--border); }
+.sb-ws .profile-badge { width: 20px; height: 20px; font-size: 10px; }
+.sb-ws:not(.active) .profile-badge { opacity: 0.72; }
+.sb-ws:hover .profile-badge { opacity: 1; }
+.sb-ws-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--text);
 }
-.sb-profile:hover .sb-profile-name { color: var(--text); }
+.sb-add-ws { flex-shrink: 0; width: 28px; height: 28px; font-size: 16px; font-weight: 300; color: var(--text-3); }
+.sb-add-ws:hover { color: var(--text); }
 .sb-settings { flex-shrink: 0; width: 30px; height: 30px; }
 #tab-bar.merge-target::after {
   content: ''; position: absolute; inset: 4px 6px;

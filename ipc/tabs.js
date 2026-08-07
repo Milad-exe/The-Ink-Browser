@@ -200,40 +200,48 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const wd = wm.getWindowByWebContents(_e.sender);
         return profiles.meta(wd?.profileId || '1');
     });
+    ipcMain.handle('profiles:list', () => profiles.list());
     ipcMain.handle('profiles:rename', (_e, id, name) => {
         const p = profiles.rename(id, name);
         broadcastProfiles();
         return p;
     });
-    // Toolbar switcher: native menu listing profiles — pick one to focus an
-    // existing window of it (or open one), create a new profile, or rename.
+    // Switch this window to a workspace IN PLACE.
+    ipcMain.handle('workspaces:switch', (_e, id) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd)
+            wm.switchWorkspace(wd, id);
+    });
+    ipcMain.handle('workspaces:create', (_e) => {
+        const p = profiles.create();
+        broadcastProfiles();
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd)
+            wm.switchWorkspace(wd, p.id);
+        return p;
+    });
+    // Switcher menu: pick a workspace (switches in place), open one in a NEW
+    // window, add a workspace, or rename the current one.
     ipcMain.on('profiles:menu', (_e, x, y) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd)
             return;
         const current = wd.profileId || '1';
-        const openProfile = (id) => {
-            for (const w of wm.windows.values()) {
-                if ((w.profileId || '1') === id && w.window && !w.window.isDestroyed()) {
-                    w.window.focus();
-                    w.window.moveTop();
-                    return;
-                }
-            }
-            wm.createWindow(1000, 700, { profile: id });
-        };
-        const template = [{ label: 'Browse as', enabled: false }, { type: 'separator' }];
+        const template = [{ label: 'Workspace', enabled: false }, { type: 'separator' }];
         for (const p of profiles.list()) {
             template.push({
                 label: p.name, type: 'checkbox', checked: p.id === current,
-                click: () => { if (p.id !== current) openProfile(p.id); },
+                click: () => { if (p.id !== current) wm.switchWorkspace(wd, p.id); },
             });
         }
         template.push({ type: 'separator' }, {
-            label: 'New Profile…',
-            click: () => { const p = profiles.create(); broadcastProfiles(); openProfile(p.id); },
+            label: 'New Workspace…',
+            click: () => { const p = profiles.create(); broadcastProfiles(); wm.switchWorkspace(wd, p.id); },
         }, {
-            label: 'Rename This Profile…',
+            label: 'Open in New Window',
+            submenu: profiles.list().map(p => ({ label: p.name, click: () => wm.createWindow(1000, 700, { profile: p.id }) })),
+        }, {
+            label: 'Rename Workspace…',
             click: () => { try { wd.window.webContents.send('rename-profile', current); } catch { } },
         });
         try { Menu.buildFromTemplate(template).popup({ window: wd.window, x: Math.round(x), y: Math.round(y) }); }

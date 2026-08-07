@@ -70,6 +70,14 @@
         let tabPrivate = new Map(); // tabIndex → boolean (private flag)
         let tabLoading = new Set(); // tabIndexes currently loading
         let personaNames = {}; // persona id → current display name (for labelling)
+        // Only the active workspace's tabs are shown in the strip.
+        function filterTabsByWorkspace() {
+            for (const [idx, btn] of tabs) {
+                const ws = btn.dataset.ws || '1';
+                btn.classList.toggle('ws-hidden', ws !== activeWorkspace);
+            }
+            updateChromeTabs(document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden)').length);
+        }
         let activeTabIndex = 0;
         let currentTabUrl = '';
         // True once the user (click) or Cmd+L/Cmd+K intentionally focuses the
@@ -1893,7 +1901,7 @@
             // ── IPC events from main process ──────────────────────────────────────
             window.tab.onTabCreated((_e, data) => {
                 tabPrivate.set(data.index, !!data.private);
-                createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private, !!data.container);
+                createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private, !!data.container, data.workspace || '1');
                 updateChromeTabs(data.totalTabs);
                 setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
             });
@@ -2223,48 +2231,76 @@
         // ── Profiles ──────────────────────────────────────────────────────────────
         // The toolbar badge shows this window's profile (coloured initial); click
         // opens the native switcher menu (built in ipc/tabs.js). Rename via modal.
+        let activeWorkspace = '1';
         function initProfiles() {
             const btn = document.getElementById('profile-btn');
             const badge = document.getElementById('profile-badge');
-            const sbBtn = document.getElementById('sb-profile');
-            const sbBadge = document.getElementById('sb-profile-badge');
-            const sbName = document.getElementById('sb-profile-name');
-            if (!btn || !badge)
-                return;
+            const wsRow = document.getElementById('sb-workspaces');
             const refresh = async () => {
-                try {
-                    const p = await window.profiles.current();
-                    if (!p)
-                        return;
-                    badge.textContent = (p.name || 'P').charAt(0);
-                    badge.style.setProperty('--pf-color', p.color || '');
-                    btn.title = `Profile: ${p.name}`;
-                    if (sbBadge) {
-                        sbBadge.textContent = (p.name || 'P').charAt(0);
-                        sbBadge.style.setProperty('--pf-color', p.color || '');
-                    }
-                    if (sbName)
-                        sbName.textContent = p.name || 'Profile';
-                }
+                let cur = null, all = [];
+                try { cur = await window.profiles.current(); }
                 catch { }
+                try { all = (await window.profiles.list()) || []; }
+                catch { }
+                if (cur) {
+                    activeWorkspace = cur.id;
+                    if (badge) {
+                        badge.textContent = (cur.name || 'P').charAt(0);
+                        badge.style.setProperty('--pf-color', cur.color || '');
+                    }
+                    if (btn)
+                        btn.title = `Workspace: ${cur.name}`;
+                }
+                // Avatar row: one per workspace, active one labelled.
+                if (wsRow) {
+                    wsRow.innerHTML = '';
+                    for (const p of all) {
+                        const b = document.createElement('button');
+                        b.className = 'sb-ws' + (p.id === activeWorkspace ? ' active' : '');
+                        b.tabIndex = -1;
+                        b.title = p.name;
+                        const av = document.createElement('span');
+                        av.className = 'profile-badge';
+                        av.textContent = (p.name || 'W').charAt(0);
+                        av.style.setProperty('--pf-color', p.color || '');
+                        b.appendChild(av);
+                        if (p.id === activeWorkspace) {
+                            const nm = document.createElement('span');
+                            nm.className = 'sb-ws-name';
+                            nm.textContent = p.name;
+                            b.appendChild(nm);
+                        }
+                        b.addEventListener('click', () => { if (p.id !== activeWorkspace) window.profiles.switch(p.id); });
+                        b.addEventListener('contextmenu', (e) => {
+                            e.preventDefault();
+                            const r = b.getBoundingClientRect();
+                            window.profiles.menu(r.left, r.top - 4);
+                        });
+                        wsRow.appendChild(b);
+                    }
+                }
             };
             refresh();
             try { window.profiles.onChanged(refresh); }
             catch { }
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const r = btn.getBoundingClientRect();
-                window.profiles.menu(r.left, r.bottom + 4);
-            });
-            // Sidebar foot: profile switcher (menu opens upward from the chip) +
-            // settings gear.
-            if (sbBtn) {
-                sbBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const r = sbBtn.getBoundingClientRect();
-                    window.profiles.menu(r.left, r.top - 4);
+            try {
+                window.profiles.onSwitched((id) => {
+                    activeWorkspace = String(id);
+                    filterTabsByWorkspace();
+                    refresh();
+                    // Essentials + bookmark bar reload via their own change events,
+                    // which main re-emits on switch (they're per-workspace now).
                 });
             }
+            catch { }
+            if (btn) {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const r = btn.getBoundingClientRect();
+                    window.profiles.menu(r.left, r.bottom + 4);
+                });
+            }
+            document.getElementById('sb-add-ws')?.addEventListener('click', () => window.profiles.create());
             document.getElementById('sb-settings')?.addEventListener('click', () => {
                 window.tab.loadUrl(activeTabIndex, 'northstar://settings');
             });
@@ -2299,12 +2335,15 @@
         // ── Tab DOM helpers ───────────────────────────────────────────────────────
         // Isolation is invisible except a small dot on tabs running in their own
         // isolated (per-tenant) session — see .tab-button[data-container] in CSS.
-        function createTabButton(index, title, afterIndex = null, shouldActivate = true, isPrivate = false, isolated = false) {
+        function createTabButton(index, title, afterIndex = null, shouldActivate = true, isPrivate = false, isolated = false, workspace = '1') {
             if (tabs.has(index))
                 return;
             const btn = document.createElement('div');
             btn.className = 'tab-button';
             btn.dataset.index = index;
+            btn.dataset.ws = String(workspace);
+            if (String(workspace) !== activeWorkspace)
+                btn.classList.add('ws-hidden');
             btn.draggable = false; // pointer-tracked drag below, not HTML5 DnD
             // Not keyboard-focusable: the tab strip should never be a Tab-key stop.
             btn.tabIndex = -1;

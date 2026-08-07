@@ -35,13 +35,11 @@
       <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><path d="M8 1L2 3.5V8c0 3.3 2.5 5.7 6 7 3.5-1.3 6-3.7 6-7V3.5L8 1zm0 6.5h4c-.3 2.2-1.8 4-4 5.1V7.5H4V5l4-1.7V7.5z"/></svg>
       Private
     </div>
-    <!-- Sidebar foot (side mode only): profile switcher + settings — the
-         bottom bar of the tab sidebar -->
+    <!-- Sidebar foot (side mode only): workspace switcher (an avatar
+         per workspace, active one labelled) + add + settings. -->
     <div id="sidebar-foot" class="sidebar-foot">
-      <button id="sb-profile" class="sb-profile" tabindex="-1" title="Profiles">
-        <span id="sb-profile-badge" class="profile-badge">P</span>
-        <span id="sb-profile-name" class="sb-profile-name">Personal</span>
-      </button>
+      <div id="sb-workspaces" class="sb-workspaces"></div>
+      <button id="sb-add-ws" class="icon-btn sb-add-ws" tabindex="-1" title="New workspace">+</button>
       <button id="sb-settings" class="icon-btn sb-settings" tabindex="-1" title="Settings">
         <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
