@@ -319,17 +319,17 @@ html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
 html[data-tabbar="side"][data-rail="on"] #tab-bar { padding: 0 6px 8px; }
 html[data-tabbar="side"][data-rail="on"] .tab-button { justify-content: center; padding: 0; gap: 0; position: relative; }
 html[data-tabbar="side"][data-rail="on"] .tab-button .tab-title { display: none; }
-/* Close hides until you hover the tab, then a corner badge appears (the rest of
-   the tile still selects the tab). Kept inside the tile so the overflow-hidden
-   strip doesn't clip it. */
+/* Hovering a tab swaps its favicon for an × in place (Chrome-style) — the icon
+   itself becomes the close target. */
 html[data-tabbar="side"][data-rail="on"] .tab-button .tab-close {
-  position: absolute; top: 1px; right: 1px; margin: 0;
-  width: 14px; height: 14px; border-radius: 50%;
-  background: var(--surface); box-shadow: 0 1px 3px rgba(8,10,20,0.3);
-  color: var(--text-3); font-size: 10px; opacity: 0;
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  margin: 0; width: 20px; height: 20px; border-radius: 6px;
+  background: transparent; color: var(--text-2); font-size: 15px; opacity: 0;
 }
+html[data-tabbar="side"][data-rail="on"] .tab-button:hover .tab-favicon,
+html[data-tabbar="side"][data-rail="on"] .tab-button:hover:not(.has-favicon)::after { opacity: 0; }
 html[data-tabbar="side"][data-rail="on"] .tab-button:hover .tab-close { opacity: 1; }
-html[data-tabbar="side"][data-rail="on"] .tab-button .tab-close:hover { color: var(--danger); background: var(--surface); }
+html[data-tabbar="side"][data-rail="on"] .tab-button .tab-close:hover { color: var(--danger); background: var(--hover); }
 html[data-tabbar="side"][data-rail="on"] .tab-favicon { width: 18px; height: 18px; }
 /* Tabs with no favicon (e.g. New Tab) still get a mark so the row isn't blank. */
 html[data-tabbar="side"][data-rail="on"] .tab-button:not(.has-favicon)::after {
