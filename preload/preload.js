@@ -217,6 +217,11 @@ exposeInternal('essentials', {
     remove: (url, persona) => ipcRenderer.invoke('essentials:remove', url, persona),
     onChanged: (cb) => ipcRenderer.on('essentials-changed', () => cb()),
 });
+// Glance — floating page preview over the current tab.
+exposeInternal('glance', {
+    open: (url) => ipcRenderer.invoke('glance:open', url),
+    close: () => ipcRenderer.invoke('glance:close'),
+});
 // Profiles — Chrome-style browsing selves; each window belongs to one.
 exposeInternal('profiles', {
     current: () => ipcRenderer.invoke('profiles:current'),

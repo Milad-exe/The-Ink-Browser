@@ -332,6 +332,14 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         broadcastEssentials();
         return ok;
     });
+    // ── Glance: peek a page in a floating preview over the current tab ──────────
+    ipcMain.handle('glance:open', (_e, url) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd?.tabs && url) wd.tabs.openGlance(url);
+    });
+    ipcMain.handle('glance:close', (_e) => {
+        wm.getWindowByWebContents(_e.sender)?.tabs?.closeGlance();
+    });
     // ── Persona naming (optional rename; auto-numbered by default) ─────────────
     // id → current display name, so history/suggestions can label personas live
     // (a rename reflects everywhere without rewriting stored entries).

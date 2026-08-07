@@ -2267,28 +2267,16 @@
                     rm.title = 'Remove from Essentials';
                     rm.addEventListener('click', (e) => { e.stopPropagation(); window.essentials.remove(it.url, it.persona || null); });
                     tile.appendChild(rm);
-                    // Click: focus an already-open tab of this site, else open one
-                    // (persona-bound essentials reopen in their persona).
+                    // Left-click: peek the site in a floating Glance over the current
+                    // tab (Esc closes, Cmd/Ctrl+Enter promotes it to a real tab).
+                    // Persona-bound essentials still open in their persona tab.
                     tile.addEventListener('click', () => {
                         if (it.persona) {
                             window.tab.openInPersona(it.persona, it.url);
                             return;
                         }
-                        let origin = null;
-                        try { origin = new URL(it.url).origin; }
-                        catch { }
-                        if (origin) {
-                            for (const [idx, u] of tabUrls) {
-                                try {
-                                    if (new URL(u).origin === origin) {
-                                        window.tab.switch(idx);
-                                        return;
-                                    }
-                                }
-                                catch { }
-                            }
-                        }
-                        window.browserBookmarks.openInNewTab(it.url, true);
+                        try { window.glance.open(it.url); }
+                        catch { window.browserBookmarks.openInNewTab(it.url, true); }
                     });
                     grid.appendChild(tile);
                 }

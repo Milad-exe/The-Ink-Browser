@@ -186,9 +186,8 @@ html[data-tabbar="side"] #tab-bar {
   grid-column: 1; grid-row: 1 / span 3;
   flex-direction: column; align-items: stretch;
   width: var(--sidebar-w, 232px); height: 100%; padding: 0 10px 8px; gap: 8px;
-  /* Tabs float on the shell (no panel tint); a hairline separates the page. */
-  background: transparent;
-  border-right: 1px solid var(--border);
+  /* Sidebar reads as a soft panel lifted off the shell — no divider hairline. */
+  background: color-mix(in srgb, var(--surface) 40%, var(--shell));
 }
 /* Right-edge drag handle to resize the sidebar (side mode only). */
 .sidebar-resizer { display: none; }
@@ -212,9 +211,11 @@ html[data-tabbar="side"] #content-area { grid-column: 2; grid-row: 3; }
    (JS sets width:72px for the top strip; height matters here instead). */
 html[data-tabbar="side"] #window-controls { width: auto !important; height: 36px; flex-shrink: 0; align-self: auto; }
 html[data-tabbar="side"] #tabs-container {
-  flex-direction: column; align-items: stretch;
+  /* Row-wrap so pinned favicon tiles flow into a grid (reflowing columns as the
+     sidebar resizes) while unpinned rows each claim a full-width line. */
+  flex-flow: row wrap; align-items: flex-start; align-content: flex-start;
   height: auto; width: auto; flex: 0 1 auto; min-height: 0;
-  overflow-x: hidden; overflow-y: auto; padding: 2px; gap: 2px;
+  overflow-x: hidden; overflow-y: auto; padding: 2px; gap: 4px;
   scrollbar-width: thin; scrollbar-color: var(--border-2) transparent;
 }
 html[data-tabbar="side"] #tabs-container::-webkit-scrollbar { width: 7px; }
@@ -246,10 +247,29 @@ html[data-tabbar="side"] .tab-button.active {
 html[data-tabbar="side"] .tab-button.active .tab-title { font-weight: 600; }
 /* Favicon a touch larger in the roomy side rows. */
 html[data-tabbar="side"] .tab-favicon { width: 17px; height: 17px; }
-/* Pinned tabs read as normal rows here (icon-only pills belong to the top
-   strip); the block still stays sorted first. */
-html[data-tabbar="side"] .tab-button.pinned { min-width: 0; width: 100%; padding: 0 8px 0 10px; justify-content: flex-start; height: 30px; }
-html[data-tabbar="side"] .tab-button.pinned .tab-title { display: block; opacity: 0.85; }
+/* Pinned tabs: favicon-only rounded tiles that wrap into a responsive grid at the
+   top of the strip — columns reflow as the sidebar resizes. Unpinned
+   rows below force a full-width line each. */
+html[data-tabbar="side"] .tab-button { position: relative; flex: 0 0 100%; }
+html[data-tabbar="side"] .tab-button.pinned {
+  flex: 1 1 88px; min-width: 60px; max-width: none; height: 46px;
+  padding: 0; gap: 0; justify-content: center; border-radius: 12px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 0.5px var(--border), 0 1px 2px rgba(8,10,20,0.06);
+}
+html[data-tabbar="side"] .tab-button.pinned:hover { background: var(--hover); }
+html[data-tabbar="side"] .tab-button.pinned .tab-title { display: none; }
+html[data-tabbar="side"] .tab-button.pinned .tab-favicon { width: 20px; height: 20px; }
+html[data-tabbar="side"] .tab-button.pinned.active {
+  color: var(--text);
+  box-shadow: inset 0 0 0 1.5px var(--accent), 0 1px 3px rgba(8,10,20,0.12);
+}
+/* Divider between the pinned grid and the normal tabs (only when tabs are pinned). */
+html[data-tabbar="side"] .tab-button.pinned + .tab-button:not(.pinned) { margin-top: 9px; }
+html[data-tabbar="side"] .tab-button.pinned + .tab-button:not(.pinned)::before {
+  content: ''; position: absolute; left: 2px; right: 2px; top: -6px;
+  height: 1px; background: var(--border);
+}
 html[data-tabbar="side"] .tab-scroll-btn { display: none; }
 html[data-tabbar="side"] #tab-actions { padding: 0; }
 /* "+ New Tab" labelled row (Arc), not a bare plus. */
@@ -317,6 +337,8 @@ html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
    (Arc). Labels, close buttons and the "New Tab" caption fall away; every
    control centres in the strip. */
 html[data-tabbar="side"][data-rail="on"] #tab-bar { padding: 0 6px 8px; }
+html[data-tabbar="side"][data-rail="on"] #tabs-container { justify-content: center; }
+html[data-tabbar="side"][data-rail="on"] .tab-button.pinned { flex: 0 0 auto; width: 40px; min-width: 40px; height: 40px; }
 html[data-tabbar="side"][data-rail="on"] .tab-button { justify-content: center; padding: 0; gap: 0; position: relative; }
 html[data-tabbar="side"][data-rail="on"] .tab-button .tab-title { display: none; }
 /* Hovering a tab swaps its favicon for an × in place (Chrome-style) — the icon
