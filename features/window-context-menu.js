@@ -79,7 +79,15 @@ class WindowContextMenu {
         }, {
             label: 'Duplicate Tab',
             click: () => windowData.tabs.duplicateTab(tabIndex),
-        }, {
+        });
+        // Split view: pair the right-clicked tab with the active one.
+        if (windowData.tabs.isSplit()) {
+            this.contextTemplate.push({ label: 'Close Split View', click: () => windowData.tabs.closeSplit() });
+        }
+        else if (tabIndex !== windowData.tabs.activeTabIndex && windowData.tabs.tabMap.size > 1) {
+            this.contextTemplate.push({ label: 'Split With Active Tab', click: () => windowData.tabs.splitWithActive(tabIndex) });
+        }
+        this.contextTemplate.push({
             // Open this tab's site as a separate persona (fresh session).
             label: 'Open in New Persona',
             click: () => {

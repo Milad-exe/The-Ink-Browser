@@ -253,6 +253,7 @@ exposeInternal('northstarPrivate', {
 exposeInternal('tabsUI', {
     onPinTab: (handler) => ipcRenderer.on('pin-tab', (_e, { index }) => handler(index)),
     onTabBarSide: (handler) => ipcRenderer.on('tabbar-side-changed', (_e, v) => handler(v)),
+    onCompact: (handler) => ipcRenderer.on('sidebar-compact-changed', (_e, v) => handler(v)),
 });
 // Reader mode + Picture-in-Picture
 exposeInternal('reader', {

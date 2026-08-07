@@ -2163,6 +2163,14 @@
                 });
             }
             catch { }
+            // Compact mode: collapse the sidebar (page full-bleed).
+            try {
+                window.tabsUI.onCompact((on) => {
+                    document.documentElement.dataset.compact = on ? 'on' : '';
+                    updateTabWidths(tabs.size);
+                });
+            }
+            catch { }
         }
         // ── Essentials (pinned favourites; sidebar top, per profile) ──────────────
         function initEssentials() {

@@ -170,6 +170,11 @@ class TabContextMenu {
             label: 'Open Link in New Persona',
             click: () => this.tabManager.openIsolatedInstance(sanitizeUrl(params.linkURL)),
         }, {
+            // Glance: a floating preview of the link over the current page (Esc to
+            // close, ⌘/Ctrl+Enter to open it as a full tab).
+            label: 'Glance at Link',
+            click: () => this.tabManager.openGlance(sanitizeUrl(params.linkURL)),
+        }, {
             label: 'Open Link in New Window',
             click: () => { if (isSafeExternal(params.linkURL))
                 shell.openExternal(params.linkURL); },

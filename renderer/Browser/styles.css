@@ -276,6 +276,10 @@ html[data-tabbar="side"] .essentials:empty { display: none; }
 /* Tabs not in the active workspace are hidden from the strip. */
 .tab-button.ws-hidden { display: none !important; }
 
+/* Compact mode: collapse the sidebar; the page (native view) goes full-bleed. */
+html[data-tabbar="side"][data-compact="on"] body { grid-template-columns: 0 minmax(0, 1fr); }
+html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
+
 /* ── Sidebar foot: workspace switcher + settings (bottom bar) ──────────────── */
 .sidebar-foot { display: none; }
 html[data-tabbar="side"] .sidebar-foot {

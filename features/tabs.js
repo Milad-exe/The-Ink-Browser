@@ -490,7 +490,7 @@ class Tabs {
         const wd = this.getWindowData();
         if (!wd?.window?.contentView)
             return;
-        const overlays = [wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt];
+        const overlays = [this.glanceView, wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt];
         overlays.forEach((view) => {
             if (!view)
                 return;
@@ -898,13 +898,15 @@ class Tabs {
         // and only the utility bar (+ optional bookmark bar) sits above.
         if ((this.persistence?.get('tabBarSide') ?? 'side') !== 'top') {
             const yOffset = 52 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
-            let width = contentBounds.width - Tabs.SIDEBAR_W - pad;
+            // Compact mode: the sidebar is hidden, so the page spans full width.
+            const leftInset = this.sidebarCompact ? pad : Tabs.SIDEBAR_W;
+            let width = contentBounds.width - leftInset - pad;
             let height = contentBounds.height - yOffset - pad;
             if (width < 0)
                 width = 0;
             if (height < 0)
                 height = 0;
-            return { x: Tabs.SIDEBAR_W, y: yOffset, width: Math.floor(width), height: Math.floor(height) };
+            return { x: leftInset, y: yOffset, width: Math.floor(width), height: Math.floor(height) };
         }
         // shell top inset (see body padding-top in Browser/styles.css) +
         // tab-bar (38px) + utility-bar (50px) + optional bookmark-bar (30px)
@@ -1497,6 +1499,146 @@ class Tabs {
             });
         }
     }
+    // ── Split view (two tabs side by side) ────────────────────────────────────
+    _splitHalves() {
+        const b = this.getTabBounds();
+        const gap = 6;
+        const w = Math.max(0, Math.floor((b.width - gap) / 2));
+        return [
+            { x: b.x, y: b.y, width: w, height: b.height },
+            { x: b.x + w + gap, y: b.y, width: b.width - w - gap, height: b.height },
+        ];
+    }
+    _layoutSplit() {
+        if (!this.splitPair)
+            return;
+        const [l, r] = this.splitPair;
+        if (!this.tabMap.has(l) || !this.tabMap.has(r)) {
+            this.splitPair = null;
+            return;
+        }
+        const [lb, rb] = this._splitHalves();
+        const radius = this._pageRadius();
+        const place = (idx, bounds) => {
+            const tab = this.tabMap.get(idx);
+            if (tab.slept) {
+                tab.slept = false;
+                try { tab.webContents.reload(); } catch { }
+            }
+            tab.setBounds(bounds);
+            try { tab.setBorderRadius(radius); } catch { }
+            tab.setVisible(true);
+        };
+        place(l, lb);
+        place(r, rb);
+        this.raiseFloatingViews();
+    }
+    splitWithActive(otherIdx) {
+        const a = this.activeTabIndex;
+        if (otherIdx == null || otherIdx === a || !this.tabMap.has(otherIdx) || !this.tabMap.has(a))
+            return;
+        // Split only within one workspace, and not private tabs.
+        if ((this.tabProfiles.get(a) || '1') !== (this.tabProfiles.get(otherIdx) || '1'))
+            return;
+        if (this.privateTabs.has(a) || this.privateTabs.has(otherIdx))
+            return;
+        this.splitPair = [a, otherIdx];
+        this.showTab(a); // lays out the split (see showTab tail)
+        try { this.mainWindow.webContents.send('split-changed', true); } catch { }
+    }
+    closeSplit() {
+        if (!this.splitPair)
+            return;
+        const keep = this.splitPair.includes(this.activeTabIndex) ? this.activeTabIndex : this.splitPair[0];
+        this.splitPair = null;
+        try { this.mainWindow.webContents.send('split-changed', false); } catch { }
+        this.showTab(keep);
+    }
+    isSplit() { return !!this.splitPair; }
+    // ── Glance (floating page preview over the current tab) ────────────────────
+    _layoutGlance() {
+        if (!this.glanceView)
+            return;
+        const b = this.getTabBounds();
+        const w = Math.min(Math.floor(b.width * 0.72), 940);
+        const h = Math.min(Math.floor(b.height * 0.84), 760);
+        const x = b.x + Math.floor((b.width - w) / 2);
+        const y = b.y + Math.floor((b.height - h) / 2);
+        try { this.glanceView.setBounds({ x, y, width: Math.max(0, w), height: Math.max(0, h) }); }
+        catch { }
+    }
+    openGlance(url) {
+        if (!/^https?:/i.test(url || ''))
+            return;
+        this.closeGlance();
+        const active = this.tabMap.get(this.activeTabIndex);
+        // Same session as the current tab, so a glance from a persona/profile tab
+        // stays in that isolated session.
+        const sess = active?.webContents?.session;
+        const view = new WebContentsView({
+            webPreferences: {
+                preload: preloadForPage(url),
+                contextIsolation: true,
+                nodeIntegration: false,
+                ...(sess ? { session: sess } : {}),
+            },
+        });
+        try { view.setBorderRadius(14); } catch { }
+        view.setBackgroundColor('#00000000');
+        this.mainWindow.contentView.addChildView(view);
+        this.glanceView = view;
+        this.glanceUrl = url;
+        this._glanceOpenedAt = Date.now();
+        UserAgent.setupTab(view);
+        // A link opened from within the glance promotes to a real tab.
+        view.webContents.setWindowOpenHandler(({ url: u }) => {
+            setImmediate(() => {
+                try {
+                    const idx = this.createTab(this.activeTabIndex, true, false);
+                    this.loadUrl(idx, u);
+                }
+                catch { }
+            });
+            this.closeGlance();
+            return { action: 'deny' };
+        });
+        this._layoutGlance();
+        view.webContents.loadURL(url);
+        // Esc closes; Cmd/Ctrl+Enter promotes the glance to a real tab.
+        view.webContents.on('before-input-event', (e, input) => {
+            if (input.type !== 'keyDown')
+                return;
+            if (input.key === 'Escape') { e.preventDefault(); this.closeGlance(); }
+            else if (input.key === 'Enter' && (input.meta || input.control)) { e.preventDefault(); this.promoteGlance(); }
+        });
+        // Click-away (focus leaves the glance) closes it — after a settle delay so
+        // load-time focus churn doesn't dismiss it immediately.
+        view.webContents.on('blur', () => {
+            if (Date.now() - (this._glanceOpenedAt || 0) < 350)
+                return;
+            this.closeGlance();
+        });
+        try { view.webContents.focus(); } catch { }
+    }
+    closeGlance() {
+        if (!this.glanceView)
+            return;
+        const v = this.glanceView;
+        this.glanceView = null;
+        this.glanceUrl = null;
+        try { this.mainWindow.contentView.removeChildView(v); } catch { }
+        try { v.webContents.close?.(); } catch { }
+        try { this.tabMap.get(this.activeTabIndex)?.webContents.focus(); } catch { }
+    }
+    promoteGlance() {
+        const url = this.glanceUrl;
+        this.closeGlance();
+        if (url) {
+            const idx = this.createTab(this.activeTabIndex, true, false);
+            this.loadUrl(idx, url);
+        }
+    }
+    isGlancing() { return !!this.glanceView; }
     // ── Workspaces (a workspace IS a profile, switched in place) ───────────────
     // The window keeps tabs of every workspace alive in tabMap; only the active
     // workspace's tabs are shown/counted. Switching swaps the visible set.
@@ -1518,6 +1660,11 @@ class Tabs {
         this.showTab(target);
     }
     showTab(index) {
+        // A glance is transient — dismiss it on any tab switch.
+        this.closeGlance();
+        // Switching to a tab outside the split pair dissolves the split.
+        if (this.splitPair && !this.splitPair.includes(index))
+            this.splitPair = null;
         this.tabMap.forEach((tab, i) => {
             tab.setVisible(false);
         });
@@ -1622,6 +1769,9 @@ class Tabs {
             tab.webContents.focus();
             this.raiseFloatingViews();
         }
+        // Split view: after showing the active half full, lay both halves out.
+        if (this.splitPair && this.splitPair.includes(index))
+            this._layoutSplit();
     }
     loadUrl(index, url) {
         // northstar:// internal pages: typing one navigates the current tab to
@@ -1732,6 +1882,10 @@ class Tabs {
             this.privateTabs.delete(index); // session wipe happens in destroyTab()
             this.tabContainers.delete(index); // container SESSION persists (shared, reusable)
             this.tabProfiles.delete(index);
+            if (this.splitPair && this.splitPair.includes(index)) {
+                this.splitPair = null;
+                try { this.mainWindow.webContents.send('split-changed', false); } catch { }
+            }
             this.tabOrder = this.tabOrder.filter(i => i !== index);
             this.tabLastActive.delete(index);
             try {
@@ -1779,6 +1933,10 @@ class Tabs {
             this.privateTabs.delete(index); // session wipe happens in destroyTab()
             this.tabContainers.delete(index); // container SESSION persists (shared, reusable)
             this.tabProfiles.delete(index);
+            if (this.splitPair && this.splitPair.includes(index)) {
+                this.splitPair = null;
+                try { this.mainWindow.webContents.send('split-changed', false); } catch { }
+            }
             this.tabOrder = this.tabOrder.filter(i => i !== index);
             this.tabLastActive.delete(index);
             try {
@@ -1990,6 +2148,10 @@ class Tabs {
                 try { tab.setBorderRadius(radius); } catch { }
             }
         });
+        if (this.splitPair)
+            this._layoutSplit();
+        if (this.glanceView)
+            this._layoutGlance();
     }
     collapseAllTabs() {
         // Move tabs off-screen so native views don't cover HTML overlays

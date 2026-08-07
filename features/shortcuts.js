@@ -338,6 +338,17 @@ class Shortcuts {
         this.registerShortcut('CmdOrCtrl+Shift+B', () => {
             this.mainWindow.webContents.send('toggle-bookmark-bar');
         });
+        // Compact mode: hide the sidebar; the page goes full-bleed. Per window.
+        this.registerShortcut('CmdOrCtrl+Shift+C', () => {
+            if (!this.tabManager)
+                return;
+            this.tabManager.sidebarCompact = !this.tabManager.sidebarCompact;
+            try {
+                this.mainWindow.webContents.send('sidebar-compact-changed', this.tabManager.sidebarCompact);
+                this.tabManager.resizeAllTabs();
+            }
+            catch { }
+        });
         // Toggle tab bar side (left sidebar ⇄ classic top strip).
         // Applies to every window: chrome reflows + page bounds resize.
         this.registerShortcut('CmdOrCtrl+Shift+S', () => {
