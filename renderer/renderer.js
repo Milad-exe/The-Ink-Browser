@@ -1902,7 +1902,8 @@
             window.tab.onTabCreated((_e, data) => {
                 tabPrivate.set(data.index, !!data.private);
                 createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private, !!data.container, data.workspace || '1');
-                updateChromeTabs(data.totalTabs);
+                // Count only the active workspace's tabs (others live hidden).
+                updateChromeTabs(document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden)').length);
                 setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
             });
             // Speaker on audible tabs; mic/camera in danger colour while recording.
@@ -2151,10 +2152,18 @@
         // ── Tab bar placement (left sidebar ⇄ classic top strip) ──────────────────
         function sideTabs() { return document.documentElement.dataset.tabbar !== 'top'; }
         function initTabBarSide() {
-            let mode = 'side';
-            try { mode = (window.northstarSettings.getSync().tabBarSide ?? 'side'); }
+            let mode = 'side', width = 232;
+            try {
+                const s = window.northstarSettings.getSync();
+                mode = (s.tabBarSide ?? 'side');
+                width = Math.max(180, Math.min(460, Number(s.sidebarWidth) || 232));
+            }
             catch { }
             document.documentElement.dataset.tabbar = mode === 'top' ? 'top' : 'side';
+            document.documentElement.style.setProperty('--sidebar-w', width + 'px');
+            initSidebarResizer();
+            try { window.tabsUI.onSidebarWidth((w) => document.documentElement.style.setProperty('--sidebar-w', w + 'px')); }
+            catch { }
             try {
                 window.tabsUI.onTabBarSide((v) => {
                     document.documentElement.dataset.tabbar = v === 'top' ? 'top' : 'side';
@@ -2171,6 +2180,41 @@
                 });
             }
             catch { }
+        }
+        // Drag the right edge of the sidebar to resize it (side mode). Live-resizes
+        // the page view; persists (globally) on release.
+        function initSidebarResizer() {
+            const handle = document.getElementById('sidebar-resizer');
+            if (!handle)
+                return;
+            let dragging = false, raf = null, pending = 232;
+            const clamp = (w) => Math.max(180, Math.min(460, Math.round(w)));
+            handle.addEventListener('pointerdown', (e) => {
+                if (sideTabs() === false)
+                    return;
+                dragging = true;
+                handle.setPointerCapture(e.pointerId);
+                document.documentElement.classList.add('sidebar-resizing');
+                e.preventDefault();
+            });
+            handle.addEventListener('pointermove', (e) => {
+                if (!dragging)
+                    return;
+                pending = clamp(e.clientX);
+                document.documentElement.style.setProperty('--sidebar-w', pending + 'px');
+                if (!raf)
+                    raf = requestAnimationFrame(() => { raf = null; window.tabsUI.resizeSidebar(pending); });
+            });
+            const end = (e) => {
+                if (!dragging)
+                    return;
+                dragging = false;
+                try { handle.releasePointerCapture(e.pointerId); } catch { }
+                document.documentElement.classList.remove('sidebar-resizing');
+                window.tabsUI.commitSidebarWidth(pending);
+            };
+            handle.addEventListener('pointerup', end);
+            handle.addEventListener('pointercancel', end);
         }
         // ── Essentials (pinned favourites; sidebar top, per profile) ──────────────
         function initEssentials() {

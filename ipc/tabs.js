@@ -206,6 +206,29 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         broadcastProfiles();
         return p;
     });
+    // ── Sidebar resize (live drag → this window; commit → persist + all) ──────
+    const clampW = (w) => Math.max(180, Math.min(460, Math.round(Number(w) || 232)));
+    ipcMain.handle('sidebar:resize', (_e, w) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd?.tabs) {
+            wd.tabs.sidebarWidth = clampW(w);
+            wd.tabs.resizeAllTabs();
+        }
+    });
+    ipcMain.handle('sidebar:resize-commit', (_e, w) => {
+        const width = clampW(w);
+        try { wm.persistence.set('sidebarWidth', width); }
+        catch { }
+        // Width is a global setting — apply to every window so they stay in sync.
+        for (const wd of wm.windows.values()) {
+            try {
+                wd.tabs.sidebarWidth = width;
+                wd.tabs.resizeAllTabs();
+                wd.window.webContents.send('sidebar-width-changed', width);
+            }
+            catch { }
+        }
+    });
     // Switch this window to a workspace IN PLACE.
     ipcMain.handle('workspaces:switch', (_e, id) => {
         const wd = wm.getWindowByWebContents(_e.sender);

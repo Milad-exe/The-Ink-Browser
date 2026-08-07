@@ -35,6 +35,8 @@ const DEFAULTS = {
     isolationHintSeen: false,
     // Tab strip placement: 'side' (left sidebar, default) or 'top'
     tabBarSide: 'side',
+    // Width of the left tab sidebar (px), drag-resizable.
+    sidebarWidth: 232,
 };
 class Persistence {
     dir; // ~/<userData>/northstar

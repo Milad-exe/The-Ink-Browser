@@ -215,6 +215,8 @@ class Tabs {
         this.tabContainers = new Map(); // tabIndex → container id
         this.nextContainerId = 1;
         this.isPrivateWindow = options?.private ?? false;
+        // Live sidebar width (px) — drag-resizable, persisted. Clamped.
+        this.sidebarWidth = Math.max(180, Math.min(460, Number(this.persistence?.get('sidebarWidth')) || 232));
         // Which workspace/profile this window is currently browsing as ('1' =
         // default session + legacy stores). Personas scope within it. Tabs are
         // tagged with the workspace they were opened in (tabProfiles) so
@@ -899,7 +901,7 @@ class Tabs {
         if ((this.persistence?.get('tabBarSide') ?? 'side') !== 'top') {
             const yOffset = 52 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
             // Compact mode: the sidebar is hidden, so the page spans full width.
-            const leftInset = this.sidebarCompact ? pad : Tabs.SIDEBAR_W;
+            const leftInset = this.sidebarCompact ? pad : this.sidebarWidth;
             let width = contentBounds.width - leftInset - pad;
             let height = contentBounds.height - yOffset - pad;
             if (width < 0)
