@@ -375,10 +375,12 @@ html[data-tabbar="side"] .sidebar-foot {
   padding: 7px 2px 0; border-top: 1px solid var(--border);
   -webkit-app-region: no-drag;
 }
-.sb-workspaces { display: flex; align-items: center; gap: 3px; flex: 1; min-width: 0; overflow: hidden; }
+/* Profiles: a centred row of icon-only avatars between settings (left) and the
+   add/downloads controls (right). */
+.sb-workspaces { display: flex; align-items: center; justify-content: center; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
 .sb-ws {
-  display: flex; align-items: center; gap: 7px; flex-shrink: 0;
-  height: 32px; padding: 0 6px; border: none; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 30px; height: 30px; padding: 0; border: none; border-radius: 9px;
   background: transparent; cursor: pointer; transition: background 0.12s;
 }
 .sb-ws:hover { background: var(--hover); }
@@ -386,13 +388,10 @@ html[data-tabbar="side"] .sidebar-foot {
 .sb-ws .profile-badge { width: 20px; height: 20px; font-size: 10px; }
 .sb-ws:not(.active) .profile-badge { opacity: 0.72; }
 .sb-ws:hover .profile-badge { opacity: 1; }
-.sb-ws-name {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--text);
-}
 .sb-add-ws { flex-shrink: 0; width: 28px; height: 28px; font-size: 16px; font-weight: 300; color: var(--text-3); }
 .sb-add-ws:hover { color: var(--text); }
-.sb-settings { flex-shrink: 0; width: 30px; height: 30px; }
+.sb-settings, .sb-downloads { flex-shrink: 0; width: 30px; height: 30px; }
+.sb-downloads.hidden { display: none; }
 #tab-bar.merge-target::after {
   content: ''; position: absolute; inset: 4px 6px;
   border: 1.5px dashed var(--accent); border-radius: var(--radius);

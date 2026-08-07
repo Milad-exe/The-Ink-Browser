@@ -2333,12 +2333,6 @@
                         av.textContent = (p.name || 'W').charAt(0);
                         av.style.setProperty('--pf-color', p.color || '');
                         b.appendChild(av);
-                        if (p.id === activeWorkspace) {
-                            const nm = document.createElement('span');
-                            nm.className = 'sb-ws-name';
-                            nm.textContent = p.name;
-                            b.appendChild(nm);
-                        }
                         b.addEventListener('click', () => { if (p.id !== activeWorkspace) window.profiles.switch(p.id); });
                         b.addEventListener('contextmenu', (e) => {
                             e.preventDefault();
@@ -2373,6 +2367,22 @@
             document.getElementById('sb-settings')?.addEventListener('click', () => {
                 window.tab.loadUrl(activeTabIndex, 'northstar://settings');
             });
+            // Downloads live in the foot too — revealed once the session
+            // has any downloads, opening the shared downloads panel.
+            const dl = document.getElementById('sb-downloads');
+            if (dl && window.downloads) {
+                const revealIfAny = async () => {
+                    try { if (((await window.downloads.getAll()) || []).length) dl.classList.remove('hidden'); }
+                    catch { }
+                };
+                dl.addEventListener('click', () => {
+                    const r = dl.getBoundingClientRect();
+                    window.downloads.togglePanel({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
+                });
+                try { window.downloads.onChanged(() => dl.classList.remove('hidden')); }
+                catch { }
+                revealIfAny();
+            }
             // Rename modal
             const modal = document.getElementById('profile-rename-modal');
             const input = document.getElementById('prf-input');
