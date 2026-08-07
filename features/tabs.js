@@ -1616,14 +1616,18 @@ class Tabs {
             if (input.key === 'Escape') { e.preventDefault(); this.closeGlance(); }
             else if (input.key === 'Enter' && (input.meta || input.control)) { e.preventDefault(); this.promoteGlance(); }
         });
-        // Click-away (focus leaves the glance) closes it — after a settle delay so
-        // load-time focus churn doesn't dismiss it immediately.
+        // Click-away closes the glance — but only once it has actually held focus
+        // (armed on its first 'focus'), so the launching click's focus churn or a
+        // slow first paint can't dismiss it the instant it opens.
+        let armed = false;
+        view.webContents.on('focus', () => { armed = true; });
         view.webContents.on('blur', () => {
-            if (Date.now() - (this._glanceOpenedAt || 0) < 350)
+            if (!armed || Date.now() - (this._glanceOpenedAt || 0) < 350)
                 return;
             this.closeGlance();
         });
-        try { view.webContents.focus(); } catch { }
+        // Focus on the next tick so the launching click has fully settled first.
+        setTimeout(() => { try { this.glanceView === view && view.webContents.focus(); } catch { } }, 60);
     }
     closeGlance() {
         if (!this.glanceView)

@@ -2267,16 +2267,28 @@
                     rm.title = 'Remove from Essentials';
                     rm.addEventListener('click', (e) => { e.stopPropagation(); window.essentials.remove(it.url, it.persona || null); });
                     tile.appendChild(rm);
-                    // Left-click: peek the site in a floating Glance over the current
-                    // tab (Esc closes, Cmd/Ctrl+Enter promotes it to a real tab).
-                    // Persona-bound essentials still open in their persona tab.
+                    // Click: focus an already-open tab of this site, else open one
+                    // (persona-bound essentials reopen in their persona).
                     tile.addEventListener('click', () => {
                         if (it.persona) {
                             window.tab.openInPersona(it.persona, it.url);
                             return;
                         }
-                        try { window.glance.open(it.url); }
-                        catch { window.browserBookmarks.openInNewTab(it.url, true); }
+                        let origin = null;
+                        try { origin = new URL(it.url).origin; }
+                        catch { }
+                        if (origin) {
+                            for (const [idx, u] of tabUrls) {
+                                try {
+                                    if (new URL(u).origin === origin) {
+                                        window.tab.switch(idx);
+                                        return;
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                        window.browserBookmarks.openInNewTab(it.url, true);
                     });
                     grid.appendChild(tile);
                 }
@@ -2453,7 +2465,11 @@
                     return;
                 // Firefox selects a tab on mousedown, not on click-release — so a
                 // drag always moves the tab you're looking at.
-                if (parseInt(index) !== activeTabIndex)
+                // Pinned sidebar tiles peek in a Glance on a plain click instead of
+                // switching — the switch is skipped here and the glance fires on
+                // release (below), so a drag still reorders them.
+                const pinnedGlance = sideTabs() && btn.classList.contains('pinned');
+                if (parseInt(index) !== activeTabIndex && !pinnedGlance)
                     window.tab.switch(parseInt(index));
                 const startX = e.clientX, startY = e.clientY;
                 let mode = 'idle'; // idle → drag
@@ -2507,8 +2523,13 @@
                 const finish = async (drop) => {
                     const wasMode = mode, wasOutside = outside;
                     cleanup();
-                    if (wasMode !== 'drag')
+                    if (wasMode !== 'drag') {
+                        if (pinnedGlance) {
+                            const u = tabUrls.get(parseInt(index)) || await window.tab.getTabUrl(index);
+                            if (u) { try { window.glance.open(u); } catch { } }
+                        }
                         return;
+                    }
                     if (!drop) {
                         restoreOrder();
                         return;

@@ -186,8 +186,8 @@ html[data-tabbar="side"] #tab-bar {
   grid-column: 1; grid-row: 1 / span 3;
   flex-direction: column; align-items: stretch;
   width: var(--sidebar-w, 232px); height: 100%; padding: 0 10px 8px; gap: 8px;
-  /* Sidebar reads as a soft panel lifted off the shell — no divider hairline. */
-  background: color-mix(in srgb, var(--surface) 40%, var(--shell));
+  /* Transparent on the shell — no panel tint, no divider hairline. */
+  background: transparent;
 }
 /* Right-edge drag handle to resize the sidebar (side mode only). */
 .sidebar-resizer { display: none; }
