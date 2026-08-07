@@ -22,6 +22,8 @@ const adBlocker = require('./ad-blocker');
 const downloadManager = require('./download-manager');
 
 const COLORS = ['#e0894a', '#4a9eff', '#3fbf7f', '#c86fe0', '#e05a7a', '#e0c341', '#5ad0d0', '#9a7bff'];
+// Default per-profile emoji avatars; a profile can clear its emoji (→ coloured dot).
+const EMOJIS = ['🏠', '💼', '🎨', '🚀', '🌙', '🎧', '🐙', '🔥'];
 const sessions = new Map(); // profile id → Electron Session (non-default only)
 
 let _reg = null; // { nextId, list: [{id,name,color,essentials:[{url,title,persona}]}] }
@@ -38,7 +40,7 @@ function load() {
         }
     }
     catch { }
-    _reg = { nextId: 2, list: [{ id: '1', name: 'Personal', color: COLORS[0], essentials: [] }] };
+    _reg = { nextId: 2, list: [{ id: '1', name: 'Personal', color: COLORS[0], emoji: EMOJIS[0], essentials: [] }] };
     save();
     return _reg;
 }
@@ -53,8 +55,9 @@ function save() {
 
 function _find(id) { return load().list.find(p => p.id === String(id)) || null; }
 
-function list() { return load().list.map(p => ({ id: p.id, name: p.name, color: p.color })); }
-function meta(id) { const p = _find(id); return p ? { id: p.id, name: p.name, color: p.color } : null; }
+const _pub = (p) => ({ id: p.id, name: p.name, color: p.color, emoji: p.emoji || null });
+function list() { return load().list.map(_pub); }
+function meta(id) { const p = _find(id); return p ? _pub(p) : null; }
 
 function create(name) {
     const reg = load();
@@ -63,11 +66,25 @@ function create(name) {
         id,
         name: (typeof name === 'string' && name.trim()) ? name.trim().slice(0, 24) : `Profile ${id}`,
         color: COLORS[reg.list.length % COLORS.length],
+        emoji: EMOJIS[reg.list.length % EMOJIS.length],
         essentials: [],
     };
     reg.list.push(p);
     save();
-    return { id: p.id, name: p.name, color: p.color };
+    return _pub(p);
+}
+
+// Update a profile's name and/or emoji. Pass emoji '' to clear it (→ dot).
+function update(id, patch) {
+    const p = _find(id);
+    if (!p)
+        return null;
+    if (patch && typeof patch.name === 'string' && patch.name.trim())
+        p.name = patch.name.trim().slice(0, 24);
+    if (patch && 'emoji' in patch)
+        p.emoji = (patch.emoji || '').trim().slice(0, 8) || null;
+    save();
+    return _pub(p);
 }
 
 function rename(id, name) {
@@ -77,7 +94,7 @@ function rename(id, name) {
     if (typeof name === 'string' && name.trim())
         p.name = name.trim().slice(0, 24);
     save();
-    return { id: p.id, name: p.name, color: p.color };
+    return _pub(p);
 }
 
 /**
@@ -139,4 +156,4 @@ function removeEssential(id, url, persona = null) {
     return true;
 }
 
-module.exports = { list, meta, create, rename, sessionFor, essentials, addEssential, removeEssential, COLORS };
+module.exports = { list, meta, create, rename, update, sessionFor, essentials, addEssential, removeEssential, COLORS, EMOJIS };

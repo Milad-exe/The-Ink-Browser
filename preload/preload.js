@@ -228,6 +228,7 @@ exposeInternal('profiles', {
     list: () => ipcRenderer.invoke('profiles:list'),
     menu: (x, y) => ipcRenderer.send('profiles:menu', x, y),
     rename: (id, name) => ipcRenderer.invoke('profiles:rename', id, name),
+    update: (id, patch) => ipcRenderer.invoke('profiles:update', id, patch),
     switch: (id) => ipcRenderer.invoke('workspaces:switch', id),
     create: () => ipcRenderer.invoke('workspaces:create'),
     onChanged: (cb) => ipcRenderer.on('profiles:changed', () => cb()),

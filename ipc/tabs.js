@@ -206,6 +206,11 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         broadcastProfiles();
         return p;
     });
+    ipcMain.handle('profiles:update', (_e, id, patch) => {
+        const p = profiles.update(id, patch);
+        broadcastProfiles();
+        return p;
+    });
     // ── Sidebar resize ────────────────────────────────────────────────────────
     // The page is a native view layered over the chrome. While the cursor is over
     // the sidebar the renderer drives the drag (pointermove → sidebar:resize); the

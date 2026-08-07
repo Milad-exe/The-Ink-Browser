@@ -206,9 +206,13 @@
 
   <!-- Rename this window's profile -->
   <div id="profile-rename-modal" class="cm-overlay hidden">
-    <div class="ri-card" role="dialog" aria-label="Rename profile">
-      <div class="ri-title">Rename profile</div>
-      <input id="prf-input" class="ri-input" maxlength="24" placeholder="e.g. Work" tabindex="-1">
+    <div class="ri-card" role="dialog" aria-label="Edit profile">
+      <div class="ri-title">Edit profile</div>
+      <div class="prf-row">
+        <input id="prf-emoji" class="ri-input prf-emoji" maxlength="8" placeholder="🙂" tabindex="-1" aria-label="Profile emoji">
+        <input id="prf-input" class="ri-input" maxlength="24" placeholder="e.g. Work" tabindex="-1">
+      </div>
+      <div class="prf-hint">Leave the emoji blank to show a coloured dot instead.</div>
       <div class="ri-actions">
         <button id="prf-cancel" class="ri-btn" tabindex="-1">Cancel</button>
         <button id="prf-save" class="ri-btn ri-btn-primary" tabindex="-1">Save</button>

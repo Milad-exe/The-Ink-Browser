@@ -2314,7 +2314,9 @@
                 if (cur) {
                     activeWorkspace = cur.id;
                     if (badge) {
-                        badge.textContent = (cur.name || 'P').charAt(0);
+                        badge.classList.toggle('has-emoji', !!cur.emoji);
+                        badge.classList.toggle('is-dot', !cur.emoji);
+                        badge.textContent = cur.emoji || (cur.name || 'P').charAt(0);
                         badge.style.setProperty('--pf-color', cur.color || '');
                     }
                     if (btn)
@@ -2327,11 +2329,12 @@
                         const b = document.createElement('button');
                         b.className = 'sb-ws' + (p.id === activeWorkspace ? ' active' : '');
                         b.tabIndex = -1;
-                        b.title = p.name;
+                        b.dataset.tip = p.name; // custom hover label (name still shows)
                         const av = document.createElement('span');
-                        av.className = 'profile-badge';
-                        av.textContent = (p.name || 'W').charAt(0);
+                        av.className = 'profile-badge' + (p.emoji ? ' has-emoji' : ' is-dot');
                         av.style.setProperty('--pf-color', p.color || '');
+                        if (p.emoji)
+                            av.textContent = p.emoji;
                         b.appendChild(av);
                         b.addEventListener('click', () => { if (p.id !== activeWorkspace) window.profiles.switch(p.id); });
                         b.addEventListener('contextmenu', (e) => {
@@ -2383,24 +2386,31 @@
                 catch { }
                 revealIfAny();
             }
-            // Rename modal
+            // Edit-profile modal (name + emoji)
             const modal = document.getElementById('profile-rename-modal');
             const input = document.getElementById('prf-input');
+            const emojiInput = document.getElementById('prf-emoji');
             if (!modal || !input)
                 return;
             let renameId = null;
             const close = () => { modal.classList.add('hidden'); renameId = null; };
             const save = async () => {
-                const name = input.value.trim();
-                if (renameId && name)
-                    await window.profiles.rename(renameId, name);
+                if (renameId)
+                    await window.profiles.update(renameId, {
+                        name: input.value.trim(),
+                        emoji: (emojiInput?.value || '').trim(), // blank → coloured dot
+                    });
                 close();
             };
             try {
                 window.profiles.onRename(async (id) => {
                     renameId = String(id);
-                    try { input.value = (await window.profiles.current())?.name || ''; }
-                    catch { input.value = ''; }
+                    let p = null;
+                    try { p = ((await window.profiles.list()) || []).find(x => x.id === renameId); }
+                    catch { }
+                    input.value = p?.name || '';
+                    if (emojiInput)
+                        emojiInput.value = p?.emoji || '';
                     modal.classList.remove('hidden');
                     input.focus(); input.select();
                 });
