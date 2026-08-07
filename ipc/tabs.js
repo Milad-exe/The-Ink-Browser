@@ -213,8 +213,14 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     // the drag from the page view's own input-event stream. The page stays visible
     // and resizes live under the cursor, and mouseUp there ends the drag (the
     // renderer is told via 'sidebar-resize-ended' since its pointerup never fires).
-    const MIN_W = 180, MAX_W = 460;
-    const clampW = (w) => Math.max(MIN_W, Math.min(MAX_W, Math.round(Number(w) || 232)));
+    // Drag below RAIL_SNAP collapses to an icon-only rail (RAIL_W); otherwise the
+    // width is clamped to a comfortable [MIN_W, MAX_W]. The 56..180 band never
+    // persists, so the divider snaps between rail and expanded (Arc-style).
+    const RAIL_W = 56, RAIL_SNAP = 132, MIN_W = 180, MAX_W = 460;
+    const clampW = (w) => {
+        w = Math.round(Number(w) || 232);
+        return w < RAIL_SNAP ? RAIL_W : Math.max(MIN_W, Math.min(MAX_W, w));
+    };
     function applyWidthLive(wd, width) {
         const t = wd.tabs;
         if (width === t.sidebarWidth) return;

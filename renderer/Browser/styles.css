@@ -186,8 +186,8 @@ html[data-tabbar="side"] #tab-bar {
   grid-column: 1; grid-row: 1 / span 3;
   flex-direction: column; align-items: stretch;
   width: var(--sidebar-w, 232px); height: 100%; padding: 0 10px 8px; gap: 8px;
-  /* A real panel, not tabs floating on the shell: faint surface + hairline. */
-  background: color-mix(in srgb, var(--surface) 42%, transparent);
+  /* Tabs float on the shell (no panel tint); a hairline separates the page. */
+  background: transparent;
   border-right: 1px solid var(--border);
 }
 /* Right-edge drag handle to resize the sidebar (side mode only). */
@@ -312,6 +312,29 @@ html[data-tabbar="side"] .essentials:empty { display: none; }
 /* Compact mode: collapse the sidebar; the page (native view) goes full-bleed. */
 html[data-tabbar="side"][data-compact="on"] body { grid-template-columns: 0 minmax(0, 1fr); }
 html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
+
+/* Icon rail: drag the divider narrow to collapse tab rows to favicons only
+   (Arc). Labels, close buttons and the "New Tab" caption fall away; every
+   control centres in the strip. */
+html[data-tabbar="side"][data-rail="on"] #tab-bar { padding: 0 6px 8px; }
+html[data-tabbar="side"][data-rail="on"] .tab-button { justify-content: center; padding: 0; gap: 0; }
+html[data-tabbar="side"][data-rail="on"] .tab-button .tab-title,
+html[data-tabbar="side"][data-rail="on"] .tab-button .tab-close { display: none; }
+html[data-tabbar="side"][data-rail="on"] .tab-favicon { width: 18px; height: 18px; }
+/* Tabs with no favicon (e.g. New Tab) still get a mark so the row isn't blank. */
+html[data-tabbar="side"][data-rail="on"] .tab-button:not(.has-favicon)::after {
+  content: ''; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-3); opacity: 0.55;
+}
+html[data-tabbar="side"][data-rail="on"] .tab-button[data-container]::after { background: var(--accent); opacity: 1; }
+html[data-tabbar="side"][data-rail="on"] .essentials { grid-template-columns: 1fr; }
+html[data-tabbar="side"][data-rail="on"] #new-tab-btn { justify-content: center; padding: 0; }
+html[data-tabbar="side"][data-rail="on"] #new-tab-btn::after { display: none; }
+/* Foot stacks: workspace avatars only, no names. */
+html[data-tabbar="side"][data-rail="on"] .sidebar-foot { flex-direction: column; gap: 4px; }
+html[data-tabbar="side"][data-rail="on"] .sb-workspaces { flex-direction: column; flex: 0 0 auto; width: 100%; align-items: stretch; }
+html[data-tabbar="side"][data-rail="on"] .sb-ws { justify-content: center; padding: 0; }
+html[data-tabbar="side"][data-rail="on"] .sb-ws-name { display: none; }
 
 /* ── Sidebar foot: workspace switcher + settings (bottom bar) ──────────────── */
 .sidebar-foot { display: none; }

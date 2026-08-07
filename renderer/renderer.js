@@ -2156,13 +2156,13 @@
             try {
                 const s = window.northstarSettings.getSync();
                 mode = (s.tabBarSide ?? 'side');
-                width = Math.max(180, Math.min(460, Number(s.sidebarWidth) || 232));
+                width = snapSidebar(Number(s.sidebarWidth) || 232);
             }
             catch { }
             document.documentElement.dataset.tabbar = mode === 'top' ? 'top' : 'side';
-            document.documentElement.style.setProperty('--sidebar-w', width + 'px');
+            applySidebarWidth(width);
             initSidebarResizer();
-            try { window.tabsUI.onSidebarWidth((w) => document.documentElement.style.setProperty('--sidebar-w', w + 'px')); }
+            try { window.tabsUI.onSidebarWidth((w) => applySidebarWidth(w)); }
             catch { }
             try {
                 window.tabsUI.onTabBarSide((v) => {
@@ -2183,12 +2183,22 @@
         }
         // Drag the right edge of the sidebar to resize it (side mode). Live-resizes
         // the page view; persists (globally) on release.
+        // Snap a raw width to either the icon rail (56) or the expanded band
+        // (180–460); the 56–180 gap never sticks. Mirrors clampW in ipc/tabs.js.
+        function snapSidebar(px) {
+            px = Math.round(px);
+            return px < 132 ? 56 : Math.max(180, Math.min(460, px));
+        }
+        function applySidebarWidth(w) {
+            document.documentElement.style.setProperty('--sidebar-w', w + 'px');
+            document.documentElement.dataset.rail = w <= 56 ? 'on' : '';
+        }
         function initSidebarResizer() {
             const handle = document.getElementById('sidebar-resizer');
             if (!handle)
                 return;
             let dragging = false, raf = null, pending = 232, pid = null;
-            const clamp = (w) => Math.max(180, Math.min(460, Math.round(w)));
+            const clamp = snapSidebar;
             handle.addEventListener('pointerdown', (e) => {
                 if (sideTabs() === false)
                     return;
@@ -2203,7 +2213,7 @@
                 if (!dragging)
                     return;
                 pending = clamp(e.clientX);
-                document.documentElement.style.setProperty('--sidebar-w', pending + 'px');
+                applySidebarWidth(pending);
                 if (!raf)
                     raf = requestAnimationFrame(() => { raf = null; window.tabsUI.resizeSidebar(pending); });
             });

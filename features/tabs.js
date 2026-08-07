@@ -215,8 +215,10 @@ class Tabs {
         this.tabContainers = new Map(); // tabIndex → container id
         this.nextContainerId = 1;
         this.isPrivateWindow = options?.private ?? false;
-        // Live sidebar width (px) — drag-resizable, persisted. Clamped.
-        this.sidebarWidth = Math.max(180, Math.min(460, Number(this.persistence?.get('sidebarWidth')) || 232));
+        // Live sidebar width (px) — drag-resizable, persisted. 56 = collapsed
+        // icon rail; otherwise clamped to [180, 460] (see clampW in ipc/tabs.js).
+        const _sw = Math.round(Number(this.persistence?.get('sidebarWidth')) || 232);
+        this.sidebarWidth = _sw < 132 ? 56 : Math.max(180, Math.min(460, _sw));
         // Which workspace/profile this window is currently browsing as ('1' =
         // default session + legacy stores). Personas scope within it. Tabs are
         // tagged with the workspace they were opened in (tabProfiles) so
