@@ -209,10 +209,11 @@
     <div class="ri-card" role="dialog" aria-label="Edit profile">
       <div class="ri-title">Edit profile</div>
       <div class="prf-row">
-        <input id="prf-emoji" class="ri-input prf-emoji" maxlength="8" placeholder="🙂" tabindex="-1" aria-label="Profile emoji">
+        <button type="button" id="prf-emoji" class="prf-emoji" tabindex="-1" aria-label="Choose emoji" title="Choose emoji">🙂</button>
         <input id="prf-input" class="ri-input" maxlength="24" placeholder="e.g. Work" tabindex="-1">
       </div>
-      <div class="prf-hint">Leave the emoji blank to show a coloured dot instead.</div>
+      <div id="prf-emoji-picker" class="emoji-picker hidden" role="listbox" aria-label="Emoji"></div>
+      <div class="prf-hint">Choose the dot to keep the avatar minimal.</div>
       <div class="ri-actions">
         <button id="prf-cancel" class="ri-btn" tabindex="-1">Cancel</button>
         <button id="prf-save" class="ri-btn ri-btn-primary" tabindex="-1">Save</button>

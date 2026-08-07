@@ -2394,11 +2394,36 @@
             // Edit-profile modal (name + emoji)
             const modal = document.getElementById('profile-rename-modal');
             const input = document.getElementById('prf-input');
-            const emojiInput = document.getElementById('prf-emoji');
+            const emojiBtn = document.getElementById('prf-emoji');
+            const picker = document.getElementById('prf-emoji-picker');
             if (!modal || !input)
                 return;
+            // Render the chosen emoji (or a dot when opted out) onto the field.
+            const setEmojiField = (val) => {
+                emojiBtn.dataset.emoji = val || '';
+                emojiBtn.textContent = val || '';
+                emojiBtn.classList.toggle('is-dot', !val);
+            };
+            // Build the picker grid once: a "dot" (no emoji) option, then a palette.
+            if (picker && !picker.dataset.built) {
+                picker.dataset.built = '1';
+                const PALETTE = ['🏠', '💼', '🎨', '🚀', '🎮', '🎧', '📚', '💡', '🔧', '🧪', '🛒', '💰', '✈️', '🌍', '🌙', '🔥', '🌈', '🍀', '🌸', '🌊', '⭐', '⚡', '🐱', '🐶', '🦊', '🐢', '🐝', '🦉', '🙂', '😎', '🤓', '👤', '❤️', '💙', '💚', '💜', '🧡', '🎬', '🎵', '⚽', '🏀', '🍕', '☕', '🛰️', '🔬', '📷', '🗂️', '🎯'];
+                const none = document.createElement('button');
+                none.type = 'button'; none.className = 'emoji-opt emoji-none';
+                none.title = 'No emoji (dot)'; none.tabIndex = -1;
+                none.addEventListener('click', () => { setEmojiField(''); picker.classList.add('hidden'); });
+                picker.appendChild(none);
+                for (const e of PALETTE) {
+                    const b = document.createElement('button');
+                    b.type = 'button'; b.className = 'emoji-opt'; b.textContent = e; b.tabIndex = -1;
+                    b.addEventListener('click', () => { setEmojiField(e); picker.classList.add('hidden'); });
+                    picker.appendChild(b);
+                }
+            }
+            emojiBtn?.addEventListener('click', (e) => { e.stopPropagation(); picker?.classList.toggle('hidden'); });
             const close = () => {
                 modal.classList.add('hidden');
+                picker?.classList.add('hidden');
                 modal.dataset.editId = '';
                 // Bring the page (native view) back up from behind the chrome.
                 try { window.focusMode.overlayClose(); }
@@ -2409,7 +2434,7 @@
                 if (id)
                     await window.profiles.update(id, {
                         name: input.value.trim(),
-                        emoji: (emojiInput?.value || '').trim(), // blank → coloured dot
+                        emoji: emojiBtn?.dataset.emoji || '', // empty → coloured dot
                     });
                 close();
             };
@@ -2420,8 +2445,8 @@
                 try { p = ((await window.profiles.list()) || []).find(x => x.id === String(id)); }
                 catch { }
                 input.value = p?.name || '';
-                if (emojiInput)
-                    emojiInput.value = p?.emoji || '';
+                setEmojiField(p?.emoji || '');
+                picker?.classList.add('hidden');
                 modal.classList.remove('hidden');
                 // The page is a native view that paints OVER the chrome DOM, so
                 // collapse it while the modal is up or the modal hides behind it.
@@ -2435,6 +2460,11 @@
             document.getElementById('prf-cancel')?.addEventListener('click', close);
             input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') close(); });
             modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+            // Any click in the card that isn't the emoji field or the picker dismisses it.
+            modal.querySelector('.ri-card')?.addEventListener('click', (e) => {
+                if (e.target !== emojiBtn && !e.target.closest('#prf-emoji-picker'))
+                    picker?.classList.add('hidden');
+            });
         }
         // ── Tab DOM helpers ───────────────────────────────────────────────────────
         // Isolation is invisible except a small dot on tabs running in their own
