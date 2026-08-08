@@ -211,11 +211,13 @@ html[data-tabbar="side"] #content-area { grid-column: 2; grid-row: 3; }
    (JS sets width:72px for the top strip; height matters here instead). */
 html[data-tabbar="side"] #window-controls { width: auto !important; height: 36px; flex-shrink: 0; align-self: auto; }
 html[data-tabbar="side"] #tabs-container {
-  /* Row-wrap so pinned favicon tiles flow into a grid (reflowing columns as the
-     sidebar resizes) while unpinned rows each claim a full-width line. */
-  flex-flow: row wrap; align-items: flex-start; align-content: flex-start;
+  /* CSS grid: pinned favicon tiles occupy single cells whose column COUNT reflows
+     as the sidebar resizes (tile size stays constant, never stretches); normal
+     tab rows span the full width. */
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+  align-content: start; gap: 5px;
   height: auto; width: auto; flex: 0 1 auto; min-height: 0;
-  overflow-x: hidden; overflow-y: auto; padding: 2px; gap: 4px;
+  overflow-x: hidden; overflow-y: auto; padding: 2px;
   scrollbar-width: thin; scrollbar-color: var(--border-2) transparent;
 }
 html[data-tabbar="side"] #tabs-container::-webkit-scrollbar { width: 7px; }
@@ -250,9 +252,9 @@ html[data-tabbar="side"] .tab-favicon { width: 17px; height: 17px; }
 /* Pinned tabs: favicon-only rounded tiles that wrap into a responsive grid at the
    top of the strip — columns reflow as the sidebar resizes. Unpinned
    rows below force a full-width line each. */
-html[data-tabbar="side"] .tab-button { position: relative; flex: 0 0 100%; }
+html[data-tabbar="side"] .tab-button { position: relative; grid-column: 1 / -1; }
 html[data-tabbar="side"] .tab-button.pinned {
-  flex: 1 1 88px; min-width: 60px; max-width: none; height: 46px;
+  grid-column: auto; min-width: 0; max-width: none; width: auto; height: 46px;
   padding: 0; gap: 0; justify-content: center; border-radius: 12px;
   background: var(--surface);
   box-shadow: inset 0 0 0 0.5px var(--border), 0 1px 2px rgba(8,10,20,0.06);
@@ -293,7 +295,7 @@ html[data-tabbar="side"] #profile-btn { display: none; }
 /* Essentials grid: favourite sites as icon tiles (sidebar mode only). */
 .essentials { display: none; }
 html[data-tabbar="side"] .essentials {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 6px;
   padding: 0 2px 2px; flex-shrink: 0;
   -webkit-app-region: no-drag;
 }
@@ -337,8 +339,8 @@ html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
    (Arc). Labels, close buttons and the "New Tab" caption fall away; every
    control centres in the strip. */
 html[data-tabbar="side"][data-rail="on"] #tab-bar { padding: 0 6px 8px; }
-html[data-tabbar="side"][data-rail="on"] #tabs-container { justify-content: center; }
-html[data-tabbar="side"][data-rail="on"] .tab-button.pinned { flex: 0 0 auto; width: 40px; min-width: 40px; height: 40px; }
+html[data-tabbar="side"][data-rail="on"] #tabs-container { grid-template-columns: 1fr; justify-items: center; }
+html[data-tabbar="side"][data-rail="on"] .tab-button.pinned { grid-column: 1 / -1; width: 40px; min-width: 40px; height: 40px; justify-self: center; }
 html[data-tabbar="side"][data-rail="on"] .tab-button { justify-content: center; padding: 0; gap: 0; position: relative; }
 html[data-tabbar="side"][data-rail="on"] .tab-button .tab-title { display: none; }
 /* Hovering a tab swaps its favicon for an × in place (Chrome-style) — the icon
