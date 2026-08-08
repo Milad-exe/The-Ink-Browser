@@ -227,6 +227,7 @@ class Tabs {
         this.tabProfiles = new Map(); // tabIndex → workspace/profile id
         this.splitPair = null; // [leftIdx, rightIdx] when split view is active
         this.glanceView = null; // floating page-preview overlay ("glance")
+        this.glanceBackdrop = null; // dim view behind the glance
         this.glanceUrl = null;
         this.sidebarCompact = false; // side mode: sidebar hidden, page full-bleed
         this.tabOrder = [];
@@ -494,7 +495,7 @@ class Tabs {
         const wd = this.getWindowData();
         if (!wd?.window?.contentView)
             return;
-        const overlays = [this.glanceView, wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt];
+        const overlays = [this.glanceBackdrop, this.glanceView, wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt];
         overlays.forEach((view) => {
             if (!view)
                 return;
@@ -1565,8 +1566,11 @@ class Tabs {
         if (!this.glanceView)
             return;
         const b = this.getTabBounds();
-        const w = Math.min(Math.floor(b.width * 0.72), 940);
-        const h = Math.min(Math.floor(b.height * 0.84), 760);
+        // Dim backdrop fills the page region so the glance reads as a floating card.
+        try { this.glanceBackdrop?.setBounds(b); }
+        catch { }
+        const w = Math.min(Math.floor(b.width * 0.66), 900);
+        const h = Math.min(Math.floor(b.height * 0.80), 720);
         const x = b.x + Math.floor((b.width - w) / 2);
         const y = b.y + Math.floor((b.height - h) / 2);
         try { this.glanceView.setBounds({ x, y, width: Math.max(0, w), height: Math.max(0, h) }); }
@@ -1577,6 +1581,17 @@ class Tabs {
             return;
         this.closeGlance();
         const active = this.tabMap.get(this.activeTabIndex);
+        // Dim backdrop over the page so the glance reads as a floating card; a click
+        // on it blurs the glance, which dismisses it (see the blur handler below).
+        try {
+            const backdrop = new WebContentsView({ webPreferences: { contextIsolation: true, nodeIntegration: false } });
+            try { backdrop.setBorderRadius(this._pageRadius()); } catch { }
+            backdrop.setBackgroundColor('#00000000');
+            this.mainWindow.contentView.addChildView(backdrop);
+            backdrop.webContents.loadURL('data:text/html,<body style="margin:0;height:100vh;background:rgba(8,10,20,0.5)"></body>');
+            this.glanceBackdrop = backdrop;
+        }
+        catch { }
         // Same session as the current tab, so a glance from a persona/profile tab
         // stays in that isolated session.
         const sess = active?.webContents?.session;
@@ -1630,6 +1645,12 @@ class Tabs {
         setTimeout(() => { try { this.glanceView === view && view.webContents.focus(); } catch { } }, 60);
     }
     closeGlance() {
+        if (this.glanceBackdrop) {
+            const bd = this.glanceBackdrop;
+            this.glanceBackdrop = null;
+            try { this.mainWindow.contentView.removeChildView(bd); } catch { }
+            try { bd.webContents.close?.(); } catch { }
+        }
         if (!this.glanceView)
             return;
         const v = this.glanceView;
