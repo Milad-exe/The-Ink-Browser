@@ -233,6 +233,9 @@ exposeInternal('profiles', {
     create: () => ipcRenderer.invoke('workspaces:create'),
     onChanged: (cb) => ipcRenderer.on('profiles:changed', () => cb()),
     onSwitched: (cb) => ipcRenderer.on('workspace-switched', (_e, id) => cb(id)),
+    // Main asks the renderer to switch workspaces (e.g. the active workspace's
+    // last tab was closed but another workspace still has tabs).
+    onForceSwitch: (cb) => ipcRenderer.on('switch-to-workspace', (_e, id) => cb(id)),
     onRename: (cb) => ipcRenderer.on('rename-profile', (_e, id) => cb(id)),
 });
 // Personas — optional rename + live id→name map for labelling history/suggestions.

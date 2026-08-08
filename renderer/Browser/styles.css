@@ -240,11 +240,10 @@ html[data-tabbar="side"] .tab-button:hover { color: var(--text); }
 html[data-tabbar="side"] .tab-button .tab-title { font-size: 12.5px; }
 html[data-tabbar="side"] .tab-button.active {
   color: var(--text);
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--accent) 8%, var(--surface)), var(--surface) 40%);
-  box-shadow: inset 2.5px 0 0 -0.5px var(--accent),
-              inset 0 0 0 0.5px var(--border),
-              0 1px 3px rgba(8,10,20,0.10);
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--accent),
+              inset 0 0 0 0.5px var(--border-2),
+              0 1px 4px rgba(8,10,20,0.20);
 }
 html[data-tabbar="side"] .tab-button.active .tab-title { font-weight: 600; }
 /* Favicon a touch larger in the roomy side rows. */
@@ -278,12 +277,18 @@ html[data-tabbar="side"] #tab-actions { padding: 0; }
 html[data-tabbar="side"] #new-tab-btn {
   width: 100%; height: 32px; border-radius: 9px;
   display: flex; justify-content: flex-start; align-items: center;
-  padding: 0 10px; font-size: 15px; color: var(--text-3);
+  padding: 0 10px; gap: 9px; font-size: 0; color: var(--text-3);
+}
+/* The "+" sits in the same 17px slot a favicon would, so "New Tab" lines up
+   with the tab titles above it. */
+html[data-tabbar="side"] #new-tab-btn::before {
+  content: '+'; width: 17px; flex-shrink: 0; text-align: center;
+  font-size: 17px; font-weight: 300; line-height: 1;
 }
 html[data-tabbar="side"] #new-tab-btn::after {
   content: 'New Tab';
   font-family: var(--font); font-size: 12px; font-weight: 500;
-  letter-spacing: -0.01em; margin-left: 9px;
+  letter-spacing: -0.01em;
 }
 html[data-tabbar="side"] #new-tab-btn:hover { color: var(--text); background: var(--hover); }
 html[data-tabbar="side"] #tab-drag-spacer { width: auto; min-width: 0; height: auto; min-height: 20px; flex: 1 1 auto; }
@@ -379,25 +384,21 @@ html[data-tabbar="side"] .sidebar-foot {
 }
 /* Profiles: a centred row of icon-only avatars between settings (left) and the
    add/downloads controls (right). */
-.sb-workspaces { display: flex; align-items: center; justify-content: center; gap: 4px; flex: 1; min-width: 0; overflow: visible; }
+/* Many profiles scroll horizontally within the middle slot instead of spilling
+   over the settings / add / downloads buttons. */
+.sb-workspaces {
+  display: flex; align-items: center; gap: 4px; flex: 1 1 auto; min-width: 0;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  justify-content: safe center; scroll-snap-type: x proximity;
+}
+.sb-workspaces::-webkit-scrollbar { display: none; }
 .sb-ws {
-  position: relative;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   width: 30px; height: 30px; padding: 0; border: none; border-radius: 9px;
   background: transparent; cursor: pointer; transition: background 0.12s;
+  scroll-snap-align: center;
 }
 .sb-ws:hover { background: var(--hover); }
-/* Name still surfaces on hover, as a floating label above the avatar. */
-.sb-ws[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%);
-  padding: 3px 8px; border-radius: 6px; white-space: nowrap;
-  background: var(--surface-2, var(--surface)); color: var(--text);
-  border: 1px solid var(--border); box-shadow: 0 4px 14px rgba(8,10,20,0.35);
-  font-family: var(--font); font-size: 11px; font-weight: 500; letter-spacing: -0.01em;
-  opacity: 0; pointer-events: none; transition: opacity 0.12s; z-index: 60;
-}
-.sb-ws:hover[data-tip]::after { opacity: 1; }
 .sb-ws.active { background: var(--surface); box-shadow: inset 0 0 0 0.5px var(--border); }
 .sb-ws .profile-badge { width: 20px; height: 20px; font-size: 10px; }
 .sb-ws:not(.active) .profile-badge { opacity: 0.72; }

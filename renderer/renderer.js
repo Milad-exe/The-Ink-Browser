@@ -2330,7 +2330,7 @@
                         const b = document.createElement('button');
                         b.className = 'sb-ws' + (p.id === activeWorkspace ? ' active' : '');
                         b.tabIndex = -1;
-                        b.dataset.tip = p.name; // custom hover label (name still shows)
+                        b.title = p.name; // native hover label (survives foot overflow-scroll)
                         const av = document.createElement('span');
                         av.className = 'profile-badge' + (p.emoji ? ' has-emoji' : ' is-dot');
                         av.style.setProperty('--pf-color', p.color || '');
@@ -2350,6 +2350,8 @@
             };
             refresh();
             try { window.profiles.onChanged(refresh); }
+            catch { }
+            try { window.profiles.onForceSwitch((id) => window.profiles.switch(id)); }
             catch { }
             try {
                 window.profiles.onSwitched((id) => {

@@ -1899,10 +1899,23 @@ class Tabs {
                 return order[i];
         return null;
     }
+    // Like _neighborInOrder but stays inside the closed tab's workspace, so
+    // closing the last tab of a workspace never jumps to another workspace's tab.
+    _neighborInWorkspace(index) {
+        const ws = String(this.tabProfiles.get(index) || this.profileId || '1');
+        const order = this.tabOrder;
+        const pos = order.indexOf(index);
+        if (pos === -1)
+            return null;
+        const ok = (i) => this.tabMap.has(i) && String(this.tabProfiles.get(i) || '1') === ws;
+        for (let i = pos + 1; i < order.length; i++) if (ok(order[i])) return order[i];
+        for (let i = pos - 1; i >= 0; i--) if (ok(order[i])) return order[i];
+        return null;
+    }
     removeTab(index) {
         if (this.tabMap.has(index)) {
             const wasActive = this.activeTabIndex === index;
-            const nextActive = wasActive ? this._neighborInOrder(index) : null;
+            const nextActive = wasActive ? this._neighborInWorkspace(index) : null;
             const tab = this.tabMap.get(index);
             this.recordClosed(index);
             this.destroyTab(tab);
@@ -1927,10 +1940,19 @@ class Tabs {
                 index: index,
                 totalTabs: this.tabMap.size
             });
-            if (wasActive && this.tabMap.size > 0) {
-                const target = (nextActive !== null && this.tabMap.has(nextActive))
-                    ? nextActive : this.tabOrder[0];
-                this.showTab(target);
+            if (wasActive) {
+                if (nextActive !== null && this.tabMap.has(nextActive)) {
+                    this.showTab(nextActive);
+                }
+                else if (this.tabMap.size > 0) {
+                    // Active workspace is now empty but other workspaces still hold
+                    // tabs — switch to one (via the renderer's profiles.switch) rather
+                    // than surfacing a stray tab from another workspace.
+                    const other = this.tabOrder.find(i => this.tabMap.has(i));
+                    const targetWs = other != null ? String(this.tabProfiles.get(other) || '1') : null;
+                    if (targetWs)
+                        try { this.mainWindow.webContents.send('switch-to-workspace', targetWs); } catch { }
+                }
             }
             if (this.tabMap.size === 0) {
                 // Defer + re-check on the next tick: guards against a transient
