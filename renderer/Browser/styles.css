@@ -211,10 +211,10 @@ html[data-tabbar="side"] #content-area { grid-column: 2; grid-row: 3; }
    (JS sets width:72px for the top strip; height matters here instead). */
 html[data-tabbar="side"] #window-controls { width: auto !important; height: 36px; flex-shrink: 0; align-self: auto; }
 html[data-tabbar="side"] #tabs-container {
-  /* CSS grid: pinned favicon tiles occupy single cells whose column COUNT reflows
-     as the sidebar resizes (tile size stays constant, never stretches); normal
-     tab rows span the full width. */
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+  /* CSS grid: pinned favicon tiles fill the width in up to ~4 columns —
+     2 pins → 2 half-width tiles, collapsing to fewer/wider with fewer pins;
+     normal tab rows span the full width. */
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(max(23%, 50px), 1fr));
   align-content: start; gap: 5px;
   height: auto; width: auto; flex: 0 1 auto; min-height: 0;
   overflow-x: hidden; overflow-y: auto; padding: 2px;
@@ -259,8 +259,8 @@ html[data-tabbar="side"] .tab-favicon { width: 17px; height: 17px; }
    rows below force a full-width line each. */
 html[data-tabbar="side"] .tab-button { position: relative; grid-column: 1 / -1; }
 html[data-tabbar="side"] .tab-button.pinned {
-  grid-column: auto; min-width: 0; max-width: none; width: auto; height: 46px;
-  padding: 0; gap: 0; justify-content: center; border-radius: 12px;
+  grid-column: auto; min-width: 0; max-width: none; width: auto; height: 58px;
+  padding: 0; gap: 0; justify-content: center; border-radius: 14px;
   background: var(--surface);
   box-shadow: inset 0 0 0 0.5px var(--border), 0 1px 2px rgba(8,10,20,0.06);
 }
