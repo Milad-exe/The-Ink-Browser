@@ -351,6 +351,15 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     ipcMain.handle('glance:close', (_e) => {
         wm.getWindowByWebContents(_e.sender)?.tabs?.closeGlance();
     });
+    // ── Folders (tab groups) ───────────────────────────────────────────────────
+    ipcMain.handle('folders:create', (_e, name) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        return wd?.tabs ? wd.tabs.createFolder(name, wd.tabs.profileId) : null;
+    });
+    ipcMain.handle('folders:rename', (_e, id, name) => { wm.getWindowByWebContents(_e.sender)?.tabs?.renameFolder(id, name); });
+    ipcMain.handle('folders:delete', (_e, id) => { wm.getWindowByWebContents(_e.sender)?.tabs?.deleteFolder(id); });
+    ipcMain.handle('folders:toggle', (_e, id, collapsed) => { wm.getWindowByWebContents(_e.sender)?.tabs?.toggleFolder(id, collapsed); });
+    ipcMain.handle('folders:assign', (_e, index, folderId) => { wm.getWindowByWebContents(_e.sender)?.tabs?.setTabFolder(index, folderId); });
     // ── Persona naming (optional rename; auto-numbered by default) ─────────────
     // id → current display name, so history/suggestions can label personas live
     // (a rename reflects everywhere without rewriting stored entries).

@@ -277,6 +277,33 @@ html[data-tabbar="side"] .tab-button.pinned + .tab-button:not(.pinned)::before {
   content: ''; position: absolute; left: 2px; right: 2px; top: -7px;
   height: 1px; background: var(--border-2);
 }
+/* ── Folders (tab groups) ──────────────────────────────────────────────────── */
+html[data-tabbar="side"] .folder-header {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 8px; height: 34px;
+  padding: 0 8px 0 8px; border-radius: 10px; cursor: pointer;
+  color: var(--text-2); position: relative;
+}
+html[data-tabbar="side"] .folder-header:hover { background: var(--hover); color: var(--text); }
+.folder-chevron { font-size: 10px; width: 12px; text-align: center; color: var(--text-3); transition: transform 0.12s; }
+.folder-header:not(.collapsed) .folder-chevron { transform: rotate(90deg); }
+.folder-icon { font-size: 15px; line-height: 1; }
+.folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.folder-rename-input {
+  flex: 1; min-width: 0; height: 22px; padding: 0 6px; border-radius: 6px;
+  border: 1px solid var(--accent); background: var(--page); color: var(--text);
+  font-family: var(--font); font-size: 13px; font-weight: 600; outline: none;
+}
+.folder-del {
+  flex-shrink: 0; width: 18px; height: 18px; border: none; border-radius: 6px;
+  background: transparent; color: var(--text-3); font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; opacity: 0;
+}
+.folder-header:hover .folder-del { opacity: 1; }
+.folder-del:hover { color: var(--danger); background: var(--surface); }
+/* Member tabs sit indented beneath their folder header. */
+html[data-tabbar="side"] .tab-button.in-folder { margin-left: 16px; width: auto; }
+html[data-tabbar="side"] .tab-button.folder-collapsed { display: none !important; }
 html[data-tabbar="side"] .tab-scroll-btn { display: none; }
 html[data-tabbar="side"] #tab-actions { padding: 0; }
 /* "+ New Tab" labelled row (Arc), not a bare plus. */

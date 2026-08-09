@@ -225,6 +225,9 @@ class Tabs {
         // switching workspaces swaps the visible tab set IN PLACE.
         this.profileId = options?.profile ? String(options.profile) : '1';
         this.tabProfiles = new Map(); // tabIndex → workspace/profile id
+        this.folders = []; // [{ id, name, collapsed, workspace }] — tab folders
+        this.tabFolders = new Map(); // tabIndex → folderId
+        this._folderSeq = 1;
         this.splitPair = null; // [leftIdx, rightIdx] when split view is active
         this.glanceView = null; // floating page-preview overlay ("glance")
         this.glanceBackdrop = null; // dim view behind the glance
@@ -1676,6 +1679,50 @@ class Tabs {
         const key = String(id);
         return this.tabOrder.filter(i => this.tabMap.has(i) && (this.tabProfiles.get(i) || '1') === key);
     }
+    // ── Folders (tab groups within a workspace) ────────────────────────────────
+    foldersForWorkspace(id) {
+        const key = String(id);
+        return this.folders.filter(f => String(f.workspace) === key);
+    }
+    broadcastFolders() {
+        try {
+            const ws = this.profileId;
+            const folders = this.foldersForWorkspace(ws).map(f => ({ ...f }));
+            const ids = new Set(folders.map(f => f.id));
+            const assignments = [...this.tabFolders.entries()].filter(([idx, fid]) => this.tabMap.has(idx) && ids.has(fid));
+            this.mainWindow.webContents.send('folders-changed', { folders, assignments });
+        }
+        catch { }
+    }
+    createFolder(name, workspace) {
+        const id = 'f' + (this._folderSeq++);
+        this.folders.push({ id, name: (name || 'New Folder').slice(0, 40), collapsed: false, workspace: String(workspace || this.profileId) });
+        this.broadcastFolders();
+        this.saveStateDebounced?.();
+        return id;
+    }
+    renameFolder(id, name) {
+        const f = this.folders.find(x => x.id === id);
+        if (f && typeof name === 'string' && name.trim()) { f.name = name.trim().slice(0, 40); this.broadcastFolders(); this.saveStateDebounced?.(); }
+    }
+    toggleFolder(id, collapsed) {
+        const f = this.folders.find(x => x.id === id);
+        if (f) { f.collapsed = (collapsed == null) ? !f.collapsed : !!collapsed; this.broadcastFolders(); this.saveStateDebounced?.(); }
+    }
+    deleteFolder(id) {
+        // "Unpack": tabs survive, just leave the folder.
+        for (const [idx, fid] of [...this.tabFolders.entries()]) if (fid === id) this.tabFolders.delete(idx);
+        this.folders = this.folders.filter(f => f.id !== id);
+        this.broadcastFolders();
+        this.saveStateDebounced?.();
+    }
+    setTabFolder(index, folderId) {
+        if (!this.tabMap.has(index)) return;
+        if (folderId && this.folders.some(f => f.id === folderId)) this.tabFolders.set(index, folderId);
+        else this.tabFolders.delete(index);
+        this.broadcastFolders();
+        this.saveStateDebounced?.();
+    }
     // Focus the active workspace after a switch: show its most-recent tab, or
     // open a fresh one if it has none. (this.profileId already points at it.)
     applyWorkspace() {
@@ -1688,6 +1735,7 @@ class Tabs {
         if (target == null)
             target = mine.reduce((a, b) => ((this.tabLastActive.get(b) || 0) > (this.tabLastActive.get(a) || 0) ? b : a), mine[0]);
         this.showTab(target);
+        this.broadcastFolders();
     }
     showTab(index) {
         // A glance is transient — dismiss it on any tab switch.
@@ -1925,6 +1973,7 @@ class Tabs {
             this.privateTabs.delete(index); // session wipe happens in destroyTab()
             this.tabContainers.delete(index); // container SESSION persists (shared, reusable)
             this.tabProfiles.delete(index);
+            if (this.tabFolders.delete(index)) this.broadcastFolders();
             if (this.splitPair && this.splitPair.includes(index)) {
                 this.splitPair = null;
                 try { this.mainWindow.webContents.send('split-changed', null); } catch { }
@@ -1985,6 +2034,7 @@ class Tabs {
             this.privateTabs.delete(index); // session wipe happens in destroyTab()
             this.tabContainers.delete(index); // container SESSION persists (shared, reusable)
             this.tabProfiles.delete(index);
+            if (this.tabFolders.delete(index)) this.broadcastFolders();
             if (this.splitPair && this.splitPair.includes(index)) {
                 this.splitPair = null;
                 try { this.mainWindow.webContents.send('split-changed', null); } catch { }

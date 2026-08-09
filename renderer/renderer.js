@@ -67,6 +67,7 @@
         // IPC is processed until every declaration and init function has run.
         let tabs = new Map(); // tabIndex → <div.tab-button>
         let splitPair = null; // [idxA, idxB] when split view is active
+        let folderState = { folders: [], assign: new Map() }; // tab folders
         let tabUrls = new Map(); // tabIndex → url string
         let tabPrivate = new Map(); // tabIndex → boolean (private flag)
         let tabLoading = new Set(); // tabIndexes currently loading
@@ -1995,6 +1996,15 @@
                 });
             }
             catch { }
+            // Folders: main sends the active workspace's folders + tab assignments.
+            try {
+                window.folders?.onChanged((data) => {
+                    folderState.folders = Array.isArray(data?.folders) ? data.folders : [];
+                    folderState.assign = new Map((data?.assignments || []).map(([i, f]) => [Number(i), f]));
+                    layoutFolders();
+                });
+            }
+            catch { }
             // Called by the main process (executeJavaScript) when a tab dragged
             // from ANOTHER window drops on our strip: x (px from our left edge) →
             // where to insert it. Returns the data-index of the tab to insert
@@ -2093,6 +2103,15 @@
                 tabsContainer.scrollBy({ left: e.deltaY !== 0 ? e.deltaY : e.deltaX, behavior: 'smooth' });
             }, { passive: false });
             tabsContainer.addEventListener('scroll', updateScrollShadows);
+            // Right-click the empty part of the tab list → new folder, then
+            // rename it inline once it renders.
+            tabsContainer.addEventListener('contextmenu', async (e) => {
+                if (e.target.closest('.tab-button') || e.target.closest('.folder-header')) return;
+                e.preventDefault();
+                let id = null;
+                try { id = await window.folders.create('New Folder'); } catch { }
+                if (id) setTimeout(() => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }, 140);
+            });
             window.addEventListener('resize', () => setTimeout(() => { updateTabWidths(tabs.size); updateScrollShadows(); }, 100));
             setTimeout(() => { if (tabs.size > 0) {
                 updateTabWidths(tabs.size);
@@ -2648,6 +2667,7 @@
             }
             tabs.set(index, btn);
             applySplitMarks();
+            if (folderState.folders.length) layoutFolders();
             if (shouldActivate) {
                 setActiveTab(index);
             }
@@ -2672,6 +2692,70 @@
                 active.classList.add('active');
             activeTabIndex = index;
             applySplitMarks();
+        }
+        // ── Folders (tab groups): render a header per folder and slot its member
+        //    tabs indented beneath it; collapsed folders hide their members. ────────
+        function makeFolderHeader(f) {
+            const h = document.createElement('div');
+            h.className = 'folder-header';
+            h.dataset.folder = f.id;
+            h.tabIndex = -1;
+            h.innerHTML = '<span class="folder-chevron">▸</span><span class="folder-icon">📁</span><span class="folder-name"></span><button class="folder-del" tabindex="-1" title="Delete folder">×</button>';
+            h.addEventListener('click', (e) => {
+                if (h.classList.contains('renaming') || e.target.closest('.folder-del')) return;
+                window.folders.toggle(f.id);
+            });
+            h.addEventListener('dblclick', (e) => { e.preventDefault(); startFolderRename(h, f.id); });
+            h.querySelector('.folder-del').addEventListener('click', (e) => { e.stopPropagation(); window.folders.remove(f.id); });
+            return h;
+        }
+        function startFolderRename(h, id) {
+            const name = h.querySelector('.folder-name');
+            if (!name || h.classList.contains('renaming')) return;
+            h.classList.add('renaming');
+            const cur = name.textContent;
+            const input = document.createElement('input');
+            input.className = 'folder-rename-input'; input.value = cur; input.maxLength = 40;
+            name.replaceWith(input); input.focus(); input.select();
+            const done = (save) => {
+                if (!h.classList.contains('renaming')) return;
+                h.classList.remove('renaming');
+                const span = document.createElement('span'); span.className = 'folder-name';
+                const val = input.value.trim();
+                span.textContent = (save && val) ? val : cur;
+                input.replaceWith(span);
+                if (save && val && val !== cur) window.folders.rename(id, val);
+            };
+            input.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); });
+            input.addEventListener('blur', () => done(true));
+        }
+        function layoutFolders() {
+            if (!tabsContainer) return;
+            const folders = folderState.folders;
+            const validIds = new Set(folders.map(f => f.id));
+            tabsContainer.querySelectorAll('.folder-header').forEach(h => { if (!validIds.has(h.dataset.folder)) h.remove(); });
+            tabsContainer.querySelectorAll('.tab-button.in-folder').forEach(b => b.classList.remove('in-folder', 'folder-collapsed'));
+            const pinned = [...tabsContainer.querySelectorAll('.tab-button.pinned')];
+            const normal = [...tabsContainer.querySelectorAll('.tab-button:not(.pinned)')];
+            const grouped = new Set();
+            const frag = document.createDocumentFragment();
+            for (const f of folders) {
+                let header = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(f.id)}"]`) || makeFolderHeader(f);
+                header.classList.toggle('collapsed', !!f.collapsed);
+                if (!header.classList.contains('renaming')) header.querySelector('.folder-name').textContent = f.name || 'Folder';
+                frag.appendChild(header);
+                for (const btn of normal) {
+                    if (folderState.assign.get(+btn.dataset.index) !== f.id) continue;
+                    btn.classList.add('in-folder');
+                    if (f.collapsed) btn.classList.add('folder-collapsed');
+                    frag.appendChild(btn);
+                    grouped.add(btn);
+                }
+            }
+            for (const btn of normal) if (!grouped.has(btn)) frag.appendChild(btn);
+            const lastPinned = pinned[pinned.length - 1] || null;
+            if (lastPinned) lastPinned.after(frag);
+            else tabsContainer.insertBefore(frag, tabsContainer.firstChild);
         }
         // ── Tab media indicator: audible/muted speaker, recording mic/camera ─────
         const INDICATOR_SVG = {

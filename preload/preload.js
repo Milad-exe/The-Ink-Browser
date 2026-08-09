@@ -222,6 +222,15 @@ exposeInternal('glance', {
     open: (url) => ipcRenderer.invoke('glance:open', url),
     close: () => ipcRenderer.invoke('glance:close'),
 });
+// Folders — tab groups within a workspace.
+exposeInternal('folders', {
+    create: (name) => ipcRenderer.invoke('folders:create', name),
+    rename: (id, name) => ipcRenderer.invoke('folders:rename', id, name),
+    remove: (id) => ipcRenderer.invoke('folders:delete', id),
+    toggle: (id, collapsed) => ipcRenderer.invoke('folders:toggle', id, collapsed),
+    assign: (index, folderId) => ipcRenderer.invoke('folders:assign', index, folderId),
+    onChanged: (cb) => ipcRenderer.on('folders-changed', (_e, data) => cb(data)),
+});
 // Profiles — Chrome-style browsing selves; each window belongs to one.
 exposeInternal('profiles', {
     current: () => ipcRenderer.invoke('profiles:current'),
