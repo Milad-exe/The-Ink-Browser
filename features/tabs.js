@@ -2315,13 +2315,14 @@ class Tabs {
                 pinned: this.pinnedTabs.has(idx),
                 container: this.tabContainers.get(idx) || null,
                 workspace: this.tabProfiles.get(idx) || '1',
+                folder: this.tabFolders.get(idx) || null,
             };
         });
         // Map active to its ordinal within the SAVED list (selected), not the
         // full tab order — filtered-out tabs (private / unpinned) would shift
         // the index and the wrong tab would be focused on restore.
         const activeOrdinal = Math.max(0, selected.indexOf(this.activeTabIndex));
-        return { tabs, activeIndex: activeOrdinal, persistAllTabs: includeAll, profile: this.profileId, activeWorkspace: this.profileId };
+        return { tabs, activeIndex: activeOrdinal, persistAllTabs: includeAll, profile: this.profileId, activeWorkspace: this.profileId, folders: this.folders.map(f => ({ ...f })) };
     }
     saveStateDebounced() {
         if (!this.persistence)

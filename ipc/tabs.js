@@ -360,6 +360,14 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     ipcMain.handle('folders:delete', (_e, id) => { wm.getWindowByWebContents(_e.sender)?.tabs?.deleteFolder(id); });
     ipcMain.handle('folders:toggle', (_e, id, collapsed) => { wm.getWindowByWebContents(_e.sender)?.tabs?.toggleFolder(id, collapsed); });
     ipcMain.handle('folders:assign', (_e, index, folderId) => { wm.getWindowByWebContents(_e.sender)?.tabs?.setTabFolder(index, folderId); });
+    ipcMain.handle('folders:list', (_e) => {
+        const t = wm.getWindowByWebContents(_e.sender)?.tabs;
+        if (!t) return { folders: [], assignments: [] };
+        const folders = t.foldersForWorkspace(t.profileId).map(f => ({ ...f }));
+        const ids = new Set(folders.map(f => f.id));
+        const assignments = [...t.tabFolders.entries()].filter(([idx, fid]) => t.tabMap.has(idx) && ids.has(fid));
+        return { folders, assignments };
+    });
     // ── Persona naming (optional rename; auto-numbered by default) ─────────────
     // id → current display name, so history/suggestions can label personas live
     // (a rename reflects everywhere without rewriting stored entries).

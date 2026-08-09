@@ -1998,11 +1998,14 @@
             catch { }
             // Folders: main sends the active workspace's folders + tab assignments.
             try {
-                window.folders?.onChanged((data) => {
+                const applyFolders = (data) => {
                     folderState.folders = Array.isArray(data?.folders) ? data.folders : [];
                     folderState.assign = new Map((data?.assignments || []).map(([i, f]) => [Number(i), f]));
                     layoutFolders();
-                });
+                };
+                window.folders?.onChanged(applyFolders);
+                // Pull the current folders (restored ones exist before this listener).
+                window.folders?.list().then(applyFolders).catch(() => { });
             }
             catch { }
             // Called by the main process (executeJavaScript) when a tab dragged
@@ -2571,6 +2574,7 @@
                 let mode = 'idle'; // idle → drag
                 let outside = false; // pointer currently beyond the strip
                 let savedOrder = null; // DOM order at drag start, for cancel
+                let dropFolder = undefined; // folder id under the cursor (null = ungrouped, undefined = untracked)
                 const restoreOrder = () => {
                     if (!savedOrder)
                         return;
@@ -2605,6 +2609,17 @@
                     }
                     edgeAutoScroll(ev.clientX, ev.clientY);
                     placeDraggedTab(btn, sideTabs() ? ev.clientY : ev.clientX);
+                    // Which folder (if any) is the tab hovering over? (drop target)
+                    if (sideTabs() && !btn.classList.contains('pinned')) {
+                        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+                        const fh = el?.closest?.('.folder-header');
+                        const mem = el?.closest?.('.tab-button.in-folder');
+                        dropFolder = fh ? fh.dataset.folder
+                            : (mem && mem !== btn) ? (folderState.assign.get(+mem.dataset.index) || null)
+                            : null;
+                        tabsContainer.querySelectorAll('.folder-header.drop-target').forEach(h => h.classList.remove('drop-target'));
+                        if (dropFolder) tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(dropFolder)}"]`)?.classList.add('drop-target');
+                    }
                 };
                 const cleanup = () => {
                     document.removeEventListener('pointermove', onMove);
@@ -2634,6 +2649,13 @@
                         const ordered = [...tabsContainer.querySelectorAll('.tab-button')].map(el => parseInt(el.dataset.index));
                         if (ordered.length)
                             window.tab.reorder(ordered);
+                        // Apply folder membership from where it was dropped.
+                        tabsContainer.querySelectorAll('.folder-header.drop-target').forEach(h => h.classList.remove('drop-target'));
+                        if (dropFolder !== undefined) {
+                            const cur = folderState.assign.get(parseInt(index)) || null;
+                            const next = dropFolder || null;
+                            if (cur !== next) { try { window.folders.assign(parseInt(index), next); } catch { } }
+                        }
                         return;
                     }
                     // Released outside the strip → main decides: move into the
@@ -2706,8 +2728,39 @@
                 window.folders.toggle(f.id);
             });
             h.addEventListener('dblclick', (e) => { e.preventDefault(); startFolderRename(h, f.id); });
+            h.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); showFolderMenu(e.clientX, e.clientY, f.id); });
             h.querySelector('.folder-del').addEventListener('click', (e) => { e.stopPropagation(); window.folders.remove(f.id); });
             return h;
+        }
+        let _closeFolderMenu = null;
+        function showFolderMenu(x, y, id) {
+            if (_closeFolderMenu) _closeFolderMenu();
+            const menu = document.createElement('div');
+            menu.className = 'folder-menu';
+            const rows = [
+                ['Rename Folder…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }],
+                ['sep'],
+                ['Unpack Folder', () => window.folders.remove(id)], // keep tabs, drop folder
+                ['Delete Folder', () => {
+                    const members = [...folderState.assign.entries()].filter(([, fid]) => fid === id).map(([i]) => i);
+                    for (const i of members) { try { window.tab.remove(i); } catch { } }
+                    window.folders.remove(id);
+                }, 'danger'],
+            ];
+            for (const r of rows) {
+                if (r[0] === 'sep') { const s = document.createElement('div'); s.className = 'folder-menu-sep'; menu.appendChild(s); continue; }
+                const b = document.createElement('button'); b.className = 'folder-menu-item' + (r[2] ? ' ' + r[2] : ''); b.textContent = r[0]; b.tabIndex = -1;
+                b.addEventListener('click', () => { const fn = r[1]; if (_closeFolderMenu) _closeFolderMenu(); fn(); });
+                menu.appendChild(b);
+            }
+            document.body.appendChild(menu);
+            const mw = menu.offsetWidth || 190, mh = menu.offsetHeight || 130;
+            menu.style.left = Math.max(6, Math.min(x, window.innerWidth - mw - 6)) + 'px';
+            menu.style.top = Math.max(6, Math.min(y, window.innerHeight - mh - 6)) + 'px';
+            const onDoc = (e) => { if (!menu.contains(e.target)) _closeFolderMenu?.(); };
+            const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); _closeFolderMenu?.(); } };
+            _closeFolderMenu = () => { menu.remove(); document.removeEventListener('click', onDoc, true); document.removeEventListener('keydown', onKey, true); _closeFolderMenu = null; };
+            setTimeout(() => { document.addEventListener('click', onDoc, true); document.addEventListener('keydown', onKey, true); }, 0);
         }
         function startFolderRename(h, id) {
             const name = h.querySelector('.folder-name');
@@ -2742,6 +2795,7 @@
             for (const f of folders) {
                 let header = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(f.id)}"]`) || makeFolderHeader(f);
                 header.classList.toggle('collapsed', !!f.collapsed);
+                header.querySelector('.folder-icon').textContent = f.icon || (f.collapsed ? '📁' : '📂');
                 if (!header.classList.contains('renaming')) header.querySelector('.folder-name').textContent = f.name || 'Folder';
                 frag.appendChild(header);
                 for (const btn of normal) {

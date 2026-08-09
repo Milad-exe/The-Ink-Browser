@@ -333,6 +333,14 @@ class WindowManager {
                         tabs.createLazyTab(t.url, t.title, t.pinned, false, false, false, t.container || null, t.workspace || '1');
                         tabKeys.push(tabs.nextTabIndex - 1);
                     });
+                    // Restore tab folders (tab groups) + their tab membership.
+                    if (Array.isArray(state.folders) && state.folders.length) {
+                        tabs.folders = state.folders.map(f => ({ ...f }));
+                        let maxSeq = 0;
+                        for (const f of tabs.folders) { const n = parseInt(String(f.id).replace(/^f/, '')); if (n > maxSeq) maxSeq = n; }
+                        tabs._folderSeq = maxSeq + 1;
+                        state.tabs.forEach((t, i) => { if (t.folder) tabs.tabFolders.set(tabKeys[i], t.folder); });
+                    }
                     const activeWs = String(state.activeWorkspace || state.profile || '1');
                     if (activeWs !== profileId) {
                         tabs.profileId = activeWs;

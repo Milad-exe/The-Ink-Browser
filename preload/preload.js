@@ -229,6 +229,7 @@ exposeInternal('folders', {
     remove: (id) => ipcRenderer.invoke('folders:delete', id),
     toggle: (id, collapsed) => ipcRenderer.invoke('folders:toggle', id, collapsed),
     assign: (index, folderId) => ipcRenderer.invoke('folders:assign', index, folderId),
+    list: () => ipcRenderer.invoke('folders:list'),
     onChanged: (cb) => ipcRenderer.on('folders-changed', (_e, data) => cb(data)),
 });
 // Profiles — Chrome-style browsing selves; each window belongs to one.
