@@ -214,8 +214,12 @@ html[data-tabbar="side"] #utility-bar .nav-buttons { display: flex; gap: 2px; -w
 html[data-tabbar="side"] #utility-bar .omnibox-wrapper { width: 100%; }
 html[data-tabbar="side"] #utility-bar .omnibox { width: 100%; }
 html[data-tabbar="side"] #utility-bar .trailing-icons {
-  display: flex; align-items: center; gap: 1px; flex-wrap: wrap; -webkit-app-region: no-drag;
+  display: flex; align-items: center; justify-content: flex-start; gap: 0; flex-wrap: wrap;
+  -webkit-app-region: no-drag; margin-top: -2px;
 }
+html[data-tabbar="side"] #utility-bar .trailing-icons .icon-btn { width: 28px; height: 28px; }
+html[data-tabbar="side"] #utility-bar .trailing-icons .icon-btn .icon-svg { width: 17px; height: 17px; }
+html[data-tabbar="side"] #utility-bar .nav-buttons .nav-btn { width: 30px; height: 30px; }
 html[data-tabbar="side"] #utility-bar #profile-btn { display: none; }
 html[data-tabbar="side"] .bookmark-bar { display: none !important; }
 html[data-tabbar="side"] #content-area { grid-column: 2; grid-row: 1; }
