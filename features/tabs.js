@@ -1720,6 +1720,16 @@ class Tabs {
         this.broadcastFolders();
         this.saveStateDebounced?.();
     }
+    reopenClosedTab() {
+        const last = this.closedTabHistory.pop();
+        if (last && last.url && last.url !== 'newtab') { const i = this.createTab(); this.loadUrl(i, last.url); }
+        else this.createTab();
+    }
+    toggleCompact() {
+        this.sidebarCompact = !this.sidebarCompact;
+        this.resizeAllTabs();
+        try { this.mainWindow.webContents.send('sidebar-compact-changed', this.sidebarCompact); } catch { }
+    }
     setTabFolder(index, folderId) {
         if (!this.tabMap.has(index)) return;
         if (folderId && this.folders.some(f => f.id === folderId)) this.tabFolders.set(index, folderId);

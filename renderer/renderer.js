@@ -2118,6 +2118,9 @@
                 openCtxMenu(e.clientX, e.clientY, [
                     ['New Tab', () => window.tab.add()],
                     ['New Folder', newFolderInline],
+                    ['sep'],
+                    ['Reopen Closed Tab', () => window.tabsUI.reopenClosed()],
+                    ['Toggle Compact Mode', () => window.tabsUI.toggleCompact()],
                 ]);
             });
             window.addEventListener('resize', () => setTimeout(() => { updateTabWidths(tabs.size); updateScrollShadows(); }, 100));
