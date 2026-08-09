@@ -66,6 +66,7 @@
         // Loading settings synchronously keeps the entire setup in one tick, so no
         // IPC is processed until every declaration and init function has run.
         let tabs = new Map(); // tabIndex → <div.tab-button>
+        let splitPair = null; // [idxA, idxB] when split view is active
         let tabUrls = new Map(); // tabIndex → url string
         let tabPrivate = new Map(); // tabIndex → boolean (private flag)
         let tabLoading = new Set(); // tabIndexes currently loading
@@ -1985,6 +1986,15 @@
                 updateTabWidths(tabs.size);
                 updateScrollShadows();
             });
+            // Split view: mark the two tabs that are on screen together so the strip
+            // shows the pairing (the focused one keeps the normal active highlight).
+            try {
+                window.tabsUI?.onSplitChanged((pair) => {
+                    splitPair = (Array.isArray(pair) && pair.length === 2) ? pair.map(Number) : null;
+                    applySplitMarks();
+                });
+            }
+            catch { }
             // Called by the main process (executeJavaScript) when a tab dragged
             // from ANOTHER window drops on our strip: x (px from our left edge) →
             // where to insert it. Returns the data-index of the tab to insert
@@ -2637,6 +2647,7 @@
                 tabsContainer.appendChild(btn);
             }
             tabs.set(index, btn);
+            applySplitMarks();
             if (shouldActivate) {
                 setActiveTab(index);
             }
@@ -2649,12 +2660,18 @@
                 tabs.delete(index);
             }
         }
+        // Toggle .in-split on the two tabs currently sharing the screen (split view).
+        function applySplitMarks() {
+            for (const [idx, btn] of tabs)
+                btn.classList.toggle('in-split', !!(splitPair && splitPair.includes(idx)));
+        }
         function setActiveTab(index) {
             tabs.forEach(tab => tab.classList.remove('active'));
             const active = tabs.get(index);
             if (active)
                 active.classList.add('active');
             activeTabIndex = index;
+            applySplitMarks();
         }
         // ── Tab media indicator: audible/muted speaker, recording mic/camera ─────
         const INDICATOR_SVG = {

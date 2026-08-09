@@ -1550,14 +1550,14 @@ class Tabs {
             return;
         this.splitPair = [a, otherIdx];
         this.showTab(a); // lays out the split (see showTab tail)
-        try { this.mainWindow.webContents.send('split-changed', true); } catch { }
+        try { this.mainWindow.webContents.send('split-changed', this.splitPair.slice()); } catch { }
     }
     closeSplit() {
         if (!this.splitPair)
             return;
         const keep = this.splitPair.includes(this.activeTabIndex) ? this.activeTabIndex : this.splitPair[0];
         this.splitPair = null;
-        try { this.mainWindow.webContents.send('split-changed', false); } catch { }
+        try { this.mainWindow.webContents.send('split-changed', null); } catch { }
         this.showTab(keep);
     }
     isSplit() { return !!this.splitPair; }
@@ -1927,7 +1927,7 @@ class Tabs {
             this.tabProfiles.delete(index);
             if (this.splitPair && this.splitPair.includes(index)) {
                 this.splitPair = null;
-                try { this.mainWindow.webContents.send('split-changed', false); } catch { }
+                try { this.mainWindow.webContents.send('split-changed', null); } catch { }
             }
             this.tabOrder = this.tabOrder.filter(i => i !== index);
             this.tabLastActive.delete(index);
@@ -1987,7 +1987,7 @@ class Tabs {
             this.tabProfiles.delete(index);
             if (this.splitPair && this.splitPair.includes(index)) {
                 this.splitPair = null;
-                try { this.mainWindow.webContents.send('split-changed', false); } catch { }
+                try { this.mainWindow.webContents.send('split-changed', null); } catch { }
             }
             this.tabOrder = this.tabOrder.filter(i => i !== index);
             this.tabLastActive.delete(index);

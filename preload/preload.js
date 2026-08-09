@@ -261,6 +261,7 @@ exposeInternal('northstarPrivate', {
 // Bridge for UI events emitted from main (via Tabs.pinTab -> 'pin-tab')
 exposeInternal('tabsUI', {
     onPinTab: (handler) => ipcRenderer.on('pin-tab', (_e, { index }) => handler(index)),
+    onSplitChanged: (handler) => ipcRenderer.on('split-changed', (_e, pair) => handler(pair)),
     onTabBarSide: (handler) => ipcRenderer.on('tabbar-side-changed', (_e, v) => handler(v)),
     onCompact: (handler) => ipcRenderer.on('sidebar-compact-changed', (_e, v) => handler(v)),
     startSidebarResize: () => ipcRenderer.invoke('sidebar:resize-start'),
