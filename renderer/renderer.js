@@ -2106,14 +2106,19 @@
                 tabsContainer.scrollBy({ left: e.deltaY !== 0 ? e.deltaY : e.deltaX, behavior: 'smooth' });
             }, { passive: false });
             tabsContainer.addEventListener('scroll', updateScrollShadows);
-            // Right-click the empty part of the tab list → new folder, then
-            // rename it inline once it renders.
-            tabsContainer.addEventListener('contextmenu', async (e) => {
-                if (e.target.closest('.tab-button') || e.target.closest('.folder-header')) return;
-                e.preventDefault();
+            // Right-click the empty part of the tab list → a custom menu.
+            const newFolderInline = async () => {
                 let id = null;
                 try { id = await window.folders.create('New Folder'); } catch { }
                 if (id) setTimeout(() => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }, 140);
+            };
+            tabsContainer.addEventListener('contextmenu', (e) => {
+                if (e.target.closest('.tab-button') || e.target.closest('.folder-header')) return;
+                e.preventDefault(); e.stopPropagation();
+                openCtxMenu(e.clientX, e.clientY, [
+                    ['New Tab', () => window.tab.add()],
+                    ['New Folder', newFolderInline],
+                ]);
             });
             window.addEventListener('resize', () => setTimeout(() => { updateTabWidths(tabs.size); updateScrollShadows(); }, 100));
             setTimeout(() => { if (tabs.size > 0) {
