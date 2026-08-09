@@ -2568,6 +2568,21 @@
                 e.stopPropagation();
                 window.tab.remove(parseInt(index));
             });
+            // Right-click a sidebar tab → a custom menu (pin, folder, close, …).
+            btn.addEventListener('contextmenu', (e) => {
+                if (e.target.closest('.tab-close')) return;
+                e.preventDefault(); e.stopPropagation();
+                const idx = parseInt(index);
+                const isPinned = btn.classList.contains('pinned');
+                const curFolder = folderState.assign.get(idx) || null;
+                const rows = [['New Tab', () => window.tab.add()], ['sep'], [isPinned ? 'Unpin Tab' : 'Pin Tab', () => window.tab.pin(idx)]];
+                if (!isPinned) {
+                    if (curFolder) rows.push(['Remove from Folder', () => window.folders.assign(idx, null)]);
+                    else for (const f of folderState.folders) rows.push([`Add to “${f.name || 'Folder'}”`, () => window.folders.assign(idx, f.id)]);
+                }
+                rows.push(['sep'], ['Close Tab', () => window.tab.remove(idx), 'danger']);
+                openCtxMenu(e.clientX, e.clientY, rows);
+            });
             // Firefox-style tab drag: pointer-tracked, and NOTHING moves until the
             // button is released.
             //  - inside the strip → live reorder preview
