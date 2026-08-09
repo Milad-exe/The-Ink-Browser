@@ -2191,6 +2191,23 @@
         }
         // ── Tab bar placement (left sidebar ⇄ classic top strip) ──────────────────
         function sideTabs() { return document.documentElement.dataset.tabbar !== 'top'; }
+        // Sidebar layout: in side mode the address bar lives INSIDE the sidebar (right
+        // after the window-controls spacer); in top mode it returns to the top bar.
+        function applySidebarLayout() {
+            const side = document.documentElement.dataset.tabbar !== 'top';
+            const ub = document.getElementById('utility-bar');
+            const tb = document.getElementById('tab-bar');
+            const wc = document.getElementById('window-controls');
+            const ca = document.getElementById('content-area');
+            if (!ub || !tb) return;
+            if (side) {
+                const ref = wc ? wc.nextSibling : tb.firstChild;
+                if (ub.parentElement !== tb || ub.previousElementSibling !== wc) tb.insertBefore(ub, ref);
+            }
+            else if (ca && ub.parentElement !== document.body) {
+                document.body.insertBefore(ub, ca);
+            }
+        }
         function initTabBarSide() {
             let mode = 'side', width = 232;
             try {
@@ -2200,6 +2217,7 @@
             }
             catch { }
             document.documentElement.dataset.tabbar = mode === 'top' ? 'top' : 'side';
+            applySidebarLayout();
             applySidebarWidth(width);
             initSidebarResizer();
             try { window.tabsUI.onSidebarWidth((w) => applySidebarWidth(w)); }
@@ -2207,6 +2225,7 @@
             try {
                 window.tabsUI.onTabBarSide((v) => {
                     document.documentElement.dataset.tabbar = v === 'top' ? 'top' : 'side';
+                    applySidebarLayout();
                     updateTabWidths(tabs.size);
                     updateScrollShadows();
                 });
