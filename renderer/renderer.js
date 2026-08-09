@@ -2375,8 +2375,15 @@
                         b.addEventListener('dblclick', (e) => { e.preventDefault(); openProfileModal(p.id); });
                         b.addEventListener('contextmenu', (e) => {
                             e.preventDefault();
-                            const r = b.getBoundingClientRect();
-                            window.profiles.menu(r.left, r.top - 4, p.id);
+                            const rows = [];
+                            if (p.id !== activeWorkspace) rows.push(['Switch to this Space', () => window.profiles.switch(p.id)], ['sep']);
+                            rows.push(
+                                ['Change Name…', () => openProfileModal(p.id)],
+                                ['Change Icon…', () => openProfileModal(p.id)],
+                                ['sep'],
+                                ['Create Space', async () => { const np = await window.profiles.create(); if (np?.id) openProfileModal(np.id); }],
+                            );
+                            openCtxMenu(e.clientX, e.clientY, rows);
                         });
                         wsRow.appendChild(b);
                     }
@@ -2734,35 +2741,38 @@
             h.querySelector('.folder-del').addEventListener('click', (e) => { e.stopPropagation(); window.folders.remove(f.id); });
             return h;
         }
-        let _closeFolderMenu = null;
-        function showFolderMenu(x, y, id) {
-            if (_closeFolderMenu) _closeFolderMenu();
+        // Reusable dark context menu. rows: [label, fn, className?] | ['sep'].
+        let _closeCtxMenu = null;
+        function openCtxMenu(x, y, rows) {
+            if (_closeCtxMenu) _closeCtxMenu();
             const menu = document.createElement('div');
-            menu.className = 'folder-menu';
-            const rows = [
-                ['Rename Folder…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }],
-                ['sep'],
-                ['Unpack Folder', () => window.folders.remove(id)], // keep tabs, drop folder
-                ['Delete Folder', () => {
-                    const members = [...folderState.assign.entries()].filter(([, fid]) => fid === id).map(([i]) => i);
-                    for (const i of members) { try { window.tab.remove(i); } catch { } }
-                    window.folders.remove(id);
-                }, 'danger'],
-            ];
+            menu.className = 'ctx-menu';
             for (const r of rows) {
-                if (r[0] === 'sep') { const s = document.createElement('div'); s.className = 'folder-menu-sep'; menu.appendChild(s); continue; }
-                const b = document.createElement('button'); b.className = 'folder-menu-item' + (r[2] ? ' ' + r[2] : ''); b.textContent = r[0]; b.tabIndex = -1;
-                b.addEventListener('click', () => { const fn = r[1]; if (_closeFolderMenu) _closeFolderMenu(); fn(); });
+                if (r[0] === 'sep') { const s = document.createElement('div'); s.className = 'ctx-menu-sep'; menu.appendChild(s); continue; }
+                const b = document.createElement('button'); b.className = 'ctx-menu-item' + (r[2] ? ' ' + r[2] : ''); b.textContent = r[0]; b.tabIndex = -1;
+                b.addEventListener('click', () => { const fn = r[1]; if (_closeCtxMenu) _closeCtxMenu(); fn && fn(); });
                 menu.appendChild(b);
             }
             document.body.appendChild(menu);
             const mw = menu.offsetWidth || 190, mh = menu.offsetHeight || 130;
             menu.style.left = Math.max(6, Math.min(x, window.innerWidth - mw - 6)) + 'px';
             menu.style.top = Math.max(6, Math.min(y, window.innerHeight - mh - 6)) + 'px';
-            const onDoc = (e) => { if (!menu.contains(e.target)) _closeFolderMenu?.(); };
-            const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); _closeFolderMenu?.(); } };
-            _closeFolderMenu = () => { menu.remove(); document.removeEventListener('click', onDoc, true); document.removeEventListener('keydown', onKey, true); _closeFolderMenu = null; };
+            const onDoc = (e) => { if (!menu.contains(e.target)) _closeCtxMenu?.(); };
+            const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); _closeCtxMenu?.(); } };
+            _closeCtxMenu = () => { menu.remove(); document.removeEventListener('click', onDoc, true); document.removeEventListener('keydown', onKey, true); _closeCtxMenu = null; };
             setTimeout(() => { document.addEventListener('click', onDoc, true); document.addEventListener('keydown', onKey, true); }, 0);
+        }
+        function showFolderMenu(x, y, id) {
+            openCtxMenu(x, y, [
+                ['Rename Folder…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }],
+                ['sep'],
+                ['Unpack Folder', () => window.folders.remove(id)],
+                ['Delete Folder', () => {
+                    const members = [...folderState.assign.entries()].filter(([, fid]) => fid === id).map(([i]) => i);
+                    for (const i of members) { try { window.tab.remove(i); } catch { } }
+                    window.folders.remove(id);
+                }, 'danger'],
+            ]);
         }
         function startFolderRename(h, id) {
             const name = h.querySelector('.folder-name');
