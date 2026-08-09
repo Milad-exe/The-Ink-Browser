@@ -180,10 +180,10 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
 html[data-tabbar="side"] body {
   display: grid;
   grid-template-columns: var(--sidebar-w, 232px) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 html[data-tabbar="side"] #tab-bar {
-  grid-column: 1; grid-row: 1;
+  grid-column: 1; grid-row: 1 / span 3;
   flex-direction: column; align-items: stretch;
   width: var(--sidebar-w, 232px); height: 100%; padding: 0 10px 8px; gap: 8px;
   /* Transparent on the shell — no panel tint, no divider hairline. */
@@ -204,21 +204,9 @@ html.sidebar-resizing .sidebar-resizer::after { background: var(--accent); }
 html.sidebar-resizing { cursor: col-resize; }
 html.sidebar-resizing * { pointer-events: none; user-select: none; }
 html.sidebar-resizing .sidebar-resizer { pointer-events: auto; }
-/* Sidebar layout: the address bar is reparented INTO the sidebar (see renderer),
-   so it stacks vertically; the page fills the whole right column. */
-html[data-tabbar="side"] #utility-bar {
-  flex-shrink: 0; display: flex; flex-direction: column; align-items: stretch;
-  gap: 7px; padding: 0 0 4px; width: 100%;
-}
-html[data-tabbar="side"] #utility-bar .nav-buttons { display: flex; gap: 2px; -webkit-app-region: no-drag; }
-html[data-tabbar="side"] #utility-bar .omnibox-wrapper { width: 100%; }
-html[data-tabbar="side"] #utility-bar .omnibox { width: 100%; }
-html[data-tabbar="side"] #utility-bar .trailing-icons {
-  display: flex; align-items: center; gap: 1px; flex-wrap: wrap; -webkit-app-region: no-drag;
-}
-html[data-tabbar="side"] #utility-bar #profile-btn { display: none; }
-html[data-tabbar="side"] .bookmark-bar { display: none !important; }
-html[data-tabbar="side"] #content-area { grid-column: 2; grid-row: 1; }
+html[data-tabbar="side"] #utility-bar { grid-column: 2; grid-row: 1; }
+html[data-tabbar="side"] .bookmark-bar { grid-column: 2; grid-row: 2; }
+html[data-tabbar="side"] #content-area { grid-column: 2; grid-row: 3; }
 /* macOS traffic lights overlay the sidebar's top-left — reserve a spacer row
    (JS sets width:72px for the top strip; height matters here instead). */
 html[data-tabbar="side"] #window-controls { width: auto !important; height: 36px; flex-shrink: 0; align-self: auto; }

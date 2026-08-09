@@ -906,9 +906,7 @@ class Tabs {
         // Sidebar mode: tabs live in a left column, so the page starts after it
         // and only the utility bar (+ optional bookmark bar) sits above.
         if ((this.persistence?.get('tabBarSide') ?? 'side') !== 'top') {
-            // Sidebar layout: the address bar lives inside the sidebar, so the page
-            // fills the full height on the right (no top bar), floating with pad.
-            const yOffset = Tabs.SHELL_TOP + pad + (this.bookmarkBarHeight || 0);
+            const yOffset = 52 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
             // Compact mode: the sidebar is hidden, so the page spans full width.
             const leftInset = this.sidebarCompact ? pad : this.sidebarWidth;
             let width = contentBounds.width - leftInset - pad;
