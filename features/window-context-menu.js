@@ -87,6 +87,21 @@ class WindowContextMenu {
         else if (tabIndex !== windowData.tabs.activeTabIndex && windowData.tabs.tabMap.size > 1) {
             this.contextTemplate.push({ label: 'Split With Active Tab', click: () => windowData.tabs.splitWithActive(tabIndex) });
         }
+        // Folders: move this tab into / out of a tab folder (tab groups).
+        {
+            const t = windowData.tabs;
+            const curFolder = t.tabFolders.get(tabIndex) || null;
+            if (!t.pinnedTabs.has(tabIndex)) {
+                if (curFolder) {
+                    this.contextTemplate.push({ label: 'Remove from Folder', click: () => t.setTabFolder(tabIndex, null) });
+                }
+                else {
+                    const wsFolders = t.foldersForWorkspace(t.profileId);
+                    if (wsFolders.length)
+                        this.contextTemplate.push({ label: 'Add to Folder', submenu: wsFolders.map(f => ({ label: f.name || 'Folder', click: () => t.setTabFolder(tabIndex, f.id) })) });
+                }
+            }
+        }
         this.contextTemplate.push({
             // Open this tab's site as a separate persona (fresh session).
             label: 'Open in New Persona',

@@ -17,6 +17,8 @@
     <div id="window-controls" class="window-controls"></div>
     <!-- Essentials: pinned favourites (sidebar mode only, per profile) -->
     <div id="essentials" class="essentials" aria-label="Essentials"></div>
+    <!-- Muted current-space label above the tab list (a "Space" header) -->
+    <div id="space-header" class="space-header"></div>
     <button id="tab-scroll-left" class="tab-scroll-btn" tabindex="-1" aria-label="Scroll tabs left">‹</button>
     <div id="tabs-container"></div>
     <button id="tab-scroll-right" class="tab-scroll-btn" tabindex="-1" aria-label="Scroll tabs right">›</button>
@@ -40,6 +42,11 @@
     <!-- Sidebar foot (side mode only): workspace switcher (an avatar
          per workspace, active one labelled) + add + settings. -->
     <div id="sidebar-foot" class="sidebar-foot">
+      <button id="sb-downloads" class="icon-btn sb-downloads hidden" tabindex="-1" title="Downloads">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/>
+        </svg>
+      </button>
       <button id="sb-settings" class="icon-btn sb-settings" tabindex="-1" title="Settings">
         <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
@@ -48,11 +55,6 @@
       </button>
       <div id="sb-workspaces" class="sb-workspaces"></div>
       <button id="sb-add-ws" class="icon-btn sb-add-ws" tabindex="-1" title="New workspace">+</button>
-      <button id="sb-downloads" class="icon-btn sb-downloads hidden" tabindex="-1" title="Downloads">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/>
-        </svg>
-      </button>
     </div>
   </div>
 

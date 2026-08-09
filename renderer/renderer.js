@@ -2354,6 +2354,8 @@
                     }
                     if (btn)
                         btn.title = `Workspace: ${cur.name}`;
+                    const sh = document.getElementById('space-header');
+                    if (sh) sh.textContent = cur.name || 'Space';
                 }
                 // Avatar row: one per workspace, active one labelled.
                 if (wsRow) {
