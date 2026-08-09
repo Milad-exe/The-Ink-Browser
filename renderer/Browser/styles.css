@@ -332,6 +332,8 @@ html[data-tabbar="side"] .tab-button.folder-collapsed { display: none !important
 .ctx-menu-item:hover { background: var(--hover); }
 .ctx-menu-item.danger:hover { color: var(--danger); }
 .ctx-menu-sep { height: 1px; margin: 5px 6px; background: var(--border); }
+.ctx-menu.emoji-pop { min-width: 0; padding: 6px; }
+.emoji-pop-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; max-height: 168px; overflow-y: auto; }
 html[data-tabbar="side"] .tab-scroll-btn { display: none; }
 html[data-tabbar="side"] #tab-actions { padding: 0; }
 /* "+ New Tab" labelled row (Arc), not a bare plus. */

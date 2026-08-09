@@ -2762,9 +2762,31 @@
             _closeCtxMenu = () => { menu.remove(); document.removeEventListener('click', onDoc, true); document.removeEventListener('keydown', onKey, true); _closeCtxMenu = null; };
             setTimeout(() => { document.addEventListener('click', onDoc, true); document.addEventListener('keydown', onKey, true); }, 0);
         }
+        function openEmojiPicker(x, y, onPick) {
+            if (_closeCtxMenu) _closeCtxMenu();
+            const PALETTE = ['📁', '📂', '💼', '🎨', '🚀', '🎮', '🎧', '📚', '💡', '🔧', '🧪', '🛒', '💰', '✈️', '🌍', '🌙', '🔥', '🌈', '🍀', '🌸', '🌊', '⭐', '⚡', '🐱', '🐶', '🦊', '❤️', '💙', '💚', '💜', '🧡', '🎬', '🎵', '⚽', '🍕', '☕'];
+            const menu = document.createElement('div');
+            menu.className = 'ctx-menu emoji-pop';
+            const grid = document.createElement('div'); grid.className = 'emoji-pop-grid';
+            for (const e of PALETTE) {
+                const b = document.createElement('button'); b.className = 'emoji-opt'; b.textContent = e; b.tabIndex = -1;
+                b.addEventListener('click', () => { if (_closeCtxMenu) _closeCtxMenu(); onPick(e); });
+                grid.appendChild(b);
+            }
+            menu.appendChild(grid);
+            document.body.appendChild(menu);
+            const mw = menu.offsetWidth || 240, mh = menu.offsetHeight || 160;
+            menu.style.left = Math.max(6, Math.min(x, window.innerWidth - mw - 6)) + 'px';
+            menu.style.top = Math.max(6, Math.min(y, window.innerHeight - mh - 6)) + 'px';
+            const onDoc = (e) => { if (!menu.contains(e.target)) _closeCtxMenu?.(); };
+            const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); _closeCtxMenu?.(); } };
+            _closeCtxMenu = () => { menu.remove(); document.removeEventListener('click', onDoc, true); document.removeEventListener('keydown', onKey, true); _closeCtxMenu = null; };
+            setTimeout(() => { document.addEventListener('click', onDoc, true); document.addEventListener('keydown', onKey, true); }, 0);
+        }
         function showFolderMenu(x, y, id) {
             openCtxMenu(x, y, [
                 ['Rename Folder…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }],
+                ['Change Icon…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); const r = h ? h.getBoundingClientRect() : { right: x, top: y }; openEmojiPicker(r.right + 4, r.top, (e) => window.folders.icon(id, e)); }],
                 ['sep'],
                 ['Unpack Folder', () => window.folders.remove(id)],
                 ['Delete Folder', () => {

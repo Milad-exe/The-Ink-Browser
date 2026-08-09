@@ -1705,6 +1705,10 @@ class Tabs {
         const f = this.folders.find(x => x.id === id);
         if (f && typeof name === 'string' && name.trim()) { f.name = name.trim().slice(0, 40); this.broadcastFolders(); this.saveStateDebounced?.(); }
     }
+    setFolderIcon(id, icon) {
+        const f = this.folders.find(x => x.id === id);
+        if (f) { f.icon = (icon || '').slice(0, 8) || null; this.broadcastFolders(); this.saveStateDebounced?.(); }
+    }
     toggleFolder(id, collapsed) {
         const f = this.folders.find(x => x.id === id);
         if (f) { f.collapsed = (collapsed == null) ? !f.collapsed : !!collapsed; this.broadcastFolders(); this.saveStateDebounced?.(); }

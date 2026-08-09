@@ -228,6 +228,7 @@ exposeInternal('folders', {
     rename: (id, name) => ipcRenderer.invoke('folders:rename', id, name),
     remove: (id) => ipcRenderer.invoke('folders:delete', id),
     toggle: (id, collapsed) => ipcRenderer.invoke('folders:toggle', id, collapsed),
+    icon: (id, icon) => ipcRenderer.invoke('folders:icon', id, icon),
     assign: (index, folderId) => ipcRenderer.invoke('folders:assign', index, folderId),
     list: () => ipcRenderer.invoke('folders:list'),
     onChanged: (cb) => ipcRenderer.on('folders-changed', (_e, data) => cb(data)),
