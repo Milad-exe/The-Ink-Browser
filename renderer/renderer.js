@@ -2493,13 +2493,12 @@
                         b.className = 'sb-ws' + (p.id === activeWorkspace ? ' active' : '');
                         b.tabIndex = -1;
                         b.title = p.name; // native hover label (survives foot overflow-scroll)
-                        // Only the active space shows its emoji tile; the rest
-                        // stay dots so the current space reads at a glance.
-                        const isActive = p.id === activeWorkspace;
+                        // Every space keeps its emoji; inactive ones are greyed
+                        // out (CSS) rather than reduced to a dot.
                         const av = document.createElement('span');
-                        av.className = 'profile-badge' + (p.emoji && isActive ? ' has-emoji' : ' is-dot');
+                        av.className = 'profile-badge' + (p.emoji ? ' has-emoji' : ' is-dot');
                         av.style.setProperty('--pf-color', p.color || '');
-                        if (p.emoji && isActive)
+                        if (p.emoji)
                             av.textContent = p.emoji;
                         b.appendChild(av);
                         b.addEventListener('click', () => { if (p.id !== activeWorkspace) window.profiles.switch(p.id); });
@@ -2994,22 +2993,70 @@
             _closeCtxMenu = closeAll;
             setTimeout(() => { document.addEventListener('click', onDoc, true); document.addEventListener('keydown', onKey, true); }, 0);
         }
+        // Shared emoji set with search keywords. A function declaration so every
+        // scope sees it regardless of init order (renderer.js inits top-down).
+        function emojiSet() {
+            return [
+                ['📁', 'folder file'], ['📂', 'folder open file'], ['🗂️', 'folder tabs files'], ['🗃️', 'box files archive'],
+                ['💼', 'work briefcase business job'], ['🏠', 'home house'], ['🏢', 'office building work'], ['🏦', 'bank money'],
+                ['🎨', 'art design paint creative'], ['🚀', 'rocket launch ship space'], ['🎮', 'game gaming play'], ['🎧', 'music audio headphones'],
+                ['📚', 'books study read library'], ['📖', 'book read'], ['💡', 'idea light bulb'], ['🔧', 'tools fix wrench settings'],
+                ['🔨', 'hammer build tools'], ['⚙️', 'settings gear config'], ['🧪', 'science lab test experiment'], ['🔬', 'science microscope research'],
+                ['🛒', 'shopping cart buy store'], ['💰', 'money finance cash bank'], ['💳', 'card payment money'], ['📈', 'chart growth stats finance'],
+                ['📊', 'chart stats data'], ['✈️', 'travel plane flight'], ['🌍', 'world earth globe travel'], ['🗺️', 'map travel'],
+                ['🏝️', 'island beach holiday travel'], ['🌙', 'moon night dark sleep'], ['☀️', 'sun day light'], ['🔥', 'fire hot trending'],
+                ['🌈', 'rainbow pride color'], ['🍀', 'luck clover green'], ['🌸', 'flower blossom spring'], ['🌊', 'wave water sea ocean'],
+                ['🌲', 'tree nature forest'], ['⭐', 'star favorite'], ['✨', 'sparkles magic new'], ['⚡', 'lightning fast power energy'],
+                ['❄️', 'snow cold winter'], ['🐱', 'cat pet animal'], ['🐶', 'dog pet animal'], ['🦊', 'fox animal'],
+                ['🐢', 'turtle animal slow'], ['🐝', 'bee animal busy'], ['🦉', 'owl animal night bird'], ['🐧', 'penguin animal bird'],
+                ['🙂', 'face smile happy'], ['😎', 'cool face sunglasses'], ['🤓', 'nerd face study geek'], ['🥳', 'party face celebrate'],
+                ['👤', 'person user profile'], ['👥', 'people users team group'], ['🧑‍💻', 'developer coding work person'], ['🫀', 'heart organ health'],
+                ['❤️', 'heart love red'], ['💙', 'heart blue'], ['💚', 'heart green'], ['💜', 'heart purple'],
+                ['🧡', 'heart orange'], ['🖤', 'heart black'], ['🎬', 'movie film video'], ['📺', 'tv video watch'],
+                ['🎵', 'music note song'], ['🎸', 'guitar music'], ['⚽', 'football soccer sport'], ['🏀', 'basketball sport'],
+                ['🏃', 'run sport fitness'], ['🧘', 'yoga calm meditate health'], ['🍕', 'pizza food'], ['🍔', 'burger food'],
+                ['🍎', 'apple fruit food health'], ['☕', 'coffee drink cafe'], ['🍺', 'beer drink'], ['🎂', 'cake birthday'],
+                ['🛰️', 'satellite space tech'], ['📷', 'camera photo'], ['🖥️', 'computer desktop work'], ['📱', 'phone mobile'],
+                ['⌨️', 'keyboard typing work'], ['🖨️', 'printer office'], ['💾', 'save disk storage'], ['🗄️', 'archive cabinet files'],
+                ['📝', 'note write notes'], ['📌', 'pin pinned'], ['🔖', 'bookmark tag'], ['🏷️', 'label tag'],
+                ['🔒', 'lock private secure'], ['🔑', 'key password secure'], ['🛡️', 'shield security safe'], ['🕵️', 'private detective spy'],
+                ['🎯', 'target goal focus'], ['🧭', 'compass explore navigate'], ['⏰', 'clock time alarm'], ['📅', 'calendar date'],
+                ['✅', 'check done complete task'], ['📮', 'mail post inbox'], ['✉️', 'mail email message'], ['💬', 'chat message talk'],
+            ];
+        }
         function openEmojiPicker(x, y, onPick) {
             if (_closeCtxMenu) _closeCtxMenu();
-            const PALETTE = ['📁', '📂', '💼', '🎨', '🚀', '🎮', '🎧', '📚', '💡', '🔧', '🧪', '🛒', '💰', '✈️', '🌍', '🌙', '🔥', '🌈', '🍀', '🌸', '🌊', '⭐', '⚡', '🐱', '🐶', '🦊', '❤️', '💙', '💚', '💜', '🧡', '🎬', '🎵', '⚽', '🍕', '☕'];
             const menu = document.createElement('div');
             menu.className = 'ctx-menu emoji-pop';
+            const search = document.createElement('input');
+            search.className = 'emoji-search'; search.type = 'text';
+            search.placeholder = 'Search emojis'; search.tabIndex = -1;
             const grid = document.createElement('div'); grid.className = 'emoji-pop-grid';
-            for (const e of PALETTE) {
-                const b = document.createElement('button'); b.className = 'emoji-opt'; b.textContent = e; b.tabIndex = -1;
-                b.addEventListener('click', () => { if (_closeCtxMenu) _closeCtxMenu(); onPick(e); });
-                grid.appendChild(b);
-            }
+            const paint = (q) => {
+                grid.innerHTML = '';
+                const needle = (q || '').trim().toLowerCase();
+                for (const [e, kw] of emojiSet()) {
+                    if (needle && !kw.includes(needle)) continue;
+                    const b = document.createElement('button');
+                    b.className = 'emoji-opt'; b.textContent = e; b.tabIndex = -1; b.title = kw.split(' ')[0];
+                    b.addEventListener('click', () => { if (_closeCtxMenu) _closeCtxMenu(); onPick(e); });
+                    grid.appendChild(b);
+                }
+            };
+            paint('');
+            search.addEventListener('input', () => paint(search.value));
+            search.addEventListener('keydown', (e) => {
+                e.stopPropagation();
+                if (e.key === 'Escape') _closeCtxMenu?.();
+                if (e.key === 'Enter') { const first = grid.querySelector('.emoji-opt'); if (first) first.click(); }
+            });
+            menu.appendChild(search);
             menu.appendChild(grid);
             document.body.appendChild(menu);
             const mw = menu.offsetWidth || 240, mh = menu.offsetHeight || 160;
             menu.style.left = Math.max(6, Math.min(x, window.innerWidth - mw - 6)) + 'px';
             menu.style.top = Math.max(6, Math.min(y, window.innerHeight - mh - 6)) + 'px';
+            setTimeout(() => search.focus(), 0);
             const onDoc = (e) => { if (!menu.contains(e.target)) _closeCtxMenu?.(); };
             const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); _closeCtxMenu?.(); } };
             _closeCtxMenu = () => { menu.remove(); document.removeEventListener('click', onDoc, true); document.removeEventListener('keydown', onKey, true); _closeCtxMenu = null; };

@@ -221,10 +221,25 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     // Drag below RAIL_SNAP collapses to an icon-only rail (RAIL_W); otherwise the
     // width is clamped to a comfortable [MIN_W, MAX_W]. The 56..180 band never
     // persists, so the divider snaps between rail and expanded (Arc-style).
-    const RAIL_W = 56, RAIL_SNAP = 132, MIN_W = 180, MAX_W = 460;
-    const clampW = (w) => {
+    // Measured off the reference: the sidebar spans ~9.5% of the window at its
+    // minimum and ~29.6% at its maximum, so the clamps scale with the window
+    // rather than sitting at fixed pixels. Absolute floors keep it usable on a
+    // very narrow window.
+    const RAIL_W = 56, RAIL_SNAP = 132;
+    const MIN_FRAC = 0.095, MAX_FRAC = 0.296;
+    const limitsFor = (wd) => {
+        let winW = 0;
+        try { winW = wd?.window?.getContentBounds?.().width || 0; } catch { }
+        if (!winW) return { min: 180, max: 460 };
+        return {
+            min: Math.max(150, Math.round(winW * MIN_FRAC)),
+            max: Math.max(320, Math.round(winW * MAX_FRAC)),
+        };
+    };
+    const clampW = (w, wd) => {
         w = Math.round(Number(w) || 232);
-        return w < RAIL_SNAP ? RAIL_W : Math.max(MIN_W, Math.min(MAX_W, w));
+        const { min, max } = limitsFor(wd);
+        return w < RAIL_SNAP ? RAIL_W : Math.max(min, Math.min(max, w));
     };
     function applyWidthLive(wd, width) {
         const t = wd.tabs;
@@ -241,7 +256,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             try { t._sidebarInput.wc.removeListener('input-event', t._sidebarInput.onInput); } catch { }
             t._sidebarInput = null;
         }
-        const final = clampW(width);
+        const final = clampW(width, wd);
         try { wm.persistence.set('sidebarWidth', final); } catch { }
         // Width is a global setting — apply to every window so they stay in sync.
         for (const w of wm.windows.values()) {
@@ -268,7 +283,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const onInput = (_ev, input) => {
             if (!t._sidebarResizing) return;
             if (input.type === 'mouseMove')
-                applyWidthLive(wd, clampW(t.sidebarWidth + input.x));
+                applyWidthLive(wd, clampW(t.sidebarWidth + input.x, wd));
             else if (input.type === 'mouseUp' || input.type === 'mouseLeave')
                 endResize(wd, t.sidebarWidth);
         };
@@ -277,7 +292,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     });
     ipcMain.handle('sidebar:resize', (_e, w) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        if (wd?.tabs?._sidebarResizing) applyWidthLive(wd, clampW(w));
+        if (wd?.tabs?._sidebarResizing) applyWidthLive(wd, clampW(w, wd));
     });
     ipcMain.handle('sidebar:resize-commit', (_e, w) => {
         endResize(wm.getWindowByWebContents(_e.sender), w);
