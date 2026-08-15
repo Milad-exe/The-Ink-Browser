@@ -45,7 +45,10 @@ body { display: flex; flex-direction: column; padding-top: var(--shell-top, 6px)
 /* macOS vibrancy: let a whisper of the window material through the shell. */
 html[data-vibrancy="true"],
 html[data-vibrancy="true"] body { background: color-mix(in srgb, var(--shell) 88%, transparent); }
-html[data-vibrancy="true"] #content-area { background: transparent; }
+/* The page view covers this area whenever a tab is open, so keeping it painted
+   costs nothing there — and it is what shows when a space has no tabs. It must
+   stay painted under vibrancy too, or that empty state is a hole to the desktop. */
+html[data-vibrancy="true"] #content-area { background: var(--page, var(--surface)); }
 
 /* Settings → Appearance → Toolbar can remove items entirely. */
 .user-hidden { display: none !important; }
@@ -939,9 +942,13 @@ browser-action-list::part(badge) {
 .bookmark-overflow-empty { padding: 8px 12px; font-size: 11px; color: var(--text-3); font-style: italic; }
 
 /* ── Content Area (behind the floating page card) ── */
+/* The page view floats over this. With no tab open (or a space emptied) the
+   area is what you see, so it carries the page card's own shape rather than
+   showing the shell through a hole. */
 #content-area {
   flex: 1; width: 100%;
-  background: transparent;
+  background: var(--page, var(--surface));
+  border-radius: var(--radius-lg, 12px);
   position: relative; overflow: hidden;
 }
 

@@ -2113,14 +2113,14 @@ class Tabs {
                 if (nextActive !== null && this.tabMap.has(nextActive)) {
                     this.showTab(nextActive);
                 }
-                else if (this.tabMap.size > 0) {
-                    // Active workspace is now empty but other workspaces still hold
-                    // tabs — switch to one (via the renderer's profiles.switch) rather
-                    // than surfacing a stray tab from another workspace.
-                    const other = this.tabOrder.find(i => this.tabMap.has(i));
-                    const targetWs = other != null ? String(this.tabProfiles.get(other) || '1') : null;
-                    if (targetWs)
-                        try { this.mainWindow.webContents.send('switch-to-workspace', targetWs); } catch { }
+                else {
+                    // Emptying a space KEEPS you in it — the page area just falls
+                    // back to its empty state. Jumping to whichever other space
+                    // happened to hold a tab moved you somewhere you did not ask
+                    // to go.
+                    this.activeTabIndex = -1;
+                    try { this.mainWindow.webContents.send('tab-switched', { index: -1 }); }
+                    catch { }
                 }
             }
             if (this.tabMap.size === 0) {
