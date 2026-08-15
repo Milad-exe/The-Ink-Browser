@@ -438,6 +438,10 @@ html[data-tabbar="side"] .essentials:empty { display: none; }
 /* Compact mode: collapse the sidebar; the page (native view) goes full-bleed. */
 html[data-tabbar="side"][data-compact="on"] body { grid-template-columns: 0 minmax(0, 1fr); }
 html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
+/* With the sidebar gone the utility bar starts at x=0 — on macOS that puts the
+   nav buttons underneath the native traffic lights, which are drawn by the OS
+   above the page. Reserve their width (trafficLightPosition x:14 + cluster). */
+html[data-platform="darwin"][data-compact="on"] #utility-bar { padding-left: 84px; }
 
 /* Icon rail: drag the divider narrow to collapse tab rows to favicons only
    (Arc). Labels, close buttons and the "New Tab" caption fall away; every

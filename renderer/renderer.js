@@ -188,6 +188,9 @@
             if (window.windowControls.platform === 'darwin') {
                 container.style.width = '72px'; // space for native traffic lights
                 container.classList.add('wc-mac');
+                // Marks the root so layout can reserve room for the NATIVE traffic
+                // lights (compact mode drops the sidebar to zero width).
+                document.documentElement.dataset.platform = 'darwin';
                 return;
             }
             // Windows / Linux: render our own controls on the right side
@@ -3498,6 +3501,9 @@
         // Focus mode + Pomodoro timer
         // ─────────────────────────────────────────────────────────────────────────
         function initFocusModeAndPomodoro() {
+            document.getElementById('compact-btn')?.addEventListener('click', () => {
+                try { window.tabsUI.toggleCompact(); } catch { }
+            });
             const focusBtn = document.getElementById('focus-btn');
             const utilityBar = document.getElementById('utility-bar');
             const pomPill = document.getElementById('pomodoro-pill');
