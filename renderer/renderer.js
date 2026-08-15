@@ -2536,6 +2536,14 @@
                                     ['Default (shared)', () => window.profiles.update(p.id, { container: 'default' })],
                                     ['sep'],
                                     ...(_containersCache || []).map(c => [c.name, () => window.profiles.update(p.id, { container: c.id })]),
+                                    ...(_containersCache.length ? [['sep'], ['Manage containers',
+                                        _containersCache.map(c => [c.name, [
+                                            [`Delete “${c.name}”`, async () => {
+                                                await window.containers.remove(c.id);
+                                                _containersCache = (await window.containers.listNamed()) || [];
+                                            }, 'danger'],
+                                        ]]),
+                                    ]] : []),
                                 ]],
                                 ['sep'],
                                 ['Create Space', () => openCreateSpace()],

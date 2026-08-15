@@ -458,6 +458,21 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const containers = require('../features/containers');
         return containers.listNamed();
     });
+    ipcMain.handle('containers:remove', (_e, id) => {
+        const containers = require('../features/containers');
+        // Any space bound to this container would be left pointing at a jar that
+        // no longer exists — unbind them back to their own storage first.
+        let unbound = 0;
+        for (const p of profiles.list()) {
+            if (String(p.container) === String(id)) {
+                profiles.update(p.id, { container: null });
+                unbound++;
+            }
+        }
+        const ok = containers.remove(String(id));
+        if (unbound) broadcastProfiles();
+        return ok;
+    });
     ipcMain.handle('containers:createNamed', (_e, name) => {
         const containers = require('../features/containers');
         return containers.createNamed(name);

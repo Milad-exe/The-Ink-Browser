@@ -277,6 +277,7 @@ exposeInternal('ctxMenu', {
 exposeInternal('containers', {
     listNamed: () => ipcRenderer.invoke('containers:listNamed'),
     createNamed: (name) => ipcRenderer.invoke('containers:createNamed', name),
+    remove: (id) => ipcRenderer.invoke('containers:remove', id),
 });
 exposeInternal('personas', {
     map: () => ipcRenderer.invoke('personas:map'),
