@@ -241,4 +241,4 @@ function setup(sess) {
     });
 }
 
-module.exports = { setup, setConfig, getConfig, getStats };
+module.exports = { setup, setConfig, getConfig, getStats, stripTrackingParams };

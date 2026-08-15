@@ -182,6 +182,14 @@ class TabContextMenu {
             label: 'Copy Link Address',
             click: () => clipboard.writeText(params.linkURL),
         }, {
+            // Same tracking-param list the privacy engine strips on navigation,
+            // so a copied link matches what the browser would have requested.
+            label: 'Copy Clean Link',
+            click: () => {
+                const { stripTrackingParams } = require('./privacy');
+                clipboard.writeText(stripTrackingParams(params.linkURL) || params.linkURL);
+            },
+        }, {
             label: 'Save Link As…',
             click: () => downloadManager.saveAs(this.tab.webContents, params.linkURL),
         });
