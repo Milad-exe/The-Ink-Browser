@@ -1,75 +1,75 @@
 /**
- * Extension API gap layer.
+ * Extension API gap layer — adds chrome.tabCapture to extension service workers.
  *
- * electron-chrome-extensions implements ten chrome.* namespaces (browserAction,
- * commands, contextMenus, cookies, notifications, permissions, runtime, tabs,
- * webNavigation, windows) and Electron's own extension system supplies more
- * (storage, offscreen, runtime.getContexts …). chrome.tabCapture is supplied by
- * neither, so an MV3 worker calling it dies on "Cannot read properties of
- * undefined (reading 'getMediaStreamId')" with no clue which API was missing.
+ * WHAT IS MISSING: electron-chrome-extensions implements ten namespaces
+ * (browserAction, commands, contextMenus, cookies, notifications, permissions,
+ * runtime, tabs, webNavigation, windows) and Electron's own extension system
+ * supplies the rest of the MV3 core — chrome.offscreen and runtime.getContexts
+ * are native. chrome.tabCapture is supplied by neither, so an MV3 worker calling
+ * it dies on "Cannot read properties of undefined (reading 'getMediaStreamId')".
  *
- * TIMING: a service-worker preload runs BEFORE the extension system installs the
- * `chrome` global, so patching at load time is a no-op. We patch whatever is
- * already there, intercept the assignment, and retry a couple of times — one of
- * those wins whatever order the runtime chooses.
+ * WHY THIS IS AWKWARD: two things defeat the obvious approach.
+ *   1. A service-worker preload runs in an ISOLATED world, so assigning to
+ *      globalThis.chrome here is invisible to the worker. Reaching it needs
+ *      contextBridge.executeInMainWorld — the same route the library uses.
+ *   2. The library calls Object.freeze(chrome) once it has installed its APIs,
+ *      and preloads run in registration order — ours is after theirs, so the
+ *      object is already frozen and a plain assignment silently does nothing.
+ *      Hence the copy-and-rebind below rather than a mutation.
  */
 'use strict';
-let ipcRenderer = null;
-try { ({ ipcRenderer } = require('electron')); }
-catch { /* no IPC in this context — the shims below degrade to rejections */ }
+const { contextBridge, ipcRenderer } = require('electron');
 
-function makeTabCapture() {
-    const warn = (api, detail) => {
-        try {
-            const id = (globalThis.chrome && globalThis.chrome.runtime && globalThis.chrome.runtime.id) || 'unknown';
-            console.warn(`[ink] extension ${id} used ${api} — ${detail}`);
-            ipcRenderer.send('ext:unsupported', { id, api });
-        }
-        catch { }
-    };
-    return {
-        // Backed by webContents.getMediaSourceId in main — the same id Chrome
-        // hands to getUserMedia with chromeMediaSource:'tab'.
-        getMediaStreamId: (options = {}) =>
-            ipcRenderer.invoke('ext:getMediaStreamId', {
-                targetTabId: options.targetTabId ?? null,
-                consumerTabId: options.consumerTabId ?? null,
-            }),
+// Handed to the main world; it cannot reach ipcRenderer by itself.
+const bridge = {
+    getMediaStreamId: (options) => ipcRenderer.invoke('ext:getMediaStreamId', options),
+    reportGap: (id, api) => { try { ipcRenderer.send('ext:unsupported', { id, api }); } catch { } },
+};
+
+// Runs INSIDE the worker's own global scope.
+function mainWorldScript() {
+    const api = globalThis.__inkExtBridge;
+    const current = globalThis.chrome;
+    if (!api || !current || current.tabCapture)
+        return;
+    const tabCapture = {
+        getMediaStreamId: (options = {}) => api.getMediaStreamId({
+            targetTabId: options.targetTabId ?? null,
+            consumerTabId: options.consumerTabId ?? null,
+        }),
         capture: () => {
-            warn('chrome.tabCapture.capture', 'not implemented');
+            api.reportGap(current.runtime && current.runtime.id, 'chrome.tabCapture.capture');
             return Promise.reject(new Error('chrome.tabCapture.capture is not implemented'));
         },
         getCapturedTabs: () => Promise.resolve([]),
         onStatusChanged: { addListener() { }, removeListener() { }, hasListener: () => false },
     };
-}
-
-function patch(c) {
-    try {
-        if (!c || typeof c !== 'object' || c.tabCapture)
-            return c;
-        c.tabCapture = makeTabCapture();
+    // chrome is frozen, so rebuild it with the extra namespace and rebind. The
+    // binding itself is writable even though the object is not.
+    const next = {};
+    for (const key of Reflect.ownKeys(current)) {
+        const desc = Object.getOwnPropertyDescriptor(current, key);
+        try { Object.defineProperty(next, key, desc); }
+        catch { }
     }
+    Object.defineProperty(next, 'tabCapture', { value: tabCapture, enumerable: true, configurable: true });
+    try { globalThis.chrome = next; }
     catch { }
-    return c;
 }
 
 try {
-    patch(globalThis.chrome);
-    // Catch the moment the runtime installs `chrome`, if it has not already.
-    if (!globalThis.chrome) {
-        let held;
-        Object.defineProperty(globalThis, 'chrome', {
-            configurable: true,
-            get() { return held; },
-            set(v) { held = patch(v); },
-        });
+    if (!process.contextIsolated) {
+        // No isolation: this scope IS the worker's, so run it directly.
+        globalThis.__inkExtBridge = bridge;
+        mainWorldScript();
     }
-    // Belt and braces: if `chrome` arrives as a non-configurable own property the
-    // setter above never fires, so sweep again once the worker starts running.
-    queueMicrotask(() => patch(globalThis.chrome));
-    setTimeout(() => patch(globalThis.chrome), 0);
-    setTimeout(() => patch(globalThis.chrome), 50);
+    else {
+        contextBridge.exposeInMainWorld('__inkExtBridge', bridge);
+        if ('executeInMainWorld' in contextBridge)
+            contextBridge.executeInMainWorld({ func: mainWorldScript });
+        else
+            console.warn('[ink] executeInMainWorld unavailable — chrome.tabCapture not installed');
+    }
 }
 catch (e) {
     try { console.warn('[ink] extension polyfill failed:', e && e.message); }

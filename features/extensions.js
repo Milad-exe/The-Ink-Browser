@@ -91,6 +91,21 @@ class Extensions {
                 id: 'ink-ext-polyfill',
                 filePath: path.join(__dirname, '../preload/ext-polyfill.js'),
             });
+            // A service worker's IPC does NOT go through the global ipcMain — each
+            // worker has its own router — so the gap layer's handlers have to be
+            // attached to every worker as it starts.
+            session.serviceWorkers.on('running-status-changed', ({ versionId, runningStatus }) => {
+                if (runningStatus !== 'running')
+                    return;
+                let sw = null;
+                try { sw = session.serviceWorkers.getWorkerFromVersionID(versionId); }
+                catch { }
+                if (!sw || sw._inkGapWired)
+                    return;
+                sw._inkGapWired = true;
+                try { require('../ipc/extensions').attachGapHandlers(sw.ipc, this.wm); }
+                catch (e) { console.error('extension gap handlers:', e.message); }
+            });
         }
         catch (e) {
             console.error('extension polyfill registration:', e.message);

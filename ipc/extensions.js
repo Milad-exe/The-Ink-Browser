@@ -63,7 +63,11 @@ function hidePanel(wd) {
         return false;
     }
 }
-function register(ipcMain, { wm }) {
+/**
+ * Gap-layer handlers (see preload/ext-polyfill.js). Bound per service worker,
+ * because a worker's IPC router is its own — not the global ipcMain.
+ */
+function attachGapHandlers(router, wm) {
     // ── Extension API gap layer (see preload/ext-polyfill.js) ─────────────────
     const { webContents } = require('electron');
     // electron-chrome-extensions uses the webContents id as the chrome tab id.
@@ -72,14 +76,25 @@ function register(ipcMain, { wm }) {
         try { return webContents.fromId(Number(id)) || null; }
         catch { return null; }
     };
-    ipcMain.handle('ext:getMediaStreamId', (_e, { targetTabId, consumerTabId } = {}) => {
+    router.handle('ext:getMediaStreamId', (_e, { targetTabId, consumerTabId } = {}) => {
         // Chrome hands back an id the CONSUMER can pass to getUserMedia with
         // chromeMediaSource:'tab'. Electron's equivalent is target.getMediaSourceId
         // (requestWebContents), so both ends have to resolve to real contents.
         const target = tabWcById(targetTabId) || wm.getPrimaryWindow()?.tabs?.tabMap?.get(wm.getPrimaryWindow()?.tabs?.activeTabIndex)?.webContents;
         if (!target)
             throw new Error('tabCapture: no target tab');
-        const consumer = tabWcById(consumerTabId) || _e.sender;
+        // A service-worker IPC event has no .sender, so resolve the consumer
+        // ourselves: the extension's own page (its offscreen document is what
+        // calls getUserMedia), else the chrome window.
+        const extOrigin = _e.serviceWorker?.scope || '';
+        const consumer = tabWcById(consumerTabId)
+            || (extOrigin ? webContents.getAllWebContents().find(w => {
+                try { return w.getURL().startsWith(extOrigin); }
+                catch { return false; }
+            }) : null)
+            || wm.getPrimaryWindow()?.window?.webContents;
+        if (!consumer)
+            throw new Error('tabCapture: no consumer context');
         try {
             return target.getMediaSourceId(consumer);
         }
@@ -90,7 +105,7 @@ function register(ipcMain, { wm }) {
     // Contexts we can actually account for. Offscreen documents are unsupported,
     // so an OFFSCREEN_DOCUMENT filter correctly comes back empty rather than
     // claiming one exists.
-    ipcMain.handle('ext:getContexts', (_e, { filter } = {}) => {
+    router.handle('ext:getContexts', (_e, { filter } = {}) => {
         const types = filter?.contextTypes;
         if (Array.isArray(types) && !types.includes('BACKGROUND') && !types.includes('SERVICE_WORKER'))
             return [];
@@ -98,12 +113,15 @@ function register(ipcMain, { wm }) {
     });
     // One line per missing API, so the next gap is named in the log.
     const seenGaps = new Set();
-    ipcMain.on('ext:unsupported', (_e, { id, api } = {}) => {
+    router.on('ext:unsupported', (_e, { id, api } = {}) => {
         const key = `${id}:${api}`;
         if (seenGaps.has(key)) return;
         seenGaps.add(key);
         console.warn(`[extensions] ${id} needs ${api}, which this browser does not implement`);
     });
+}
+
+function register(ipcMain, { wm }) {
     extensions.onChanged(() => {
         for (const wd of wm.getAllWindows()) {
             try {
@@ -283,4 +301,4 @@ function register(ipcMain, { wm }) {
     });
 }
 
-module.exports = { register };
+module.exports = { attachGapHandlers, register };
