@@ -41,6 +41,11 @@ function load() {
         const raw = JSON.parse(fs.readFileSync(file(), 'utf-8'));
         if (raw && Array.isArray(raw.list)) {
             _registry = { nextId: Number(raw.nextId) || (raw.list.length + 1), list: raw.list };
+            // Records written before the rename call this `profile`, which now
+            // means something else entirely (an entry's profile names a
+            // CONTAINER; this field names the SPACE that owns the container).
+            for (const c of _registry.list)
+                if (c && c.profile !== undefined && c.space === undefined) { c.space = c.profile; delete c.profile; }
             return _registry;
         }
     }
@@ -86,21 +91,21 @@ function labelForUrl(url) {
     return 'Instance';
 }
 
-// Dedupe a base label within one profile: "Site", then "Site · 2", "Site · 3"…
-function _uniqueName(base, profile = '1') {
+// Dedupe a base label within one space: "Site", then "Site · 2", "Site · 3"…
+function _uniqueName(base, space = '1') {
     const reg = load();
-    const family = reg.list.filter(c => ((c.profile || '1') === String(profile)) &&
+    const family = reg.list.filter(c => ((c.space || '1') === String(space)) &&
         (c.name === base || c.name.startsWith(base + ' · ')));
     return family.length === 0 ? base : `${base} · ${family.length + 1}`;
 }
 
 /**
- * Create a fresh container auto-named from (url), scoped to (profile). Used by the
+ * Create a fresh container auto-named from (url), scoped to (space). Used by the
  * MANUAL new-container action — every call mints a new one (so you can
  * hold two separate logins to the same site on purpose).
  */
-function createForUrl(url, profile = '1') {
-    return _create(_uniqueName(labelForUrl(url), profile), url, profile);
+function createForUrl(url, space = '1') {
+    return _create(_uniqueName(labelForUrl(url), space), url, space);
 }
 
 // The distinguishing subdomain of a host ("acme" from acme.successfactors.com),
@@ -121,21 +126,21 @@ function subdomainOf(host) {
  * signed in") while globex.successfactors.com gets its own. Named by tenant:
  * "SuccessFactors — acme", falling back to the site label + "· N".
  */
-function instanceForHost(url, profile = '1') {
+function instanceForHost(url, space = '1') {
     let host = null;
     try { host = new URL(url).hostname; }
     catch { }
     if (!host)
-        return createForUrl(url, profile);
+        return createForUrl(url, space);
     const reg = load();
-    // Tenant-keyed WITHIN the profile — Work's acme.foo.com container is separate
+    // Tenant-keyed WITHIN the space — Work's acme.foo.com container is separate
     // from Personal's acme.foo.com container.
-    const existing = reg.list.find(x => x.tenantHost === host && (x.profile || '1') === String(profile));
+    const existing = reg.list.find(x => x.tenantHost === host && (x.space || '1') === String(space));
     if (existing)
         return { ...existing };
     const label = labelForUrl(url);
     const sub = subdomainOf(host);
-    const c = _create(_uniqueName(sub ? `${label} — ${sub}` : label, profile), url, profile);
+    const c = _create(_uniqueName(sub ? `${label} — ${sub}` : label, space), url, space);
     // Tag it tenant-keyed so a later open of the same host reuses it.
     const rec = load().list.find(x => x.id === c.id);
     if (rec) {
@@ -146,7 +151,7 @@ function instanceForHost(url, profile = '1') {
     return c;
 }
 
-function _create(name, site, profile = '1') {
+function _create(name, site, space = '1') {
     const reg = load();
     const id = String(reg.nextId++);
     const c = {
@@ -154,7 +159,8 @@ function _create(name, site, profile = '1') {
         name: (name || 'Instance').slice(0, 32),
         color: COLORS[reg.list.length % COLORS.length],
         site: (typeof site === 'string' && /^https?:/i.test(site)) ? (() => { try { return new URL(site).hostname; } catch { return null; } })() : null,
-        ...(String(profile) !== '1' ? { profile: String(profile) } : {}),
+        // Which SPACE owns this container (absent = the default space).
+        ...(String(space) !== '1' ? { space: String(space) } : {}),
     };
     reg.list.push(c);
     save();
@@ -167,7 +173,7 @@ function _create(name, site, profile = '1') {
  * auto-minted per-site containers out of that list.
  */
 function createNamed(name) {
-    // Deliberately NOT profile-scoped: the point of a Space Profile is that two
+    // Deliberately NOT space-scoped: the point of a Space Profile is that two
     // Spaces can share one, so these live above the per-space registry.
     const c = _create(_uniqueName((name || 'Container').trim().slice(0, 32), '1'), null, '1');
     const rec = load().list.find(x => x.id === c.id);
