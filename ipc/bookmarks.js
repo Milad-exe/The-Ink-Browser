@@ -29,23 +29,23 @@ function register(ipcMain, { wm, webContents }) {
     ipcMain.handle('bookmarks-get', async (_e) => {
         return bmFor(_e).getAll();
     });
-    // The star acts on the ACTIVE tab's page, so its persona (if any) tags the
-    // favourite — a page starred in a persona is that persona's favourite.
-    const activePersona = (senderWc) => {
+    // The star acts on the ACTIVE tab's page, so its profile (if any) tags the
+    // favourite — a page starred in a profile is that profile's favourite.
+    const activeProfileTag = (senderWc) => {
         const wd = wm.getWindowByWebContents(senderWc);
         return wd?.tabs ? (wd.tabs.tabContainers.get(wd.tabs.activeTabIndex) || null) : null;
     };
     ipcMain.handle('bookmarks-has', async (_e, url) => {
-        return bmFor(_e).has(url, activePersona(_e.sender));
+        return bmFor(_e).has(url, activeProfileTag(_e.sender));
     });
     // ── Write ─────────────────────────────────────────────────────────────────
     ipcMain.handle('bookmarks-add', async (_e, url, title) => {
-        const added = await bmFor(_e).add(sanitizeUrl(url), title, activePersona(_e.sender));
+        const added = await bmFor(_e).add(sanitizeUrl(url), title, activeProfileTag(_e.sender));
         broadcast();
         return added;
     });
     ipcMain.handle('bookmarks-remove', async (_e, url) => {
-        const ok = await bmFor(_e).remove(url, activePersona(_e.sender));
+        const ok = await bmFor(_e).remove(url, activeProfileTag(_e.sender));
         broadcast();
         return ok;
     });

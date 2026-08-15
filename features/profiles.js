@@ -3,16 +3,16 @@
  * Profiles — Chrome-style separate browsing selves.
  *
  * A profile is WHO you are: its own cookies/logins, its own history, its own
- * bookmarks + Essentials, its own personas. Settings, theme, and extensions
+ * bookmarks + Essentials, its own containers. Settings, theme, and extensions
  * stay shared across profiles (per-profile extensions is heavy and rarely
  * wanted). Each window belongs to one profile; the toolbar switcher opens (or
  * focuses) a window per profile.
  *
- * Layering: a persona (features/containers.js) is WHICH ACCOUNT on one site,
+ * Layering: a profile (features/containers.js) is WHICH ACCOUNT on one site,
  * *inside* a profile. Profile 1 ("Personal") maps to the app's original default
  * session and legacy store files, so existing users keep logins/history with no
  * migration; every other profile gets its own persist: partition hardened
- * exactly like a persona session, plus its own store files.
+ * exactly like a profile session, plus its own store files.
  */
 const path = require('path');
 const fs = require('fs');
@@ -26,7 +26,7 @@ const COLORS = ['#e0894a', '#4a9eff', '#3fbf7f', '#c86fe0', '#e05a7a', '#e0c341'
 const EMOJIS = ['🏠', '💼', '🎨', '🚀', '🌙', '🎧', '🐙', '🔥'];
 const sessions = new Map(); // profile id → Electron Session (non-default only)
 
-let _reg = null; // { nextId, list: [{id,name,color,essentials:[{url,title,persona}]}] }
+let _reg = null; // { nextId, list: [{id,name,color,essentials:[{url,title,profile}]}] }
 function file() { return path.join(app.getPath('userData'), 'northstar', 'profiles.json'); }
 
 function load() {
@@ -38,8 +38,12 @@ function load() {
             // Carry the global essentials through — rebuilding from nextId+list
             // alone would drop them on every launch.
             _reg = { nextId: Number(raw.nextId) || (raw.list.length + 1), list: raw.list };
-            if (Array.isArray(raw.essentials))
+            if (Array.isArray(raw.essentials)) {
                 _reg.essentials = raw.essentials;
+                // Essentials written before the rename use `container`.
+                for (const e of _reg.essentials)
+                    if (e && e.container !== undefined && e.profile === undefined) { e.profile = e.container; delete e.container; }
+            }
             return _reg;
         }
     }
@@ -125,7 +129,7 @@ function rename(id, name) {
 
 /**
  * The browsing session for a profile. Profile 1 IS the default session (so
- * existing cookies survive); others get a persist: partition with the persona
+ * existing cookies survive); others get a persist: partition with the profile
  * hardening stack (UA + headers + ad blocking + downloads + spoof preloads).
  */
 function sessionFor(id) {
@@ -205,7 +209,7 @@ function _essentials() {
         reg.essentials = [];
         for (const p of reg.list) {
             for (const e of (p.essentials || [])) {
-                const key = `${e.url}|${e.persona || ''}`;
+                const key = `${e.url}|${e.profile || ''}`;
                 if (seen.has(key))
                     continue;
                 seen.add(key);
@@ -226,27 +230,27 @@ function addEssential(_id, e) {
     if (!e || !e.url)
         return false;
     const list = _essentials();
-    if (list.some(x => x.url === e.url && (x.persona || null) === (e.persona || null)))
+    if (list.some(x => x.url === e.url && (x.profile || null) === (e.profile || null)))
         return false;
     if (list.length >= ESSENTIALS_MAX)
         return false;
-    list.push({ url: e.url, title: e.title || e.url, persona: e.persona || null });
+    list.push({ url: e.url, title: e.title || e.url, profile: e.profile || null });
     save();
     return true;
 }
 // A static icon pinned to an Essential, overriding the live favicon (upstream
 // behaviour: an Essential's icon does not change when the site's does).
-function setEssentialIcon(_id, url, persona, icon) {
-    const e = _essentials().find(x => x.url === url && (x.persona || null) === (persona || null));
+function setEssentialIcon(_id, url, profile, icon) {
+    const e = _essentials().find(x => x.url === url && (x.profile || null) === (profile || null));
     if (!e)
         return false;
     e.icon = (icon || '').trim().slice(0, 8) || null;
     save();
     return true;
 }
-function removeEssential(_id, url, persona = null) {
+function removeEssential(_id, url, profile = null) {
     const list = _essentials();
-    const i = list.findIndex(x => x.url === url && (x.persona || null) === (persona || null));
+    const i = list.findIndex(x => x.url === url && (x.profile || null) === (profile || null));
     if (i === -1)
         return false;
     list.splice(i, 1);

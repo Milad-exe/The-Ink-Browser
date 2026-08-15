@@ -41,12 +41,12 @@
         const titleElement = document.createElement('div');
         titleElement.textContent = entry.title || 'Untitled';
         titleElement.className = 'history-title';
-        // Persona-tagged entries are distinct visits — label them and reopen in
-        // their persona (so you land back in the right account).
-        if (entry.persona) {
+        // Profile-tagged entries are distinct visits — label them and reopen in
+        // their profile (so you land back in the right account).
+        if (entry.profile) {
             const badge = document.createElement('span');
-            badge.className = 'history-persona';
-            badge.textContent = entry.personaName || 'persona';
+            badge.className = 'history-profile';
+            badge.textContent = entry.profileName || 'profile';
             titleElement.appendChild(badge);
         }
         const urlElement = document.createElement('div');
@@ -72,8 +72,8 @@
         contentDiv.addEventListener('click', () => {
             if (!entry.url)
                 return;
-            if (entry.persona && window.tab?.openInContainer) {
-                window.tab.openInContainer(entry.persona, entry.url);
+            if (entry.profile && window.tab?.openInContainer) {
+                window.tab.openInContainer(entry.profile, entry.url);
                 return;
             }
             window.electronAPI.navigateActiveTab(entry.url);

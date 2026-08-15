@@ -65,6 +65,9 @@ class History {
             // Plaintext legacy file — migrated to encrypted on next write.
             const plaintext = isEncrypted(raw) ? decrypt(raw) : raw;
             const data = JSON.parse(plaintext);
+            // Entries written before the rename tag their container as `persona`.
+            for (const e of (Array.isArray(data) ? data : (data?.entries || [])))
+                if (e && e.persona !== undefined && e.profile === undefined) { e.profile = e.persona; delete e.persona; }
             this.cache = Array.isArray(data) ? data : [];
         }
         catch {
@@ -106,17 +109,17 @@ class History {
     async loadHistory() {
         return this.load();
     }
-    async addToHistory(url, title, persona = null, personaName = null) {
+    async addToHistory(url, title, profile = null, profileName = null) {
         if (isSearchResultUrl(url))
             return;
-        const p = persona || null;
+        const p = profile || null;
         const history = await this.load();
-        // Dedup by URL *and persona* — the same page under two personas (e.g. Gmail
+        // Dedup by URL *and profile* — the same page under two profiles (e.g. Gmail
         // as Work vs Personal) is treated as two distinct entries, not one.
-        const i = history.findIndex(e => e.url === url && (e.persona || null) === p);
+        const i = history.findIndex(e => e.url === url && (e.profile || null) === p);
         if (i !== -1)
             history.splice(i, 1);
-        history.unshift({ url, title, timestamp: new Date().toISOString(), ...(p ? { persona: p, personaName: personaName || null } : {}) });
+        history.unshift({ url, title, timestamp: new Date().toISOString(), ...(p ? { profile: p, profileName: profileName || null } : {}) });
         if (history.length > MAX_ENTRIES)
             history.length = MAX_ENTRIES;
         this._scheduleWrite();

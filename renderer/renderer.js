@@ -455,7 +455,7 @@
                 window.tab.switch(item.tabIndex);
             }
             else if ((item.type === 'history' || item.type === 'bookmark') && item.url) {
-                if (item.persona) { hideSuggestions(); searchBar.blur(); window.tab.openInContainer(item.persona, item.url); return; }
+                if (item.profile) { hideSuggestions(); searchBar.blur(); window.tab.openInContainer(item.profile, item.url); return; }
                 searchBar.value = item.url;
                 commitNavigation(item.url);
             }
@@ -480,7 +480,7 @@
                 return;
             }
             if ((item.type === 'history' || item.type === 'bookmark') && item.url) {
-                if (item.persona) { hideSuggestions(); searchBar.blur(); window.tab.openInContainer(item.persona, item.url); return; }
+                if (item.profile) { hideSuggestions(); searchBar.blur(); window.tab.openInContainer(item.profile, item.url); return; }
                 searchBar.value = item.url;
                 commitNavigation(item.url);
             }
@@ -588,7 +588,7 @@
                         continue;
                     const base = e.title || e.url;
                     const pName = null;
-                    results.push({ type: 'bookmark', url: e.url, title: pName ? `${base}  ·  ${pName}` : base, persona: e.persona || null });
+                    results.push({ type: 'bookmark', url: e.url, title: pName ? `${base}  ·  ${pName}` : base, profile: e.profile || null });
                     if (results.length >= limit)
                         break;
                 }
@@ -610,9 +610,9 @@
                 for (const e of entries) {
                     if (!e.url)
                         continue;
-                    // Key by URL *and persona* so the same page under two personas
+                    // Key by URL *and profile* so the same page under two containers
                     // stays as two distinct suggestions.
-                    const key = normalizeUrl(e.url) + '|' + (e.persona || '');
+                    const key = normalizeUrl(e.url) + '|' + (e.profile || '');
                     if (seen.has(key))
                         continue;
                     seen.add(key);
@@ -621,7 +621,7 @@
                     results.push({
                         type: 'history', url: e.url,
                         title: pName ? `${base}  ·  ${pName}` : base,
-                        persona: e.persona || null,
+                        profile: e.profile || null,
                     });
                     if (results.length >= limit)
                         break;
@@ -1670,10 +1670,10 @@
                     lbl.textContent = entry.url;
                 }
                 btn.appendChild(lbl);
-                if (entry.persona)
+                if (entry.profile)
                 btn.addEventListener('click', () => {
-                    if (entry.persona)
-                        window.tab.openInContainer(entry.persona, entry.url);
+                    if (entry.profile)
+                        window.tab.openInContainer(entry.profile, entry.url);
                     else
                         window.tab.loadUrl(activeTabIndex, entry.url);
                 });
@@ -2305,13 +2305,13 @@
                     rm.tabIndex = -1;
                     rm.textContent = '×';
                     rm.title = 'Remove from Essentials';
-                    rm.addEventListener('click', (e) => { e.stopPropagation(); window.essentials.remove(it.url, it.persona || null); });
+                    rm.addEventListener('click', (e) => { e.stopPropagation(); window.essentials.remove(it.url, it.profile || null); });
                     tile.appendChild(rm);
                     // Click: focus an already-open tab of this site, else open one
-                    // (persona-bound essentials reopen in their persona).
+                    // (profile-bound essentials reopen in their profile).
                     tile.addEventListener('click', () => {
-                        if (it.persona) {
-                            window.tab.openInContainer(it.persona, it.url);
+                        if (it.profile) {
+                            window.tab.openInContainer(it.profile, it.url);
                             return;
                         }
                         let origin = null;
@@ -2338,10 +2338,10 @@
                             ['Open in New Tab', () => window.browserBookmarks.openInNewTab(it.url, true)],
                             ['sep'],
                             ['Change Icon…', () => openEmojiPicker(ev.clientX, ev.clientY,
-                                (emo) => window.essentials.setIcon(it.url, it.persona || null, emo), true)],
+                                (emo) => window.essentials.setIcon(it.url, it.profile || null, emo), true)],
                             ['Bookmark…', () => window.browserBookmarks.add(it.url, it.title || '')],
                             ['sep'],
-                            ['Remove from Essentials', () => window.essentials.remove(it.url, it.persona || null), 'danger'],
+                            ['Remove from Essentials', () => window.essentials.remove(it.url, it.profile || null), 'danger'],
                         ]);
                     });
                     grid.appendChild(tile);

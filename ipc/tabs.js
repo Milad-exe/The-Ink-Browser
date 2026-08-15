@@ -176,14 +176,14 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     // Reopen a container-tagged history/bookmark/suggestion in its container (a
     // new tab on that container's session, so you land back in the right
     // account). If the container is gone, fall back to a fresh one for the site.
-    ipcMain.handle('tab:openInContainer', (_e, personaId, url) => {
+    ipcMain.handle('tab:openInContainer', (_e, containerId, url) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd)
             return;
         const containers = require('../features/containers');
         const safe = sanitizeUrl(url);
-        if (personaId != null && containers.meta(String(personaId)))
-            wd.tabs.openInContainer(safe, String(personaId));
+        if (containerId != null && containers.meta(String(containerId)))
+            wd.tabs.openInContainer(safe, String(containerId));
         else
             wd.tabs.openIsolatedInstance(safe);
     });
@@ -417,21 +417,21 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         catch { }
     };
     ipcMain.handle('essentials:list', (_e) => profiles.essentials(wm.profileOf(_e.sender)));
-    ipcMain.handle('essentials:add', (_e, url, title, persona) => {
+    ipcMain.handle('essentials:add', (_e, url, title, profile) => {
         if (!/^https?:/i.test(url || '')) return false;
         let label = title;
         if (!label) { try { label = new URL(url).hostname.replace(/^www\./, ''); } catch { label = url; } }
-        const ok = profiles.addEssential(wm.profileOf(_e.sender), { url, title: label, persona: persona || null });
+        const ok = profiles.addEssential(wm.profileOf(_e.sender), { url, title: label, profile: profile || null });
         if (ok) broadcastEssentials();
         return ok;
     });
-    ipcMain.handle('essentials:icon', (_e, url, persona, icon) => {
-        const ok = profiles.setEssentialIcon(wm.profileOf(_e.sender), url, persona || null, icon);
+    ipcMain.handle('essentials:icon', (_e, url, profile, icon) => {
+        const ok = profiles.setEssentialIcon(wm.profileOf(_e.sender), url, profile || null, icon);
         if (ok) broadcastEssentials();
         return ok;
     });
-    ipcMain.handle('essentials:remove', (_e, url, persona) => {
-        const ok = profiles.removeEssential(wm.profileOf(_e.sender), url, persona || null);
+    ipcMain.handle('essentials:remove', (_e, url, profile) => {
+        const ok = profiles.removeEssential(wm.profileOf(_e.sender), url, profile || null);
         broadcastEssentials();
         return ok;
     });
@@ -506,7 +506,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const assignments = [...t.tabFolders.entries()].filter(([idx, fid]) => t.tabMap.has(idx) && ids.has(fid));
         return { folders, assignments };
     });
-    // ── Persona naming (optional rename; auto-numbered by default) ─────────────
+    // ── Profile naming (optional rename; auto-numbered by default) ─────────────
     // id → current display name, used to label container-tagged entries
     // (a rename reflects everywhere without rewriting stored entries).
     ipcMain.handle('goBack', (_e, index) => {

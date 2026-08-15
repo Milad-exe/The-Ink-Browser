@@ -103,7 +103,7 @@ class WindowContextMenu {
             }
         }
         // Pin this site into the sidebar's Essentials grid (per profile; a
-        // persona tab's essential keeps its persona).
+        // profile tab's essential keeps its profile).
         {
             const u = windowData.tabs.tabUrls.get(tabIndex);
             if (/^https?:/i.test(u || '')) {
@@ -116,7 +116,7 @@ class WindowContextMenu {
                         catch { }
                         profiles.addEssential(windowData.tabs.profileId || '1', {
                             url: u, title,
-                            persona: windowData.tabs.tabContainers.get(tabIndex) || null,
+                            profile: windowData.tabs.tabContainers.get(tabIndex) || null,
                         });
                         try { windowData.window.webContents.send('essentials-changed'); }
                         catch { }
@@ -124,8 +124,8 @@ class WindowContextMenu {
                 });
             }
         }
-        // No persona naming prompt: Space Profiles decide which cookie jar a tab
-        // uses, so per-tab personas are an implementation detail now.
+        // No profile naming prompt: Space Profiles decide which cookie jar a tab
+        // uses, so per-tab containers are an implementation detail now.
         this.contextTemplate.push({
             label: isPinned ? 'Unpin Tab' : 'Pin Tab',
             click: () => windowData.tabs.pinTab(tabIndex),

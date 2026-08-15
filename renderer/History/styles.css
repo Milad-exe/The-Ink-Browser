@@ -89,8 +89,8 @@ h1 { user-select: none; -webkit-user-select: none; }
 
 }
 
-/* Persona badge on tagged entries (a visit made as a specific persona). */
-.history-persona {
+/* Profile badge on tagged entries (a visit made under a specific profile). */
+.history-profile {
   display: inline-block; margin-left: 8px; padding: 1px 7px;
   border-radius: 999px; background: var(--accent-wash, rgba(224,137,74,0.18));
   color: var(--accent, #e0894a); font-size: 10px; font-weight: 700;

@@ -219,7 +219,7 @@ class Tabs {
         const _sw = Math.round(Number(this.persistence?.get('sidebarWidth')) || 232);
         this.sidebarWidth = _sw < 132 ? 56 : Math.max(180, Math.min(460, _sw));
         // Which workspace/profile this window is currently browsing as ('1' =
-        // default session + legacy stores). Personas scope within it. Tabs are
+        // default session + legacy stores). Containers scope within it. Tabs are
         // tagged with the workspace they were opened in (tabProfiles) so
         // switching workspaces swaps the visible tab set IN PLACE.
         this.profileId = options?.profile ? String(options.profile) : '1';
@@ -346,7 +346,7 @@ class Tabs {
         tab.setVisible(false); // Do not show initially
         UserAgent.setupTab(tab);
         this._applyTabBackground(tab, url || 'newtab');
-        // Own-session tabs (persona / private / non-default profile) skip
+        // Own-session tabs (profile / private / non-default profile) skip
         // extension registration — extensions live on the default session.
         if (!makePrivate && !container && this.profileId === '1')
             extensions.addTab(tab.webContents, this.mainWindow);
@@ -550,7 +550,7 @@ class Tabs {
         this.raiseFloatingViews();
         UserAgent.setupTab(tab);
         this._applyTabBackground(tab, 'newtab');
-        // Persona/private/non-default-profile tabs run on their own session —
+        // Profile/private/non-default-profile tabs run on their own session —
         // extensions are loaded on the default session only, so they skip
         // extension registration.
         if (!makePrivate && !container && this.profileId === '1')
@@ -684,7 +684,7 @@ class Tabs {
     // Decide how a user-opened url should be sessioned. Never re-routes something
     // already in an instance (stickiness) or a private tab; only http(s) sites.
     //   → { mode: 'default' | 'keep' | 'isolate' | 'ask' }
-    // Auto-isolation was removed with the persona concept: which cookie jar a
+    // Auto-isolation was removed with the profile concept: which cookie jar a
     // tab uses is decided by its Space's Profile now, not by per-site rules.
     resolveIsolation() {
         return { mode: 'default' };
@@ -1457,10 +1457,10 @@ class Tabs {
             }
         }
     }
-    addToHistory(url, title, persona = null) {
+    addToHistory(url, title, profile = null) {
         if (this.history && url && !url.startsWith('file://')) {
-            const personaName = persona ? (containers.meta(persona)?.name || null) : null;
-            this.history.addToHistory(url, title || url, persona || null, personaName).catch(error => {
+            const profileName = profile ? (containers.meta(profile)?.name || null) : null;
+            this.history.addToHistory(url, title || url, profile || null, profileName).catch(error => {
             });
         }
     }
@@ -1551,7 +1551,7 @@ class Tabs {
             this.glanceBackdrop = backdrop;
         }
         catch { }
-        // Same session as the current tab, so a glance from a persona/profile tab
+        // Same session as the current tab, so a glance from a profile/profile tab
         // stays in that isolated session.
         const sess = active?.webContents?.session;
         const view = new WebContentsView({

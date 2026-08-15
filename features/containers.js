@@ -95,8 +95,8 @@ function _uniqueName(base, profile = '1') {
 }
 
 /**
- * Create a fresh persona auto-named from (url), scoped to (profile). Used by the
- * MANUAL "Open in New Persona" action — every call mints a new one (so you can
+ * Create a fresh container auto-named from (url), scoped to (profile). Used by the
+ * MANUAL new-container action — every call mints a new one (so you can
  * hold two separate logins to the same site on purpose).
  */
 function createForUrl(url, profile = '1') {
@@ -128,8 +128,8 @@ function instanceForHost(url, profile = '1') {
     if (!host)
         return createForUrl(url, profile);
     const reg = load();
-    // Tenant-keyed WITHIN the profile — Work's acme.foo.com persona is separate
-    // from Personal's acme.foo.com persona.
+    // Tenant-keyed WITHIN the profile — Work's acme.foo.com container is separate
+    // from Personal's acme.foo.com container.
     const existing = reg.list.find(x => x.tenantHost === host && (x.profile || '1') === String(profile));
     if (existing)
         return { ...existing };
@@ -164,7 +164,7 @@ function _create(name, site, profile = '1') {
 /**
  * Create a user-named container ("Work", "Banking") not derived from a URL.
  * Tagged `named` so the UI can offer these as Space Profiles while leaving the
- * auto-minted per-site personas out of that list.
+ * auto-minted per-site containers out of that list.
  */
 function createNamed(name) {
     // Deliberately NOT profile-scoped: the point of a Space Profile is that two
@@ -249,7 +249,7 @@ async function gc(activeIds) {
     const active = new Set([...(activeIds || [])].map(String));
     for (const c of [...load().list]) {
         // User-named containers are addressable (a Space can be bound to one), so
-        // they outlive having no tabs — only auto-minted personas are reaped.
+        // they outlive having no tabs — only auto-minted containers are reaped.
         if (c.named || active.has(c.id))
             continue;
         try {

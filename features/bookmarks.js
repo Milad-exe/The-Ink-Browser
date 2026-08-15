@@ -30,6 +30,9 @@ class Bookmarks {
             else
                 plaintext = raw; // legacy plaintext — encrypted on next save()
             this.cache = JSON.parse(plaintext);
+            // Entries written before the rename tag their container as `persona`.
+            for (const b of (Array.isArray(this.cache) ? this.cache : (this.cache?.items || [])))
+                if (b && b.persona !== undefined && b.profile === undefined) { b.profile = b.persona; delete b.persona; }
             if (!Array.isArray(this.cache))
                 this.cache = [];
         }
@@ -50,22 +53,22 @@ class Bookmarks {
     async getAll() {
         return this.load();
     }
-    async add(url, title, persona = null) {
-        const p = persona || null;
+    async add(url, title, profile = null) {
+        const p = profile || null;
         const bookmarks = await this.load();
-        // Keyed by URL *and persona* — a page bookmarked under a persona is a
-        // distinct favourite that reopens in that persona.
-        const exists = bookmarks.some(b => b.type === 'bookmark' && b.url === url && (b.persona || null) === p);
+        // Keyed by URL *and profile* — a page bookmarked under a profile is a
+        // distinct favourite that reopens in that profile.
+        const exists = bookmarks.some(b => b.type === 'bookmark' && b.url === url && (b.profile || null) === p);
         if (!exists) {
-            bookmarks.push({ type: 'bookmark', id: this.genId(), url, title: title || url, addedAt: Date.now(), ...(p ? { persona: p } : {}) });
+            bookmarks.push({ type: 'bookmark', id: this.genId(), url, title: title || url, addedAt: Date.now(), ...(p ? { profile: p } : {}) });
             await this.save();
         }
         return !exists;
     }
-    async remove(url, persona = null) {
-        const p = persona || null;
+    async remove(url, profile = null) {
+        const p = profile || null;
         const bookmarks = await this.load();
-        const idx = bookmarks.findIndex(b => b.url === url && (b.persona || null) === p);
+        const idx = bookmarks.findIndex(b => b.url === url && (b.profile || null) === p);
         if (idx !== -1) {
             bookmarks.splice(idx, 1);
             await this.save();
@@ -83,10 +86,10 @@ class Bookmarks {
         }
         return false;
     }
-    async has(url, persona = null) {
-        const p = persona || null;
+    async has(url, profile = null) {
+        const p = profile || null;
         const bookmarks = await this.load();
-        return bookmarks.some(b => b.type === 'bookmark' && b.url === url && (b.persona || null) === p);
+        return bookmarks.some(b => b.type === 'bookmark' && b.url === url && (b.profile || null) === p);
     }
     async updateTitle(url, title) {
         const bookmarks = await this.load();
