@@ -132,14 +132,8 @@ class WindowContextMenu {
                 });
             }
         }
-        // Optional persona name (auto-numbered by default). Only on persona tabs.
-        const personaId = windowData.tabs.tabContainers.get(tabIndex);
-        if (personaId) {
-            this.contextTemplate.push({
-                label: 'Name This Persona…',
-                click: () => { try { windowData.window.webContents.send('rename-persona', personaId); } catch { } },
-            });
-        }
+        // No persona naming prompt: Space Profiles decide which cookie jar a tab
+        // uses, so per-tab personas are an implementation detail now.
         this.contextTemplate.push({
             label: isPinned ? 'Unpin Tab' : 'Pin Tab',
             click: () => windowData.tabs.pinTab(tabIndex),

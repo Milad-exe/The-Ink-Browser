@@ -2720,8 +2720,7 @@
                 btn.dataset.private = 'true';
             if (isolated) {
                 btn.dataset.container = 'true';
-                btn.title = 'Separate persona — its own login & history';
-                maybeShowIsolationHint();
+                btn.title = 'Separate login for this site';
             }
             const titleSpan = document.createElement('span');
             titleSpan.className = 'tab-title';
