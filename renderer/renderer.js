@@ -2745,11 +2745,26 @@
                         if (target) window.tab.loadUrl(ni, target);
                     }],
                     ['sep'],
-                    ['Add to Essentials', async () => {
+                    // Pinned tabs are workspace-scoped; promoting one to an
+                    // Essential makes it global, so the pin is dropped with it.
+                    [isPinned ? 'Move to Essentials' : 'Add to Essentials', async () => {
                         const url = await window.tab.getTabUrl(idx);
                         const title = btn.querySelector('.tab-title')?.textContent || '';
-                        if (/^https?:/i.test(url || '')) window.essentials.add(url, title, null);
+                        if (!/^https?:/i.test(url || '')) return;
+                        const ok = await window.essentials.add(url, title, null);
+                        if (ok && isPinned) window.tab.pin(idx);
                     }],
+                    ['Close Multiple Tabs', [
+                        ['Close Other Tabs', () => {
+                            for (const b of [...document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden):not(.pinned)')])
+                                if (+b.dataset.index !== idx) window.tab.remove(+b.dataset.index);
+                        }],
+                        ['Close Tabs Below', () => {
+                            const all = [...document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden):not(.pinned)')];
+                            const at = all.findIndex(b => +b.dataset.index === idx);
+                            if (at >= 0) for (const b of all.slice(at + 1)) window.tab.remove(+b.dataset.index);
+                        }],
+                    ]],
                     ['Bookmark Tab…', async () => {
                         const url = await window.tab.getTabUrl(idx);
                         const title = btn.querySelector('.tab-title')?.textContent || '';
@@ -2897,7 +2912,14 @@
                 tabsContainer.insertBefore(btn, afterBtn.nextSibling);
             }
             else {
-                tabsContainer.appendChild(btn);
+                // New tabs land at the TOP of the loose-tab section — after the
+                // pinned block and any folders, before the existing tabs.
+                const firstLoose = [...tabsContainer.querySelectorAll('.tab-button')]
+                    .find(b => b !== btn && !b.classList.contains('pinned') && !b.classList.contains('in-folder'));
+                if (firstLoose)
+                    tabsContainer.insertBefore(btn, firstLoose);
+                else
+                    tabsContainer.appendChild(btn);
             }
             tabs.set(index, btn);
             layoutFolders(); // keep the new tab in the composed order
