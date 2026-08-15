@@ -21,7 +21,7 @@ ipcRenderer.on('theme-changed', (_e, theme) => {
 contextBridge.exposeInMainWorld("electronAPI", {
     platform: process.platform,
     windowClick: (pos) => ipcRenderer.send("window-click", pos),
-    addTab: () => ipcRenderer.invoke("addTab"),
+    addTab: () => ipcRenderer.invoke("menu-new-tab"),
     addPrivateTab: () => ipcRenderer.invoke("addPrivateTab"),
     newWindow: () => ipcRenderer.invoke("newWindow"),
     newPrivateWindow: () => ipcRenderer.invoke("newPrivateWindow"),

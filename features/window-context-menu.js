@@ -72,7 +72,7 @@ class WindowContextMenu {
         this.sep();
         this.contextTemplate.push({
             label: 'New Tab',
-            click: () => windowData.tabs.createTab(),
+            click: () => { try { require('../ipc/palette').openFor(windowData); } catch { windowData.tabs.createTab(); } },
         }, { type: 'separator' }, {
             label: 'Reload Tab',
             click: () => windowData.tabs.reload(tabIndex),
@@ -176,7 +176,7 @@ class WindowContextMenu {
         this.sep();
         this.contextTemplate.push({
             label: 'New Tab',
-            click: () => windowData.tabs.createTab(),
+            click: () => { try { require('../ipc/palette').openFor(windowData); } catch { windowData.tabs.createTab(); } },
         });
         const closed = windowData.tabs.closedTabHistory;
         if (closed && closed.length > 0) {

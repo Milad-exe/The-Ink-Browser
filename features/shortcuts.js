@@ -101,8 +101,14 @@ class Shortcuts {
     }
     // ── Tab shortcuts ──────────────────────────────────────────────────────────
     registerTabShortcuts() {
-        // New tab
+        // New tab — raises the palette; committing a query is what creates the
+        // tab, so there is no blank page to pass through.
         this.registerShortcut('CmdOrCtrl+T', () => {
+            try {
+                const wd = this.tabManager.getWindowData?.();
+                if (wd) { require('../ipc/palette').openFor(wd); return; }
+            }
+            catch { }
             this.tabManager.createTab();
         });
         // New private tab — fully isolated session, wiped when the tab closes

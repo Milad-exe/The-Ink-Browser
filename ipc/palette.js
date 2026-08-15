@@ -41,6 +41,32 @@ function hidePalette(wd) {
     catch { }
 }
 
+// Raise the palette for a window. Every user-facing "new tab" goes through
+// here — the tab is created when the query is committed, not before.
+async function openFor(wd) {
+    if (!wd) return false;
+    try {
+        const view = await ensurePalette(wd);
+        const b = wd.window.getContentBounds();
+        view.setBounds({ x: 0, y: 0, width: b.width, height: b.height });
+        try {
+            wd.window.contentView.removeChildView(view);
+            wd.window.contentView.addChildView(view);
+        }
+        catch { }
+        view.setVisible(true);
+        wd.paletteOpen = true;
+        view.webContents.send('palette:data', {});
+        try { view.webContents.focus(); }
+        catch { }
+        return true;
+    }
+    catch (err) {
+        console.error('palette open:', err);
+        return false;
+    }
+}
+
 function register(ipcMain, { wm }) {
     ipcMain.handle('palette:open', async (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
@@ -74,4 +100,4 @@ function register(ipcMain, { wm }) {
     }
 }
 
-module.exports = { register, hidePalette };
+module.exports = { register, hidePalette, openFor };

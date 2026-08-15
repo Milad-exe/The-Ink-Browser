@@ -79,6 +79,13 @@ function register(ipcMain, { wm }) {
     });
     // Click coordinates from the chrome renderer — close floating panels
     // if the click landed outside their bounds.
+    // The overflow menu's New Tab raises the palette, like every other
+    // user-facing new-tab entry point.
+    ipcMain.handle('menu-new-tab', (_e) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        try { return require('./palette').openFor(wd); }
+        catch { wd?.tabs?.createTab(); return false; }
+    });
     ipcMain.on('window-click', (_e, pos) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd)
