@@ -79,6 +79,7 @@
                 btn.classList.toggle('ws-hidden', ws !== activeWorkspace);
             }
             updateChromeTabs(document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden)').length);
+            syncPinCols();
         }
         let activeTabIndex = 0;
         let currentTabUrl = '';
@@ -1986,6 +1987,7 @@
                     window.tab.reorder(ordered);
                 updateTabWidths(tabs.size);
                 updateScrollShadows();
+                syncPinCols();
             });
             // Split view: mark the two tabs that are on screen together so the strip
             // shows the pairing (the focused one keeps the normal active highlight).
@@ -2373,10 +2375,13 @@
                         b.className = 'sb-ws' + (p.id === activeWorkspace ? ' active' : '');
                         b.tabIndex = -1;
                         b.title = p.name; // native hover label (survives foot overflow-scroll)
+                        // Only the active space shows its emoji tile; the rest
+                        // stay dots so the current space reads at a glance.
+                        const isActive = p.id === activeWorkspace;
                         const av = document.createElement('span');
-                        av.className = 'profile-badge' + (p.emoji ? ' has-emoji' : ' is-dot');
+                        av.className = 'profile-badge' + (p.emoji && isActive ? ' has-emoji' : ' is-dot');
                         av.style.setProperty('--pf-color', p.color || '');
-                        if (p.emoji)
+                        if (p.emoji && isActive)
                             av.textContent = p.emoji;
                         b.appendChild(av);
                         b.addEventListener('click', () => { if (p.id !== activeWorkspace) window.profiles.switch(p.id); });
@@ -2839,6 +2844,12 @@
             input.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); });
             input.addEventListener('blur', () => done(true));
         }
+        // Pin tiles share the tab grid with full-width rows, so auto-fit can never
+        // collapse a track. Drive the track count off the visible pin count instead.
+        function syncPinCols() {
+            const n = tabsContainer.querySelectorAll('.tab-button.pinned:not(.ws-hidden)').length;
+            tabsContainer.style.setProperty('--pin-cols', String(Math.min(Math.max(n, 1), 4)));
+        }
         function layoutFolders() {
             if (!tabsContainer) return;
             const folders = folderState.folders;
@@ -2847,6 +2858,7 @@
             tabsContainer.querySelectorAll('.tab-button.in-folder').forEach(b => b.classList.remove('in-folder', 'folder-collapsed'));
             const pinned = [...tabsContainer.querySelectorAll('.tab-button.pinned')];
             const normal = [...tabsContainer.querySelectorAll('.tab-button:not(.pinned)')];
+            syncPinCols();
             const grouped = new Set();
             const frag = document.createDocumentFragment();
             for (const f of folders) {
