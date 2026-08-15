@@ -37,6 +37,10 @@ function hidePalette(wd) {
     try {
         wd.palette.setVisible(false);
         wd.paletteOpen = false;
+        // The overlay took keyboard focus when it opened; hand it back or the
+        // window is left with nothing focused and the next accelerator beeps.
+        try { wd.window.webContents.focus(); }
+        catch { }
     }
     catch { }
 }
