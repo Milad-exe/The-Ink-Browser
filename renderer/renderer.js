@@ -2126,12 +2126,22 @@
             tabsContainer.addEventListener('contextmenu', (e) => {
                 if (e.target.closest('.tab-button') || e.target.closest('.folder-header')) return;
                 e.preventDefault(); e.stopPropagation();
+                // Grouped as in the reference design doc. Only actions with a real
+                // implementation are listed — no placeholder rows.
                 openCtxMenu(e.clientX, e.clientY, [
+                    ['Compact Mode', [
+                        ['Toggle compact mode', () => window.tabsUI.toggleCompact()],
+                    ]],
                     ['New Tab', () => window.tab.add()],
                     ['New Folder', newFolderInline],
                     ['sep'],
+                    ['Reload Selected Tab', () => window.tab.reload(activeTabIndex)],
+                    ['Bookmark Selected Tab…', () => {
+                        const btn = tabs.get(activeTabIndex);
+                        const title = btn?.querySelector('.tab-title')?.textContent || '';
+                        if (currentTabUrl) window.browserBookmarks.add(currentTabUrl, title);
+                    }],
                     ['Reopen Closed Tab', () => window.tabsUI.reopenClosed()],
-                    ['Toggle Compact Mode', () => window.tabsUI.toggleCompact()],
                 ]);
             });
             window.addEventListener('resize', () => setTimeout(() => { updateTabWidths(tabs.size); updateScrollShadows(); }, 100));
