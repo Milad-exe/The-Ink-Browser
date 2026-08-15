@@ -64,6 +64,46 @@ function hidePanel(wd) {
     }
 }
 function register(ipcMain, { wm }) {
+    // ── Extension API gap layer (see preload/ext-polyfill.js) ─────────────────
+    const { webContents } = require('electron');
+    // electron-chrome-extensions uses the webContents id as the chrome tab id.
+    const tabWcById = (id) => {
+        if (id == null) return null;
+        try { return webContents.fromId(Number(id)) || null; }
+        catch { return null; }
+    };
+    ipcMain.handle('ext:getMediaStreamId', (_e, { targetTabId, consumerTabId } = {}) => {
+        // Chrome hands back an id the CONSUMER can pass to getUserMedia with
+        // chromeMediaSource:'tab'. Electron's equivalent is target.getMediaSourceId
+        // (requestWebContents), so both ends have to resolve to real contents.
+        const target = tabWcById(targetTabId) || wm.getPrimaryWindow()?.tabs?.tabMap?.get(wm.getPrimaryWindow()?.tabs?.activeTabIndex)?.webContents;
+        if (!target)
+            throw new Error('tabCapture: no target tab');
+        const consumer = tabWcById(consumerTabId) || _e.sender;
+        try {
+            return target.getMediaSourceId(consumer);
+        }
+        catch (err) {
+            throw new Error('tabCapture: ' + err.message);
+        }
+    });
+    // Contexts we can actually account for. Offscreen documents are unsupported,
+    // so an OFFSCREEN_DOCUMENT filter correctly comes back empty rather than
+    // claiming one exists.
+    ipcMain.handle('ext:getContexts', (_e, { filter } = {}) => {
+        const types = filter?.contextTypes;
+        if (Array.isArray(types) && !types.includes('BACKGROUND') && !types.includes('SERVICE_WORKER'))
+            return [];
+        return [{ contextType: 'SERVICE_WORKER', contextId: String(_e.sender.id), documentUrl: undefined, incognito: false }];
+    });
+    // One line per missing API, so the next gap is named in the log.
+    const seenGaps = new Set();
+    ipcMain.on('ext:unsupported', (_e, { id, api } = {}) => {
+        const key = `${id}:${api}`;
+        if (seenGaps.has(key)) return;
+        seenGaps.add(key);
+        console.warn(`[extensions] ${id} needs ${api}, which this browser does not implement`);
+    });
     extensions.onChanged(() => {
         for (const wd of wm.getAllWindows()) {
             try {

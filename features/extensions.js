@@ -77,7 +77,24 @@ class Extensions {
         });
         try { ElectronChromeExtensions.handleCRXProtocol(session); }
         catch { }
+        this._registerPolyfill(session);
         return host;
+    }
+    /**
+     * Fill the chrome.* gaps in extension service workers. Registered per
+     * session, since each space hosts its own extension processes.
+     */
+    _registerPolyfill(session) {
+        try {
+            session.registerPreloadScript({
+                type: 'service-worker',
+                id: 'ink-ext-polyfill',
+                filePath: path.join(__dirname, '../preload/ext-polyfill.js'),
+            });
+        }
+        catch (e) {
+            console.error('extension polyfill registration:', e.message);
+        }
     }
     /**
      * The host for a session, created on first use. Spaces and containers get
