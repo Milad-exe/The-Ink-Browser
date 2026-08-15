@@ -125,12 +125,13 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
             return { ok: false, error: err.message };
         }
     });
-    ipcMain.handle('open-settings-tab', (_e) => {
+    // section is optional ('passwords', 'extensions', …) — omitted opens the root.
+    ipcMain.handle('open-settings-tab', (_e, section) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd?.tabs) {
             const active = wd.tabs.activeTabIndex;
             const onNewTab = wd.tabs.tabUrls.get(active) === 'newtab';
-            wd.tabs.openInternalPage('settings', null, onNewTab);
+            wd.tabs.openInternalPage('settings', section || null, onNewTab);
         }
     });
     ipcMain.handle('google-login', async (_e, clientId, clientSecret) => {

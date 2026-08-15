@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     newPrivateWindow: () => ipcRenderer.invoke("newPrivateWindow"),
     openHistoryTab: () => ipcRenderer.invoke("open-history-tab"),
     openBookmarksTab: () => ipcRenderer.invoke("open-bookmarks-tab"),
-    openSettingsTab: () => ipcRenderer.invoke("open-settings-tab"),
+    openSettingsTab: (section) => ipcRenderer.invoke("open-settings-tab", section),
     closeMenu: () => ipcRenderer.invoke("close-menu"),
     toggleBookmarkBar: () => ipcRenderer.send("toggle-bookmark-bar"),
     getSettings: () => ipcRenderer.invoke("settings-get"),

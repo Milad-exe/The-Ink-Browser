@@ -41,6 +41,8 @@
         document.getElementById('btn-print').addEventListener('click', act(() => api.print()));
         document.getElementById('btn-history').addEventListener('click', act(() => api.openHistoryTab()));
         document.getElementById('btn-bookmarks').addEventListener('click', act(() => api.openBookmarksTab()));
+        document.getElementById('btn-passwords').addEventListener('click', act(() => api.openSettingsTab('passwords')));
+        document.getElementById('btn-extensions').addEventListener('click', act(() => api.openSettingsTab('extensions')));
         document.getElementById('btn-bookmark-bar').addEventListener('click', act(() => api.toggleBookmarkBar()));
         document.getElementById('btn-settings').addEventListener('click', act(() => api.openSettingsTab()));
         // ── Zoom (menu stays open so you can adjust repeatedly) ──────────────────
