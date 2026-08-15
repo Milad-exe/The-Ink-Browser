@@ -2750,6 +2750,11 @@
                 window.tab.remove(parseInt(index));
             });
             // Right-click a sidebar tab → a custom menu (pin, folder, close, …).
+            btn.addEventListener('dblclick', (e) => {
+                if (e.target.closest('.tab-close')) return;
+                e.preventDefault();
+                startTabRename(btn, parseInt(index));
+            });
             btn.addEventListener('contextmenu', (e) => {
                 if (e.target.closest('.tab-close')) return;
                 e.preventDefault(); e.stopPropagation();
@@ -2768,6 +2773,8 @@
                 }
                 rows.push(
                     ['sep'],
+                    ['Change Label…', () => startTabRename(btn, idx)],
+                    ['Reset Label', () => window.tab.setLabel(idx, '')],
                     ['Reload Tab', () => window.tab.reload(idx)],
                     ['Mute Tab', () => window.tab.toggleMute(idx)],
                     ['sep'],
@@ -3207,6 +3214,34 @@
             let id = null;
             try { id = await window.folders.create('New Folder'); } catch { }
             if (id) setTimeout(() => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }, 140);
+        }
+        // Inline rename for a tab row — double-click or the Change Label item.
+        function startTabRename(btn, idx) {
+            const label = btn.querySelector('.tab-title');
+            if (!label || btn.classList.contains('renaming'))
+                return;
+            btn.classList.add('renaming');
+            const input = document.createElement('input');
+            input.className = 'folder-rename-input';
+            input.value = label.textContent;
+            input.maxLength = 60;
+            label.replaceWith(input);
+            try { window.tabsUI.focusChrome(); } catch { }
+            input.focus(); input.select();
+            const done = (save) => {
+                if (!btn.classList.contains('renaming'))
+                    return;
+                btn.classList.remove('renaming');
+                const val = input.value;
+                input.replaceWith(label);
+                if (save) window.tab.setLabel(idx, val);
+            };
+            input.addEventListener('keydown', (e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') done(true);
+                if (e.key === 'Escape') done(false);
+            });
+            input.addEventListener('blur', () => done(true));
         }
         function startFolderRename(h, id) {
             const name = h.querySelector('.folder-name');

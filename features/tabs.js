@@ -226,6 +226,7 @@ class Tabs {
         this.profileId = options?.profile ? String(options.profile) : '1';
         this.tabProfiles = new Map(); // tabIndex → workspace/profile id
         this.folders = []; // [{ id, name, collapsed, workspace }] — tab folders
+        this.tabLabels = new Map(); // tabIndex → user-set label overriding the page title
         this.tabFolders = new Map(); // tabIndex → folderId
         this._folderSeq = 1;
         this.splitPair = null; // [leftIdx, rightIdx] when split view is active
@@ -1379,7 +1380,10 @@ class Tabs {
     }
     sendTabUpdate(tabIndex, tab, url, title, favicon) {
         let displayUrl = url;
-        let displayTitle = title || this.computeDisplayTitleFor(tabIndex) || "New Tab";
+        // A user-set label wins over whatever the page reports, and keeps winning
+        // as the page navigates — until it is reset.
+        const custom = this.tabLabels?.get(tabIndex);
+        let displayTitle = custom || title || this.computeDisplayTitleFor(tabIndex) || "New Tab";
         // Internal pages: settings/bookmarks/history (and settings/<section>) keep
         // their token so the omnibox can show it as a northstar:// url; the new-tab
         // page and any bare file:// url show a blank address bar.
@@ -1716,6 +1720,21 @@ class Tabs {
     // Reorder folders within the current workspace. `ids` is the new order for
     // this workspace only — folders in other workspaces keep their relative
     // positions, so a reorder here can't disturb them.
+    // Rename a tab. Passing a blank label clears the override so the page title
+    // takes over again (the reference's "reset" behaviour).
+    setTabLabel(index, label) {
+        const i = Number(index);
+        const tab = this.tabMap.get(i);
+        if (!tab)
+            return;
+        const clean = (label || '').trim().slice(0, 60);
+        if (clean)
+            this.tabLabels.set(i, clean);
+        else
+            this.tabLabels.delete(i);
+        this.sendTabUpdate(i, tab, this.tabUrls.get(i) || '', clean || tab.lazyTitle);
+        this.saveStateDebounced?.();
+    }
     reorderFolders(ids) {
         const ws = String(this.profileId);
         const wanted = (ids || []).map(String);
