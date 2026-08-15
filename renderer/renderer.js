@@ -2640,6 +2640,11 @@
                         if (url && typeof ni === 'number') window.tab.loadUrl(ni, url);
                     }],
                     ['sep'],
+                    ['Add to Essentials', async () => {
+                        const url = await window.tab.getTabUrl(idx);
+                        const title = btn.querySelector('.tab-title')?.textContent || '';
+                        if (url) window.essentials.add(url, title, null);
+                    }],
                     ['Bookmark Tab…', async () => {
                         const url = await window.tab.getTabUrl(idx);
                         const title = btn.querySelector('.tab-title')?.textContent || '';

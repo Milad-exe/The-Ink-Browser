@@ -338,6 +338,14 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         catch { }
     };
     ipcMain.handle('essentials:list', (_e) => profiles.essentials(wm.profileOf(_e.sender)));
+    ipcMain.handle('essentials:add', (_e, url, title, persona) => {
+        if (!/^https?:/i.test(url || '')) return false;
+        let label = title;
+        if (!label) { try { label = new URL(url).hostname.replace(/^www\./, ''); } catch { label = url; } }
+        const ok = profiles.addEssential(wm.profileOf(_e.sender), { url, title: label, persona: persona || null });
+        if (ok) broadcastEssentials();
+        return ok;
+    });
     ipcMain.handle('essentials:remove', (_e, url, persona) => {
         const ok = profiles.removeEssential(wm.profileOf(_e.sender), url, persona || null);
         broadcastEssentials();

@@ -214,6 +214,7 @@ exposeInternal("tab", {
 // Essentials — pinned favourites at the top of the tab sidebar.
 exposeInternal('essentials', {
     list: () => ipcRenderer.invoke('essentials:list'),
+    add: (url, title, persona) => ipcRenderer.invoke('essentials:add', url, title, persona),
     remove: (url, persona) => ipcRenderer.invoke('essentials:remove', url, persona),
     onChanged: (cb) => ipcRenderer.on('essentials-changed', () => cb()),
 });
