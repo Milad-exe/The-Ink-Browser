@@ -161,6 +161,23 @@ function _create(name, site, profile = '1') {
     return { ...c };
 }
 
+/**
+ * Create a user-named container ("Work", "Banking") not derived from a URL.
+ * Tagged `named` so the UI can offer these as Space Profiles while leaving the
+ * auto-minted per-site personas out of that list.
+ */
+function createNamed(name) {
+    // Deliberately NOT profile-scoped: the point of a Space Profile is that two
+    // Spaces can share one, so these live above the per-space registry.
+    const c = _create(_uniqueName((name || 'Container').trim().slice(0, 32), '1'), null, '1');
+    const rec = load().list.find(x => x.id === c.id);
+    if (rec) { rec.named = true; save(); }
+    return { ...c, named: true };
+}
+/** Just the user-named containers (Space Profile candidates), across all spaces. */
+function listNamed() {
+    return load().list.filter(c => c.named).map(c => ({ ...c }));
+}
 /** Rename / recolor an instance. Returns updated meta or null. */
 function update(id, patch = {}) {
     const reg = load();
@@ -231,7 +248,9 @@ async function gc(activeIds) {
     const { session } = require('electron');
     const active = new Set([...(activeIds || [])].map(String));
     for (const c of [...load().list]) {
-        if (active.has(c.id))
+        // User-named containers are addressable (a Space can be bound to one), so
+        // they outlive having no tabs — only auto-minted personas are reaped.
+        if (c.named || active.has(c.id))
             continue;
         try {
             const sess = session.fromPartition(`persist:container-${c.id}`);
@@ -252,4 +271,4 @@ function colorFor(id) {
     return COLORS[n % COLORS.length];
 }
 
-module.exports = { get, colorFor, list, meta, createForUrl, instanceForHost, labelForUrl, update, remove, gc, COLORS };
+module.exports = { get, colorFor, list, meta, createForUrl, createNamed, listNamed, instanceForHost, labelForUrl, update, remove, gc, COLORS };

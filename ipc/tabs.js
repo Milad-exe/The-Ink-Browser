@@ -372,6 +372,15 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     ipcMain.handle('sidebar:toggleCompact', (_e) => { wm.getWindowByWebContents(_e.sender)?.tabs?.toggleCompact(); });
     ipcMain.handle('folders:assign', (_e, index, folderId) => { wm.getWindowByWebContents(_e.sender)?.tabs?.setTabFolder(index, folderId); });
     ipcMain.handle('folders:move', (_e, id, workspace) => { wm.getWindowByWebContents(_e.sender)?.tabs?.moveFolderToWorkspace(id, workspace); });
+    // ── Containers as Space Profiles ───────────────────────────────────────────
+    ipcMain.handle('containers:listNamed', (_e) => {
+        const containers = require('../features/containers');
+        return containers.listNamed();
+    });
+    ipcMain.handle('containers:createNamed', (_e, name) => {
+        const containers = require('../features/containers');
+        return containers.createNamed(name);
+    });
     ipcMain.handle('folders:list', (_e) => {
         const t = wm.getWindowByWebContents(_e.sender)?.tabs;
         if (!t) return { folders: [], assignments: [] };

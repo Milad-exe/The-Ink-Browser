@@ -55,7 +55,7 @@ function save() {
 
 function _find(id) { return load().list.find(p => p.id === String(id)) || null; }
 
-const _pub = (p) => ({ id: p.id, name: p.name, color: p.color, emoji: p.emoji || null });
+const _pub = (p) => ({ id: p.id, name: p.name, color: p.color, emoji: p.emoji || null, container: p.container || null });
 function list() { return load().list.map(_pub); }
 function meta(id) { const p = _find(id); return p ? _pub(p) : null; }
 
@@ -83,6 +83,15 @@ function update(id, patch) {
         p.name = patch.name.trim().slice(0, 24);
     if (patch && 'emoji' in patch)
         p.emoji = (patch.emoji || '').trim().slice(0, 8) || null;
+    // container: a named container id whose cookie jar this space uses, 'default'
+    // for the shared session, or null to keep the space's own jar. Changing it
+    // repoints where logins live, so it only takes effect on the next session
+    // lookup (callers re-open/switch the space).
+    if (patch && 'container' in patch) {
+        const v = patch.container;
+        p.container = (v === null || v === undefined || v === '') ? null : String(v);
+        sessions.delete(String(id)); // drop the memoised session for this space
+    }
     save();
     return _pub(p);
 }
@@ -105,6 +114,16 @@ function rename(id, name) {
 function sessionFor(id) {
     const key = String(id);
     const { session } = require('electron');
+    // A space bound to a Profile takes that container's jar instead of its own,
+    // so two spaces on the same container share one login set. Spaces created
+    // before this existed have no binding and keep their own jar.
+    const bound = _find(key)?.container;
+    if (bound) {
+        if (bound === 'default')
+            return session.defaultSession;
+        const containers = require('./containers');
+        return containers.get(bound);
+    }
     if (key === '1')
         return session.defaultSession;
     if (sessions.has(key))

@@ -2400,6 +2400,7 @@
                 };
                 openCreateSpace = () => {
                     setEmoji('');
+                    setContainer(null, 'Own');
                     nameEl.value = '';
                     panel.classList.remove('hidden');
                     bar.classList.add('creating-space');
@@ -2414,13 +2415,39 @@
                     window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance');
                     close();
                 });
+                // null = this space keeps its own jar; 'default' = shared session;
+                // otherwise a named container id shared with other spaces.
+                let container = null;
+                const valEl = document.getElementById('sc-profile-val');
+                const setContainer = (id, label) => { container = id; valEl.textContent = label; };
+                document.getElementById('sc-profile')?.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    // currentTarget is cleared once dispatch ends — read the rect
+                    // before the first await or it is null by the time we need it.
+                    const r = e.currentTarget.getBoundingClientRect();
+                    let named = [];
+                    try { named = (await window.containers.listNamed()) || []; } catch { }
+                    const rows = [
+                        ['Own (isolated)', () => setContainer(null, 'Own')],
+                        ['Default (shared)', () => setContainer('default', 'Default')],
+                    ];
+                    if (named.length) rows.push(['sep']);
+                    for (const c of named) rows.push([c.name, () => setContainer(c.id, c.name)]);
+                    rows.push(['sep'], ['New Container…', async () => {
+                        const nm = (nameEl.value.trim() || 'Container');
+                        const c = await window.containers.createNamed(nm);
+                        if (c?.id) setContainer(c.id, c.name);
+                    }]);
+                    openCtxMenu(r.right - 8, r.bottom + 4, rows);
+                });
                 const create = async () => {
                     const name = nameEl.value.trim();
                     const p = await window.profiles.create();
-                    if (p?.id && (name || chosen)) {
+                    if (p?.id && (name || chosen || container)) {
                         const patch = {};
                         if (name) patch.name = name;
                         if (chosen) patch.emoji = chosen;
+                        if (container) patch.container = container;
                         try { await window.profiles.update(p.id, patch); } catch { }
                     }
                     close();

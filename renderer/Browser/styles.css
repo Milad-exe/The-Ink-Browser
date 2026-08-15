@@ -479,6 +479,11 @@ html[data-tabbar="side"] #tab-bar.creating-space > *:not(#space-create):not(#win
   color: var(--text); font-family: var(--font); font-size: 12.5px;
 }
 .sc-row:hover { background: var(--hover); }
+.sc-pick { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
+.sc-pick-val {
+  flex-shrink: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 3px 9px; border-radius: 8px; background: var(--hover); color: var(--text-2); font-size: 12px;
+}
 .sc-actions { margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding-top: 10px; }
 .sc-btn {
   width: 100%; padding: 9px 10px; border-radius: 12px; cursor: pointer;

@@ -253,6 +253,11 @@ exposeInternal('profiles', {
     onRename: (cb) => ipcRenderer.on('rename-profile', (_e, id) => cb(id)),
 });
 // Personas — optional rename + live id→name map for labelling history/suggestions.
+// Named containers — a Space's "Profile": whose cookie jar its tabs use.
+exposeInternal('containers', {
+    listNamed: () => ipcRenderer.invoke('containers:listNamed'),
+    createNamed: (name) => ipcRenderer.invoke('containers:createNamed', name),
+});
 exposeInternal('personas', {
     map: () => ipcRenderer.invoke('personas:map'),
     rename: (id, name) => ipcRenderer.invoke('personas:rename', id, name),

@@ -25,6 +25,11 @@
         <input id="sc-name" class="sc-input" maxlength="24" placeholder="Space Name" tabindex="-1">
       </div>
       <div id="sc-emoji-picker" class="emoji-picker hidden" role="listbox" aria-label="Icon"></div>
+      <!-- Which cookie jar this space's tabs use: its own, the shared Default,
+           or a named container shared with other spaces. -->
+      <button class="sc-row sc-pick" id="sc-profile" tabindex="-1">
+        <span>Profile</span><span class="sc-pick-val" id="sc-profile-val">Own</span>
+      </button>
       <button class="sc-row" id="sc-theme" tabindex="-1">Edit Theme…</button>
       <div class="sc-actions">
         <button id="sc-create" class="sc-btn sc-btn-primary" tabindex="-1">Create Space</button>
