@@ -3213,6 +3213,13 @@
                 ['Rename Folder…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }],
                 ['Change Icon…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); const r = h ? h.getBoundingClientRect() : { right: x, top: y }; openEmojiPicker(r.right + 4, r.top, (e) => window.folders.icon(id, e)); }],
                 ['sep'],
+                ['New Subfolder…', async () => {
+                    const sub = await window.folders.create('New Folder', id);
+                    if (sub) setTimeout(() => {
+                        const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(sub)}"]`);
+                        if (h) startFolderRename(h, sub);
+                    }, 160);
+                }],
                 ['Unload All Tabs', () => {
                     for (const [i, fid] of folderState.assign.entries())
                         if (fid === id) window.tab.unload(i);
@@ -3329,20 +3336,30 @@
             // fragment MOVES the existing nodes, so the result is deterministic.
             const frag = document.createDocumentFragment();
             for (const btn of pinned) frag.appendChild(btn);
-            for (const f of folders) {
-                let header = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(f.id)}"]`) || makeFolderHeader(f);
-                header.classList.toggle('collapsed', !!f.collapsed);
-                setFolderIcon(header.querySelector('.folder-icon'), f);
-                if (!header.classList.contains('renaming')) header.querySelector('.folder-name').textContent = f.name || 'Folder';
-                frag.appendChild(header);
-                for (const btn of normal) {
-                    if (folderState.assign.get(+btn.dataset.index) !== f.id) continue;
-                    btn.classList.add('in-folder');
-                    if (f.collapsed) btn.classList.add('folder-collapsed');
-                    frag.appendChild(btn);
-                    grouped.add(btn);
+            // Folders nest: walk parents first so a child sits directly under
+            // its parent, indented, and inherits any ancestor's collapse.
+            const childrenOf = (pid) => folders.filter(f => (f.parent || null) === pid);
+            const walk = (parentId, depth, hidden) => {
+                for (const f of childrenOf(parentId)) {
+                    let header = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(f.id)}"]`) || makeFolderHeader(f);
+                    header.classList.toggle('collapsed', !!f.collapsed);
+                    header.classList.toggle('folder-collapsed', hidden);
+                    header.style.setProperty('--depth', String(depth));
+                    setFolderIcon(header.querySelector('.folder-icon'), f);
+                    if (!header.classList.contains('renaming')) header.querySelector('.folder-name').textContent = f.name || 'Folder';
+                    frag.appendChild(header);
+                    for (const btn of normal) {
+                        if (folderState.assign.get(+btn.dataset.index) !== f.id) continue;
+                        btn.classList.add('in-folder');
+                        btn.style.setProperty('--depth', String(depth + 1));
+                        if (hidden || f.collapsed) btn.classList.add('folder-collapsed');
+                        frag.appendChild(btn);
+                        grouped.add(btn);
+                    }
+                    walk(f.id, depth + 1, hidden || !!f.collapsed);
                 }
-            }
+            };
+            walk(null, 0, false);
             const actions = document.getElementById('tab-actions');
             if (actions) {
                 // Divider sits above New Tab whenever anything precedes it —

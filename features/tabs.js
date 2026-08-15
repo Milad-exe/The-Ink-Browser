@@ -1702,9 +1702,19 @@ class Tabs {
         }
         catch { }
     }
-    createFolder(name, workspace) {
+    // Folders nest up to MAX_FOLDER_DEPTH levels, matching the reference.
+    _folderDepth(id) {
+        let d = 0, cur = this.folders.find(f => f.id === id);
+        while (cur?.parent && d < 10) { cur = this.folders.find(f => f.id === cur.parent); d++; }
+        return d;
+    }
+    createFolder(name, workspace, parent) {
         const id = 'f' + (this._folderSeq++);
-        this.folders.push({ id, name: (name || 'New Folder').slice(0, 40), collapsed: false, workspace: String(workspace || this.profileId) });
+        let pid = parent ? String(parent) : null;
+        // Refuse to nest past the cap — the folder is created at the root instead.
+        if (pid && this._folderDepth(pid) >= 4)
+            pid = null;
+        this.folders.push({ id, name: (name || 'New Folder').slice(0, 40), collapsed: false, workspace: String(workspace || this.profileId), ...(pid ? { parent: pid } : {}) });
         this.broadcastFolders();
         this.saveStateDebounced?.();
         return id;
@@ -1857,6 +1867,13 @@ class Tabs {
     deleteFolder(id) {
         // "Unpack": tabs survive, just leave the folder.
         for (const [idx, fid] of [...this.tabFolders.entries()]) if (fid === id) this.tabFolders.delete(idx);
+        // Children would otherwise point at a folder that no longer exists.
+        const gone = this.folders.find(f => f.id === id);
+        for (const f of this.folders)
+            if (f.parent === id) {
+                if (gone?.parent) f.parent = gone.parent;
+                else delete f.parent;
+            }
         this.folders = this.folders.filter(f => f.id !== id);
         this.broadcastFolders();
         this.saveStateDebounced?.();

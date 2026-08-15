@@ -247,7 +247,7 @@ exposeInternal('glance', {
 });
 // Folders — tab groups within a workspace.
 exposeInternal('folders', {
-    create: (name) => ipcRenderer.invoke('folders:create', name),
+    create: (name, parent) => ipcRenderer.invoke('folders:create', name, parent),
     rename: (id, name) => ipcRenderer.invoke('folders:rename', id, name),
     remove: (id) => ipcRenderer.invoke('folders:delete', id),
     toggle: (id, collapsed) => ipcRenderer.invoke('folders:toggle', id, collapsed),

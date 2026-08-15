@@ -445,9 +445,9 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         wm.getWindowByWebContents(_e.sender)?.tabs?.closeGlance();
     });
     // ── Folders (tab groups) ───────────────────────────────────────────────────
-    ipcMain.handle('folders:create', (_e, name) => {
+    ipcMain.handle('folders:create', (_e, name, parent) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        return wd?.tabs ? wd.tabs.createFolder(name, wd.tabs.profileId) : null;
+        return wd?.tabs ? wd.tabs.createFolder(name, wd.tabs.profileId, parent) : null;
     });
     ipcMain.handle('folders:rename', (_e, id, name) => { wm.getWindowByWebContents(_e.sender)?.tabs?.renameFolder(id, name); });
     ipcMain.handle('folders:delete', (_e, id) => { wm.getWindowByWebContents(_e.sender)?.tabs?.deleteFolder(id); });
