@@ -348,6 +348,12 @@ class WindowManager {
                         tabs._folderSeq = maxSeq + 1;
                         state.tabs.forEach((t, i) => { if (t.folder) tabs.tabFolders.set(tabKeys[i], t.folder); });
                     }
+                    // User-set labels and icons override page metadata, so they
+                    // have to come back before the tabs report their own titles.
+                    state.tabs.forEach((t, i) => {
+                        if (t.label) tabs.tabLabels.set(tabKeys[i], t.label);
+                        if (t.icon) tabs.tabIcons.set(tabKeys[i], t.icon);
+                    });
                     const activeWs = String(state.activeWorkspace || state.profile || '1');
                     if (activeWs !== profileId) {
                         tabs.profileId = activeWs;

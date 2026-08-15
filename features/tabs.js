@@ -1253,6 +1253,8 @@ class Tabs {
             }
         });
         tab.webContents.on('page-title-updated', (event, title) => {
+            if (tab._unloading)
+                return; // discarding: keep the row's own title
             tab.lazyTitle = title;
             this.navigationHistory.setCurrentTitle(tabIndex, title);
             const currentUrl = this.tabUrls.get(tabIndex) || '';
@@ -1749,6 +1751,51 @@ class Tabs {
         try { this.mainWindow.webContents.send('tab-icon-changed', { index: i, icon: clean || null }); }
         catch { }
         this.saveStateDebounced?.();
+    }
+    /**
+     * Discard a tab's page while keeping its row. Rather than destroying the
+     * view (which would disturb bounds/z-order bookkeeping), this reuses the
+     * lazy-tab path: blank the contents and clear lazyLoaded, so showTab reloads
+     * the stored URL when you come back to it. The active tab is never unloaded.
+     */
+    unloadTab(index) {
+        const i = Number(index);
+        const tab = this.tabMap.get(i);
+        const url = this.tabUrls.get(i);
+        if (!tab || i === this.activeTabIndex || !url || url === 'newtab')
+            return false;
+        if (tab.lazyLoaded === false)
+            return false; // already unloaded
+        // Capture the title first — blanking the page would otherwise lose it.
+        const keep = this.tabLabels.get(i) || this.computeDisplayTitleFor(i) || tab.lazyTitle || 'New Tab';
+        // Blanking navigates, which would drive the normal title/url handlers and
+        // leave the row reading "about:blank" with its stored url replaced — so
+        // flag it, then put the real url and title back once the blank settles.
+        tab._unloading = true;
+        try {
+            tab.webContents.stop();
+            tab.webContents.loadURL('about:blank');
+        }
+        catch { }
+        tab.lazyLoaded = false;
+        tab.lazyTitle = keep;
+        const restore = () => {
+            tab._unloading = false;
+            this.tabUrls.set(i, url);
+            tab.lazyTitle = keep;
+            this.sendTabUpdate(i, tab, url, keep);
+        };
+        try { tab.webContents.once('did-finish-load', restore); }
+        catch { }
+        setTimeout(restore, 900); // in case the blank load reports nothing
+        return true;
+    }
+    // Unload every tab in a workspace except the active one.
+    unloadWorkspace(ws) {
+        let n = 0;
+        for (const idx of this.tabsInWorkspace(ws || this.profileId))
+            if (this.unloadTab(idx)) n++;
+        return n;
     }
     reorderFolders(ids) {
         const ws = String(this.profileId);
@@ -2405,6 +2452,8 @@ class Tabs {
                 container: this.tabContainers.get(idx) || null,
                 workspace: this.tabProfiles.get(idx) || '1',
                 folder: this.tabFolders.get(idx) || null,
+                label: this.tabLabels.get(idx) || null,
+                icon: this.tabIcons.get(idx) || null,
             };
         });
         // Map active to its ordinal within the SAVED list (selected), not the

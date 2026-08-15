@@ -2544,6 +2544,7 @@
                                 ['Change Name…', () => openProfileModal(p.id)],
                                 ['Change Icon…', () => openProfileModal(p.id)],
                                 ['Edit Theme…', () => window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance')],
+                                ['Unload Space', () => window.tab.unloadWorkspace(p.id)],
                                 ['Set Profile', [
                                     ['Own (isolated)', () => window.profiles.update(p.id, { container: null })],
                                     ['Default (shared)', () => window.profiles.update(p.id, { container: 'default' })],
@@ -2784,6 +2785,7 @@
                     ['Mute Tab', () => window.tab.toggleMute(idx)],
                     ['sep'],
                     [isPinned ? 'Unpin Tab' : 'Pin Tab', () => window.tab.pin(idx)],
+                    ['Unload Tab', () => window.tab.unload(idx)],
                     ['Duplicate Tab', async () => {
                         const url = await window.tab.getTabUrl(idx);
                         const ni = await window.tab.add();
@@ -3203,6 +3205,11 @@
             openCtxMenu(x, y, [
                 ['Rename Folder…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }],
                 ['Change Icon…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); const r = h ? h.getBoundingClientRect() : { right: x, top: y }; openEmojiPicker(r.right + 4, r.top, (e) => window.folders.icon(id, e)); }],
+                ['sep'],
+                ['Unload All Tabs', () => {
+                    for (const [i, fid] of folderState.assign.entries())
+                        if (fid === id) window.tab.unload(i);
+                }],
                 ['sep'],
                 ...(spaceRows.length ? [['Change Space', spaceRows], ['sep']] : []),
                 ['Unpack Folder', () => window.folders.remove(id)],
