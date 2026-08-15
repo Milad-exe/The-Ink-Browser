@@ -2142,6 +2142,8 @@
                         if (currentTabUrl) window.browserBookmarks.add(currentTabUrl, title);
                     }],
                     ['Reopen Closed Tab', () => window.tabsUI.reopenClosed()],
+                    ['sep'],
+                    ['Edit Theme…', () => window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance')],
                 ]);
             });
             window.addEventListener('resize', () => setTimeout(() => { updateTabWidths(tabs.size); updateScrollShadows(); }, 100));
@@ -2431,6 +2433,7 @@
                             rows.push(
                                 ['Change Name…', () => openProfileModal(p.id)],
                                 ['Change Icon…', () => openProfileModal(p.id)],
+                                ['Edit Theme…', () => window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance')],
                                 ['sep'],
                                 ['Create Space', async () => { const np = await window.profiles.create(); if (np?.id) openProfileModal(np.id); }],
                             );
