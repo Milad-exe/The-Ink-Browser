@@ -2376,7 +2376,12 @@
                 catch { }
                 _spacesCache = all; // menus need the space list without awaiting
                 if (cur) {
+                    // Restored tabs are tagged and filtered before this resolves, so
+                    // they get measured against the default workspace and all end up
+                    // hidden. Re-filter once the real one is known.
+                    const wsChanged = activeWorkspace !== cur.id;
                     activeWorkspace = cur.id;
+                    if (wsChanged) filterTabsByWorkspace();
                     if (badge) {
                         badge.classList.toggle('has-emoji', !!cur.emoji);
                         badge.classList.toggle('is-dot', !cur.emoji);
@@ -2601,12 +2606,36 @@
                 const idx = parseInt(index);
                 const isPinned = btn.classList.contains('pinned');
                 const curFolder = folderState.assign.get(idx) || null;
-                const rows = [['New Tab', () => window.tab.add()], ['sep'], [isPinned ? 'Unpin Tab' : 'Pin Tab', () => window.tab.pin(idx)]];
+                // Grouped as in the reference design doc; folder targets collapse
+                // into one submenu instead of a row per folder.
+                const rows = [['New Tab', () => window.tab.add()]];
                 if (!isPinned) {
-                    if (curFolder) rows.push(['Remove from Folder', () => window.folders.assign(idx, null)]);
-                    else for (const f of folderState.folders) rows.push([`Add to “${f.name || 'Folder'}”`, () => window.folders.assign(idx, f.id)]);
+                    const moves = folderState.folders
+                        .filter(f => f.id !== curFolder)
+                        .map(f => [f.name || 'Folder', () => window.folders.assign(idx, f.id)]);
+                    if (curFolder) moves.push(['sep'], ['Remove from Folder', () => window.folders.assign(idx, null)]);
+                    if (moves.length) rows.push(['Move to Folder', moves]);
                 }
-                rows.push(['sep'], ['Close Tab', () => window.tab.remove(idx), 'danger']);
+                rows.push(
+                    ['sep'],
+                    ['Reload Tab', () => window.tab.reload(idx)],
+                    ['Mute Tab', () => window.tab.toggleMute(idx)],
+                    ['sep'],
+                    [isPinned ? 'Unpin Tab' : 'Pin Tab', () => window.tab.pin(idx)],
+                    ['Duplicate Tab', async () => {
+                        const url = await window.tab.getTabUrl(idx);
+                        const ni = await window.tab.add();
+                        if (url && typeof ni === 'number') window.tab.loadUrl(ni, url);
+                    }],
+                    ['sep'],
+                    ['Bookmark Tab…', async () => {
+                        const url = await window.tab.getTabUrl(idx);
+                        const title = btn.querySelector('.tab-title')?.textContent || '';
+                        if (url) window.browserBookmarks.add(url, title);
+                    }],
+                    ['sep'],
+                    ['Close Tab', () => window.tab.remove(idx), 'danger'],
+                );
                 openCtxMenu(e.clientX, e.clientY, rows);
             });
             // Firefox-style tab drag: pointer-tracked, and NOTHING moves until the

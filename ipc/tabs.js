@@ -133,8 +133,8 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     // ── Basic tab operations ──────────────────────────────────────────────────
     ipcMain.handle('addTab', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        if (wd)
-            wd.tabs.createTab();
+        // Returns the new tab's index so callers can load into it (Duplicate Tab).
+        return wd ? wd.tabs.createTab() : null;
     });
     // Private tab: fully isolated in-memory session, wiped when the tab closes.
     ipcMain.handle('addPrivateTab', (_e) => {
