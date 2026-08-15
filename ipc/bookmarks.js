@@ -26,7 +26,7 @@ function register(ipcMain, { wm, webContents }) {
         return null;
     };
     // ── Read ─────────────────────────────────────────────────────────────────
-    ipcMain.handle('bookmarks-get', async () => {
+    ipcMain.handle('bookmarks-get', async (_e) => {
         return bmFor(_e).getAll();
     });
     // The star acts on the ACTIVE tab's page, so its persona (if any) tags the

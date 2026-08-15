@@ -3006,10 +3006,21 @@
         function openCtxMenu(x, y, rows) {
             if (_closeCtxMenu) _closeCtxMenu();
             const chain = []; // every menu element currently on screen, root first
-            const place = (menu, mx, my) => {
+            // The page is a native view painted OVER the chrome, so a menu that
+            // spills past the sidebar is hidden behind it. Keep menus inside the
+            // chrome's own column; submenus flip left when they'd overflow.
+            const chromeRight = () => {
+                const bar = document.getElementById('tab-bar');
+                if (document.documentElement.dataset.tabbar !== 'side' || !bar) return window.innerWidth;
+                return bar.getBoundingClientRect().right;
+            };
+            const place = (menu, mx, my, parentRect) => {
                 document.body.appendChild(menu);
                 const mw = menu.offsetWidth || 190, mh = menu.offsetHeight || 130;
-                menu.style.left = Math.max(6, Math.min(mx, window.innerWidth - mw - 6)) + 'px';
+                const limit = chromeRight() - 6;
+                let left = mx;
+                if (parentRect && left + mw > limit) left = parentRect.left - mw + 2; // flip
+                menu.style.left = Math.max(6, Math.min(left, limit - mw)) + 'px';
                 menu.style.top = Math.max(6, Math.min(my, window.innerHeight - mh - 6)) + 'px';
             };
             const closeFrom = (depth) => { while (chain.length > depth) chain.pop().remove(); };
@@ -3030,7 +3041,7 @@
                         const rc = b.getBoundingClientRect();
                         const child = build(sub, depth + 1);
                         chain.push(child);
-                        place(child, rc.right - 2, rc.top - 5);
+                        place(child, rc.right - 2, rc.top - 5, rc);
                     });
                     b.addEventListener('click', (e) => {
                         if (sub) { e.stopPropagation(); return; }
@@ -3119,7 +3130,12 @@
             menu.appendChild(grid);
             document.body.appendChild(menu);
             const mw = menu.offsetWidth || 240, mh = menu.offsetHeight || 160;
-            menu.style.left = Math.max(6, Math.min(x, window.innerWidth - mw - 6)) + 'px';
+            // Same constraint as the context menus — stay inside the chrome column
+            // or the page view paints over it.
+            const bar = document.getElementById('tab-bar');
+            const limit = (document.documentElement.dataset.tabbar === 'side' && bar)
+                ? bar.getBoundingClientRect().right - 6 : window.innerWidth - 6;
+            menu.style.left = Math.max(6, Math.min(x, limit - mw)) + 'px';
             menu.style.top = Math.max(6, Math.min(y, window.innerHeight - mh - 6)) + 'px';
             setTimeout(() => search.focus(), 0);
             const onDoc = (e) => { if (!menu.contains(e.target)) _closeCtxMenu?.(); };
