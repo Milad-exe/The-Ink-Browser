@@ -79,7 +79,6 @@
                 btn.classList.toggle('ws-hidden', ws !== activeWorkspace);
             }
             updateChromeTabs(document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden)').length);
-            syncPinCols();
         }
         let activeTabIndex = 0;
         let currentTabUrl = '';
@@ -1988,8 +1987,7 @@
                     window.tab.reorder(ordered);
                 updateTabWidths(tabs.size);
                 updateScrollShadows();
-                syncPinCols();
-            });
+                });
             // Split view: mark the two tabs that are on screen together so the strip
             // shows the pairing (the focused one keeps the normal active highlight).
             try {
@@ -2738,18 +2736,24 @@
                     ['Duplicate Tab', async () => {
                         const url = await window.tab.getTabUrl(idx);
                         const ni = await window.tab.add();
-                        if (url && typeof ni === 'number') window.tab.loadUrl(ni, url);
+                        if (typeof ni !== 'number') return;
+                        // tabUrls holds TOKENS for internal pages ('newtab',
+                        // 'settings/privacy'), which are not loadable URLs — passing
+                        // one through sanitizeUrl lands on the 404 page. A fresh tab
+                        // already is the new-tab page.
+                        const target = northstarUrlFor(url);
+                        if (target) window.tab.loadUrl(ni, target);
                     }],
                     ['sep'],
                     ['Add to Essentials', async () => {
                         const url = await window.tab.getTabUrl(idx);
                         const title = btn.querySelector('.tab-title')?.textContent || '';
-                        if (url) window.essentials.add(url, title, null);
+                        if (/^https?:/i.test(url || '')) window.essentials.add(url, title, null);
                     }],
                     ['Bookmark Tab…', async () => {
                         const url = await window.tab.getTabUrl(idx);
                         const title = btn.querySelector('.tab-title')?.textContent || '';
-                        if (url) window.browserBookmarks.add(url, title);
+                        if (/^https?:/i.test(url || '')) window.browserBookmarks.add(url, title);
                     }],
                     ['sep'],
                     ['Close Tab', () => window.tab.remove(idx), 'danger'],
@@ -3020,6 +3024,13 @@
         // The menu itself is rendered by the CtxMenu overlay view — chrome DOM
         // cannot paint above the page's native view. Handlers can't cross IPC, so
         // rows go out as labels and a picked PATH of indices comes back here.
+        // tabUrls stores internal pages as tokens; map one to something loadable
+        // (null when the fresh tab already shows it, i.e. 'newtab').
+        function northstarUrlFor(url) {
+            if (!url || url === 'newtab') return null;
+            if (/^(settings|history|bookmarks)(\/[a-z]+)?$/i.test(url)) return 'northstar://' + url;
+            return /^[a-z]+:/i.test(url) ? url : null;
+        }
         function openCtxMenu(x, y, rows) {
             const serialize = (rs) => rs.map((r) => {
                 if (r[0] === 'sep') return { sep: true };
@@ -3129,12 +3140,6 @@
             input.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); });
             input.addEventListener('blur', () => done(true));
         }
-        // Pin tiles share the tab grid with full-width rows, so auto-fit can never
-        // collapse a track. Drive the track count off the visible pin count instead.
-        function syncPinCols() {
-            const n = tabsContainer.querySelectorAll('.tab-button.pinned:not(.ws-hidden)').length;
-            tabsContainer.style.setProperty('--pin-cols', String(Math.min(Math.max(n, 1), 4)));
-        }
         function layoutFolders() {
             if (!tabsContainer) return;
             const folders = folderState.folders;
@@ -3143,7 +3148,6 @@
             tabsContainer.querySelectorAll('.tab-button.in-folder').forEach(b => b.classList.remove('in-folder', 'folder-collapsed'));
             const pinned = [...tabsContainer.querySelectorAll('.tab-button.pinned')];
             const normal = [...tabsContainer.querySelectorAll('.tab-button:not(.pinned)')];
-            syncPinCols();
             const grouped = new Set();
             // Panel order is composed here in full — pinned tiles, folders and
             // their members, the New Tab row, then loose tabs — and appending the
@@ -3166,7 +3170,9 @@
             }
             const actions = document.getElementById('tab-actions');
             if (actions) {
-                actions.classList.toggle('after-folders', folders.length > 0);
+                // Divider sits above New Tab whenever anything precedes it —
+                // folders or pinned tiles — separating that block from the tabs.
+                actions.classList.toggle('after-folders', folders.length > 0 || pinned.length > 0);
                 frag.appendChild(actions);
             }
             for (const btn of normal) if (!grouped.has(btn)) frag.appendChild(btn);

@@ -229,12 +229,9 @@ html[data-tabbar="side"] #tab-bar #window-controls .wc-btn { -webkit-app-region:
    (JS sets width:72px for the top strip; height matters here instead). */
 html[data-tabbar="side"] #window-controls { display: none; }
 html[data-tabbar="side"] #tabs-container {
-  /* CSS grid: pinned favicon tiles fill the width in up to 4 columns —
-     2 pins → 2 half-width tiles, collapsing to fewer/wider with fewer pins;
-     normal tab rows span the full width. The column count is driven from the
-     visible pin count (--pin-cols, set in layoutTabs): auto-fit cannot collapse
-     empty tracks here because the full-width rows span every track. */
-  display: grid; grid-template-columns: repeat(var(--pin-cols, 4), minmax(0, 1fr));
+  /* One column: pinned tabs are rows like the rest (the tile grid belonged to
+     Essentials, which has its own container above). */
+  display: grid; grid-template-columns: minmax(0, 1fr);
   align-content: start; gap: 5px;
   height: auto; width: auto; flex: 0 1 auto; min-height: 0;
   overflow-x: hidden; overflow-y: auto; padding: 2px;
@@ -272,25 +269,17 @@ html[data-tabbar="side"] .tab-button.in-split:not(.active) {
 }
 /* Favicon a touch larger in the roomy side rows. */
 html[data-tabbar="side"] .tab-favicon { width: 17px; height: 17px; }
-/* Pinned tabs: favicon-only rounded tiles that wrap into a responsive grid at the
-   top of the strip — columns reflow as the sidebar resizes. Unpinned
-   rows below force a full-width line each. */
+/* Pinned tabs are workspace-scoped and read as NORMAL rows docked above the
+   loose tabs (the big favicon tiles are the Essentials treatment, not this one).
+   Only the title weight marks them out. */
 html[data-tabbar="side"] .tab-button { position: relative; grid-column: 1 / -1; }
 html[data-tabbar="side"] .tab-button.pinned {
-  grid-column: auto; min-width: 0; max-width: none; width: auto; height: 58px;
-  padding: 0; gap: 0; justify-content: center; border-radius: 14px;
-  background: var(--surface);
-  box-shadow: inset 0 0 0 0.5px var(--border), 0 1px 2px rgba(8,10,20,0.06);
+  padding: 0 8px 0 11px; gap: 10px; justify-content: flex-start;
 }
-html[data-tabbar="side"] .tab-button.pinned:hover { background: var(--hover); }
-html[data-tabbar="side"] .tab-button.pinned .tab-title { display: none; }
-html[data-tabbar="side"] .tab-button.pinned .tab-favicon { width: 20px; height: 20px; }
-html[data-tabbar="side"] .tab-button.pinned.active {
-  color: var(--text);
-  box-shadow: inset 0 0 0 1.5px var(--accent), 0 1px 3px rgba(8,10,20,0.12);
-}
-/* Divider between the pinned grid and the normal tabs (only when tabs are pinned). */
-html[data-tabbar="side"] .tab-button.pinned + .tab-button:not(.pinned) { margin-top: 11px; }
+/* Undo the top-strip rule that hides the label on pinned tabs — in the sidebar
+   they are ordinary rows. */
+html[data-tabbar="side"] .tab-button.pinned .tab-title { display: block; font-weight: 600; }
+html[data-tabbar="side"] .tab-button.pinned + .tab-button:not(.pinned) { margin-top: 4px; }
 html[data-tabbar="side"] .tab-button.pinned + .tab-button:not(.pinned)::before {
   content: ''; position: absolute; left: 2px; right: 2px; top: -7px;
   height: 1px; background: var(--border-2);

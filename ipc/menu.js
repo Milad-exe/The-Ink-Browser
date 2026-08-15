@@ -9,7 +9,8 @@ const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
 const { closeWindowMenu, closeFolderDropdown } = require('./utils');
 const MENU_WIDTH = 268;
-const MENU_HEIGHT = 486; // grows with menu rows (renderer/Menu/index.html)
+const MENU_HEIGHT = 566; // must cover every row in renderer/Menu/index.html
+// (12 rows + zoom + separators; adding a row without raising this clips the menu)
 function register(ipcMain, { wm }) {
     // ── Open ─────────────────────────────────────────────────────────────────
     ipcMain.handle('open', (_e) => {
