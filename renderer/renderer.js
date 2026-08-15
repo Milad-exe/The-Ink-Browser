@@ -2137,6 +2137,7 @@
                     ['New Tab', () => window.palette.open()],
                     ['New Folder', newFolderInline],
                     ['sep'],
+                    ['Select All Tabs', () => selectAllTabs()],
                     ['Reload Selected Tab', () => window.tab.reload(activeTabIndex)],
                     ['Bookmark Selected Tab…', () => {
                         const btn = tabs.get(activeTabIndex);
@@ -2395,6 +2396,30 @@
         // The toolbar badge shows this window's profile (coloured initial); click
         // opens the native switcher menu (built in ipc/tabs.js). Rename via modal.
         let activeWorkspace = '1';
+        // Multi-select: Cmd/Ctrl-click toggles a tab, Shift-click takes the range
+        // from the last click. Bulk actions in the tab menu act on this set when
+        // it holds more than one tab.
+        const selectedTabs = new Set();
+        let lastClickedTab = null;
+        function paintSelection() {
+            for (const [idx, btn] of tabs)
+                btn.classList.toggle('multi-selected', selectedTabs.has(idx));
+        }
+        function clearSelection() {
+            if (!selectedTabs.size) return;
+            selectedTabs.clear();
+            paintSelection();
+        }
+        function selectAllTabs() {
+            selectedTabs.clear();
+            for (const b of document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden)'))
+                selectedTabs.add(parseInt(b.dataset.index));
+            paintSelection();
+        }
+        // The set is what a bulk action applies to; a lone tab falls back to idx.
+        function selectionFor(idx) {
+            return selectedTabs.size > 1 && selectedTabs.has(idx) ? [...selectedTabs] : [idx];
+        }
         let _spacesCache = [];
         let _containersCache = []; // named containers, for the Set Profile menus
         try {
@@ -2914,7 +2939,10 @@
                         if (/^https?:/i.test(url || '')) window.browserBookmarks.add(url, title);
                     }],
                     ['sep'],
-                    ['Close Tab', () => window.tab.remove(idx), 'danger'],
+                    ['Select All Tabs', () => selectAllTabs()],
+                    ['sep'],
+                    [selectionFor(idx).length > 1 ? `Close ${selectionFor(idx).length} Tabs` : 'Close Tab',
+                        () => { for (const i of selectionFor(idx)) window.tab.remove(i); clearSelection(); }, 'danger'],
                 );
                 openCtxMenu(e.clientX, e.clientY, rows);
             });
@@ -2934,9 +2962,31 @@
                 // Pinned sidebar tiles peek in a Glance on a plain click instead of
                 // switching — the switch is skipped here and the glance fires on
                 // release (below), so a drag still reorders them.
+                const idxNum = parseInt(index);
+                if (e.metaKey || e.ctrlKey) {
+                    // Toggle this tab in the selection without switching to it.
+                    if (selectedTabs.has(idxNum)) selectedTabs.delete(idxNum);
+                    else selectedTabs.add(idxNum);
+                    lastClickedTab = idxNum;
+                    paintSelection();
+                    return;
+                }
+                if (e.shiftKey && lastClickedTab !== null) {
+                    const order = [...document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden)')]
+                        .map(b => parseInt(b.dataset.index));
+                    const a = order.indexOf(lastClickedTab), b2 = order.indexOf(idxNum);
+                    if (a >= 0 && b2 >= 0) {
+                        selectedTabs.clear();
+                        for (const i of order.slice(Math.min(a, b2), Math.max(a, b2) + 1)) selectedTabs.add(i);
+                        paintSelection();
+                        return;
+                    }
+                }
+                clearSelection();
+                lastClickedTab = idxNum;
                 const pinnedGlance = sideTabs() && btn.classList.contains('pinned');
-                if (parseInt(index) !== activeTabIndex && !pinnedGlance)
-                    window.tab.switch(parseInt(index));
+                if (idxNum !== activeTabIndex && !pinnedGlance)
+                    window.tab.switch(idxNum);
                 const startX = e.clientX, startY = e.clientY;
                 let mode = 'idle'; // idle → drag
                 let outside = false; // pointer currently beyond the strip

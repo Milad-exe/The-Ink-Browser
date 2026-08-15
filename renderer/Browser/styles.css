@@ -1073,3 +1073,8 @@ html[data-tabbar="side"] .sb-workspaces.reordering {
 }
 html[data-tabbar="side"] .sb-workspaces.reordering .sb-ws { cursor: grab; }
 }
+
+@layer components {
+/* Multi-selected tabs read as a group without stealing the active tab's look. */
+html[data-tabbar="side"] .tab-button.multi-selected { box-shadow: inset 0 0 0 1.5px var(--accent-2, var(--accent)); }
+}
