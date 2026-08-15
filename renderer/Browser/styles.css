@@ -451,6 +451,44 @@ html[data-tabbar="side"][data-rail="on"] .sb-workspaces { flex-direction: column
 html[data-tabbar="side"][data-rail="on"] .sb-ws { justify-content: center; padding: 0; }
 html[data-tabbar="side"][data-rail="on"] .sb-ws-name { display: none; }
 
+/* ── Create a Space (in-sidebar form) ──────────────────────────────────────── */
+/* While it's up the rest of the sidebar is hidden, so the form owns the column. */
+html[data-tabbar="side"] #tab-bar.creating-space > *:not(#space-create):not(#window-controls):not(#sidebar-resizer) { display: none !important; }
+.space-create { display: flex; flex-direction: column; gap: 8px; padding: 6px 4px; -webkit-app-region: no-drag; }
+.space-create.hidden { display: none; }
+.sc-title { font-size: 15px; font-weight: 650; color: var(--text); }
+.sc-sub { font-size: 11.5px; line-height: 1.45; color: var(--text-3); margin-bottom: 4px; }
+.sc-namerow {
+  display: flex; align-items: center; gap: 8px; padding: 5px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+}
+.sc-emoji {
+  width: 30px; height: 30px; flex-shrink: 0; border-radius: 9px; cursor: pointer;
+  background: transparent; border: 1px dashed var(--border-2); color: var(--text-2);
+  font-size: 15px; line-height: 1; display: flex; align-items: center; justify-content: center;
+}
+.sc-emoji:hover { background: var(--hover); }
+.sc-emoji.has-emoji { border-style: solid; }
+.sc-input {
+  flex: 1; min-width: 0; height: 30px; border: none; background: transparent;
+  color: var(--text); font-family: var(--font); font-size: 13px; outline: none;
+}
+.sc-row {
+  width: 100%; text-align: center; padding: 9px 10px; border: none; cursor: pointer;
+  background: var(--surface); border-radius: 12px;
+  color: var(--text); font-family: var(--font); font-size: 12.5px;
+}
+.sc-row:hover { background: var(--hover); }
+.sc-actions { margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding-top: 10px; }
+.sc-btn {
+  width: 100%; padding: 9px 10px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font-family: var(--font); font-size: 12.5px;
+}
+.sc-btn:hover { background: var(--hover); }
+.sc-btn-primary { border-color: transparent; background: var(--accent); color: #fff; }
+.sc-btn-primary:hover { filter: brightness(1.08); background: var(--accent); }
+
 /* ── Sidebar foot: workspace switcher + settings (bottom bar) ──────────────── */
 .sidebar-foot { display: none; }
 html[data-tabbar="side"] .sidebar-foot {

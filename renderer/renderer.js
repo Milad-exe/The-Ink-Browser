@@ -2377,6 +2377,62 @@
             const badge = document.getElementById('profile-badge');
             const wsRow = document.getElementById('sb-workspaces');
             let openProfileModal = () => {}; // assigned when the modal wires up below
+            let openCreateSpace = () => {}; // assigned by initCreateSpace below
+            // Create a Space: an in-sidebar form (reference) rather than a modal.
+            // The space is created only on submit, so cancelling leaves nothing behind.
+            function initCreateSpace() {
+                const panel = document.getElementById('space-create');
+                const bar = document.getElementById('tab-bar');
+                if (!panel || !bar) return;
+                const nameEl = document.getElementById('sc-name');
+                const emojiEl = document.getElementById('sc-emoji');
+                const pickerEl = document.getElementById('sc-emoji-picker');
+                let chosen = '';
+                const setEmoji = (e) => {
+                    chosen = e || '';
+                    emojiEl.textContent = chosen;
+                    emojiEl.classList.toggle('has-emoji', !!chosen);
+                };
+                const close = () => {
+                    panel.classList.add('hidden');
+                    bar.classList.remove('creating-space');
+                    pickerEl?.classList.add('hidden');
+                };
+                openCreateSpace = () => {
+                    setEmoji('');
+                    nameEl.value = '';
+                    panel.classList.remove('hidden');
+                    bar.classList.add('creating-space');
+                    nameEl.focus();
+                };
+                emojiEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const r = emojiEl.getBoundingClientRect();
+                    openEmojiPicker(r.left, r.bottom + 4, setEmoji);
+                });
+                document.getElementById('sc-theme')?.addEventListener('click', () => {
+                    window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance');
+                    close();
+                });
+                const create = async () => {
+                    const name = nameEl.value.trim();
+                    const p = await window.profiles.create();
+                    if (p?.id && (name || chosen)) {
+                        const patch = {};
+                        if (name) patch.name = name;
+                        if (chosen) patch.emoji = chosen;
+                        try { await window.profiles.update(p.id, patch); } catch { }
+                    }
+                    close();
+                    if (p?.id) window.profiles.switch(p.id);
+                };
+                document.getElementById('sc-create')?.addEventListener('click', create);
+                document.getElementById('sc-cancel')?.addEventListener('click', close);
+                nameEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') create();
+                    if (e.key === 'Escape') close();
+                });
+            }
             const refresh = async () => {
                 let cur = null, all = [];
                 try { cur = await window.profiles.current(); }
@@ -2430,7 +2486,7 @@
                                 ['Change Icon…', () => openProfileModal(p.id)],
                                 ['Edit Theme…', () => window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance')],
                                 ['sep'],
-                                ['Create Space', async () => { const np = await window.profiles.create(); if (np?.id) openProfileModal(np.id); }],
+                                ['Create Space', () => openCreateSpace()],
                             );
                             openCtxMenu(e.clientX, e.clientY, rows);
                         });
@@ -2438,6 +2494,7 @@
                     }
                 }
             };
+            initCreateSpace();
             refresh();
             try { window.profiles.onChanged(refresh); }
             catch { }
@@ -2462,14 +2519,10 @@
             }
             // The foot "+" opens a menu rather than creating a space outright —
             // it's the create-anything affordance in the reference.
-            const createSpace = async () => {
-                const p = await window.profiles.create();
-                if (p?.id) openProfileModal(p.id); // prompt to name the new profile
-            };
             document.getElementById('sb-add-ws')?.addEventListener('click', (e) => {
                 const r = e.currentTarget.getBoundingClientRect();
                 openCtxMenu(r.left, r.top - 8, [
-                    ['Create Space', createSpace],
+                    ['Create Space', () => openCreateSpace()],
                     ['Create Folder', () => newFolderInline()],
                     ['sep'],
                     ['New Tab', () => window.tab.add()],

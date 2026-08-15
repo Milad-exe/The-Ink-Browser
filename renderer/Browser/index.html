@@ -15,6 +15,22 @@
     <div id="sidebar-resizer" class="sidebar-resizer" title="Drag to resize"></div>
     <!-- Window controls — position/style set by JS based on platform -->
     <div id="window-controls" class="window-controls"></div>
+    <!-- Create-a-Space form. Lives in the sidebar (chrome, outside the page
+         bounds) so unlike the modals it needs no page-view collapse. -->
+    <div id="space-create" class="space-create hidden" role="dialog" aria-label="Create a Space">
+      <div class="sc-title">Create a Space</div>
+      <div class="sc-sub">Spaces keep their own tabs, essentials and history.</div>
+      <div class="sc-namerow">
+        <button type="button" id="sc-emoji" class="sc-emoji" tabindex="-1" aria-label="Choose icon" title="Choose icon"></button>
+        <input id="sc-name" class="sc-input" maxlength="24" placeholder="Space Name" tabindex="-1">
+      </div>
+      <div id="sc-emoji-picker" class="emoji-picker hidden" role="listbox" aria-label="Icon"></div>
+      <button class="sc-row" id="sc-theme" tabindex="-1">Edit Theme…</button>
+      <div class="sc-actions">
+        <button id="sc-create" class="sc-btn sc-btn-primary" tabindex="-1">Create Space</button>
+        <button id="sc-cancel" class="sc-btn" tabindex="-1">Cancel</button>
+      </div>
+    </div>
     <!-- Essentials: pinned favourites (sidebar mode only, per profile) -->
     <div id="essentials" class="essentials" aria-label="Essentials"></div>
     <!-- Muted current-space label above the tab list (a "Space" header) -->
