@@ -445,6 +445,8 @@ class WindowManager {
                 return windowData;
             if (windowData.ctxMenu?.webContents === webContents)
                 return windowData;
+            if (windowData.palette?.webContents === webContents)
+                return windowData;
             if (windowData.extensionsPanel?.webContents === webContents)
                 return windowData;
             if (windowData.passwordPrompt?.webContents === webContents)

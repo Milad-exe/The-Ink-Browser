@@ -420,6 +420,11 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (ok) broadcastEssentials();
         return ok;
     });
+    ipcMain.handle('essentials:icon', (_e, url, persona, icon) => {
+        const ok = profiles.setEssentialIcon(wm.profileOf(_e.sender), url, persona || null, icon);
+        if (ok) broadcastEssentials();
+        return ok;
+    });
     ipcMain.handle('essentials:remove', (_e, url, persona) => {
         const ok = profiles.removeEssential(wm.profileOf(_e.sender), url, persona || null);
         broadcastEssentials();

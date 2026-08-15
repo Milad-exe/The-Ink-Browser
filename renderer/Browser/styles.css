@@ -1041,3 +1041,8 @@ html[data-private-window="true"] .private-badge { display: flex; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
 
 }
+
+@layer components {
+/* Pinned Essential icon (emoji) sits where the favicon would. */
+.ess-fallback.ess-icon { background: transparent; font-size: 17px; }
+}

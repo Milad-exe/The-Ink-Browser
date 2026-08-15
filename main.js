@@ -89,6 +89,7 @@ const passwordsIpc = require('./ipc/passwords');
 const siteInfoIpc = require('./ipc/site-info');
 const miniPlayerIpc = require('./ipc/mini-player');
 const ctxMenuIpc = require('./ipc/ctxmenu');
+const paletteIpc = require('./ipc/palette');
 // ── App ──────────────────────────────────────────────────────────────────────
 class Northstar {
     windowManager;
@@ -121,6 +122,7 @@ class Northstar {
         settingsIpc.register(ipcMain, deps);
         downloadsIpc.register(ipcMain, deps);
         ctxMenuIpc.register(ipcMain, deps);
+        paletteIpc.register(ipcMain, deps);
         extensionsIpc.register(ipcMain, deps);
         passwordsIpc.register(ipcMain, deps);
         siteInfoIpc.register(ipcMain, deps);

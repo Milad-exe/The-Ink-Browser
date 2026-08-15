@@ -221,6 +221,16 @@ function addEssential(_id, e) {
     save();
     return true;
 }
+// A static icon pinned to an Essential, overriding the live favicon (upstream
+// behaviour: an Essential's icon does not change when the site's does).
+function setEssentialIcon(_id, url, persona, icon) {
+    const e = _essentials().find(x => x.url === url && (x.persona || null) === (persona || null));
+    if (!e)
+        return false;
+    e.icon = (icon || '').trim().slice(0, 8) || null;
+    save();
+    return true;
+}
 function removeEssential(_id, url, persona = null) {
     const list = _essentials();
     const i = list.findIndex(x => x.url === url && (x.persona || null) === (persona || null));
@@ -231,4 +241,4 @@ function removeEssential(_id, url, persona = null) {
     return true;
 }
 
-module.exports = { list, meta, create, remove, rename, update, sessionFor, essentials, addEssential, removeEssential, COLORS, EMOJIS };
+module.exports = { list, meta, create, remove, rename, update, sessionFor, essentials, addEssential, removeEssential, setEssentialIcon, COLORS, EMOJIS };

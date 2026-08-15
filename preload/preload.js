@@ -229,6 +229,7 @@ exposeInternal('essentials', {
     list: () => ipcRenderer.invoke('essentials:list'),
     add: (url, title, persona) => ipcRenderer.invoke('essentials:add', url, title, persona),
     remove: (url, persona) => ipcRenderer.invoke('essentials:remove', url, persona),
+    setIcon: (url, persona, icon) => ipcRenderer.invoke('essentials:icon', url, persona, icon),
     onChanged: (cb) => ipcRenderer.on('essentials-changed', () => cb()),
 });
 // Glance — floating page preview over the current tab.
@@ -273,6 +274,10 @@ exposeInternal('profiles', {
 exposeInternal('ctxMenu', {
     open: (data) => ipcRenderer.invoke('ctxmenu:open', data),
     onPicked: (cb) => ipcRenderer.on('ctxmenu:picked', (_e, result) => cb(result)),
+});
+// Command palette — opens in place of creating a blank tab.
+exposeInternal('palette', {
+    open: () => ipcRenderer.invoke('palette:open'),
 });
 exposeInternal('containers', {
     listNamed: () => ipcRenderer.invoke('containers:listNamed'),

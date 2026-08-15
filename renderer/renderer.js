@@ -229,7 +229,7 @@
                 else
                     window.tab.reload(activeTabIndex);
             });
-            addBtn.addEventListener('click', () => window.tab.add());
+            addBtn.addEventListener('click', () => window.palette.open());
             window.addEventListener('click', (e) => {
                 if (menuOpen)
                     window.electronAPI.windowClick({ x: e.clientX, y: e.clientY });
@@ -2132,7 +2132,7 @@
                     ['Compact Mode', [
                         ['Toggle compact mode', () => window.tabsUI.toggleCompact()],
                     ]],
-                    ['New Tab', () => window.tab.add()],
+                    ['New Tab', () => window.palette.open()],
                     ['New Folder', newFolderInline],
                     ['sep'],
                     ['Reload Selected Tab', () => window.tab.reload(activeTabIndex)],
@@ -2323,12 +2323,21 @@
                     const fb = document.createElement('span');
                     fb.className = 'ess-fallback';
                     fb.textContent = letter;
-                    const img = document.createElement('img');
-                    img.style.display = 'none';
-                    img.addEventListener('load', () => { img.style.display = ''; fb.style.display = 'none'; });
-                    paintCachedFavicon(img, it.url);
-                    tile.appendChild(img);
-                    tile.appendChild(fb);
+                    if (it.icon) {
+                        // A pinned icon overrides the site's favicon and never
+                        // changes when the site's does.
+                        fb.textContent = it.icon;
+                        fb.classList.add('ess-icon');
+                        tile.appendChild(fb);
+                    }
+                    else {
+                        const img = document.createElement('img');
+                        img.style.display = 'none';
+                        img.addEventListener('load', () => { img.style.display = ''; fb.style.display = 'none'; });
+                        paintCachedFavicon(img, it.url);
+                        tile.appendChild(img);
+                        tile.appendChild(fb);
+                    }
                     const rm = document.createElement('button');
                     rm.className = 'ess-remove';
                     rm.tabIndex = -1;
@@ -2366,6 +2375,8 @@
                         openCtxMenu(ev.clientX, ev.clientY, [
                             ['Open in New Tab', () => window.browserBookmarks.openInNewTab(it.url, true)],
                             ['sep'],
+                            ['Change Icon…', () => openEmojiPicker(ev.clientX, ev.clientY,
+                                (emo) => window.essentials.setIcon(it.url, it.persona || null, emo), true)],
                             ['Bookmark…', () => window.browserBookmarks.add(it.url, it.title || '')],
                             ['sep'],
                             ['Remove from Essentials', () => window.essentials.remove(it.url, it.persona || null), 'danger'],
@@ -2590,7 +2601,7 @@
                     ['Create Space', () => openCreateSpace()],
                     ['Create Folder', () => newFolderInline()],
                     ['sep'],
-                    ['New Tab', () => window.tab.add()],
+                    ['New Tab', () => window.palette.open()],
                 ]);
             });
             document.getElementById('sb-settings')?.addEventListener('click', () => {
@@ -2747,7 +2758,7 @@
                 const curFolder = folderState.assign.get(idx) || null;
                 // Grouped as in the reference design doc; folder targets collapse
                 // into one submenu instead of a row per folder.
-                const rows = [['New Tab', () => window.tab.add()]];
+                const rows = [['New Tab', () => window.palette.open()]];
                 if (!isPinned) {
                     const moves = folderState.folders
                         .filter(f => f.id !== curFolder)

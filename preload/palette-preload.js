@@ -1,0 +1,19 @@
+const { contextBridge, ipcRenderer } = require('electron');
+// The palette needs both its overlay lifecycle and a few internal bridges, and a
+// view gets exactly one preload — so the handful it uses are re-exposed here
+// rather than pulling in the whole shared preload.
+contextBridge.exposeInMainWorld('overlayPalette', {
+    onOpen: (cb) => ipcRenderer.on('palette:data', (_e, d) => cb(d)),
+    done: () => ipcRenderer.send('palette:done'),
+    dismiss: () => ipcRenderer.send('palette:dismiss'),
+});
+contextBridge.exposeInMainWorld('tab', {
+    add: () => ipcRenderer.invoke('addTab'),
+    loadUrl: (index, url) => ipcRenderer.invoke('loadUrl', index, url),
+});
+contextBridge.exposeInMainWorld('browserHistory', {
+    search: (query, limit) => ipcRenderer.invoke('history-search', query, limit),
+});
+contextBridge.exposeInMainWorld('browserBookmarks', {
+    getAll: () => ipcRenderer.invoke('bookmarks-get'),
+});
