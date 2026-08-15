@@ -2261,6 +2261,13 @@
             };
             handle.addEventListener('pointerup', () => stop(true));
             handle.addEventListener('pointercancel', () => stop(true));
+            // With no tabs there is no page view, so main cannot watch a tab's
+            // input stream to notice the release — and if the handle loses the
+            // pointer the drag would never end, leaving the resize cursor stuck.
+            // A release or Escape anywhere in the chrome finishes it.
+            window.addEventListener('pointerup', () => stop(true));
+            window.addEventListener('blur', () => stop(true));
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') stop(true); });
             // Main fires this when the release happened over the page view.
             try { window.tabsUI.onSidebarResizeEnded((w) => { pending = clamp(w); stop(false); }); } catch { }
         }

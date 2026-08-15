@@ -278,6 +278,9 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (!t) return;
         t._sidebarResizing = true;
         const wc = t.tabMap.get(t.activeTabIndex)?.webContents;
+        // No active tab (an emptied space) means no page view to steal the
+        // pointer, so the renderer's own pointermove/up drive the drag and there
+        // is nothing to attach to here.
         if (!wc) return;
         // input.x is relative to the view's left edge, which sits at the current
         // sidebar width — so the cursor's window-x is sidebarWidth + input.x.
@@ -307,6 +310,9 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const t = wd?.tabs;
         if (!t || t._menuWatch) return;
         const wc = t.tabMap.get(t.activeTabIndex)?.webContents;
+        // No active tab (an emptied space) means no page view to steal the
+        // pointer, so the renderer's own pointermove/up drive the drag and there
+        // is nothing to attach to here.
         if (!wc) return;
         const onInput = (_ev, input) => {
             if (input.type === 'mouseDown' || input.type === 'rawKeyDown')
