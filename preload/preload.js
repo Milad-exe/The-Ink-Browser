@@ -232,6 +232,7 @@ exposeInternal('folders', {
     icon: (id, icon) => ipcRenderer.invoke('folders:icon', id, icon),
     assign: (index, folderId) => ipcRenderer.invoke('folders:assign', index, folderId),
     move: (id, workspace) => ipcRenderer.invoke('folders:move', id, workspace),
+    reorder: (ids) => ipcRenderer.invoke('folders:reorder', ids),
     list: () => ipcRenderer.invoke('folders:list'),
     onChanged: (cb) => ipcRenderer.on('folders-changed', (_e, data) => cb(data)),
     onTabsMoved: (cb) => ipcRenderer.on('tabs-workspace-changed', (_e, data) => cb(data)),

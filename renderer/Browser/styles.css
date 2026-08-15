@@ -210,6 +210,15 @@ html.sidebar-resizing .sidebar-resizer { pointer-events: auto; }
 html[data-tabbar="side"] #utility-bar { grid-column: 2; grid-row: 1; }
 html[data-tabbar="side"] .bookmark-bar { grid-column: 2; grid-row: 2; }
 html[data-tabbar="side"] #content-area { grid-column: 2; grid-row: 3; }
+/* In side mode the strip is a full-height working column, not a title bar, so
+   it must NOT be a window-drag region — everything without an explicit no-drag
+   (folder headers, the empty tab area, the space label) would otherwise swallow
+   clicks and right-clicks into a window drag. Only the top strip beside the
+   traffic lights drags; the utility bar still does too. */
+html[data-tabbar="side"] #tab-bar { -webkit-app-region: no-drag; }
+/* Needs to outrank the `#tab-bar #window-controls` no-drag above (two IDs). */
+html[data-tabbar="side"] #tab-bar #window-controls { -webkit-app-region: drag; }
+html[data-tabbar="side"] #tab-bar #window-controls .wc-btn { -webkit-app-region: no-drag; }
 /* macOS traffic lights overlay the sidebar's top-left — reserve a spacer row
    (JS sets width:72px for the top strip; height matters here instead). */
 html[data-tabbar="side"] #window-controls { width: auto !important; height: 36px; flex-shrink: 0; align-self: auto; }
@@ -308,6 +317,7 @@ html[data-tabbar="side"] .folder-header.drop-target {
 .folder-header:not(.collapsed) .folder-chevron { transform: rotate(90deg); }
 /* Emoji icons render as text; the default folder glyph is an inline SVG that
    picks up the row's colour, with a darker fill behind the outline. */
+.folder-header.folder-dragging { opacity: 0.55; }
 .folder-icon { font-size: 15px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; width: 17px; flex-shrink: 0; }
 .folder-icon svg { width: 17px; height: 17px; --folder-fill: color-mix(in srgb, var(--shell) 70%, transparent); }
 .folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }

@@ -93,6 +93,11 @@ class WindowManager {
             wd.window.webContents.send('essentials-changed');
         }
         catch { }
+        // Folders are per-workspace too. Without this the strip keeps the old
+        // workspace's folders — and on the startup restore, which switches into
+        // the saved workspace, they never appear at all.
+        try { wd.tabs.broadcastFolders(); }
+        catch { }
     }
     _clampBoundsToDisplays(bounds) {
         try {
@@ -347,6 +352,18 @@ class WindowManager {
                         windowData.profileId = activeWs;
                         tabs.history = this.historyFor(activeWs);
                     }
+                    // Restore assigns folders straight onto the Tabs instance, so
+                    // nothing tells the chrome about them: its own init fetch runs
+                    // against the pre-restore workspace and comes back empty, and
+                    // restored folders never appear. Push them once it can listen.
+                    try {
+                        const wc = windowData.window.webContents;
+                        if (wc.isLoading())
+                            wc.once('did-finish-load', () => { try { tabs.broadcastFolders(); } catch { } });
+                        else
+                            tabs.broadcastFolders();
+                    }
+                    catch { }
                     // Focus the saved active tab if it's in the active workspace,
                     // else the active workspace's first tab.
                     const inWs = tabs.tabsInWorkspace(tabs.profileId);

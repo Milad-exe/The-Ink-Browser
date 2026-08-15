@@ -2016,7 +2016,13 @@
                     filterTabsByWorkspace();
                 });
                 // Pull the current folders (restored ones exist before this listener).
-                window.folders?.list().then(applyFolders).catch(() => { });
+                // The session restore assigns folders and the active workspace on
+                // the main side at its own pace, so this first fetch can land on
+                // the pre-restore workspace and come back empty — re-fetch once
+                // shortly after rather than depend on main winning the race.
+                const pullFolders = () => window.folders?.list().then(applyFolders).catch(() => { });
+                pullFolders();
+                setTimeout(pullFolders, 600);
             }
             catch { }
             // Called by the main process (executeJavaScript) when a tab dragged
@@ -2931,10 +2937,59 @@
             h.innerHTML = '<span class="folder-chevron">▸</span><span class="folder-icon">📁</span><span class="folder-name"></span><button class="folder-del" tabindex="-1" title="Delete folder">×</button>';
             h.addEventListener('click', (e) => {
                 if (h.classList.contains('renaming') || e.target.closest('.folder-del')) return;
+                if (h.dataset.suppressClick) return; // a drag just ended here
                 window.folders.toggle(f.id);
             });
             h.addEventListener('dblclick', (e) => { e.preventDefault(); startFolderRename(h, f.id); });
             h.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); showFolderMenu(e.clientX, e.clientY, f.id); });
+            // Drag to reorder. Nothing moves until the pointer passes a small
+            // threshold, so a plain click still toggles the folder.
+            h.addEventListener('pointerdown', (e) => {
+                if (e.button !== 0 || h.classList.contains('renaming') || e.target.closest('.folder-del')) return;
+                const startY = e.clientY;
+                const original = folderState.folders.map(x => x.id);
+                let dragging = false;
+                const onMove = (ev) => {
+                    if (!dragging) {
+                        if (Math.abs(ev.clientY - startY) < 4) return;
+                        dragging = true;
+                        h.classList.add('folder-dragging');
+                        document.documentElement.classList.add('tab-dragging');
+                    }
+                    const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('.folder-header');
+                    if (!over || over === h) return;
+                    const ids = folderState.folders.map(x => x.id);
+                    const from = ids.indexOf(f.id), to = ids.indexOf(over.dataset.folder);
+                    if (from < 0 || to < 0 || from === to) return;
+                    const moved = folderState.folders.splice(from, 1)[0];
+                    folderState.folders.splice(to, 0, moved);
+                    layoutFolders();
+                    document.querySelector(`.folder-header[data-folder="${CSS.escape(f.id)}"]`)?.classList.add('folder-dragging');
+                };
+                const finish = (commit) => {
+                    document.removeEventListener('pointermove', onMove);
+                    document.removeEventListener('pointerup', onUp);
+                    document.removeEventListener('keydown', onKey, true);
+                    document.documentElement.classList.remove('tab-dragging');
+                    document.querySelectorAll('.folder-header.folder-dragging').forEach(x => x.classList.remove('folder-dragging'));
+                    if (!dragging) return;
+                    const ids = folderState.folders.map(x => x.id);
+                    if (commit && ids.join() !== original.join()) window.folders.reorder(ids);
+                    else if (!commit) {
+                        const byId = new Map(folderState.folders.map(x => [x.id, x]));
+                        folderState.folders = original.map(id => byId.get(id)).filter(Boolean);
+                        layoutFolders();
+                    }
+                    // Suppress the click that follows a real drag.
+                    h.dataset.suppressClick = '1';
+                    setTimeout(() => { delete h.dataset.suppressClick; }, 0);
+                };
+                const onUp = () => finish(true);
+                const onKey = (ev) => { if (ev.key === 'Escape') { ev.stopPropagation(); finish(false); } };
+                document.addEventListener('pointermove', onMove);
+                document.addEventListener('pointerup', onUp);
+                document.addEventListener('keydown', onKey, true);
+            });
             h.querySelector('.folder-del').addEventListener('click', (e) => { e.stopPropagation(); window.folders.remove(f.id); });
             return h;
         }

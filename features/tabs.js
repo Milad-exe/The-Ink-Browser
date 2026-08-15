@@ -1713,6 +1713,21 @@ class Tabs {
         const f = this.folders.find(x => x.id === id);
         if (f) { f.collapsed = (collapsed == null) ? !f.collapsed : !!collapsed; this.broadcastFolders(); this.saveStateDebounced?.(); }
     }
+    // Reorder folders within the current workspace. `ids` is the new order for
+    // this workspace only — folders in other workspaces keep their relative
+    // positions, so a reorder here can't disturb them.
+    reorderFolders(ids) {
+        const ws = String(this.profileId);
+        const wanted = (ids || []).map(String);
+        const mine = this.folders.filter(f => String(f.workspace) === ws);
+        const byId = new Map(mine.map(f => [f.id, f]));
+        const ordered = wanted.map(id => byId.get(id)).filter(Boolean);
+        if (ordered.length !== mine.length) return; // stale list — ignore
+        let i = 0;
+        this.folders = this.folders.map(f => String(f.workspace) === ws ? ordered[i++] : f);
+        this.broadcastFolders();
+        this.saveStateDebounced?.();
+    }
     // Move a folder to another workspace. Its tabs go with it, otherwise they'd
     // be stranded in a workspace whose folder list no longer names them.
     moveFolderToWorkspace(id, workspace) {
