@@ -42,12 +42,76 @@ class Extensions {
     constructor() {
         this.session = null;
         this.wm = null;
-        this.instance = null; // ElectronChromeExtensions (for tab wiring)
+        this.instance = null; // default-session ElectronChromeExtensions
+        // A host is per SESSION, so every space (and container) needs its own or
+        // its tabs are invisible to chrome.* — which is why extensions only ever
+        // worked in the default space.
+        this.hosts = new Map(); // Electron session → ElectronChromeExtensions
         this.unpackedFile = null;
         this.disabledFile = null;
         this.disabled = {}; // id → { path, name, version, description, optionsUrl } for disabled extensions
         this.listeners = new Set();
         this.popups = new Set();
+    }
+    /** Build a chrome.* host bound to one session. */
+    _makeHost(session) {
+        const host = new ElectronChromeExtensions({
+            license: 'GPL-3.0',
+            session,
+            createTab: (details) => this._createTab(details),
+            selectTab: (wc) => this._selectTab(wc),
+            removeTab: (wc) => this._removeTab(wc),
+            createWindow: async () => {
+                const wd = this.wm.createWindow();
+                return wd.window;
+            },
+            removeWindow: (win) => { try {
+                win.close();
+            }
+            catch { } },
+        });
+        host.on?.('browser-action-popup-created', (popup) => {
+            this.popups.add(popup);
+            try { popup.browserWindow?.once('closed', () => this.popups.delete(popup)); }
+            catch { }
+        });
+        try { ElectronChromeExtensions.handleCRXProtocol(session); }
+        catch { }
+        return host;
+    }
+    /**
+     * The host for a session, created on first use. Spaces and containers get
+     * their own sessions, so each loads the same installed extensions with its
+     * own storage — the way Chrome profiles work.
+     */
+    ensureForSession(session) {
+        if (!session || !this.instance)
+            return null; // setup() has not run yet; nothing to attach to
+        const existing = this.hosts.get(session);
+        if (existing)
+            return existing;
+        let host = null;
+        try {
+            loadLibs();
+            host = this._makeHost(session);
+            this.hosts.set(session, host);
+            // Load the same installed set into this session, and keep it updated.
+            webStore.installChromeWebStore({
+                session,
+                loadExtensions: true,
+                allowUnpackedExtensions: true,
+                autoUpdate: false, // the default session's host owns updating
+            }).catch((e) => console.error('extensions for session:', e.message));
+        }
+        catch (e) {
+            console.error('ensureForSession:', e.message);
+        }
+        return host;
+    }
+    /** The host that owns a webContents, by its session. */
+    _hostFor(webContents) {
+        try { return this.hosts.get(webContents.session) || this.ensureForSession(webContents.session); }
+        catch { return null; }
     }
     onChanged(fn) { this.listeners.add(fn); }
     _emit() { for (const fn of this.listeners) {
@@ -74,21 +138,8 @@ class Extensions {
         // extensions: the browser-action API only registers extensions from
         // 'extension-loaded' events, so anything loaded earlier would never
         // get a toolbar action button.
-        this.instance = new ElectronChromeExtensions({
-            license: 'GPL-3.0',
-            session,
-            createTab: (details) => this._createTab(details),
-            selectTab: (wc) => this._selectTab(wc),
-            removeTab: (wc) => this._removeTab(wc),
-            createWindow: async () => {
-                const wd = this.wm.createWindow();
-                return wd.window;
-            },
-            removeWindow: (win) => { try {
-                win.close();
-            }
-            catch { } },
-        });
+        this.instance = this._makeHost(session);
+        this.hosts.set(session, this.instance);
         // Track live browser-action popups so the browser can close them the
         // way Firefox does (tab switch, clicking elsewhere) — the library only
         // closes them on window blur, which misses clicks landing on
@@ -146,14 +197,17 @@ class Extensions {
     // ── Tab wiring (called from Tabs) ──────────────────────────────────────────
     addTab(webContents, browserWindow) {
         try {
-            this.instance?.addTab(webContents, browserWindow);
+            // Route to the host owning this tab's session — a tab registered with
+            // the wrong host is invisible to chrome.tabs, which is what broke
+            // tab-specific extensions outside the default space.
+            this._hostFor(webContents)?.addTab(webContents, browserWindow);
         }
         catch { }
     }
     selectTab(webContents) {
         this.closePopups(); // switching tabs dismisses an open action popup (Firefox behavior)
         try {
-            this.instance?.selectTab(webContents);
+            this._hostFor(webContents)?.selectTab(webContents);
         }
         catch { }
     }

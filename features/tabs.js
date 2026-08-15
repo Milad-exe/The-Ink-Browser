@@ -346,9 +346,10 @@ class Tabs {
         tab.setVisible(false); // Do not show initially
         UserAgent.setupTab(tab);
         this._applyTabBackground(tab, url || 'newtab');
-        // Own-session tabs (profile / private / non-default profile) skip
-        // extension registration — extensions live on the default session.
-        if (!makePrivate && !container && this.profileId === '1')
+        // Every non-private tab is registered; addTab resolves the host for the
+        // tab's own session, so extensions work in every space and container.
+        // Private tabs stay out, matching Chrome's incognito default.
+        if (!makePrivate)
             extensions.addTab(tab.webContents, this.mainWindow);
         // Setup context menu
         tab.webContents.on("context-menu", async (_event, params) => {
@@ -550,10 +551,9 @@ class Tabs {
         this.raiseFloatingViews();
         UserAgent.setupTab(tab);
         this._applyTabBackground(tab, 'newtab');
-        // Profile/private/non-default-profile tabs run on their own session —
-        // extensions are loaded on the default session only, so they skip
-        // extension registration.
-        if (!makePrivate && !container && this.profileId === '1')
+        // Registered against the host for this tab's own session, so lazy tabs in
+        // any space get extensions too. Private tabs stay out.
+        if (!makePrivate)
             extensions.addTab(tab.webContents, this.mainWindow);
         tab.webContents.on("context-menu", async (_event, params) => {
             let menuParams = params;
@@ -1962,7 +1962,7 @@ class Tabs {
             this.updateWindowTitle(index);
             // Notify the extension system of the active tab (chrome.tabs + actions)
             if (!this.privateTabs.has(index))
-                extensions.selectTab(tab.webContents);
+                extensions.selectTab(tab.webContents); // resolves the session's host
             // Put the website back into focus so keyboard events register immediately
             tab.webContents.focus();
             this.raiseFloatingViews();
