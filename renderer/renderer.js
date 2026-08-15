@@ -2539,6 +2539,11 @@
                                 ]],
                                 ['sep'],
                                 ['Create Space', () => openCreateSpace()],
+                                ...(_spacesCache.length > 1 && String(p.id) !== '1' ? [['sep'], ['Delete Space', [
+                                    // Wipes the space's logins and closes its tabs,
+                                    // so it asks rather than acting on one click.
+                                    [`Delete “${p.name}” and its data`, () => window.profiles.remove(p.id), 'danger'],
+                                ]]] : []),
                             );
                             openCtxMenu(e.clientX, e.clientY, rows);
                         });

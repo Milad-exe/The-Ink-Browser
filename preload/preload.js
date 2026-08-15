@@ -259,6 +259,7 @@ exposeInternal('profiles', {
     update: (id, patch) => ipcRenderer.invoke('profiles:update', id, patch),
     switch: (id) => ipcRenderer.invoke('workspaces:switch', id),
     create: () => ipcRenderer.invoke('workspaces:create'),
+    remove: (id) => ipcRenderer.invoke('workspaces:delete', id),
     onChanged: (cb) => ipcRenderer.on('profiles:changed', () => cb()),
     onSwitched: (cb) => ipcRenderer.on('workspace-switched', (_e, id) => cb(id)),
     // Main asks the renderer to switch workspaces (e.g. the active workspace's

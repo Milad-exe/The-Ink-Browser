@@ -151,6 +151,35 @@ function sessionFor(id) {
     return sess;
 }
 
+/**
+ * Delete a space and wipe its cookie jar. Refuses the last remaining space, and
+ * refuses profile 1 outright — it IS the default session, so removing it would
+ * take the browser's main storage with it.
+ *
+ * A space bound to a container shares that container's jar with other spaces, so
+ * only an unbound space's own persist:profile-<id> partition is cleared.
+ */
+function remove(id) {
+    const key = String(id);
+    const reg = load();
+    if (key === '1' || reg.list.length <= 1)
+        return false;
+    const i = reg.list.findIndex(p => p.id === key);
+    if (i === -1)
+        return false;
+    const [gone] = reg.list.splice(i, 1);
+    sessions.delete(key);
+    save();
+    if (!gone.container) {
+        try {
+            const { session } = require('electron');
+            session.fromPartition(`persist:profile-${key}`).clearStorageData();
+        }
+        catch { }
+    }
+    return true;
+}
+
 // ── Essentials (global across spaces; the big favicon tiles) ─────────────────
 // Essentials are GLOBAL across spaces — unlike pinned tabs, which are
 // per-space. They used to be stored per profile, so the first read folds any
@@ -202,4 +231,4 @@ function removeEssential(_id, url, persona = null) {
     return true;
 }
 
-module.exports = { list, meta, create, rename, update, sessionFor, essentials, addEssential, removeEssential, COLORS, EMOJIS };
+module.exports = { list, meta, create, remove, rename, update, sessionFor, essentials, addEssential, removeEssential, COLORS, EMOJIS };

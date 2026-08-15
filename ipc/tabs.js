@@ -342,6 +342,34 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             wm.switchWorkspace(wd, p.id);
         return p;
     });
+    // Delete a space: close its tabs, move off it if it is active, then drop the
+    // record and wipe its jar. Destructive and not recoverable — the renderer
+    // confirms first.
+    ipcMain.handle('workspaces:delete', (_e, id) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        const key = String(id);
+        if (!wd?.tabs || key === '1' || profiles.list().length <= 1)
+            return false;
+        if (String(wd.tabs.profileId) === key) {
+            const other = profiles.list().find(p => p.id !== key);
+            if (!other)
+                return false;
+            wm.switchWorkspace(wd, other.id);
+        }
+        for (const idx of wd.tabs.tabsInWorkspace(key))
+            try { wd.tabs.removeTab(idx); }
+            catch { }
+        // Folders belonging to the space go with it.
+        try {
+            wd.tabs.folders = wd.tabs.folders.filter(f => String(f.workspace) !== key);
+            wd.tabs.broadcastFolders();
+        }
+        catch { }
+        const ok = profiles.remove(key);
+        if (ok)
+            broadcastProfiles();
+        return ok;
+    });
     // Switcher menu: pick a workspace (switches in place), open one in a NEW
     // window, add a workspace, or rename the current one.
     ipcMain.on('profiles:menu', (_e, x, y, targetId) => {
