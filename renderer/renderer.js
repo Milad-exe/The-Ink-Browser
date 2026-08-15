@@ -2408,6 +2408,60 @@
             const btn = document.getElementById('profile-btn');
             const badge = document.getElementById('profile-badge');
             const wsRow = document.getElementById('sb-workspaces');
+            // The foot row holds every space, so it runs out of width. Long-press
+            // expands it into a wrapping reorder grid (drag to set the order) and
+            // scrolling over the row switches spaces — both as upstream does.
+            function initSpaceRowGestures() {
+                const row = document.getElementById('sb-workspaces');
+                if (!row) return;
+                let pressTimer = null;
+                row.addEventListener('pointerdown', () => {
+                    clearTimeout(pressTimer);
+                    pressTimer = setTimeout(() => row.classList.add('reordering'), 450);
+                });
+                for (const ev of ['pointerup', 'pointerleave', 'pointercancel'])
+                    row.addEventListener(ev, () => clearTimeout(pressTimer));
+                // Click-away leaves the reorder grid.
+                document.addEventListener('pointerdown', (e) => {
+                    if (row.classList.contains('reordering') && !row.contains(e.target))
+                        row.classList.remove('reordering');
+                }, true);
+                let wheelLock = 0;
+                row.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const now = Date.now();
+                    if (now - wheelLock < 320) return;
+                    wheelLock = now;
+                    const ids = [..._spacesCache].map(p => p.id);
+                    const at = ids.indexOf(String(activeWorkspace));
+                    if (at < 0 || ids.length < 2) return;
+                    const next = ids[(at + (e.deltaY > 0 ? 1 : -1) + ids.length) % ids.length];
+                    window.profiles.switch(next);
+                }, { passive: false });
+                // Drag to reorder while the grid is open.
+                let dragId = null;
+                row.addEventListener('dragstart', (e) => {
+                    const b = e.target.closest('.sb-ws');
+                    if (!b || !row.classList.contains('reordering')) return;
+                    dragId = b.dataset.space;
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+                row.addEventListener('dragover', (e) => {
+                    if (!dragId) return;
+                    e.preventDefault();
+                    const over = e.target.closest('.sb-ws');
+                    const dragged = row.querySelector(`.sb-ws[data-space="${CSS.escape(dragId)}"]`);
+                    if (!over || !dragged || over === dragged) return;
+                    const rect = over.getBoundingClientRect();
+                    row.insertBefore(dragged, (e.clientX < rect.left + rect.width / 2) ? over : over.nextSibling);
+                });
+                row.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (!dragId) return;
+                    dragId = null;
+                    window.profiles.reorder([...row.querySelectorAll('.sb-ws')].map(b => b.dataset.space));
+                });
+            }
             let openProfileModal = () => {}; // assigned when the modal wires up below
             let openCreateSpace = () => {}; // assigned by initCreateSpace below
             // Create a Space: an in-sidebar form (reference) rather than a modal.
@@ -2524,6 +2578,8 @@
                     for (const p of all) {
                         const b = document.createElement('button');
                         b.className = 'sb-ws' + (p.id === activeWorkspace ? ' active' : '');
+                        b.dataset.space = p.id;
+                        b.draggable = true;
                         b.tabIndex = -1;
                         b.title = p.name; // native hover label (survives foot overflow-scroll)
                         // Every space keeps its emoji; inactive ones are greyed
@@ -2573,6 +2629,7 @@
                     }
                 }
             };
+            initSpaceRowGestures();
             initCreateSpace();
             refresh();
             try { window.profiles.onChanged(refresh); }

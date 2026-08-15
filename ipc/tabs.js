@@ -345,6 +345,11 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     // Delete a space: close its tabs, move off it if it is active, then drop the
     // record and wipe its jar. Destructive and not recoverable — the renderer
     // confirms first.
+    ipcMain.handle('workspaces:reorder', (_e, ids) => {
+        const ok = profiles.reorder(ids);
+        if (ok) broadcastProfiles();
+        return ok;
+    });
     ipcMain.handle('workspaces:delete', (_e, id) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         const key = String(id);

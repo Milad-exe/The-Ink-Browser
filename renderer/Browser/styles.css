@@ -1057,3 +1057,19 @@ html[data-private-window="true"] .private-badge { display: flex; }
 html[data-tabbar="side"] .folder-header { padding-left: calc(6px + var(--depth, 0) * 13px); }
 html[data-tabbar="side"] .tab-button.in-folder { margin-left: calc(var(--depth, 1) * 13px); width: auto; }
 }
+
+@layer components {
+/* Spaces row: a single scrolling line normally, so the foot keeps its height
+   however many spaces exist. Long-press expands it into a wrapping grid for
+   drag-reordering. */
+html[data-tabbar="side"] .sb-workspaces {
+  display: flex; flex-wrap: nowrap; gap: 4px; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; scroll-behavior: smooth;
+}
+html[data-tabbar="side"] .sb-workspaces::-webkit-scrollbar { display: none; }
+html[data-tabbar="side"] .sb-workspaces.reordering {
+  flex-wrap: wrap; overflow: visible; justify-content: center;
+  padding: 6px; border-radius: 12px; background: var(--hover);
+}
+html[data-tabbar="side"] .sb-workspaces.reordering .sb-ws { cursor: grab; }
+}

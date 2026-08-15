@@ -100,6 +100,19 @@ function update(id, patch) {
     return _pub(p);
 }
 
+// Set the order spaces appear in (the foot row, and the switcher shortcuts).
+function reorder(ids) {
+    const reg = load();
+    const wanted = (ids || []).map(String);
+    const byId = new Map(reg.list.map(p => [p.id, p]));
+    const ordered = wanted.map(id => byId.get(id)).filter(Boolean);
+    if (ordered.length !== reg.list.length)
+        return false; // stale list — ignore rather than drop a space
+    reg.list = ordered;
+    save();
+    return true;
+}
+
 function rename(id, name) {
     const p = _find(id);
     if (!p)
@@ -241,4 +254,4 @@ function removeEssential(_id, url, persona = null) {
     return true;
 }
 
-module.exports = { list, meta, create, remove, rename, update, sessionFor, essentials, addEssential, removeEssential, setEssentialIcon, COLORS, EMOJIS };
+module.exports = { list, meta, create, remove, reorder, rename, update, sessionFor, essentials, addEssential, removeEssential, setEssentialIcon, COLORS, EMOJIS };
