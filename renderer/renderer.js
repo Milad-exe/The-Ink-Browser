@@ -3004,76 +3004,47 @@
         }
         // Reusable dark context menu. rows: [label, fn, className?] | ['sep'].
         let _closeCtxMenu = null;
-        // rows: ['Label', fn, className?] | ['Label', [subRows], className?] | ['sep'].
-        // A row whose second slot is an array becomes a submenu, opened on hover.
-        function openCtxMenu(x, y, rows) {
-            if (_closeCtxMenu) _closeCtxMenu();
-            const chain = []; // every menu element currently on screen, root first
-            // The page is a native view painted OVER the chrome, so a menu that
-            // spills past the sidebar is hidden behind it. Keep menus inside the
-            // chrome's own column; submenus flip left when they'd overflow.
-            const chromeRight = () => {
-                const bar = document.getElementById('tab-bar');
-                if (document.documentElement.dataset.tabbar !== 'side' || !bar) return window.innerWidth;
-                return bar.getBoundingClientRect().right;
-            };
-            const place = (menu, mx, my, parentRect) => {
-                document.body.appendChild(menu);
-                const mw = menu.offsetWidth || 190, mh = menu.offsetHeight || 130;
-                const limit = chromeRight() - 6;
-                let left = mx;
-                if (parentRect && left + mw > limit) left = parentRect.left - mw + 2; // flip
-                menu.style.left = Math.max(6, Math.min(left, limit - mw)) + 'px';
-                menu.style.top = Math.max(6, Math.min(my, window.innerHeight - mh - 6)) + 'px';
-            };
-            const closeFrom = (depth) => { while (chain.length > depth) chain.pop().remove(); };
-            const build = (rowSet, depth) => {
-                const menu = document.createElement('div');
-                menu.className = 'ctx-menu';
-                for (const r of rowSet) {
-                    if (r[0] === 'sep') { const s = document.createElement('div'); s.className = 'ctx-menu-sep'; menu.appendChild(s); continue; }
-                    const sub = Array.isArray(r[1]) ? r[1] : null;
-                    const b = document.createElement('button');
-                    b.className = 'ctx-menu-item' + (r[2] ? ' ' + r[2] : '') + (sub ? ' has-sub' : '');
-                    b.tabIndex = -1;
-                    b.appendChild(document.createTextNode(r[0]));
-                    if (sub) { const ar = document.createElement('span'); ar.className = 'ctx-sub-arrow'; ar.textContent = '›'; b.appendChild(ar); }
-                    b.addEventListener('mouseenter', () => {
-                        closeFrom(depth + 1);
-                        if (!sub || !sub.length) return;
-                        const rc = b.getBoundingClientRect();
-                        const child = build(sub, depth + 1);
-                        chain.push(child);
-                        place(child, rc.right - 2, rc.top - 5, rc);
-                    });
-                    b.addEventListener('click', (e) => {
-                        if (sub) { e.stopPropagation(); return; }
-                        const fn = r[1]; closeAll(); fn && fn();
-                    });
-                    menu.appendChild(b);
-                }
-                return menu;
-            };
-            const onDoc = (e) => { if (!chain.some(m => m.contains(e.target))) closeAll(); };
-            const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeAll(); } };
-            function closeAll() {
-                closeFrom(0);
-                document.removeEventListener('click', onDoc, true);
-                document.removeEventListener('keydown', onKey, true);
-                try { window.tabsUI.menuClosed(); } catch { }
+        let _ctxPending = null; // resolves the overlay's pick for the open menu
+        try {
+            window.ctxMenu?.onPicked((result) => {
+                const fn = _ctxPending;
+                _ctxPending = null;
                 _closeCtxMenu = null;
-            }
-            const root = build(rows, 0);
-            chain.push(root);
-            place(root, x, y);
-            _closeCtxMenu = closeAll;
-            // A click on the page view never reaches this document — main watches
-            // the active tab's input stream while a menu is up and calls back.
-            try { window.tabsUI.menuOpened(); } catch { }
-            setTimeout(() => { document.addEventListener('click', onDoc, true); document.addEventListener('keydown', onKey, true); }, 0);
+                if (fn) fn(result);
+            });
         }
-        // Shared emoji set with search keywords. A function declaration so every
-        // scope sees it regardless of init order (renderer.js inits top-down).
+        catch { }
+        // rows: ['Label', fn, className?] | ['Label', [subRows], className?] | ['sep'].
+        // The menu itself is rendered by the CtxMenu overlay view — chrome DOM
+        // cannot paint above the page's native view. Handlers can't cross IPC, so
+        // rows go out as labels and a picked PATH of indices comes back here.
+        function openCtxMenu(x, y, rows) {
+            const serialize = (rs) => rs.map((r) => {
+                if (r[0] === 'sep') return { sep: true };
+                const sub = Array.isArray(r[1]) ? r[1] : null;
+                return { label: r[0], cls: r[2] || '', ...(sub ? { sub: serialize(sub) } : {}) };
+            });
+            const resolve = (rs, path) => {
+                let cur = rs;
+                for (let i = 0; i < path.length; i++) {
+                    const row = cur[path[i]];
+                    if (!row) return null;
+                    if (i === path.length - 1) return typeof row[1] === 'function' ? row[1] : null;
+                    cur = Array.isArray(row[1]) ? row[1] : [];
+                }
+                return null;
+            };
+            _ctxPending = (result) => {
+                if (!Array.isArray(result)) return;
+                const fn = resolve(rows, result);
+                if (fn) fn();
+            };
+            _closeCtxMenu = () => { _ctxPending = null; };
+            try { window.ctxMenu.open({ kind: 'menu', x, y, rows: serialize(rows) }); }
+            catch { }
+        }
+        // Shared emoji set with search keywords, rendered by the overlay. A
+        // function declaration so every scope sees it regardless of init order.
         function emojiSet() {
             return [
                 ['📁', 'folder file'], ['📂', 'folder open file'], ['🗂️', 'folder tabs files'], ['🗃️', 'box files archive'],
@@ -3103,48 +3074,13 @@
                 ['✅', 'check done complete task'], ['📮', 'mail post inbox'], ['✉️', 'mail email message'], ['💬', 'chat message talk'],
             ];
         }
-        function openEmojiPicker(x, y, onPick) {
-            if (_closeCtxMenu) _closeCtxMenu();
-            const menu = document.createElement('div');
-            menu.className = 'ctx-menu emoji-pop';
-            const search = document.createElement('input');
-            search.className = 'emoji-search'; search.type = 'text';
-            search.placeholder = 'Search emojis'; search.tabIndex = -1;
-            const grid = document.createElement('div'); grid.className = 'emoji-pop-grid';
-            const paint = (q) => {
-                grid.innerHTML = '';
-                const needle = (q || '').trim().toLowerCase();
-                for (const [e, kw] of emojiSet()) {
-                    if (needle && !kw.includes(needle)) continue;
-                    const b = document.createElement('button');
-                    b.className = 'emoji-opt'; b.textContent = e; b.tabIndex = -1; b.title = kw.split(' ')[0];
-                    b.addEventListener('click', () => { if (_closeCtxMenu) _closeCtxMenu(); onPick(e); });
-                    grid.appendChild(b);
-                }
+        function openEmojiPicker(x, y, onPick, allowNone) {
+            _ctxPending = (result) => {
+                if (result && typeof result.emoji === 'string') onPick(result.emoji);
             };
-            paint('');
-            search.addEventListener('input', () => paint(search.value));
-            search.addEventListener('keydown', (e) => {
-                e.stopPropagation();
-                if (e.key === 'Escape') _closeCtxMenu?.();
-                if (e.key === 'Enter') { const first = grid.querySelector('.emoji-opt'); if (first) first.click(); }
-            });
-            menu.appendChild(search);
-            menu.appendChild(grid);
-            document.body.appendChild(menu);
-            const mw = menu.offsetWidth || 240, mh = menu.offsetHeight || 160;
-            // Same constraint as the context menus — stay inside the chrome column
-            // or the page view paints over it.
-            const bar = document.getElementById('tab-bar');
-            const limit = (document.documentElement.dataset.tabbar === 'side' && bar)
-                ? bar.getBoundingClientRect().right - 6 : window.innerWidth - 6;
-            menu.style.left = Math.max(6, Math.min(x, limit - mw)) + 'px';
-            menu.style.top = Math.max(6, Math.min(y, window.innerHeight - mh - 6)) + 'px';
-            setTimeout(() => search.focus(), 0);
-            const onDoc = (e) => { if (!menu.contains(e.target)) _closeCtxMenu?.(); };
-            const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); _closeCtxMenu?.(); } };
-            _closeCtxMenu = () => { menu.remove(); document.removeEventListener('click', onDoc, true); document.removeEventListener('keydown', onKey, true); _closeCtxMenu = null; };
-            setTimeout(() => { document.addEventListener('click', onDoc, true); document.addEventListener('keydown', onKey, true); }, 0);
+            _closeCtxMenu = () => { _ctxPending = null; };
+            try { window.ctxMenu.open({ kind: 'emoji', x, y, emojis: emojiSet(), allowNone: !!allowNone }); }
+            catch { }
         }
         function showFolderMenu(x, y, id) {
             // Spaces other than the current one; the folder and its tabs move together.

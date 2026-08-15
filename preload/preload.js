@@ -255,6 +255,11 @@ exposeInternal('profiles', {
 });
 // Personas — optional rename + live id→name map for labelling history/suggestions.
 // Named containers — a Space's "Profile": whose cookie jar its tabs use.
+// Context-menu overlay: menus live in their own view so they paint above the page.
+exposeInternal('ctxMenu', {
+    open: (data) => ipcRenderer.invoke('ctxmenu:open', data),
+    onPicked: (cb) => ipcRenderer.on('ctxmenu:picked', (_e, result) => cb(result)),
+});
 exposeInternal('containers', {
     listNamed: () => ipcRenderer.invoke('containers:listNamed'),
     createNamed: (name) => ipcRenderer.invoke('containers:createNamed', name),

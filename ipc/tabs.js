@@ -225,21 +225,22 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     // minimum and ~29.6% at its maximum, so the clamps scale with the window
     // rather than sitting at fixed pixels. Absolute floors keep it usable on a
     // very narrow window.
-    const RAIL_W = 56, RAIL_SNAP = 132;
-    const MIN_FRAC = 0.095, MAX_FRAC = 0.296;
+    // No icon-rail collapse: dragging narrow stops at the minimum with labels
+    // intact, rather than snapping to an icons-only strip.
+    const MIN_FRAC = 0.105, MAX_FRAC = 0.296;
     const limitsFor = (wd) => {
         let winW = 0;
         try { winW = wd?.window?.getContentBounds?.().width || 0; } catch { }
         if (!winW) return { min: 180, max: 460 };
         return {
-            min: Math.max(150, Math.round(winW * MIN_FRAC)),
+            min: Math.max(178, Math.round(winW * MIN_FRAC)),
             max: Math.max(320, Math.round(winW * MAX_FRAC)),
         };
     };
     const clampW = (w, wd) => {
         w = Math.round(Number(w) || 232);
         const { min, max } = limitsFor(wd);
-        return w < RAIL_SNAP ? RAIL_W : Math.max(min, Math.min(max, w));
+        return Math.max(min, Math.min(max, w));
     };
     function applyWidthLive(wd, width) {
         const t = wd.tabs;
