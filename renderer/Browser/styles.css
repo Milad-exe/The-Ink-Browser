@@ -303,7 +303,10 @@ html[data-tabbar="side"] .folder-header.drop-target {
 }
 .folder-chevron { font-size: 10px; width: 12px; text-align: center; color: var(--text-3); transition: transform 0.12s; }
 .folder-header:not(.collapsed) .folder-chevron { transform: rotate(90deg); }
-.folder-icon { font-size: 15px; line-height: 1; }
+/* Emoji icons render as text; the default folder glyph is an inline SVG that
+   picks up the row's colour, with a darker fill behind the outline. */
+.folder-icon { font-size: 15px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; width: 17px; flex-shrink: 0; }
+.folder-icon svg { width: 17px; height: 17px; --folder-fill: color-mix(in srgb, var(--shell) 70%, transparent); }
 .folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
 .folder-rename-input {
   flex: 1; min-width: 0; height: 22px; padding: 0 6px; border-radius: 6px;

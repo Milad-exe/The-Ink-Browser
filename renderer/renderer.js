@@ -2824,6 +2824,20 @@
         }
         // ── Folders (tab groups): render a header per folder and slot its member
         //    tabs indented beneath it; collapsed folders hide their members. ────────
+        // Folder glyph (open / closed), matching the reference. A user-set emoji
+        // via Change Icon still wins over it.
+        const FOLDER_GLYPH = {
+            closed: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">' +
+                '<path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v6.3a1.7 1.7 0 0 1-1.7 1.7H4.2a1.7 1.7 0 0 1-1.7-1.7z" fill="var(--folder-fill)"/></svg>',
+            open: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">' +
+                '<path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v1.2H5.6z" fill="var(--folder-fill)"/>' +
+                '<path d="M2.5 6.6l1.3 7.9a1.7 1.7 0 0 0 1.7 1.5h10.3a1.7 1.7 0 0 0 1.7-1.5l1-5.2H5.6z" fill="var(--folder-fill)"/></svg>',
+        };
+        function setFolderIcon(el, f) {
+            if (f.icon) { el.innerHTML = ''; el.textContent = f.icon; return; }
+            el.textContent = '';
+            el.innerHTML = f.collapsed ? FOLDER_GLYPH.closed : FOLDER_GLYPH.open;
+        }
         function makeFolderHeader(f) {
             const h = document.createElement('div');
             h.className = 'folder-header';
@@ -2973,7 +2987,7 @@
             for (const f of folders) {
                 let header = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(f.id)}"]`) || makeFolderHeader(f);
                 header.classList.toggle('collapsed', !!f.collapsed);
-                header.querySelector('.folder-icon').textContent = f.icon || (f.collapsed ? '📁' : '📂');
+                setFolderIcon(header.querySelector('.folder-icon'), f);
                 if (!header.classList.contains('renaming')) header.querySelector('.folder-name').textContent = f.name || 'Folder';
                 frag.appendChild(header);
                 for (const btn of normal) {
