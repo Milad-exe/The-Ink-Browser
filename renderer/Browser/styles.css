@@ -528,7 +528,7 @@ html[data-tabbar="side"] #tab-bar.creating-space > *:not(#space-create):not(#win
 .sidebar-foot { display: none; }
 html[data-tabbar="side"] .sidebar-foot {
   display: flex; align-items: center; gap: 4px; flex-shrink: 0;
-  padding: 7px 2px 0; border-top: 1px solid var(--border);
+  padding: 7px 2px 0;
   -webkit-app-region: no-drag;
 }
 /* Profiles: a centred row of icon-only avatars between settings (left) and the

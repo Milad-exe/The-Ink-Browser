@@ -1979,12 +1979,10 @@
                     return;
                 const isPinned = btn.classList.toggle('pinned');
                 btn.dataset.pinned = isPinned ? '1' : '';
-                // Firefox keeps pinned tabs in a block at the start of the strip:
-                // pinning moves the tab to the end of that block, unpinning drops
-                // it right after the block.
-                const firstUnpinned = [...tabsContainer.querySelectorAll('.tab-button')]
-                    .find(b => b !== btn && !b.classList.contains('pinned'));
-                tabsContainer.insertBefore(btn, firstUnpinned || null);
+                // Placement is layoutFolders' job — it is the only thing that
+                // knows the full panel order (pinned, folders, New Tab, tabs).
+                // Hand-placing here is what let pinned tabs land in the wrong spot.
+                layoutFolders();
                 const ordered = [...tabsContainer.querySelectorAll('.tab-button')].map(el => parseInt(el.dataset.index));
                 if (ordered.length)
                     window.tab.reorder(ordered);
@@ -2853,6 +2851,9 @@
                         return;
                     } // aborted
                     if (!wasOutside) { // reorder commit
+                        // The drag preview places the tab by hand; re-compose so
+                        // it settles into the right section before we persist.
+                        layoutFolders();
                         const ordered = [...tabsContainer.querySelectorAll('.tab-button')].map(el => parseInt(el.dataset.index));
                         if (ordered.length)
                             window.tab.reorder(ordered);
@@ -2895,6 +2896,7 @@
                 tabsContainer.appendChild(btn);
             }
             tabs.set(index, btn);
+            layoutFolders(); // keep the new tab in the composed order
             applySplitMarks();
             if (folderState.folders.length) layoutFolders();
             if (shouldActivate) {
