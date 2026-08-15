@@ -2118,11 +2118,6 @@
             }, { passive: false });
             tabsContainer.addEventListener('scroll', updateScrollShadows);
             // Right-click the empty part of the tab list → a custom menu.
-            const newFolderInline = async () => {
-                let id = null;
-                try { id = await window.folders.create('New Folder'); } catch { }
-                if (id) setTimeout(() => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }, 140);
-            };
             tabsContainer.addEventListener('contextmenu', (e) => {
                 if (e.target.closest('.tab-button') || e.target.closest('.folder-header')) return;
                 e.preventDefault(); e.stopPropagation();
@@ -2465,9 +2460,20 @@
                     window.profiles.menu(r.left, r.bottom + 4);
                 });
             }
-            document.getElementById('sb-add-ws')?.addEventListener('click', async () => {
+            // The foot "+" opens a menu rather than creating a space outright —
+            // it's the create-anything affordance in the reference.
+            const createSpace = async () => {
                 const p = await window.profiles.create();
                 if (p?.id) openProfileModal(p.id); // prompt to name the new profile
+            };
+            document.getElementById('sb-add-ws')?.addEventListener('click', (e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                openCtxMenu(r.left, r.top - 8, [
+                    ['Create Space', createSpace],
+                    ['Create Folder', () => newFolderInline()],
+                    ['sep'],
+                    ['New Tab', () => window.tab.add()],
+                ]);
             });
             document.getElementById('sb-settings')?.addEventListener('click', () => {
                 window.tab.loadUrl(activeTabIndex, 'northstar://settings');
@@ -2946,6 +2952,13 @@
                     window.folders.remove(id);
                 }, 'danger'],
             ]);
+        }
+        // Shared by the tab-list menu and the foot "+" — a function declaration so
+        // both scopes see it regardless of init order.
+        async function newFolderInline() {
+            let id = null;
+            try { id = await window.folders.create('New Folder'); } catch { }
+            if (id) setTimeout(() => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }, 140);
         }
         function startFolderRename(h, id) {
             const name = h.querySelector('.folder-name');
