@@ -182,8 +182,11 @@ html[data-tabbar="side"] body {
   grid-template-columns: var(--sidebar-w, 232px) minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr);
 }
+/* The utility bar spans the full width at the top (as in compact mode) and the
+   sidebar hangs below it, rather than the sidebar running the whole height. */
+html[data-tabbar="side"] #utility-bar { grid-column: 1 / -1; grid-row: 1; }
 html[data-tabbar="side"] #tab-bar {
-  grid-column: 1; grid-row: 1 / span 3;
+  grid-column: 1; grid-row: 2 / span 2;
   flex-direction: column; align-items: stretch;
   width: var(--sidebar-w, 232px); height: 100%; padding: 0 10px 8px; gap: 8px;
   /* Transparent on the shell — no panel tint, no divider hairline. */
@@ -207,7 +210,6 @@ html.sidebar-resizing .sidebar-resizer::after { background: var(--accent); }
 html.sidebar-resizing { cursor: col-resize; }
 html.sidebar-resizing * { pointer-events: none; user-select: none; }
 html.sidebar-resizing .sidebar-resizer { pointer-events: auto; }
-html[data-tabbar="side"] #utility-bar { grid-column: 2; grid-row: 1; }
 html[data-tabbar="side"] .bookmark-bar { grid-column: 2; grid-row: 2; }
 html[data-tabbar="side"] #content-area { grid-column: 2; grid-row: 3; }
 /* In side mode the strip is a full-height working column, not a title bar, so
@@ -225,7 +227,7 @@ html[data-tabbar="side"] #tab-bar #window-controls { -webkit-app-region: drag; }
 html[data-tabbar="side"] #tab-bar #window-controls .wc-btn { -webkit-app-region: no-drag; }
 /* macOS traffic lights overlay the sidebar's top-left — reserve a spacer row
    (JS sets width:72px for the top strip; height matters here instead). */
-html[data-tabbar="side"] #window-controls { width: auto !important; height: 36px; flex-shrink: 0; align-self: auto; }
+html[data-tabbar="side"] #window-controls { display: none; }
 html[data-tabbar="side"] #tabs-container {
   /* CSS grid: pinned favicon tiles fill the width in up to 4 columns —
      2 pins → 2 half-width tiles, collapsing to fewer/wider with fewer pins;
@@ -243,11 +245,9 @@ html[data-tabbar="side"] #tabs-container::-webkit-scrollbar-thumb {
   background: transparent; border-radius: 7px; border: 2px solid transparent; background-clip: padding-box;
 }
 html[data-tabbar="side"] #tabs-container:hover::-webkit-scrollbar-thumb { background: var(--border-2); background-clip: padding-box; }
-/* Hairline dividers structuring the panel: Essentials · pinned · tabs. */
-html[data-tabbar="side"] .essentials:not(:empty) {
-  padding-bottom: 10px; margin-bottom: 3px;
-  border-bottom: 1px solid var(--border-2);
-}
+/* The only divider in the panel is between the folder block and the tab list
+   (added on #tab-actions when folders exist). */
+html[data-tabbar="side"] .essentials:not(:empty) { padding-bottom: 8px; margin-bottom: 2px; }
 /* Tab rows: favicon + title + hover close, Arc-style rounded cards. */
 html[data-tabbar="side"] .tab-button {
   width: 100%; min-width: 0; max-width: none; flex-shrink: 0;
@@ -367,7 +367,11 @@ html[data-tabbar="side"] .tab-button.folder-collapsed { display: none !important
 }
 .emoji-search:focus { border-color: var(--accent); }
 html[data-tabbar="side"] .tab-scroll-btn { display: none; }
-html[data-tabbar="side"] #tab-actions { padding: 0; }
+html[data-tabbar="side"] #tab-actions { padding: 0; grid-column: 1 / -1; }
+/* The one divider in the panel: folder block above, tab list below. */
+html[data-tabbar="side"] #tab-actions.after-folders {
+  margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border-2);
+}
 /* "+ New Tab" labelled row (Arc), not a bare plus. */
 html[data-tabbar="side"] #new-tab-btn {
   width: 100%; height: 32px; border-radius: 9px;
@@ -438,10 +442,9 @@ html[data-tabbar="side"] .essentials:empty { display: none; }
 /* Compact mode: collapse the sidebar; the page (native view) goes full-bleed. */
 html[data-tabbar="side"][data-compact="on"] body { grid-template-columns: 0 minmax(0, 1fr); }
 html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
-/* With the sidebar gone the utility bar starts at x=0 — on macOS that puts the
-   nav buttons underneath the native traffic lights, which are drawn by the OS
-   above the page. Reserve their width (trafficLightPosition x:14 + cluster). */
-html[data-platform="darwin"][data-compact="on"] #utility-bar { padding-left: 84px; }
+/* The utility bar now runs the full width in side mode, so on macOS the native
+   traffic lights sit over its left end in every mode — always reserve them. */
+html[data-platform="darwin"][data-tabbar="side"] #utility-bar { padding-left: 84px; }
 
 /* Icon rail: drag the divider narrow to collapse tab rows to favicons only
    (Arc). Labels, close buttons and the "New Tab" caption fall away; every

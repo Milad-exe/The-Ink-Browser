@@ -3143,7 +3143,11 @@
             const normal = [...tabsContainer.querySelectorAll('.tab-button:not(.pinned)')];
             syncPinCols();
             const grouped = new Set();
+            // Panel order is composed here in full — pinned tiles, folders and
+            // their members, the New Tab row, then loose tabs — and appending the
+            // fragment MOVES the existing nodes, so the result is deterministic.
             const frag = document.createDocumentFragment();
+            for (const btn of pinned) frag.appendChild(btn);
             for (const f of folders) {
                 let header = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(f.id)}"]`) || makeFolderHeader(f);
                 header.classList.toggle('collapsed', !!f.collapsed);
@@ -3158,10 +3162,13 @@
                     grouped.add(btn);
                 }
             }
+            const actions = document.getElementById('tab-actions');
+            if (actions) {
+                actions.classList.toggle('after-folders', folders.length > 0);
+                frag.appendChild(actions);
+            }
             for (const btn of normal) if (!grouped.has(btn)) frag.appendChild(btn);
-            const lastPinned = pinned[pinned.length - 1] || null;
-            if (lastPinned) lastPinned.after(frag);
-            else tabsContainer.insertBefore(frag, tabsContainer.firstChild);
+            tabsContainer.appendChild(frag);
         }
         // ── Tab media indicator: audible/muted speaker, recording mic/camera ─────
         const INDICATOR_SVG = {
