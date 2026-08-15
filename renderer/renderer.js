@@ -2383,6 +2383,14 @@
         // opens the native switcher menu (built in ipc/tabs.js). Rename via modal.
         let activeWorkspace = '1';
         let _spacesCache = [];
+        let _containersCache = []; // named containers, for the Set Profile menus
+        try {
+            const pullContainers = () => window.containers?.listNamed()
+                .then((c) => { _containersCache = c || []; }).catch(() => { });
+            pullContainers();
+            setTimeout(pullContainers, 800);
+        }
+        catch { }
         function initProfiles() {
             const btn = document.getElementById('profile-btn');
             const badge = document.getElementById('profile-badge');
@@ -2415,6 +2423,7 @@
                     nameEl.value = '';
                     panel.classList.remove('hidden');
                     bar.classList.add('creating-space');
+                    try { window.tabsUI.focusChrome(); } catch { }
                     nameEl.focus();
                 };
                 emojiEl.addEventListener('click', (e) => {
@@ -2522,6 +2531,12 @@
                                 ['Change Name…', () => openProfileModal(p.id)],
                                 ['Change Icon…', () => openProfileModal(p.id)],
                                 ['Edit Theme…', () => window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance')],
+                                ['Set Profile', [
+                                    ['Own (isolated)', () => window.profiles.update(p.id, { container: null })],
+                                    ['Default (shared)', () => window.profiles.update(p.id, { container: 'default' })],
+                                    ['sep'],
+                                    ...(_containersCache || []).map(c => [c.name, () => window.profiles.update(p.id, { container: c.id })]),
+                                ]],
                                 ['sep'],
                                 ['Create Space', () => openCreateSpace()],
                             );
@@ -2753,6 +2768,33 @@
                         if (!/^https?:/i.test(url || '')) return;
                         const ok = await window.essentials.add(url, title, null);
                         if (ok && isPinned) window.tab.pin(idx);
+                    }],
+                    ['Open in New Container Tab', (_containersCache || []).map(c => [
+                        c.name, async () => {
+                            const url = await window.tab.getTabUrl(idx);
+                            if (/^https?:/i.test(url || '')) window.tab.openInPersona(c.id, url);
+                        },
+                    ])],
+                    ['Move Tab', [
+                        ['Move to Top', () => {
+                            const first = [...tabsContainer.querySelectorAll('.tab-button:not(.pinned):not(.in-folder)')][0];
+                            if (first && first !== btn) tabsContainer.insertBefore(btn, first);
+                            window.tab.reorder([...tabsContainer.querySelectorAll('.tab-button')].map(el => +el.dataset.index));
+                        }],
+                        ['Move to Bottom', () => {
+                            tabsContainer.appendChild(btn);
+                            window.tab.reorder([...tabsContainer.querySelectorAll('.tab-button')].map(el => +el.dataset.index));
+                        }],
+                    ]],
+                    ['Close Duplicate Tabs', async () => {
+                        const all = [...document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden)')];
+                        const seen = new Set();
+                        for (const b of all) {
+                            const u = await window.tab.getTabUrl(+b.dataset.index);
+                            if (!u || u === 'newtab') continue;
+                            if (seen.has(u)) window.tab.remove(+b.dataset.index);
+                            else seen.add(u);
+                        }
                     }],
                     ['Close Multiple Tabs', [
                         ['Close Other Tabs', () => {
@@ -3149,7 +3191,11 @@
             const cur = name.textContent;
             const input = document.createElement('input');
             input.className = 'folder-rename-input'; input.value = cur; input.maxLength = 40;
-            name.replaceWith(input); input.focus(); input.select();
+            name.replaceWith(input);
+            // Pull keyboard focus to the chrome first, else the caret shows but
+            // every keystroke goes to the page view that still owns focus.
+            try { window.tabsUI.focusChrome(); } catch { }
+            input.focus(); input.select();
             const done = (save) => {
                 if (!h.classList.contains('renaming')) return;
                 h.classList.remove('renaming');

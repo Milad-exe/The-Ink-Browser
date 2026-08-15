@@ -295,6 +295,13 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     // over it — a click on the page never reaches the chrome, so the menu would
     // stay open. While one is up, watch the active tab's input stream and tell
     // the chrome to close on any press there.
+    // Keyboard focus lives with the active tab's view, so an inline input in the
+    // chrome (folder rename, space name) gets a caret but receives no keystrokes
+    // until the chrome itself is focused.
+    ipcMain.on('chrome:focus', (_e) => {
+        try { wm.getWindowByWebContents(_e.sender)?.window?.webContents?.focus(); }
+        catch { }
+    });
     ipcMain.on('chrome-menu-open', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         const t = wd?.tabs;
