@@ -2786,6 +2786,13 @@
                     ['sep'],
                     [isPinned ? 'Unpin Tab' : 'Pin Tab', () => window.tab.pin(idx)],
                     ['Unload Tab', () => window.tab.unload(idx)],
+                    ...(isPinned ? [
+                        ['Edit Pinned URL…', async () => {
+                            const cur = await window.tab.getHome(idx);
+                            startInlineEdit(btn, cur, (v) => window.tab.setHome(idx, v));
+                        }],
+                        ['Reset Pinned Tab', () => window.tab.resetPinned(idx)],
+                    ] : []),
                     ['Duplicate Tab', async () => {
                         const url = await window.tab.getTabUrl(idx);
                         const ni = await window.tab.add();
@@ -3228,6 +3235,35 @@
             if (id) setTimeout(() => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }, 140);
         }
         // Inline rename for a tab row — double-click or the Change Label item.
+        // Generic inline editor on a tab row: swaps the title for an input,
+        // commits on Enter/blur, cancels on Escape.
+        function startInlineEdit(btn, initial, commit) {
+            const label = btn.querySelector('.tab-title');
+            if (!label || btn.classList.contains('renaming'))
+                return;
+            btn.classList.add('renaming');
+            const input = document.createElement('input');
+            input.className = 'folder-rename-input';
+            input.value = initial || '';
+            input.maxLength = 300;
+            label.replaceWith(input);
+            try { window.tabsUI.focusChrome(); } catch { }
+            input.focus(); input.select();
+            const done = (save) => {
+                if (!btn.classList.contains('renaming'))
+                    return;
+                btn.classList.remove('renaming');
+                const val = input.value;
+                input.replaceWith(label);
+                if (save) commit(val);
+            };
+            input.addEventListener('keydown', (e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') done(true);
+                if (e.key === 'Escape') done(false);
+            });
+            input.addEventListener('blur', () => done(true));
+        }
         function startTabRename(btn, idx) {
             const label = btn.querySelector('.tab-title');
             if (!label || btn.classList.contains('renaming'))

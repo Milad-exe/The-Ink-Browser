@@ -456,6 +456,9 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     ipcMain.handle('tab:reopenClosed', (_e) => { wm.getWindowByWebContents(_e.sender)?.tabs?.reopenClosedTab(); });
     ipcMain.handle('sidebar:toggleCompact', (_e) => { wm.getWindowByWebContents(_e.sender)?.tabs?.toggleCompact(); });
     ipcMain.handle('folders:assign', (_e, index, folderId) => { wm.getWindowByWebContents(_e.sender)?.tabs?.setTabFolder(index, folderId); });
+    ipcMain.handle('tab:setHome', (_e, index, url) => wm.getWindowByWebContents(_e.sender)?.tabs?.setPinnedHome(index, url) || false);
+    ipcMain.handle('tab:resetPinned', (_e, index) => wm.getWindowByWebContents(_e.sender)?.tabs?.resetPinnedTab(index) || false);
+    ipcMain.handle('tab:getHome', (_e, index) => wm.getWindowByWebContents(_e.sender)?.tabs?.pinnedHome.get(Number(index)) || '');
     ipcMain.handle('tab:unload', (_e, index) => wm.getWindowByWebContents(_e.sender)?.tabs?.unloadTab(index) || false);
     ipcMain.handle('tab:unloadWorkspace', (_e, ws) => wm.getWindowByWebContents(_e.sender)?.tabs?.unloadWorkspace(ws) || 0);
     ipcMain.handle('tab:setIcon', (_e, index, icon) => {

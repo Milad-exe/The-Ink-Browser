@@ -228,6 +228,7 @@ class Tabs {
         this.folders = []; // [{ id, name, collapsed, workspace }] — tab folders
         this.tabLabels = new Map(); // tabIndex → user-set label overriding the page title
         this.tabIcons = new Map(); // tabIndex → user-set icon overriding the favicon
+        this.pinnedHome = new Map(); // tabIndex → the url a pinned tab resets to
         this.tabFolders = new Map(); // tabIndex → folderId
         this._folderSeq = 1;
         this.splitPair = null; // [leftIdx, rightIdx] when split view is active
@@ -1758,6 +1759,24 @@ class Tabs {
      * lazy-tab path: blank the contents and clear lazyLoaded, so showTab reloads
      * the stored URL when you come back to it. The active tab is never unloaded.
      */
+    // The url a pinned tab returns to. Blank clears it back to the current page.
+    setPinnedHome(index, url) {
+        const i = Number(index);
+        if (!this.pinnedTabs.has(i))
+            return false;
+        const clean = (url || '').trim();
+        this.pinnedHome.set(i, clean || this.tabUrls.get(i) || 'newtab');
+        this.saveStateDebounced?.();
+        return true;
+    }
+    resetPinnedTab(index) {
+        const i = Number(index);
+        const home = this.pinnedHome.get(i);
+        if (!home || !this.tabMap.has(i))
+            return false;
+        this.openUrlUserInitiated(i, home);
+        return true;
+    }
     unloadTab(index) {
         const i = Number(index);
         const tab = this.tabMap.get(i);
@@ -2419,9 +2438,15 @@ class Tabs {
                 this.createTab();
             }
             this.pinnedTabs.add(index);
+            // Pinning captures where the tab "lives"; Reset returns here however
+            // far the tab has since navigated.
+            const here = this.tabUrls.get(index);
+            if (here && here !== 'newtab' && !this.pinnedHome.has(index))
+                this.pinnedHome.set(index, here);
         }
         else {
             this.pinnedTabs.delete(index);
+            this.pinnedHome.delete(index);
         }
         this.mainWindow.webContents.send('pin-tab', { index });
         this.saveStateDebounced();
@@ -2454,6 +2479,7 @@ class Tabs {
                 folder: this.tabFolders.get(idx) || null,
                 label: this.tabLabels.get(idx) || null,
                 icon: this.tabIcons.get(idx) || null,
+                home: this.pinnedHome.get(idx) || null,
             };
         });
         // Map active to its ordinal within the SAVED list (selected), not the

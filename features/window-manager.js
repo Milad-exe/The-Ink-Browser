@@ -353,6 +353,7 @@ class WindowManager {
                     state.tabs.forEach((t, i) => {
                         if (t.label) tabs.tabLabels.set(tabKeys[i], t.label);
                         if (t.icon) tabs.tabIcons.set(tabKeys[i], t.icon);
+                        if (t.home) tabs.pinnedHome.set(tabKeys[i], t.home);
                     });
                     const activeWs = String(state.activeWorkspace || state.profile || '1');
                     if (activeWs !== profileId) {
