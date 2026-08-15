@@ -2351,6 +2351,18 @@
                         }
                         window.browserBookmarks.openInNewTab(it.url, true);
                     });
+                    // Essentials get their own menu — "Remove from Essentials"
+                    // rather than the tab strip's unpin.
+                    tile.addEventListener('contextmenu', (ev) => {
+                        ev.preventDefault(); ev.stopPropagation();
+                        openCtxMenu(ev.clientX, ev.clientY, [
+                            ['Open in New Tab', () => window.browserBookmarks.openInNewTab(it.url, true)],
+                            ['sep'],
+                            ['Bookmark…', () => window.browserBookmarks.add(it.url, it.title || '')],
+                            ['sep'],
+                            ['Remove from Essentials', () => window.essentials.remove(it.url, it.persona || null), 'danger'],
+                        ]);
+                    });
                     grid.appendChild(tile);
                 }
             };
