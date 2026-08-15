@@ -183,6 +183,19 @@ window.addEventListener('blur', () => {
         return;
     disableLinkSelectionSuppression(0);
 }, true);
+// Alt+click a link opens it in a Glance preview over the current page rather
+// than navigating. Registered for every page, not just internal ones.
+document.addEventListener('click', (event) => {
+    if (!event.altKey || event.button !== 0 || event.defaultPrevented)
+        return;
+    const a = findAnchorInEventPath(event);
+    if (!a || !/^https?:/i.test(a.href || ''))
+        return;
+    event.preventDefault();
+    event.stopPropagation();
+    try { ipcRenderer.send('glance:from-page', a.href); }
+    catch { }
+}, true);
 exposeInternal("tab", {
     add: () => ipcRenderer.invoke("addTab"),
     addPrivate: () => ipcRenderer.invoke("addPrivateTab"),

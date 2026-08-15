@@ -35,7 +35,11 @@ function load() {
     try {
         const raw = JSON.parse(fs.readFileSync(file(), 'utf-8'));
         if (raw && Array.isArray(raw.list) && raw.list.length) {
+            // Carry the global essentials through — rebuilding from nextId+list
+            // alone would drop them on every launch.
             _reg = { nextId: Number(raw.nextId) || (raw.list.length + 1), list: raw.list };
+            if (Array.isArray(raw.essentials))
+                _reg.essentials = raw.essentials;
             return _reg;
         }
     }
@@ -147,30 +151,53 @@ function sessionFor(id) {
     return sess;
 }
 
-// ── Essentials (per profile; pinned favourites) ───────────────────────────────
-function essentials(id) {
-    const p = _find(id);
-    return p ? (p.essentials || []).map(e => ({ ...e })) : [];
+// ── Essentials (global across spaces; the big favicon tiles) ─────────────────
+// Essentials are GLOBAL across spaces — unlike pinned tabs, which are
+// per-space. They used to be stored per profile, so the first read folds any
+// old per-profile lists into the shared one (de-duped) and drops them.
+const ESSENTIALS_MAX = 12;
+function _essentials() {
+    const reg = load();
+    if (!Array.isArray(reg.essentials)) {
+        const seen = new Set();
+        reg.essentials = [];
+        for (const p of reg.list) {
+            for (const e of (p.essentials || [])) {
+                const key = `${e.url}|${e.persona || ''}`;
+                if (seen.has(key))
+                    continue;
+                seen.add(key);
+                reg.essentials.push({ ...e });
+            }
+            delete p.essentials;
+        }
+        save();
+    }
+    return reg.essentials;
 }
-function addEssential(id, e) {
-    const p = _find(id);
-    if (!p || !e || !e.url)
+// The id argument is kept so existing per-window callers still work; Essentials
+// no longer vary by space.
+function essentials(_id) {
+    return _essentials().map(e => ({ ...e }));
+}
+function addEssential(_id, e) {
+    if (!e || !e.url)
         return false;
-    p.essentials = p.essentials || [];
-    if (p.essentials.some(x => x.url === e.url && (x.persona || null) === (e.persona || null)))
+    const list = _essentials();
+    if (list.some(x => x.url === e.url && (x.persona || null) === (e.persona || null)))
         return false;
-    p.essentials.push({ url: e.url, title: e.title || e.url, persona: e.persona || null });
+    if (list.length >= ESSENTIALS_MAX)
+        return false;
+    list.push({ url: e.url, title: e.title || e.url, persona: e.persona || null });
     save();
     return true;
 }
-function removeEssential(id, url, persona = null) {
-    const p = _find(id);
-    if (!p || !p.essentials)
-        return false;
-    const i = p.essentials.findIndex(x => x.url === url && (x.persona || null) === (persona || null));
+function removeEssential(_id, url, persona = null) {
+    const list = _essentials();
+    const i = list.findIndex(x => x.url === url && (x.persona || null) === (persona || null));
     if (i === -1)
         return false;
-    p.essentials.splice(i, 1);
+    list.splice(i, 1);
     save();
     return true;
 }

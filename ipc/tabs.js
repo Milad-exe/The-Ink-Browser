@@ -391,6 +391,12 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         return ok;
     });
     // ── Glance: peek a page in a floating preview over the current tab ──────────
+    // Alt+click a link in a PAGE — the reference's primary Glance trigger. The
+    // sender is the tab's webContents, not the chrome, so resolve its window.
+    ipcMain.on('glance:from-page', (_e, url) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd?.tabs && /^https?:/i.test(url || '')) wd.tabs.openGlance(sanitizeUrl(url));
+    });
     ipcMain.handle('glance:open', (_e, url) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd?.tabs && url) wd.tabs.openGlance(url);
