@@ -230,8 +230,10 @@ exposeInternal('folders', {
     toggle: (id, collapsed) => ipcRenderer.invoke('folders:toggle', id, collapsed),
     icon: (id, icon) => ipcRenderer.invoke('folders:icon', id, icon),
     assign: (index, folderId) => ipcRenderer.invoke('folders:assign', index, folderId),
+    move: (id, workspace) => ipcRenderer.invoke('folders:move', id, workspace),
     list: () => ipcRenderer.invoke('folders:list'),
     onChanged: (cb) => ipcRenderer.on('folders-changed', (_e, data) => cb(data)),
+    onTabsMoved: (cb) => ipcRenderer.on('tabs-workspace-changed', (_e, data) => cb(data)),
 });
 // Profiles — Chrome-style browsing selves; each window belongs to one.
 exposeInternal('profiles', {

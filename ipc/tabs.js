@@ -363,6 +363,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     ipcMain.handle('tab:reopenClosed', (_e) => { wm.getWindowByWebContents(_e.sender)?.tabs?.reopenClosedTab(); });
     ipcMain.handle('sidebar:toggleCompact', (_e) => { wm.getWindowByWebContents(_e.sender)?.tabs?.toggleCompact(); });
     ipcMain.handle('folders:assign', (_e, index, folderId) => { wm.getWindowByWebContents(_e.sender)?.tabs?.setTabFolder(index, folderId); });
+    ipcMain.handle('folders:move', (_e, id, workspace) => { wm.getWindowByWebContents(_e.sender)?.tabs?.moveFolderToWorkspace(id, workspace); });
     ipcMain.handle('folders:list', (_e) => {
         const t = wm.getWindowByWebContents(_e.sender)?.tabs;
         if (!t) return { folders: [], assignments: [] };

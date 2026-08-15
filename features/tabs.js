@@ -1713,6 +1713,32 @@ class Tabs {
         const f = this.folders.find(x => x.id === id);
         if (f) { f.collapsed = (collapsed == null) ? !f.collapsed : !!collapsed; this.broadcastFolders(); this.saveStateDebounced?.(); }
     }
+    // Move a folder to another workspace. Its tabs go with it, otherwise they'd
+    // be stranded in a workspace whose folder list no longer names them.
+    moveFolderToWorkspace(id, workspace) {
+        const f = this.folders.find(x => x.id === id);
+        if (!f) return;
+        const ws = String(workspace);
+        if (ws === String(f.workspace)) return;
+        f.workspace = ws;
+        const moved = [];
+        for (const [idx, fid] of this.tabFolders.entries()) {
+            if (fid !== id || !this.tabMap.has(idx)) continue;
+            this.tabProfiles.set(idx, ws);
+            moved.push(idx);
+        }
+        if (moved.length) {
+            try { this.mainWindow.webContents.send('tabs-workspace-changed', { indices: moved, workspace: ws }); }
+            catch { }
+            // A moved-away tab must not stay on screen in the old workspace.
+            if (moved.includes(this.activeTabIndex)) {
+                const stay = this.tabsInWorkspace(this.profileId)[0];
+                if (stay !== undefined) this.showTab(stay);
+            }
+        }
+        this.broadcastFolders();
+        this.saveStateDebounced?.();
+    }
     deleteFolder(id) {
         // "Unpack": tabs survive, just leave the folder.
         for (const [idx, fid] of [...this.tabFolders.entries()]) if (fid === id) this.tabFolders.delete(idx);

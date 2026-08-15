@@ -2006,6 +2006,15 @@
                     layoutFolders();
                 };
                 window.folders?.onChanged(applyFolders);
+                // A folder moved to another space takes its tabs with it, so re-tag
+                // them here or they'd stay visible in the space they just left.
+                window.folders?.onTabsMoved(({ indices, workspace }) => {
+                    for (const i of indices || []) {
+                        const btn = tabs.get(Number(i));
+                        if (btn) btn.dataset.ws = String(workspace);
+                    }
+                    filterTabsByWorkspace();
+                });
                 // Pull the current folders (restored ones exist before this listener).
                 window.folders?.list().then(applyFolders).catch(() => { });
             }
@@ -2343,6 +2352,7 @@
         // The toolbar badge shows this window's profile (coloured initial); click
         // opens the native switcher menu (built in ipc/tabs.js). Rename via modal.
         let activeWorkspace = '1';
+        let _spacesCache = [];
         function initProfiles() {
             const btn = document.getElementById('profile-btn');
             const badge = document.getElementById('profile-badge');
@@ -2354,6 +2364,7 @@
                 catch { }
                 try { all = (await window.profiles.list()) || []; }
                 catch { }
+                _spacesCache = all; // menus need the space list without awaiting
                 if (cur) {
                     activeWorkspace = cur.id;
                     if (badge) {
@@ -2771,23 +2782,57 @@
         }
         // Reusable dark context menu. rows: [label, fn, className?] | ['sep'].
         let _closeCtxMenu = null;
+        // rows: ['Label', fn, className?] | ['Label', [subRows], className?] | ['sep'].
+        // A row whose second slot is an array becomes a submenu, opened on hover.
         function openCtxMenu(x, y, rows) {
             if (_closeCtxMenu) _closeCtxMenu();
-            const menu = document.createElement('div');
-            menu.className = 'ctx-menu';
-            for (const r of rows) {
-                if (r[0] === 'sep') { const s = document.createElement('div'); s.className = 'ctx-menu-sep'; menu.appendChild(s); continue; }
-                const b = document.createElement('button'); b.className = 'ctx-menu-item' + (r[2] ? ' ' + r[2] : ''); b.textContent = r[0]; b.tabIndex = -1;
-                b.addEventListener('click', () => { const fn = r[1]; if (_closeCtxMenu) _closeCtxMenu(); fn && fn(); });
-                menu.appendChild(b);
+            const chain = []; // every menu element currently on screen, root first
+            const place = (menu, mx, my) => {
+                document.body.appendChild(menu);
+                const mw = menu.offsetWidth || 190, mh = menu.offsetHeight || 130;
+                menu.style.left = Math.max(6, Math.min(mx, window.innerWidth - mw - 6)) + 'px';
+                menu.style.top = Math.max(6, Math.min(my, window.innerHeight - mh - 6)) + 'px';
+            };
+            const closeFrom = (depth) => { while (chain.length > depth) chain.pop().remove(); };
+            const build = (rowSet, depth) => {
+                const menu = document.createElement('div');
+                menu.className = 'ctx-menu';
+                for (const r of rowSet) {
+                    if (r[0] === 'sep') { const s = document.createElement('div'); s.className = 'ctx-menu-sep'; menu.appendChild(s); continue; }
+                    const sub = Array.isArray(r[1]) ? r[1] : null;
+                    const b = document.createElement('button');
+                    b.className = 'ctx-menu-item' + (r[2] ? ' ' + r[2] : '') + (sub ? ' has-sub' : '');
+                    b.tabIndex = -1;
+                    b.appendChild(document.createTextNode(r[0]));
+                    if (sub) { const ar = document.createElement('span'); ar.className = 'ctx-sub-arrow'; ar.textContent = '›'; b.appendChild(ar); }
+                    b.addEventListener('mouseenter', () => {
+                        closeFrom(depth + 1);
+                        if (!sub || !sub.length) return;
+                        const rc = b.getBoundingClientRect();
+                        const child = build(sub, depth + 1);
+                        chain.push(child);
+                        place(child, rc.right - 2, rc.top - 5);
+                    });
+                    b.addEventListener('click', (e) => {
+                        if (sub) { e.stopPropagation(); return; }
+                        const fn = r[1]; closeAll(); fn && fn();
+                    });
+                    menu.appendChild(b);
+                }
+                return menu;
+            };
+            const onDoc = (e) => { if (!chain.some(m => m.contains(e.target))) closeAll(); };
+            const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeAll(); } };
+            function closeAll() {
+                closeFrom(0);
+                document.removeEventListener('click', onDoc, true);
+                document.removeEventListener('keydown', onKey, true);
+                _closeCtxMenu = null;
             }
-            document.body.appendChild(menu);
-            const mw = menu.offsetWidth || 190, mh = menu.offsetHeight || 130;
-            menu.style.left = Math.max(6, Math.min(x, window.innerWidth - mw - 6)) + 'px';
-            menu.style.top = Math.max(6, Math.min(y, window.innerHeight - mh - 6)) + 'px';
-            const onDoc = (e) => { if (!menu.contains(e.target)) _closeCtxMenu?.(); };
-            const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); _closeCtxMenu?.(); } };
-            _closeCtxMenu = () => { menu.remove(); document.removeEventListener('click', onDoc, true); document.removeEventListener('keydown', onKey, true); _closeCtxMenu = null; };
+            const root = build(rows, 0);
+            chain.push(root);
+            place(root, x, y);
+            _closeCtxMenu = closeAll;
             setTimeout(() => { document.addEventListener('click', onDoc, true); document.addEventListener('keydown', onKey, true); }, 0);
         }
         function openEmojiPicker(x, y, onPick) {
@@ -2812,10 +2857,15 @@
             setTimeout(() => { document.addEventListener('click', onDoc, true); document.addEventListener('keydown', onKey, true); }, 0);
         }
         function showFolderMenu(x, y, id) {
+            // Spaces other than the current one; the folder and its tabs move together.
+            const spaceRows = (_spacesCache || [])
+                .filter(p => String(p.id) !== String(activeWorkspace))
+                .map(p => [`${p.emoji ? p.emoji + '  ' : ''}${p.name}`, () => window.folders.move(id, p.id)]);
             openCtxMenu(x, y, [
                 ['Rename Folder…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }],
                 ['Change Icon…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); const r = h ? h.getBoundingClientRect() : { right: x, top: y }; openEmojiPicker(r.right + 4, r.top, (e) => window.folders.icon(id, e)); }],
                 ['sep'],
+                ...(spaceRows.length ? [['Change Space', spaceRows], ['sep']] : []),
                 ['Unpack Folder', () => window.folders.remove(id)],
                 ['Delete Folder', () => {
                     const members = [...folderState.assign.entries()].filter(([, fid]) => fid === id).map(([i]) => i);

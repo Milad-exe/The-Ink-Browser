@@ -326,6 +326,10 @@ html[data-tabbar="side"] .tab-button.folder-collapsed { display: none !important
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
   box-shadow: 0 14px 40px rgba(8,10,20,0.45);
 }
+/* Submenu parents keep the chevron hard right, so labels stay left-aligned
+   with the plain rows above and below them. */
+.ctx-menu-item.has-sub { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.ctx-sub-arrow { color: var(--text-3); font-size: 14px; line-height: 1; flex-shrink: 0; }
 .ctx-menu-item {
   display: block; width: 100%; text-align: left; border: none; background: transparent;
   padding: 7px 11px; border-radius: 8px; color: var(--text); font-family: var(--font);
