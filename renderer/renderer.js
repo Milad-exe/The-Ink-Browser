@@ -1972,6 +1972,8 @@
             window.tab.onTabLoading((_e, data) => {
                 setTabLoading(data.index, data.loading);
             });
+            try { window.tab.onIconChanged(({ index, icon }) => applyCustomTabIcon(Number(index), icon)); }
+            catch { }
             window.tabsUI?.onPinTab((index) => {
                 const btn = document.querySelector(`#tabs-container .tab-button[data-index="${index}"]`);
                 if (!btn)
@@ -2774,7 +2776,10 @@
                 rows.push(
                     ['sep'],
                     ['Change Label…', () => startTabRename(btn, idx)],
+                    ['Change Icon…', () => openEmojiPicker(e.clientX, e.clientY,
+                        (emo) => window.tab.setIcon(idx, emo), true)],
                     ['Reset Label', () => window.tab.setLabel(idx, '')],
+                    ['Reset Icon', () => window.tab.setIcon(idx, '')],
                     ['Reload Tab', () => window.tab.reload(idx)],
                     ['Mute Tab', () => window.tab.toggleMute(idx)],
                     ['sep'],
@@ -3434,6 +3439,25 @@
         }
         // Letter placeholder — derived from the PAGE host, not the favicon URL, so
         // a site whose /favicon.ico fails still shows its own initial.
+        // A user-set icon replaces the favicon entirely and is re-applied after
+        // any favicon update, so navigation cannot overwrite it.
+        function applyCustomTabIcon(index, icon) {
+            const btn = tabs.get(index);
+            if (!btn) return;
+            const cur = btn.querySelector('.tab-favicon');
+            if (!icon) {
+                // Clearing must put an icon back, or the tab keeps the old emoji.
+                btn.dataset.customIcon = '';
+                setFaviconFallback(index, cur);
+                return;
+            }
+            btn.dataset.customIcon = icon;
+            const div = document.createElement('div');
+            div.className = 'tab-favicon default custom-icon';
+            div.textContent = icon;
+            if (cur) cur.replaceWith(div);
+            btn.classList.add('has-favicon');
+        }
         function setFaviconFallback(index, el) {
             const div = document.createElement('div');
             div.className = 'tab-favicon default';
@@ -3448,6 +3472,8 @@
                 }
             }
             catch { }
+            const custom = tabs.get(index)?.dataset.customIcon;
+            if (custom) return applyCustomTabIcon(index, custom);
             div.textContent = ch;
             if (el && el.isConnected)
                 el.replaceWith(div);

@@ -1046,3 +1046,8 @@ html[data-private-window="true"] .private-badge { display: flex; }
 /* Pinned Essential icon (emoji) sits where the favicon would. */
 .ess-fallback.ess-icon { background: transparent; font-size: 17px; }
 }
+
+@layer components {
+/* User-set tab icon sits where the favicon would, at emoji size. */
+.tab-favicon.custom-icon { display: flex; align-items: center; justify-content: center; font-size: 14px; background: transparent; }
+}

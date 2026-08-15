@@ -213,6 +213,8 @@ exposeInternal("tab", {
     getButton: (index) => ipcRenderer.invoke("getTabButton", index),
     pin: (index) => ipcRenderer.invoke("pinTab", index),
     setLabel: (index, label) => ipcRenderer.invoke('tab:setLabel', index, label),
+    setIcon: (index, icon) => ipcRenderer.invoke('tab:setIcon', index, icon),
+    onIconChanged: (cb) => ipcRenderer.on('tab-icon-changed', (_e, d) => cb(d)),
     toggleMute: (index) => ipcRenderer.invoke("muteTab", index),
     fetchFavicon: (url) => ipcRenderer.invoke('favicon-fetch', url),
     cachedFavicon: (host) => ipcRenderer.invoke('favicon-cached', host),

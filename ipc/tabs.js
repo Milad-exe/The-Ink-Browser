@@ -456,6 +456,9 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     ipcMain.handle('tab:reopenClosed', (_e) => { wm.getWindowByWebContents(_e.sender)?.tabs?.reopenClosedTab(); });
     ipcMain.handle('sidebar:toggleCompact', (_e) => { wm.getWindowByWebContents(_e.sender)?.tabs?.toggleCompact(); });
     ipcMain.handle('folders:assign', (_e, index, folderId) => { wm.getWindowByWebContents(_e.sender)?.tabs?.setTabFolder(index, folderId); });
+    ipcMain.handle('tab:setIcon', (_e, index, icon) => {
+        wm.getWindowByWebContents(_e.sender)?.tabs?.setTabIcon(index, icon);
+    });
     ipcMain.handle('tab:setLabel', (_e, index, label) => {
         wm.getWindowByWebContents(_e.sender)?.tabs?.setTabLabel(index, label);
     });

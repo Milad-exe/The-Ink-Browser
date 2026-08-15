@@ -227,6 +227,7 @@ class Tabs {
         this.tabProfiles = new Map(); // tabIndex → workspace/profile id
         this.folders = []; // [{ id, name, collapsed, workspace }] — tab folders
         this.tabLabels = new Map(); // tabIndex → user-set label overriding the page title
+        this.tabIcons = new Map(); // tabIndex → user-set icon overriding the favicon
         this.tabFolders = new Map(); // tabIndex → folderId
         this._folderSeq = 1;
         this.splitPair = null; // [leftIdx, rightIdx] when split view is active
@@ -1733,6 +1734,20 @@ class Tabs {
         else
             this.tabLabels.delete(i);
         this.sendTabUpdate(i, tab, this.tabUrls.get(i) || '', clean || tab.lazyTitle);
+        this.saveStateDebounced?.();
+    }
+    // A pinned icon replaces the favicon and survives navigation; blank resets.
+    setTabIcon(index, icon) {
+        const i = Number(index);
+        if (!this.tabMap.has(i))
+            return;
+        const clean = (icon || '').trim().slice(0, 8);
+        if (clean)
+            this.tabIcons.set(i, clean);
+        else
+            this.tabIcons.delete(i);
+        try { this.mainWindow.webContents.send('tab-icon-changed', { index: i, icon: clean || null }); }
+        catch { }
         this.saveStateDebounced?.();
     }
     reorderFolders(ids) {
