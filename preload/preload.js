@@ -203,7 +203,7 @@ exposeInternal("tab", {
     remove: (index) => ipcRenderer.invoke("removeTab", index),
     switch: (index) => ipcRenderer.invoke("switchTab", index),
     loadUrl: (index, url) => ipcRenderer.invoke("loadUrl", index, url),
-    openInPersona: (personaId, url) => ipcRenderer.invoke("tab:openInPersona", personaId, url),
+    openInContainer: (containerId, url) => ipcRenderer.invoke('tab:openInContainer', containerId, url),
     goBack: (index) => ipcRenderer.invoke("goBack", index),
     goForward: (index) => ipcRenderer.invoke("goForward", index),
     showNavHistoryMenu: (index, x, y) => ipcRenderer.invoke("show-nav-history-menu", index, x, y),
@@ -292,12 +292,6 @@ exposeInternal('containers', {
     listNamed: () => ipcRenderer.invoke('containers:listNamed'),
     createNamed: (name) => ipcRenderer.invoke('containers:createNamed', name),
     remove: (id) => ipcRenderer.invoke('containers:remove', id),
-});
-exposeInternal('personas', {
-    map: () => ipcRenderer.invoke('personas:map'),
-    rename: (id, name) => ipcRenderer.invoke('personas:rename', id, name),
-    onChanged: (cb) => ipcRenderer.on('personas:changed', () => cb()),
-    onRename: (cb) => ipcRenderer.on('rename-persona', (_e, id) => cb(id)),
 });
 exposeInternal('northstarPrivate', {
     newPrivateWindow: () => ipcRenderer.invoke('newPrivateWindow'),

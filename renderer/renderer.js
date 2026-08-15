@@ -71,7 +71,6 @@
         let tabUrls = new Map(); // tabIndex → url string
         let tabPrivate = new Map(); // tabIndex → boolean (private flag)
         let tabLoading = new Set(); // tabIndexes currently loading
-        let personaNames = {}; // persona id → current display name (for labelling)
         // Only the active workspace's tabs are shown in the strip.
         function filterTabsByWorkspace() {
             for (const [idx, btn] of tabs) {
@@ -149,7 +148,6 @@
         initUtilityBarConfig();
         initReaderAndPip();
         initChromeClock();
-        initPersonas();
         initProfiles();
         initEssentials();
         // ─────────────────────────────────────────────────────────────────────────
@@ -457,7 +455,7 @@
                 window.tab.switch(item.tabIndex);
             }
             else if ((item.type === 'history' || item.type === 'bookmark') && item.url) {
-                if (item.persona) { hideSuggestions(); searchBar.blur(); window.tab.openInPersona(item.persona, item.url); return; }
+                if (item.persona) { hideSuggestions(); searchBar.blur(); window.tab.openInContainer(item.persona, item.url); return; }
                 searchBar.value = item.url;
                 commitNavigation(item.url);
             }
@@ -482,7 +480,7 @@
                 return;
             }
             if ((item.type === 'history' || item.type === 'bookmark') && item.url) {
-                if (item.persona) { hideSuggestions(); searchBar.blur(); window.tab.openInPersona(item.persona, item.url); return; }
+                if (item.persona) { hideSuggestions(); searchBar.blur(); window.tab.openInContainer(item.persona, item.url); return; }
                 searchBar.value = item.url;
                 commitNavigation(item.url);
             }
@@ -589,7 +587,7 @@
                     if (!e.url.toLowerCase().includes(ql) && !(e.title || '').toLowerCase().includes(ql))
                         continue;
                     const base = e.title || e.url;
-                    const pName = e.persona ? (personaNames[e.persona] || 'persona') : null;
+                    const pName = null;
                     results.push({ type: 'bookmark', url: e.url, title: pName ? `${base}  ·  ${pName}` : base, persona: e.persona || null });
                     if (results.length >= limit)
                         break;
@@ -619,7 +617,7 @@
                         continue;
                     seen.add(key);
                     const base = e.title || e.url;
-                    const pName = e.persona ? (personaNames[e.persona] || e.personaName || 'persona') : null;
+                    const pName = null;
                     results.push({
                         type: 'history', url: e.url,
                         title: pName ? `${base}  ·  ${pName}` : base,
@@ -1673,10 +1671,9 @@
                 }
                 btn.appendChild(lbl);
                 if (entry.persona)
-                    lbl.textContent += '  ·  ' + (personaNames[entry.persona] || 'persona');
                 btn.addEventListener('click', () => {
                     if (entry.persona)
-                        window.tab.openInPersona(entry.persona, entry.url);
+                        window.tab.openInContainer(entry.persona, entry.url);
                     else
                         window.tab.loadUrl(activeTabIndex, entry.url);
                 });
@@ -2182,44 +2179,6 @@
             el.querySelector('.iso-hint-close')?.addEventListener('click', dismiss, { once: true });
             timer = setTimeout(dismiss, 7000);
         }
-        // ── Personas ──────────────────────────────────────────────────────────────
-        // Personas are auto-numbered; a persona tab can be optionally renamed via
-        // right-click → "Name This Persona…". Names are resolved live (personaNames
-        // map) so a rename reflects in history/suggestions without rewriting entries.
-        async function refreshPersonaNames() {
-            try { personaNames = (await window.personas.map()) || {}; }
-            catch { personaNames = {}; }
-        }
-        function initPersonas() {
-            refreshPersonaNames();
-            try { window.personas.onChanged(() => refreshPersonaNames()); }
-            catch { }
-            const modal = document.getElementById('persona-rename-modal');
-            const input = document.getElementById('pr-input');
-            if (!modal || !input)
-                return;
-            let renameId = null;
-            const close = () => { modal.classList.add('hidden'); renameId = null; };
-            const save = async () => {
-                const name = input.value.trim();
-                if (renameId && name) { await window.personas.rename(renameId, name); await refreshPersonaNames(); }
-                close();
-            };
-            try {
-                window.personas.onRename((id) => {
-                    renameId = String(id);
-                    input.value = personaNames[renameId] || '';
-                    modal.classList.remove('hidden');
-                    input.focus(); input.select();
-                });
-            }
-            catch { }
-            document.getElementById('pr-save')?.addEventListener('click', save);
-            document.getElementById('pr-cancel')?.addEventListener('click', close);
-            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') close(); });
-            modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
-        }
-        // ── Tab bar placement (left sidebar ⇄ classic top strip) ──────────────────
         function sideTabs() { return document.documentElement.dataset.tabbar !== 'top'; }
         function initTabBarSide() {
             let mode = 'side', width = 232;
@@ -2352,7 +2311,7 @@
                     // (persona-bound essentials reopen in their persona).
                     tile.addEventListener('click', () => {
                         if (it.persona) {
-                            window.tab.openInPersona(it.persona, it.url);
+                            window.tab.openInContainer(it.persona, it.url);
                             return;
                         }
                         let origin = null;
@@ -2898,7 +2857,7 @@
                     ['Open in New Container Tab', (_containersCache || []).map(c => [
                         c.name, async () => {
                             const url = await window.tab.getTabUrl(idx);
-                            if (/^https?:/i.test(url || '')) window.tab.openInPersona(c.id, url);
+                            if (/^https?:/i.test(url || '')) window.tab.openInContainer(c.id, url);
                         },
                     ])],
                     ['Move Tab', [

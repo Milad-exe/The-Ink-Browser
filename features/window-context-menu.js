@@ -102,14 +102,6 @@ class WindowContextMenu {
                 }
             }
         }
-        this.contextTemplate.push({
-            // Open this tab's site as a separate persona (fresh session).
-            label: 'Open in New Persona',
-            click: () => {
-                const u = windowData.tabs.tabUrls.get(tabIndex);
-                windowData.tabs.openIsolatedInstance(/^https?:/i.test(u || '') ? u : null);
-            },
-        });
         // Pin this site into the sidebar's Essentials grid (per profile; a
         // persona tab's essential keeps its persona).
         {

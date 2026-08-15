@@ -100,7 +100,7 @@ class Northstar {
         // Test seam — exposes internals to the Playwright harness only when
         // NORTHSTAR_TEST=1. No-op (and not even referenced) in normal runs.
         if (process.env.NORTHSTAR_TEST === '1') {
-            global.__northstarTest = { wm: this.windowManager, focusMode, privacy, adBlocker, containers: require('./features/containers'), isolationRules: require('./features/isolation-rules'), profiles: require('./features/profiles') };
+            global.__northstarTest = { wm: this.windowManager, focusMode, privacy, adBlocker, containers: require('./features/containers'), profiles: require('./features/profiles') };
         }
     }
     registerIpc() {

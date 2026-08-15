@@ -173,10 +173,10 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (wd)
             wd.tabs.openUrlUserInitiated(index, sanitizeUrl(url));
     });
-    // Reopen a persona-tagged history/bookmark/suggestion in its persona (a new tab
-    // on that persona's session — so you land back in the right account). If the
-    // persona was cleaned up, fall back to a fresh persona for the site.
-    ipcMain.handle('tab:openInPersona', (_e, personaId, url) => {
+    // Reopen a container-tagged history/bookmark/suggestion in its container (a
+    // new tab on that container's session, so you land back in the right
+    // account). If the container is gone, fall back to a fresh one for the site.
+    ipcMain.handle('tab:openInContainer', (_e, personaId, url) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd)
             return;
@@ -507,25 +507,8 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         return { folders, assignments };
     });
     // ── Persona naming (optional rename; auto-numbered by default) ─────────────
-    // id → current display name, so history/suggestions can label personas live
+    // id → current display name, used to label container-tagged entries
     // (a rename reflects everywhere without rewriting stored entries).
-    ipcMain.handle('personas:map', () => {
-        const containers = require('../features/containers');
-        const m = {};
-        for (const c of containers.list())
-            m[c.id] = c.name;
-        return m;
-    });
-    ipcMain.handle('personas:rename', (_e, id, name) => {
-        const containers = require('../features/containers');
-        const c = containers.update(id, { name });
-        try {
-            for (const wd of wm.windows.values())
-                wd.window?.webContents?.send('personas:changed');
-        }
-        catch { }
-        return c;
-    });
     ipcMain.handle('goBack', (_e, index) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd)

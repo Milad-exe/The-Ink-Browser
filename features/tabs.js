@@ -5,7 +5,6 @@ const UserAgent = require('./user-agent');
 const faviconStore = require('./favicon-store');
 const containers = require('./containers');
 const profiles = require('./profiles');
-const isolationRules = require('./isolation-rules');
 const permissionUI = require('./permission-ui');
 const captivePortal = require('./captive-portal');
 const contextMenu = require('./tab-context-menu');
@@ -685,59 +684,11 @@ class Tabs {
     // Decide how a user-opened url should be sessioned. Never re-routes something
     // already in an instance (stickiness) or a private tab; only http(s) sites.
     //   → { mode: 'default' | 'keep' | 'isolate' | 'ask' }
-    resolveIsolation(index, url, sourceContainerId) {
-        if (!/^https?:/i.test(url || ''))
-            return { mode: 'default' };
-        if (this.isPrivateWindow || (index != null && this.privateTabs.has(index)))
-            return { mode: 'default' };
-        const pol = isolationRules.policyFor(url);
-        // A decided-isolate site ALWAYS goes to its own tenant instance — even
-        // from inside another instance — so a different tenant never loads into
-        // the wrong session. Same-tenant tab → keep (no-op).
-        if (pol === 'isolate') {
-            let destHost = null;
-            try { destHost = new URL(url).hostname; }
-            catch { }
-            if (sourceContainerId && containers.meta(sourceContainerId)?.tenantHost === destHost)
-                return { mode: 'keep' };
-            return { mode: 'isolate' };
-        }
-        // Not a decided-isolate site: stay in the current instance if we're in one
-        // (stickiness); otherwise prompt for built-ins ('ask') or use the default.
-        if (sourceContainerId)
-            return { mode: 'keep' };
-        if (pol === 'ask')
-            return { mode: 'ask' };
+    // Auto-isolation was removed with the persona concept: which cookie jar a
+    // tab uses is decided by its Space's Profile now, not by per-site rules.
+    resolveIsolation() {
         return { mode: 'default' };
     }
-    // First-open doorhanger. Returns 'isolate' | 'no' | 'dismissed' and records the
-    // decision (except dismiss). Reuses the permission doorhanger overlay.
-    async _promptIsolate(wc, url) {
-        let origin = url;
-        try { origin = new URL(url).origin; }
-        catch { }
-        let res;
-        try {
-            res = await permissionUI.request(wc, {
-                origin,
-                title: 'Open this in its own persona?',
-                action: 'open in its own persona',
-                allowLabel: 'New persona',
-                blockLabel: 'Use my main',
-                iconType: 'shield',
-                checkbox: false,
-            });
-        }
-        catch {
-            return 'dismissed';
-        }
-        if (res.dismissed)
-            return 'dismissed';
-        if (res.allowed) { isolationRules.set(url, 'isolate'); return 'isolate'; }
-        isolationRules.set(url, 'no');
-        return 'no';
-    }
-    // Replace tab (index) with a fresh tab in url's tenant instance, in place.
     _routeTypedToInstance(index, url) {
         const inst = containers.instanceForHost(url, this.profileId);
         const orderPos = this.tabOrder.indexOf(index);
@@ -991,10 +942,7 @@ class Tabs {
             try {
                 if (this.isPrivateWindow || this.privateTabs.has(tabIndex) || this.tabContainers.get(tabIndex))
                     return;
-                if (!/^https?:/i.test(url) || isolationRules.policyFor(url) !== 'isolate')
-                    return;
-                event.preventDefault();
-                this.openInContainer(url, containers.instanceForHost(url, this.profileId).id, tabIndex);
+                return; // no per-site routing
             }
             catch { }
         });

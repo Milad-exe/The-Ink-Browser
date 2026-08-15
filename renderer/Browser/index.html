@@ -228,11 +228,6 @@
   </div>
 
   <!-- One-time hint the first time a tab runs in an isolated session -->
-  <div id="iso-hint" class="iso-hint hidden">
-    <span class="iso-hint-dot"></span>
-    <span class="iso-hint-text">Separate persona — its own login &amp; history.</span>
-    <button class="iso-hint-close" tabindex="-1">Got it</button>
-  </div>
 
   <!-- Rename this window's profile -->
   <div id="profile-rename-modal" class="cm-overlay hidden">
@@ -247,18 +242,6 @@
       <div class="ri-actions">
         <button id="prf-cancel" class="ri-btn" tabindex="-1">Cancel</button>
         <button id="prf-save" class="ri-btn ri-btn-primary" tabindex="-1">Save</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Optional persona rename (auto-numbered by default) -->
-  <div id="persona-rename-modal" class="cm-overlay hidden">
-    <div class="ri-card" role="dialog" aria-label="Name this persona">
-      <div class="ri-title">Name this persona</div>
-      <input id="pr-input" class="ri-input" maxlength="24" placeholder="e.g. Work" tabindex="-1">
-      <div class="ri-actions">
-        <button id="pr-cancel" class="ri-btn" tabindex="-1">Cancel</button>
-        <button id="pr-save" class="ri-btn ri-btn-primary" tabindex="-1">Save</button>
       </div>
     </div>
   </div>

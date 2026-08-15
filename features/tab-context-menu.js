@@ -82,22 +82,7 @@ class TabContextMenu {
             this.contextTemplate.push({
                 label: 'Copy Page URL',
                 click: () => clipboard.writeText(currentUrl),
-            }, { type: 'separator' }, {
-                label: 'Open in New Persona',
-                click: () => this.tabManager.openIsolatedInstance(sanitizeUrl(currentUrl)),
             });
-            // Per-site rule (future opens of this site). Checked when this site is
-            // set to always open in its own persona.
-            if (/^https?:/i.test(currentUrl)) {
-                const isolationRules = require('./isolation-rules');
-                const on = isolationRules.policyFor(currentUrl) === 'isolate';
-                this.contextTemplate.push({
-                    label: 'Always Use a Persona Here',
-                    type: 'checkbox',
-                    checked: on,
-                    click: () => isolationRules.set(currentUrl, on ? 'no' : 'isolate'),
-                });
-            }
         }
     }
     addInspect(params) {
@@ -166,9 +151,6 @@ class TabContextMenu {
         this.contextTemplate.push({
             label: 'Open Link in New Tab',
             click: () => this.openInNewTab(params.linkURL),
-        }, {
-            label: 'Open Link in New Persona',
-            click: () => this.tabManager.openIsolatedInstance(sanitizeUrl(params.linkURL)),
         }, {
             // Glance: a floating preview of the link over the current page (Esc to
             // close, ⌘/Ctrl+Enter to open it as a full tab).

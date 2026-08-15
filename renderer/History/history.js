@@ -72,8 +72,8 @@
         contentDiv.addEventListener('click', () => {
             if (!entry.url)
                 return;
-            if (entry.persona && window.tab?.openInPersona) {
-                window.tab.openInPersona(entry.persona, entry.url);
+            if (entry.persona && window.tab?.openInContainer) {
+                window.tab.openInContainer(entry.persona, entry.url);
                 return;
             }
             window.electronAPI.navigateActiveTab(entry.url);
