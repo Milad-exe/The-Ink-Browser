@@ -8,7 +8,7 @@
  */
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
-const { WebContentsView } = require('electron');
+const { WebContentsView, shell, app } = require('electron');
 const downloadManager = require('../features/download-manager');
 const PANEL_WIDTH = 340;
 const HEADER_H = 40;
@@ -101,6 +101,11 @@ function register(ipcMain, { wm }) {
                 break;
             case 'clear-finished':
                 downloadManager.clearFinished();
+                break;
+            case 'show-all':
+                // No downloads library page exists — reveal the folder instead.
+                try { shell.openPath(app.getPath('downloads')); }
+                catch { }
                 break;
         }
         return true;

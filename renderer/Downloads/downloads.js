@@ -88,7 +88,7 @@
             if (!items.length) {
                 const empty = document.createElement('div');
                 empty.className = 'empty';
-                empty.textContent = 'No downloads yet';
+                empty.textContent = 'No downloads for this session.';
                 listEl.appendChild(empty);
                 return;
             }
@@ -141,6 +141,8 @@
             });
         }
         clearBtn.addEventListener('click', () => window.overlayDownloads.action('clear-finished'));
+        document.getElementById('show-all')
+            ?.addEventListener('click', () => window.overlayDownloads.action('show-all'));
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape')
                 window.overlayDownloads.close();
