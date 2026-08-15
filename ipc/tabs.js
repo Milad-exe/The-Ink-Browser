@@ -290,6 +290,29 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         t._sidebarInput = { wc, onInput };
         try { wc.on('input-event', onInput); } catch { }
     });
+    // Chrome context menus are chrome DOM, but the page is a native view painted
+    // over it — a click on the page never reaches the chrome, so the menu would
+    // stay open. While one is up, watch the active tab's input stream and tell
+    // the chrome to close on any press there.
+    ipcMain.on('chrome-menu-open', (_e) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        const t = wd?.tabs;
+        if (!t || t._menuWatch) return;
+        const wc = t.tabMap.get(t.activeTabIndex)?.webContents;
+        if (!wc) return;
+        const onInput = (_ev, input) => {
+            if (input.type === 'mouseDown' || input.type === 'rawKeyDown')
+                try { wd.window.webContents.send('close-chrome-menus'); } catch { }
+        };
+        t._menuWatch = { wc, onInput };
+        try { wc.on('input-event', onInput); } catch { }
+    });
+    ipcMain.on('chrome-menu-close', (_e) => {
+        const t = wm.getWindowByWebContents(_e.sender)?.tabs;
+        if (!t?._menuWatch) return;
+        try { t._menuWatch.wc.removeListener('input-event', t._menuWatch.onInput); } catch { }
+        t._menuWatch = null;
+    });
     ipcMain.handle('sidebar:resize', (_e, w) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (wd?.tabs?._sidebarResizing) applyWidthLive(wd, clampW(w, wd));

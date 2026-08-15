@@ -216,6 +216,10 @@ html[data-tabbar="side"] #content-area { grid-column: 2; grid-row: 3; }
    clicks and right-clicks into a window drag. Only the top strip beside the
    traffic lights drags; the utility bar still does too. */
 html[data-tabbar="side"] #tab-bar { -webkit-app-region: no-drag; }
+/* The spacer still does its layout job (pushing the foot down), but in side
+   mode it grows to fill the whole empty column — as a drag region that made
+   the bulk of the sidebar unclickable. */
+html[data-tabbar="side"] #tab-drag-spacer { -webkit-app-region: no-drag; }
 /* Needs to outrank the `#tab-bar #window-controls` no-drag above (two IDs). */
 html[data-tabbar="side"] #tab-bar #window-controls { -webkit-app-region: drag; }
 html[data-tabbar="side"] #tab-bar #window-controls .wc-btn { -webkit-app-region: no-drag; }

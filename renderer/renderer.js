@@ -2124,7 +2124,7 @@
             }, { passive: false });
             tabsContainer.addEventListener('scroll', updateScrollShadows);
             // Right-click the empty part of the tab list → a custom menu.
-            tabsContainer.addEventListener('contextmenu', (e) => {
+            const emptyAreaMenu = (e) => {
                 if (e.target.closest('.tab-button') || e.target.closest('.folder-header')) return;
                 e.preventDefault(); e.stopPropagation();
                 // Grouped as in the reference design doc. Only actions with a real
@@ -2146,7 +2146,11 @@
                     ['sep'],
                     ['Edit Theme…', () => window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance')],
                 ]);
-            });
+            };
+            tabsContainer.addEventListener('contextmenu', emptyAreaMenu);
+            // The spacer fills the rest of the column in side mode, so a
+            // right-click below the last tab lands there, not on the list.
+            document.getElementById('tab-drag-spacer')?.addEventListener('contextmenu', emptyAreaMenu);
             window.addEventListener('resize', () => setTimeout(() => { updateTabWidths(tabs.size); updateScrollShadows(); }, 100));
             setTimeout(() => { if (tabs.size > 0) {
                 updateTabWidths(tabs.size);
@@ -2226,6 +2230,8 @@
             document.documentElement.dataset.tabbar = mode === 'top' ? 'top' : 'side';
             applySidebarWidth(width);
             initSidebarResizer();
+            try { window.tabsUI.onCloseMenus(() => { _closeCtxMenu?.(); }); }
+            catch { }
             try { window.tabsUI.onSidebarWidth((w) => applySidebarWidth(w)); }
             catch { }
             try {
@@ -3040,12 +3046,16 @@
                 closeFrom(0);
                 document.removeEventListener('click', onDoc, true);
                 document.removeEventListener('keydown', onKey, true);
+                try { window.tabsUI.menuClosed(); } catch { }
                 _closeCtxMenu = null;
             }
             const root = build(rows, 0);
             chain.push(root);
             place(root, x, y);
             _closeCtxMenu = closeAll;
+            // A click on the page view never reaches this document — main watches
+            // the active tab's input stream while a menu is up and calls back.
+            try { window.tabsUI.menuOpened(); } catch { }
             setTimeout(() => { document.addEventListener('click', onDoc, true); document.addEventListener('keydown', onKey, true); }, 0);
         }
         // Shared emoji set with search keywords. A function declaration so every
