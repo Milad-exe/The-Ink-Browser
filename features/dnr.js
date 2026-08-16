@@ -155,6 +155,65 @@ function testWithBudget(rule, url) {
     return hit;
 }
 
+/**
+ * Chrome match patterns, for host-permission gating.
+ *
+ * Which actions need host access is not uniform, and getting it wrong is a
+ * privilege bug either way:
+ *   - `declarativeNetRequest`: block/allow/allowAllRequests/upgradeScheme apply
+ *     everywhere, but redirect and modifyHeaders need access to BOTH the
+ *     request URL and its initiator — otherwise an extension with no host
+ *     permissions could silently reroute traffic or strip security headers.
+ *   - `declarativeNetRequestWithHostAccess`: every action needs that access.
+ *
+ * Runtime-granted optional_host_permissions are not modelled: Electron has no
+ * host-permission grant flow, so what the manifest declares is what is held.
+ */
+const ALL_URLS_SCHEMES = new Set(['http', 'https', 'file', 'ftp', 'ws', 'wss']);
+function compilePattern(pattern) {
+    if (!pattern || typeof pattern !== 'string')
+        return null;
+    if (pattern === '<all_urls>')
+        return { all: true };
+    const m = /^(\*|[a-z][a-z0-9+.-]*):\/\/([^/]*)(\/.*)?$/i.exec(pattern);
+    if (!m)
+        return null;
+    const scheme = m[1].toLowerCase();
+    const host = m[2];
+    const pathGlob = m[3] || '/*';
+    let hostRe;
+    if (host === '*')
+        hostRe = /^.*$/;
+    else if (host.startsWith('*.'))
+        hostRe = new RegExp(`^(?:.*\\.)?${escapeRe(host.slice(2))}$`, 'i');
+    else
+        hostRe = new RegExp(`^${escapeRe(host)}$`, 'i');
+    const pathRe = new RegExp('^' + pathGlob.split('*').map(escapeRe).join('.*') + '$');
+    return { scheme, hostRe, pathRe };
+}
+function patternMatches(c, url) {
+    if (!c)
+        return false;
+    try {
+        const u = new URL(url);
+        const proto = u.protocol.replace(/:$/, '');
+        if (c.all)
+            return ALL_URLS_SCHEMES.has(proto);
+        // '*' as a scheme means http or https only — never file: or ws:.
+        if (c.scheme === '*') {
+            if (proto !== 'http' && proto !== 'https')
+                return false;
+        }
+        else if (c.scheme !== proto) {
+            return false;
+        }
+        if (!c.hostRe.test(u.hostname))
+            return false;
+        return c.pathRe.test(u.pathname + u.search);
+    }
+    catch { return false; }
+}
+
 // eTLD+1 comparison for domainType firstParty/thirdParty.
 let _parseTld = null;
 function etld1(host) {
@@ -283,10 +342,47 @@ class Dnr {
     _rec(extensionId) {
         let rec = this.exts.get(extensionId);
         if (!rec) {
-            rec = { staticSets: new Map(), dynamic: [], session: [], manifest: null };
+            rec = {
+                staticSets: new Map(), dynamic: [], session: [], manifest: null,
+                hostPatterns: [], strictHostAccess: false,
+            };
             this.exts.set(extensionId, rec);
         }
         return rec;
+    }
+
+    /** Does this extension hold host access to `url`? */
+    _canAccess(extensionId, url) {
+        const rec = this.exts.get(extensionId);
+        if (!rec || !url)
+            return false;
+        for (const p of rec.hostPatterns)
+            if (patternMatches(p, url))
+                return true;
+        return false;
+    }
+
+    /**
+     * Whether a matching rule is actually permitted to act on this request.
+     * A refused rule is SKIPPED, not treated as a miss — the next matching rule
+     * still gets its turn, which is what Chrome does.
+     */
+    _mayApply(rule, req) {
+        const rec = this.exts.get(rule.extensionId);
+        if (!rec)
+            return true;
+        const t = rule.action.type;
+        const needsAccess = t === 'redirect' || t === 'modifyHeaders' || rec.strictHostAccess;
+        if (!needsAccess)
+            return true;
+        if (!this._canAccess(rule.extensionId, req.url))
+            return false;
+        // Access to the initiating document is required too, or an extension
+        // permitted on one site could rewrite its requests to another.
+        if (req.initiatorUrl && req.initiatorUrl !== req.url &&
+            !this._canAccess(rule.extensionId, req.initiatorUrl))
+            return false;
+        return true;
     }
 
     _invalidate() { this._flat = null; }
@@ -325,6 +421,25 @@ class Dnr {
             const rec = this._rec(ext.id);
             rec.manifest = manifest;
             rec.staticSets.clear();
+            // Host access, for gating redirect/modifyHeaders below.
+            const perms = manifest.permissions || [];
+            rec.hostPatterns = [];
+            for (const p of manifest.host_permissions || []) {
+                const c = compilePattern(p);
+                if (c)
+                    rec.hostPatterns.push(c);
+            }
+            // MV2 declares host permissions in `permissions` alongside API names.
+            for (const p of perms) {
+                if (typeof p === 'string' && (p === '<all_urls>' || p.includes('://'))) {
+                    const c = compilePattern(p);
+                    if (c)
+                        rec.hostPatterns.push(c);
+                }
+            }
+            // The WithHostAccess variant gates EVERY action, not just the two.
+            rec.strictHostAccess = perms.includes('declarativeNetRequestWithHostAccess') &&
+                !perms.includes('declarativeNetRequest');
             for (const res of decl?.rule_resources || []) {
                 const file = path.join(ext.path, String(res.path || '').replace(/^\/+/, ''));
                 let rules = [];
@@ -453,6 +568,7 @@ class Dnr {
             url,
             type,
             host: hostOf(url),
+            initiatorUrl: initiator || '',
             initiatorHost: hostOf(initiator || url),
             method: (details.method || 'GET').toLowerCase(),
             tabId: details.webContentsId ?? -1,
@@ -486,6 +602,8 @@ class Dnr {
                 continue;
             if (!rule.matches(req))
                 continue;
+            if (!this._mayApply(rule, req))
+                continue; // no host access — the next matching rule still applies
             winner = rule; // list is pre-sorted, so the first match wins
             break;
         }
@@ -579,7 +697,7 @@ class Dnr {
         for (const rule of this._rules()) {
             if (rule.action.type !== 'allow' && rule.action.type !== 'allowAllRequests')
                 continue;
-            if (rule.matches(req)) {
+            if (rule.matches(req) && this._mayApply(rule, req)) {
                 allowPriority = rule.priority;
                 break;
             }
@@ -595,6 +713,8 @@ class Dnr {
             if (!ops || !ops.length)
                 continue;
             if (!rule.matches(req))
+                continue;
+            if (!this._mayApply(rule, req))
                 continue;
             for (const op of ops) {
                 const name = String(op.header || '');
@@ -650,6 +770,7 @@ class Dnr {
             url: request.url,
             type: request.type || 'other',
             host: hostOf(request.url),
+            initiatorUrl: request.initiator || '',
             initiatorHost: hostOf(request.initiator || request.url),
             method: (request.method || 'get').toLowerCase(),
             tabId: request.tabId ?? -1,
@@ -658,7 +779,8 @@ class Dnr {
         for (const rule of this._rules()) {
             if (rule.extensionId !== extensionId)
                 continue;
-            if (rule.matches(req))
+            // Report what would really happen, host permissions included.
+            if (rule.matches(req) && this._mayApply(rule, req))
                 hits.push({ ruleId: rule.id, rulesetId: rule.source, extensionId });
         }
         return { matchedRules: hits };
