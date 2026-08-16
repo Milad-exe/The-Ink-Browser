@@ -191,7 +191,7 @@ html[data-tabbar="side"] #utility-bar { grid-column: 1 / -1; grid-row: 1; }
 html[data-tabbar="side"] #tab-bar {
   grid-column: 1; grid-row: 2 / span 2;
   flex-direction: column; align-items: stretch;
-  width: var(--sidebar-w, 232px); height: 100%; padding: 0 10px 8px; gap: 8px;
+  width: var(--sidebar-w, 232px); height: 100%; padding: 0 8px 8px; gap: 2px;
   /* Transparent on the shell — no panel tint, no divider hairline. */
   background: transparent;
 }
@@ -251,8 +251,8 @@ html[data-tabbar="side"] .essentials:not(:empty) { padding-bottom: 8px; margin-b
 /* Tab rows: favicon + title + hover close, Arc-style rounded cards. */
 html[data-tabbar="side"] .tab-button {
   width: 100%; min-width: 0; max-width: none; flex-shrink: 0;
-  height: 40px; padding: 0 8px 0 11px; gap: 10px;
-  border-radius: 11px; color: var(--text-2);
+  height: 34px; padding: 0 8px 0 10px; gap: 9px;
+  border-radius: 9px; color: var(--text-2);
 }
 html[data-tabbar="side"] .tab-button:hover:not(.active) { color: var(--text); background: var(--hover); }
 html[data-tabbar="side"] .tab-button .tab-title { font-size: 13px; }
@@ -707,9 +707,11 @@ html[data-tabbar="side"] .sidebar-foot {
 
 /* ── Utility Bar (toolbar) ───────────────── */
 #utility-bar {
-  display: flex; height: 50px; width: 100%;
+  /* Height MUST match Tabs.UTILITY_BAR_H (features/tabs.js) — the page view is
+     positioned beneath this bar from there. */
+  display: flex; height: 40px; width: 100%;
   background: transparent;
-  align-items: center; padding: 0 10px; gap: 10px;
+  align-items: center; padding: 0 8px; gap: 8px;
   position: relative; z-index: 20; flex-shrink: 0;
   -webkit-app-region: drag;
 }
@@ -768,10 +770,13 @@ html[data-tabbar="side"] .sidebar-foot {
 /* ── Address bar (omnibox) ───────────────── */
 .omnibox-wrapper { flex: 1; min-width: 0; }
 .omnibox {
-  display: flex; align-items: center; height: 38px;
+  /* Sits inside the 40px toolbar, so it has to leave air above and below —
+     at 38px it filled the bar edge to edge. Safari and Chrome both keep the
+     field around 28-30px in a bar this tall. */
+  display: flex; align-items: center; height: 30px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px; padding: 0 14px; gap: 10px;
+  border-radius: 9px; padding: 0 12px; gap: 8px;
   transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
 }
 .omnibox:focus-within {

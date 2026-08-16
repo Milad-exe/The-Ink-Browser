@@ -184,9 +184,10 @@ class WindowManager {
             icon: path.join(__dirname, process.platform === 'win32' ? '../logo-win.png' : '../logo.png'),
             frame: process.platform === 'linux' ? true : false,
             titleBarStyle: process.platform === 'win32' || process.platform === 'linux' ? 'default' : 'hiddenInset',
-            // Centre on the utility bar, which now spans the top: shell-top inset
-            // (6) + half of its 50px height, less half a 12px light.
-            trafficLightPosition: { x: 14, y: 25 },
+            // Centre on the utility bar, which spans the top: shell-top inset
+            // plus half the bar height, less half a 12px light. Derived rather
+            // than hardcoded so it follows the bar height.
+            trafficLightPosition: { x: 14, y: Tabs.SHELL_TOP + Math.round(Tabs.UTILITY_BAR_H / 2) - 6 },
             // macOS frosted-glass: the window material shows through the
             // translucent chrome (renderer paints the chrome with alpha).
             ...(process.platform === 'darwin'

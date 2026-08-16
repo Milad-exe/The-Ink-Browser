@@ -849,6 +849,13 @@ class Tabs {
     // Shell inset above the tab strip (matches body padding-top in
     // Browser/styles.css) so the space above the tabs matches the space below.
     static SHELL_TOP = 6;
+    // Chrome bar heights. These MUST match #utility-bar / #tab-bar in
+    // renderer/Browser/styles.css: the page view is positioned underneath them
+    // from here, and there is no build step sharing values between the two, so
+    // changing one side alone silently misaligns the page.
+    static UTILITY_BAR_H = 40;
+    static TAB_BAR_H = 38;
+    static BAR_GAP = 2; // hairline between the chrome and the page card
 
     // 0 while a video (or the OS) is truly fullscreen — the page must be
     // edge-to-edge and square there; otherwise the rounded floating card.
@@ -869,7 +876,7 @@ class Tabs {
         // Sidebar mode: tabs live in a left column, so the page starts after it
         // and only the utility bar (+ optional bookmark bar) sits above.
         if ((this.persistence?.get('tabBarSide') ?? 'side') !== 'top') {
-            const yOffset = 52 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
+            const yOffset = Tabs.UTILITY_BAR_H + Tabs.BAR_GAP + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
             // Compact mode: the sidebar is hidden, so the page spans full width.
             const leftInset = this.sidebarCompact ? pad : this.sidebarWidth;
             let width = contentBounds.width - leftInset - pad - rightInset;
@@ -881,8 +888,9 @@ class Tabs {
             return { x: leftInset, y: yOffset, width: Math.floor(width), height: Math.floor(height) };
         }
         // shell top inset (see body padding-top in Browser/styles.css) +
-        // tab-bar (38px) + utility-bar (50px) + optional bookmark-bar (30px)
-        const yOffset = 90 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
+        // tab-bar + utility-bar + optional bookmark-bar (30px)
+        const yOffset = Tabs.TAB_BAR_H + Tabs.UTILITY_BAR_H + Tabs.BAR_GAP
+            + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
         let width = contentBounds.width - pad * 2 - rightInset;
         let height = contentBounds.height - yOffset - pad;
         if (width < 0)
