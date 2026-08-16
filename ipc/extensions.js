@@ -211,36 +211,6 @@ function attachGapHandlers(router, wm) {
         const a = alarms.get(name || '');
         return a ? pub(a) : undefined;
     });
-    // ── Native messaging ─────────────────────────────────────────────────────
-    // chrome.runtime.connectNative / sendNativeMessage. Ports are held here and
-    // addressed by id, since a Port object cannot cross IPC.
-    const nm = require('../features/native-messaging');
-    const extIdOf = (event) => {
-        try { return new URL(event.serviceWorker.scope).hostname; }
-        catch { return null; }
-    };
-    // Errors are RETURNED, not thrown: a rejection crossing the worker IPC and
-    // contextBridge arrives as a plain resolve(undefined), which silently looks
-    // like success. The preload turns { error } back into a rejection.
-    router.handle('ext:native.connect', (_e, { name } = {}) => {
-        try {
-            const extensionId = extIdOf(_e);
-            const sw = _e.serviceWorker;
-            let portId = null;
-            portId = nm.connect(name, extensionId, {
-                onMessage: (message) => { try { sw.send('ext:nativeMessage', { portId, message }); } catch { } },
-                onDisconnect: (error) => { try { sw.send('ext:nativeDisconnect', { portId, error }); } catch { } },
-            });
-            return { portId };
-        }
-        catch (e) { return { error: e.message }; }
-    });
-    router.handle('ext:native.post', (_e, { portId, message } = {}) => nm.post(portId, message));
-    router.handle('ext:native.disconnect', (_e, { portId } = {}) => { nm.disconnect(portId); return true; });
-    router.handle('ext:native.send', async (_e, { name, message } = {}) => {
-        try { return { value: await nm.sendOnce(name, extIdOf(_e), message) }; }
-        catch (e) { return { error: e.message }; }
-    });
     // One line per missing API, so the next gap is named in the log.
     const seenGaps = new Set();
     router.on('ext:unsupported', (_e, { id, api } = {}) => {
