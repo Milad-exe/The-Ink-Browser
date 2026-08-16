@@ -258,15 +258,12 @@ class Extensions {
         this._saveDisabled();
         extApi(session).on?.('extension-loaded', () => this._emit());
         extApi(session).on?.('extension-unloaded', () => this._emit());
-        // DevTools-panel extensions have no DevTools frontend to load into, so
-        // their devtools_page is booted here instead and the panels it registers
-        // are surfaced in our own UI. No-op when no extension declares one.
-        try {
-            const wd = this._activeWindow();
-            if (wd)
-                require('./devtools-ext').discover(wd).catch(() => { });
-        }
-        catch { }
+        // NOTE: devtools_page loading is deliberately NOT done here. It used to
+        // be, and that ran before any tab existed, so chrome.devtools.
+        // inspectedWindow.tabId resolved to -1 — which breaks React DevTools,
+        // since it uses that id to connect its backend. Discovery is lazy
+        // instead (ipc/extensions.js 'devtools-panels-list'), by which point
+        // there is a real tab to inspect.
         this._emit();
     }
     // ── Tab wiring (called from Tabs) ──────────────────────────────────────────
