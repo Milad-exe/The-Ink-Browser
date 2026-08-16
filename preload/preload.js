@@ -469,6 +469,13 @@ exposeInternal('extensionsUI', {
     onPinnedChanged: (fn) => ipcRenderer.on('ext-pinned-changed', (_e, map) => fn(map)),
     closeActionPopup: () => ipcRenderer.invoke('extensions-close-action-popup'),
     onActivate: (fn) => ipcRenderer.on('ext-activate-action', (_e, id) => fn(id)),
+    // chrome.sidePanel: which extensions open a panel on action click, and the
+    // call to actually open one.
+    sidePanelBehavior: () => ipcRenderer.invoke('side-panel-behavior-get'),
+    onSidePanelBehavior: (fn) => ipcRenderer.on('ext-sidepanel-behavior', (_e, ids) => fn(ids)),
+    openSidePanel: (id) => ipcRenderer.invoke('side-panel-open-for', id),
+    devtoolsPanels: () => ipcRenderer.invoke('devtools-panels-list'),
+    openDevtoolsPanel: (panelId) => ipcRenderer.invoke('devtools-panel-open', panelId),
 });
 exposeInternal('downloads', {
     getAll: () => ipcRenderer.invoke('downloads-get'),

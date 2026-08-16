@@ -1,0 +1,7 @@
+@layer components {
+    /* The header is a thin cap on top of the extension's own page, so it only
+       rounds its top corners — the content view below carries the bottom ones. */
+    #bar {
+        -webkit-app-region: no-drag;
+    }
+}

@@ -87,13 +87,58 @@
             listEl.appendChild(row);
         }
     }
+    // DevTools-panel extensions have no DevTools frontend to live in, so their
+    // panels are listed here and open in the side panel instead.
+    function renderDevtools(panels) {
+        if (!panels || !panels.length)
+            return;
+        const head = document.createElement('div');
+        head.className = 'border-b border-subtle bg-surface-2 px-3.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-secondary';
+        head.textContent = 'DevTools panels';
+        listEl.appendChild(head);
+        for (const p of panels) {
+            const row = document.createElement('button');
+            row.tabIndex = -1;
+            row.className = 'flex w-full cursor-pointer items-center gap-2.5 border-0 border-b border-subtle bg-transparent px-3.5 py-2.5 text-left hover:bg-hover';
+            row.title = `Open “${p.title}” from ${p.extensionName || p.extensionId}`;
+            const meta = document.createElement('div');
+            meta.className = 'min-w-0 flex-1';
+            const name = document.createElement('div');
+            name.className = 'truncate text-[12.5px] font-medium';
+            name.textContent = p.title;
+            const sub = document.createElement('div');
+            sub.className = 'truncate font-mono text-[10px] text-tertiary';
+            sub.textContent = p.extensionName || p.extensionId;
+            meta.appendChild(name);
+            meta.appendChild(sub);
+            row.appendChild(meta);
+            const arrow = document.createElement('span');
+            arrow.className = 'flex-shrink-0 text-[12px] text-tertiary';
+            arrow.textContent = '→';
+            row.appendChild(arrow);
+            row.addEventListener('click', () => {
+                window.extPanel.openDevtoolsPanel(p.id);
+                window.extPanel.close();
+            });
+            listEl.appendChild(row);
+        }
+    }
+    // render() clears the list, so the devtools section is always appended after
+    // it — never on its own.
+    async function appendDevtools() {
+        try {
+            renderDevtools(await window.extPanel.devtoolsPanels());
+        }
+        catch { }
+    }
     async function refresh() {
         try {
             render(await window.extPanel.list());
         }
         catch { }
+        await appendDevtools();
     }
-    window.extPanel.onData((items) => render(items));
+    window.extPanel.onData((items) => { render(items); appendDevtools(); });
     document.getElementById('close-btn').addEventListener('click', () => window.extPanel.close());
     document.getElementById('store-link').addEventListener('click', (e) => {
         e.preventDefault();

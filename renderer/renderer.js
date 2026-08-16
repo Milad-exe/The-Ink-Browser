@@ -3980,9 +3980,47 @@
                 pinnedMap = map || {};
                 applyPinned(pinnedMap);
             });
+            // ── chrome.sidePanel on action click ─────────────────────────────
+            // An extension that called setPanelBehavior({openPanelOnActionClick})
+            // gets its side panel instead of a popup. The decision must be
+            // synchronous to beat the library's own handler inside the custom
+            // element, so the id set is kept here and refreshed from main.
+            let sidePanelIds = new Set();
+            const refreshSidePanelIds = (ids) => { sidePanelIds = new Set(ids || []); };
+            if (window.extensionsUI.sidePanelBehavior)
+                window.extensionsUI.sidePanelBehavior().then(refreshSidePanelIds).catch(() => { });
+            if (window.extensionsUI.onSidePanelBehavior)
+                window.extensionsUI.onSidePanelBehavior(refreshSidePanelIds);
+            // Capture phase on the host element: the library listens inside the
+            // shadow root, so this runs first and can stop the event.
+            const extIdFromEvent = (e) => {
+                const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+                for (const n of path) {
+                    if (n && n.id && sidePanelIds.has(n.id))
+                        return n.id;
+                }
+                return null;
+            };
+            document.addEventListener('click', (e) => {
+                if (!sidePanelIds.size)
+                    return;
+                const list = actionList();
+                if (!list || !e.composedPath || !e.composedPath().includes(list))
+                    return;
+                const id = extIdFromEvent(e);
+                if (!id)
+                    return;
+                e.preventDefault();
+                e.stopPropagation();
+                window.extensionsUI.openSidePanel(id);
+            }, true);
             // Panel row click → click the real action button so the extension's
             // popup opens (or its onClicked fires), anchored to the toolbar.
             window.extensionsUI.onActivate((id) => {
+                if (sidePanelIds.has(id)) {
+                    window.extensionsUI.openSidePanel(id);
+                    return;
+                }
                 const list = actionList();
                 const node = list && list.shadowRoot && list.shadowRoot.getElementById(id);
                 if (node)

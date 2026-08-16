@@ -30,4 +30,8 @@ contextBridge.exposeInMainWorld('extPanel', {
     activate: (id) => ipcRenderer.invoke('extensions-activate', id),
     close: () => ipcRenderer.invoke('extensions-panel-close'),
     onData: (callback) => ipcRenderer.on('extensions-data', (_e, items) => callback(items)),
+    // DevTools-panel extensions are listed here because there is no DevTools
+    // frontend to host them; opening one shows it in the side panel.
+    devtoolsPanels: () => ipcRenderer.invoke('devtools-panels-list'),
+    openDevtoolsPanel: (panelId) => ipcRenderer.invoke('devtools-panel-open', panelId),
 });
