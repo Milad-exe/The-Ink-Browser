@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('tab', {
 });
 contextBridge.exposeInMainWorld('browserHistory', {
     search: (query, limit) => ipcRenderer.invoke('history-search', query, limit),
+    // history-search returns nothing for an empty query, so the palette needs
+    // the raw list to show anything before you type.
+    recent: () => ipcRenderer.invoke('history-get'),
 });
 contextBridge.exposeInMainWorld('browserBookmarks', {
     getAll: () => ipcRenderer.invoke('bookmarks-get'),

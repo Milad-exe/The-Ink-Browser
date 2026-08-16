@@ -455,6 +455,13 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     ipcMain.handle('glance:close', (_e) => {
         wm.getWindowByWebContents(_e.sender)?.tabs?.closeGlance();
     });
+    // The glance header strip's two buttons.
+    ipcMain.on('glance:bar-close', (_e) => {
+        wm.getWindowByWebContents(_e.sender)?.tabs?.closeGlance();
+    });
+    ipcMain.on('glance:bar-promote', (_e) => {
+        wm.getWindowByWebContents(_e.sender)?.tabs?.promoteGlance();
+    });
     // ── Folders (tab groups) ───────────────────────────────────────────────────
     ipcMain.handle('folders:create', (_e, name, parent) => {
         const wd = wm.getWindowByWebContents(_e.sender);

@@ -190,6 +190,11 @@ class Shortcuts {
             if (tabIndexes.length > 0)
                 this.tabManager.showTab(tabIndexes[tabIndexes.length - 1]);
         });
+        // Split view — Ctrl/Cmd+Shift+E toggles the active tab against the last
+        // one you were on. Previously this feature had no keyboard access at all.
+        this.registerShortcut('CmdOrCtrl+Shift+E', () => {
+            this.tabManager.toggleSplit();
+        });
         // Pin / unpin active tab — Ctrl+Shift+L
         this.registerShortcut('CmdOrCtrl+Shift+L', () => {
             this.tabManager.pinTab(this.tabManager.activeTabIndex);

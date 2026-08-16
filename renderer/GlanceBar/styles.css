@@ -1,0 +1,33 @@
+@layer components {
+    /* Cap above the glance card. Written as real CSS rather than utilities
+       because renderer/styles/ui.css is a compiled Tailwind subset with no
+       build step here — a class not already used elsewhere does not exist. */
+    #bar {
+        border-radius: var(--radius);
+        border: 1px solid var(--border-2);
+        background: var(--surface);
+        padding-left: 12px;
+        padding-right: 10px;
+        box-shadow: 0 6px 18px rgba(8, 10, 20, 0.28);
+    }
+
+    #host { min-width: 0; }
+
+    #open-tab {
+        padding: 3px 8px;
+        border-radius: var(--radius);
+        flex-shrink: 0;
+    }
+    #open-tab:hover { background: var(--hover); }
+
+    #close-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
+        border-radius: var(--radius);
+    }
+    #close-btn:hover { background: var(--hover); }
+}

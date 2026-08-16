@@ -58,6 +58,20 @@
     const refresh = async () => {
         const q = input.value.trim();
         rows = [];
+        if (!q) {
+            // Opening the prompt with nothing typed used to show an empty box.
+            // Recent pages make it useful the moment it appears, and give the
+            // arrow keys something to act on.
+            try {
+                const recent = (await window.browserHistory.recent()) || [];
+                for (const h of recent) {
+                    if (!h?.url || rows.some(r => r.url === h.url)) continue;
+                    rows.push({ url: h.url, title: h.title || h.url, badge: 'Recent' });
+                    if (rows.length >= 6) break;
+                }
+            }
+            catch { }
+        }
         if (q) {
             const direct = toUrl(q);
             rows.push({
@@ -128,6 +142,9 @@
         rows = [];
         sel = -1;
         paint();
+        // refresh() only ran on input before, so opening the prompt always
+        // showed an empty box — now the empty query has recents to list.
+        refresh();
         setTimeout(() => input.focus(), 0);
     });
 })();

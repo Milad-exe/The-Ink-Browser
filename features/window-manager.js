@@ -497,6 +497,8 @@ class WindowManager {
                 return windowData;
             if (windowData.tabs?.glanceBackdrop?.webContents === webContents)
                 return windowData;
+            if (windowData.tabs?.glanceBar?.webContents === webContents)
+                return windowData;
             // Match tab WebContentsViews
             if (windowData.tabs) {
                 for (const [, tab] of windowData.tabs.tabMap) {

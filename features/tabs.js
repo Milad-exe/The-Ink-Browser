@@ -234,6 +234,7 @@ class Tabs {
         this.splitPair = null; // [leftIdx, rightIdx] when split view is active
         this.glanceView = null; // floating page-preview overlay ("glance")
         this.glanceBackdrop = null; // dim view behind the glance
+        this.glanceBar = null; // header strip above the glance card
         this.glanceUrl = null;
         this.sidebarCompact = false; // side mode: sidebar hidden, page full-bleed
         this.tabOrder = [];
@@ -506,7 +507,7 @@ class Tabs {
         const wd = this.getWindowData();
         if (!wd?.window?.contentView)
             return;
-        const overlays = [this.glanceBackdrop, this.glanceView, wd.sidePanel, wd.sidePanelHeader, wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt, wd.ctxMenu, wd.palette];
+        const overlays = [this.glanceBackdrop, this.glanceView, this.glanceBar, wd.sidePanel, wd.sidePanelHeader, wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt, wd.ctxMenu, wd.palette];
         overlays.forEach((view) => {
             if (!view)
                 return;
@@ -853,6 +854,8 @@ class Tabs {
     // renderer/Browser/styles.css: the page view is positioned underneath them
     // from here, and there is no build step sharing values between the two, so
     // changing one side alone silently misaligns the page.
+    static GLANCE_BAR_H = 30;
+    static GLANCE_BAR_GAP = 6;
     static UTILITY_BAR_H = 40;
     static TAB_BAR_H = 38;
     static BAR_GAP = 2; // hairline between the chrome and the page card
@@ -1557,6 +1560,40 @@ class Tabs {
         this.showTab(keep);
     }
     isSplit() { return !!this.splitPair; }
+    /**
+     * Split/unsplit from a single keystroke.
+     *
+     * Split view was previously reachable only by right-clicking a tab, which
+     * meant most people never found it. With no explicit partner to pair with,
+     * the sensible one is the tab you were on last — tabLastActive already
+     * tracks that for the sleep scan.
+     */
+    toggleSplit() {
+        if (this.splitPair) {
+            this.closeSplit();
+            return;
+        }
+        const active = this.activeTabIndex;
+        let best = null;
+        let bestAt = -1;
+        for (const [idx] of this.tabMap) {
+            if (idx === active)
+                continue;
+            // Same workspace, and never private — splitWithActive enforces this
+            // too, but picking a candidate it would reject just no-ops.
+            if ((this.tabProfiles.get(idx) || '1') !== (this.tabProfiles.get(active) || '1'))
+                continue;
+            if (this.privateTabs.has(idx) || this.privateTabs.has(active))
+                continue;
+            const at = this.tabLastActive.get(idx) || 0;
+            if (at > bestAt) {
+                bestAt = at;
+                best = idx;
+            }
+        }
+        if (best !== null)
+            this.splitWithActive(best);
+    }
     // ── Glance (floating page preview over the current tab) ────────────────────
     _layoutGlance() {
         if (!this.glanceView)
@@ -1566,10 +1603,23 @@ class Tabs {
         try { this.glanceBackdrop?.setBounds(b); }
         catch { }
         const w = Math.min(Math.floor(b.width * 0.66), 900);
-        const h = Math.min(Math.floor(b.height * 0.80), 720);
+        const total = Math.min(Math.floor(b.height * 0.80), 720);
         const x = b.x + Math.floor((b.width - w) / 2);
-        const y = b.y + Math.floor((b.height - h) / 2);
-        try { this.glanceView.setBounds({ x, y, width: Math.max(0, w), height: Math.max(0, h) }); }
+        const y = b.y + Math.floor((b.height - total) / 2);
+        // The card carries no chrome of its own, so Esc / Cmd+Enter were the
+        // only ways to act on it and neither is visible. A header strip above
+        // it names the site and offers the two actions.
+        const barH = this.glanceBar ? Tabs.GLANCE_BAR_H : 0;
+        const gap = this.glanceBar ? Tabs.GLANCE_BAR_GAP : 0;
+        try { this.glanceBar?.setBounds({ x, y, width: Math.max(0, w), height: barH }); }
+        catch { }
+        try {
+            this.glanceView.setBounds({
+                x, y: y + barH + gap,
+                width: Math.max(0, w),
+                height: Math.max(0, total - barH - gap),
+            });
+        }
         catch { }
     }
     openGlance(url) {
@@ -1604,6 +1654,24 @@ class Tabs {
         this.mainWindow.contentView.addChildView(view);
         this.glanceView = view;
         this.glanceUrl = url;
+        try {
+            const bar = new WebContentsView({
+                webPreferences: {
+                    preload: path.join(__dirname, '../preload/glance-bar-preload.js'),
+                    contextIsolation: true,
+                    nodeIntegration: false,
+                },
+            });
+            bar.setBackgroundColor('#00000000');
+            this.mainWindow.contentView.addChildView(bar);
+            this.glanceBar = bar;
+            bar.webContents.once('did-finish-load', () => {
+                try { bar.webContents.send('glance:info', { url }); }
+                catch { }
+            });
+            bar.webContents.loadFile(resolveAppFile('renderer/GlanceBar/index.html'));
+        }
+        catch { }
         this._glanceOpenedAt = Date.now();
         UserAgent.setupTab(view);
         // A link opened from within the glance promotes to a real tab.
@@ -1635,12 +1703,29 @@ class Tabs {
         view.webContents.on('blur', () => {
             if (!armed || Date.now() - (this._glanceOpenedAt || 0) < 350)
                 return;
-            this.closeGlance();
+            // Clicking the header strip blurs the card, so closing immediately
+            // would tear the header down before its button click registered.
+            // Defer briefly and stand down if the header took the focus.
+            setTimeout(() => {
+                try {
+                    if (this.glanceBar && !this.glanceBar.webContents.isDestroyed()
+                        && this.glanceBar.webContents.isFocused())
+                        return;
+                }
+                catch { }
+                this.closeGlance();
+            }, 130);
         });
         // Focus on the next tick so the launching click has fully settled first.
         setTimeout(() => { try { this.glanceView === view && view.webContents.focus(); } catch { } }, 60);
     }
     closeGlance() {
+        if (this.glanceBar) {
+            const bar = this.glanceBar;
+            this.glanceBar = null;
+            try { this.mainWindow.contentView.removeChildView(bar); } catch { }
+            try { bar.webContents.close?.(); } catch { }
+        }
         if (this.glanceBackdrop) {
             const bd = this.glanceBackdrop;
             this.glanceBackdrop = null;
