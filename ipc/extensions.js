@@ -81,6 +81,24 @@ function hidePanel(wd) {
 // browser's own mutation sites (Tabs.addToHistory, the bookmark handlers) have
 // to drive these events too — not just extension-initiated changes.
 const extEvents = require('../features/ext-events');
+// One line per missing API, so the next gap is named in the log rather than
+// surfacing as a mystery failure inside the extension. Where a working
+// alternative exists, name it — the developer reading this log is the person
+// who can act on it.
+const GAP_HINTS = {
+    'chrome.identity.getAuthToken': 'use chrome.identity.launchWebAuthFlow, which is implemented',
+    'chrome.tabCapture.capture': 'use chrome.tabCapture.getMediaStreamId with getUserMedia',
+};
+const seenGaps = new Set();
+function logGap({ id, api } = {}) {
+    const key = `${id}:${api}`;
+    if (seenGaps.has(key))
+        return;
+    seenGaps.add(key);
+    const hint = GAP_HINTS[api];
+    console.warn(`[extensions] ${id} needs ${api}, which this browser does not implement`
+        + (hint ? ` — ${hint}` : ''));
+}
 const broadcastToWorkers = (channel, data) => extEvents.broadcast(channel, data);
 
 /**
@@ -443,13 +461,7 @@ function attachGapHandlers(sw, wm) {
         wm,
     });
     // One line per missing API, so the next gap is named in the log.
-    const seenGaps = new Set();
-    router.on('ext:unsupported', (_e, { id, api } = {}) => {
-        const key = `${id}:${api}`;
-        if (seenGaps.has(key)) return;
-        seenGaps.add(key);
-        console.warn(`[extensions] ${id} needs ${api}, which this browser does not implement`);
-    });
+    router.on('ext:unsupported', (_e, payload = {}) => logGap(payload));
 }
 
 /**
@@ -475,13 +487,7 @@ function registerFrameGapHandlers(ipcMain, wm) {
         profileIdOf: (e) => wm.profileOf(e.sender),
         wm,
     });
-    const seenGaps = new Set();
-    ipcMain.on('ext:unsupported', (_e, { id, api } = {}) => {
-        const key = `${id}:${api}`;
-        if (seenGaps.has(key)) return;
-        seenGaps.add(key);
-        console.warn(`[extensions] ${id} needs ${api}, which this browser does not implement`);
-    });
+    ipcMain.on('ext:unsupported', (_e, payload = {}) => logGap(payload));
 }
 
 function register(ipcMain, { wm }) {

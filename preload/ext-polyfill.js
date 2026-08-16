@@ -77,11 +77,16 @@ function mainWorldScript() {
         const p = Promise.resolve()
             .then(() => fn(...args))
             .catch((err) => {
+                // Electron wraps IPC rejections as "Error invoking remote
+                // method '<channel>': Error: <real message>". Extensions branch
+                // on Chrome's exact error strings, so unwrap before surfacing.
+                const raw = String(err && err.message || err);
+                const message = raw.replace(/^Error invoking remote method '[^']*':\s*(?:Error:\s*)?/, '');
                 // Best-effort: chrome.runtime may be frozen, in which case
                 // callers just get the rejection instead of lastError.
-                try { globalThis.chrome.runtime.lastError = { message: String(err && err.message || err) }; }
+                try { globalThis.chrome.runtime.lastError = { message }; }
                 catch { }
-                throw err;
+                throw new Error(message);
             });
         if (!cb)
             return p;
@@ -233,12 +238,27 @@ function mainWorldScript() {
                 catch { }
                 return `https://${id}.chromiumapp.org/${String(path).replace(/^\/+/, '')}`;
             },
-            // Needs a browser-level signed-in account to mint from; there is
-            // none here, and a fake token fails confusingly deep inside the
-            // extension. Fail loudly and point at the flow that does work.
+            /**
+             * getAuthToken mints a Google token from the BROWSER's signed-in
+             * account, using the manifest's oauth2 client_id. There is no
+             * browser-level account here, so it cannot succeed — the question
+             * is only how to fail, and every non-Chrome browser answers the
+             * same way: don't provide it, and let extensions use
+             * launchWebAuthFlow. Firefox ships identity WITHOUT getAuthToken
+             * for exactly this reason; Brave, which does inherit Chromium's
+             * implementation, still fails here whenever Google sign-in is off.
+             *
+             * So we reject — but with Chrome's OWN error string rather than a
+             * custom one. Extensions already branch on this message and fall
+             * back to launchWebAuthFlow (which does work here); a bespoke
+             * message would just be an unrecognised failure. Synthesising a
+             * token from the manifest's oauth2 client_id was the alternative
+             * and is worse: those client_ids are registered as Chrome-app
+             * type, so the flow dies at Google with redirect_uri_mismatch.
+             */
             getAuthToken: dual(() => {
                 api.reportGap(current.runtime && current.runtime.id, 'chrome.identity.getAuthToken');
-                throw new Error('chrome.identity.getAuthToken is not supported; use launchWebAuthFlow');
+                throw new Error('The user is not signed in.');
             }),
             removeCachedAuthToken: dual(() => ({})),
             clearAllCachedAuthTokens: dual(() => undefined),
