@@ -33,13 +33,22 @@ const bridge = {
     alarmClear: (req) => ipcRenderer.invoke('ext:alarms.clear', req),
     alarmGet: (req) => ipcRenderer.invoke('ext:alarms.get', req),
     onAlarm: (cb) => ipcRenderer.on('ext:alarm', (_e, alarm) => cb(alarm)),
+    // Native messaging — ports live in main and are addressed by id.
+    nativeConnect: (name) => ipcRenderer.invoke('ext:native.connect', { name }),
+    nativePost: (portId, message) => ipcRenderer.invoke('ext:native.post', { portId, message }),
+    nativeDisconnect: (portId) => ipcRenderer.invoke('ext:native.disconnect', { portId }),
+    nativeSend: (name, message) => ipcRenderer.invoke('ext:native.send', { name, message }),
+    onNativeMessage: (cb) => ipcRenderer.on('ext:nativeMessage', (_e, d) => cb(d)),
+    onNativeDisconnect: (cb) => ipcRenderer.on('ext:nativeDisconnect', (_e, d) => cb(d)),
 };
 
 // Runs INSIDE the worker's own global scope.
 function mainWorldScript() {
     const api = globalThis.__inkExtBridge;
     const current = globalThis.chrome;
-    if (!api || !current || (current.tabCapture && current.scripting && current.alarms))
+    if (!api || !current)
+        return;
+    if (current.tabCapture && current.scripting && current.alarms && current.runtime?.connectNative)
         return;
     const tabCapture = current.tabCapture || {
         getMediaStreamId: (options = {}) => api.getMediaStreamId({
@@ -62,6 +71,73 @@ function mainWorldScript() {
         catch { }
     }
     Object.defineProperty(next, 'tabCapture', { value: tabCapture, enumerable: true, configurable: true });
+
+    // ── chrome.runtime.connectNative / sendNativeMessage ──────────────────
+    // runtime is frozen too, so it gets the same copy-and-replace as chrome.
+    if (current.runtime && typeof current.runtime.connectNative !== 'function') {
+        const msgSubs = new Map(); // portId → Set<fn>
+        const discSubs = new Map();
+        api.onNativeMessage(({ portId, message }) => {
+            for (const fn of msgSubs.get(portId) || []) { try { fn(message); } catch { } }
+        });
+        api.onNativeDisconnect(({ portId, error }) => {
+            for (const fn of discSubs.get(portId) || []) { try { fn(error); } catch { } }
+            msgSubs.delete(portId);
+            discSubs.delete(portId);
+        });
+        const connectNative = (name) => {
+            // Chrome hands back a Port synchronously, so queue anything posted
+            // before the host has actually spawned.
+            let portId = null;
+            let queue = [];
+            const port = {
+                name,
+                postMessage: (m) => { if (portId === null) queue.push(m); else api.nativePost(portId, m); },
+                disconnect: () => { if (portId !== null) api.nativeDisconnect(portId); },
+                onMessage: {
+                    addListener: (fn) => { port._m.add(fn); if (portId !== null) msgSubs.get(portId)?.add(fn); },
+                    removeListener: (fn) => port._m.delete(fn),
+                    hasListener: (fn) => port._m.has(fn),
+                },
+                onDisconnect: {
+                    addListener: (fn) => { port._d.add(fn); if (portId !== null) discSubs.get(portId)?.add(fn); },
+                    removeListener: (fn) => port._d.delete(fn),
+                    hasListener: (fn) => port._d.has(fn),
+                },
+                _m: new Set(),
+                _d: new Set(),
+            };
+            api.nativeConnect(name).then((res) => {
+                if (!res || res.error) throw new Error(res && res.error || 'connectNative failed');
+                const id = res.portId;
+                portId = id;
+                msgSubs.set(id, port._m);
+                discSubs.set(id, port._d);
+                for (const m of queue) api.nativePost(id, m);
+                queue = [];
+            }).catch((err) => {
+                for (const fn of port._d) { try { fn(String(err && err.message || err)); } catch { } }
+            });
+            return port;
+        };
+        const sendNativeMessage = (name, message, cb) => {
+            const p = api.nativeSend(name, message).then((res) => {
+                if (!res || res.error) throw new Error(res && res.error || 'sendNativeMessage failed');
+                return res.value;
+            });
+            if (typeof cb === 'function') { p.then(cb, () => cb(undefined)); return; }
+            return p;
+        };
+        const runtime = {};
+        for (const key of Reflect.ownKeys(current.runtime)) {
+            const desc = Object.getOwnPropertyDescriptor(current.runtime, key);
+            try { Object.defineProperty(runtime, key, desc); }
+            catch { }
+        }
+        Object.defineProperty(runtime, 'connectNative', { value: connectNative, enumerable: true, configurable: true });
+        Object.defineProperty(runtime, 'sendNativeMessage', { value: sendNativeMessage, enumerable: true, configurable: true });
+        Object.defineProperty(next, 'runtime', { value: runtime, enumerable: true, configurable: true });
+    }
 
     // ── chrome.scripting ──────────────────────────────────────────────────
     // MV3's content-injection API. func/args are stringified here because a
