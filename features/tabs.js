@@ -1445,6 +1445,24 @@ class Tabs {
             catch { }
         });
     }
+    /**
+     * Revive a slept tab: the renderer process is gone, so the page has to be
+     * reloaded.
+     *
+     * KNOWN GAP vs Chrome: its memory saver restores the scroll position, we
+     * land at the top. Capturing the position needs an async read of the page
+     * before the renderer is discarded, and deferring the discard behind that
+     * read risks a page that never answers keeping its renderer alive — which
+     * would defeat the point. Not worth trading a memory guarantee for a
+     * convenience until it can be verified end to end.
+     */
+    _wakeTab(tab) {
+        if (!tab)
+            return;
+        tab.slept = false;
+        try { tab.webContents.reload(); }
+        catch { }
+    }
     // Tell the chrome a tab started/stopped loading so it can show a tab
     // spinner and flip the reload button to a stop button (and back).
     sendLoadingState(tabIndex, loading) {
@@ -1499,10 +1517,8 @@ class Tabs {
         const radius = this._pageRadius();
         const place = (idx, bounds) => {
             const tab = this.tabMap.get(idx);
-            if (tab.slept) {
-                tab.slept = false;
-                try { tab.webContents.reload(); } catch { }
-            }
+            if (tab.slept)
+                this._wakeTab(tab);
             tab.setBounds(bounds);
             try { tab.setBorderRadius(radius); } catch { }
             tab.setVisible(true);
@@ -1890,13 +1906,8 @@ class Tabs {
             // tab is fresh. Wake it if the sleep scan discarded its renderer.
             this.tabLastActive.set(this.activeTabIndex, Date.now());
             this.tabLastActive.set(index, Date.now());
-            if (tab.slept) {
-                tab.slept = false;
-                try {
-                    tab.webContents.reload();
-                }
-                catch { }
-            }
+            if (tab.slept)
+                this._wakeTab(tab);
             // Eager background tabs load muted; restore sound on first view.
             if (tab.mutedUntilShown) {
                 tab.mutedUntilShown = false;
@@ -2370,6 +2381,38 @@ class Tabs {
         }
         return false;
     }
+    /**
+     * Catch background tabs up on the current bounds once a resize has settled.
+     *
+     * resizeAllTabs() deliberately resizes only the visible tab, because moving
+     * every background view on each resize tick makes dragging a window edge
+     * crawl. The cost landed on tab SWITCHING instead: an incoming tab was laid
+     * out at the old size, so it relayed out and repainted as it appeared —
+     * which is the jank that makes switching feel unlike Chrome, where every
+     * tab is already the right size.
+     *
+     * Doing it once, after the drag stops, gets both.
+     */
+    _scheduleBackgroundResize() {
+        clearTimeout(this._bgResizeTimer);
+        this._bgResizeTimer = setTimeout(() => {
+            this._bgResizeTimer = null;
+            if (!this.mainWindow || this.mainWindow.isDestroyed())
+                return;
+            const bounds = this.getTabBounds();
+            const radius = this._pageRadius();
+            this.tabMap.forEach((tab, index) => {
+                if (index === this.activeTabIndex || tab.lazyLoaded === false || tab.slept)
+                    return;
+                try {
+                    tab.setBounds(bounds);
+                    tab.setBorderRadius(radius);
+                }
+                catch { }
+            });
+        }, 200);
+    }
+
     resizeAllTabs() {
         // Re-clamp the side panel's reserved width BEFORE measuring the page,
         // or a resize lays the page out against the previous width.
@@ -2395,6 +2438,10 @@ class Tabs {
             this._layoutSplit();
         if (this.glanceView)
             this._layoutGlance();
+        // Every bounds change funnels through here — window resize, sidebar
+        // drag, side panel, fullscreen exit — so this is the one place that has
+        // to schedule the settled catch-up for background tabs.
+        this._scheduleBackgroundResize();
         // The extension side panel shares the page row, so it re-lays out here.
         try {
             const wd = this.getWindowData();

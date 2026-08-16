@@ -258,6 +258,16 @@ class CompiledRule {
             this.regex = null;
             this.invalid = true;
         }
+        // Index key for the domain-bucketed lookup (see Dnr._candidates).
+        // A ||domain^ rule can only ever match requests to that domain or a
+        // subdomain of it, so it never needs testing against anything else —
+        // and blocklists are overwhelmingly made of those.
+        this.hostKey = null;
+        if (!this.isRegex && typeof c.urlFilter === 'string') {
+            const m = /^\|\|([a-z0-9][a-z0-9.-]*[a-z0-9])(?=[/^:?|]|$)/i.exec(c.urlFilter);
+            if (m && !m[1].includes('*'))
+                this.hostKey = m[1].toLowerCase();
+        }
         // Normalise the two generations of domain conditions into one shape.
         this.initiatorDomains = c.initiatorDomains || c.domains || null;
         this.excludedInitiatorDomains = c.excludedInitiatorDomains || c.excludedDomains || null;
@@ -401,7 +411,59 @@ class Dnr {
         // Sort once here so matching never has to.
         out.sort((a, b) => (b.priority - a.priority) || (a.rank - b.rank));
         this._hasHeaderRules = out.some(r => r.action.type === 'modifyHeaders');
+        // Bucket by domain. Without this every request scanned every rule, and
+        // a real blocklist is large — uBlock Origin Lite alone loads ~18k rules,
+        // so a page of 50 requests meant ~900k regex tests on the main process,
+        // which is exactly the sort of thing that makes a browser feel sluggish.
+        // Requests that match nothing (the common case) paid the full scan.
+        const byHost = new Map();
+        const generic = [];
+        out.forEach((rule, i) => {
+            rule.seq = i; // global priority order, so candidates can be re-merged
+            if (rule.hostKey) {
+                let bucket = byHost.get(rule.hostKey);
+                if (!bucket)
+                    byHost.set(rule.hostKey, bucket = []);
+                bucket.push(rule);
+            }
+            else {
+                generic.push(rule);
+            }
+        });
+        this._byHost = byHost;
+        this._generic = generic;
         this._flat = out;
+        return out;
+    }
+
+    /**
+     * Rules that could possibly match this request, in global priority order.
+     * Everything bucketed under an unrelated domain is skipped outright.
+     */
+    _candidates(req) {
+        this._rules(); // ensures the index is built
+        const generic = this._generic;
+        const host = req.host;
+        if (!host)
+            return generic;
+        // Walk the domain and its parents: a rule keyed on example.com must be
+        // considered for a.b.example.com.
+        let buckets = null;
+        let from = 0;
+        for (;;) {
+            const bucket = this._byHost.get(host.slice(from));
+            if (bucket)
+                (buckets || (buckets = [])).push(bucket);
+            const dot = host.indexOf('.', from);
+            if (dot === -1)
+                break;
+            from = dot + 1;
+        }
+        if (!buckets)
+            return generic;
+        const out = generic.concat(...buckets);
+        // Both parts are individually ordered; re-merge into global order.
+        out.sort((a, b) => a.seq - b.seq);
         return out;
     }
 
@@ -597,7 +659,7 @@ class Dnr {
         if (req.type !== 'main_frame' && this._frameAllow.has(`${req.tabId}:${req.initiatorHost}`))
             return null;
         let winner = null;
-        for (const rule of this._rules()) {
+        for (const rule of this._candidates(req)) {
             if (rule.action.type === 'modifyHeaders')
                 continue;
             if (!rule.matches(req))
@@ -693,8 +755,9 @@ class Dnr {
             return false;
         const req = this._subject(details);
         // A matching allow rule outranks header rules of lower priority.
+        const candidates = this._candidates(req);
         let allowPriority = -Infinity;
-        for (const rule of this._rules()) {
+        for (const rule of candidates) {
             if (rule.action.type !== 'allow' && rule.action.type !== 'allowAllRequests')
                 continue;
             if (rule.matches(req) && this._mayApply(rule, req)) {
@@ -704,7 +767,7 @@ class Dnr {
         }
         const key = which === 'request' ? 'requestHeaders' : 'responseHeaders';
         let changed = false;
-        for (const rule of this._rules()) {
+        for (const rule of candidates) {
             if (rule.action.type !== 'modifyHeaders')
                 continue;
             if (rule.priority <= allowPriority)
