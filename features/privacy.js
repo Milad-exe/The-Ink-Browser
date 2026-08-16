@@ -18,6 +18,7 @@
  */
 const UserAgent = require('./user-agent');
 const adBlocker = require('./ad-blocker');
+const dnr = require('./dnr');
 const sitePermissions = require('./site-permissions');
 const { parse: parseTld } = require('tldts');
 // Live configuration — mirrors the persisted privacy settings. Defaults to the
@@ -126,6 +127,12 @@ function setup(sess) {
     // ── onBeforeRequest: block → upgrade → strip params ───────────────────────
     sess.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, cb) => {
         const { url, resourceType } = details;
+        // Extension content blockers (chrome.declarativeNetRequest) run first and
+        // independently of the shield — the shield governs OUR protections, not
+        // what the user's extensions were installed to do.
+        const ruled = dnr.onBeforeRequest(details);
+        if (ruled)
+            return cb(ruled);
         // Per-site shield: user turned protections off for this site. Fast path:
         // no URL/eTLD parsing at all while the shield list is empty.
         const shieldOff = sitePermissions.hasAnyProtectionOff() &&
@@ -166,6 +173,7 @@ function setup(sess) {
         const headers = { ...details.requestHeaders };
         // Keep client-hints consistent with the Chrome UA (see user-agent.js).
         UserAgent.applyClientHintHeaders(headers);
+        dnr.modifyHeaders(details, headers, 'request');
         if (details.resourceType === 'mainFrame') {
             headers['Accept-Language'] = 'en-US,en;q=0.9';
         }
@@ -230,11 +238,15 @@ function setup(sess) {
     // behaviour) — skip the header copy for the ~95% of requests that are
     // subresources, where injecting them does nothing.
     sess.webRequest.onHeadersReceived((details, cb) => {
-        if (!config.trimReferrer ||
-            (details.resourceType !== 'mainFrame' && details.resourceType !== 'subFrame')) {
-            return cb({});
+        const isDoc = details.resourceType === 'mainFrame' || details.resourceType === 'subFrame';
+        // Extension header rules apply to every resource type, so they are
+        // checked before the document-only referrer work below.
+        if (!config.trimReferrer || !isDoc) {
+            const headers = { ...details.responseHeaders };
+            return cb(dnr.modifyHeaders(details, headers, 'response') ? { responseHeaders: headers } : {});
         }
         const headers = { ...details.responseHeaders };
+        dnr.modifyHeaders(details, headers, 'response');
         headers['Referrer-Policy'] = ['strict-origin-when-cross-origin'];
         headers['X-DNS-Prefetch-Control'] = ['off'];
         cb({ responseHeaders: headers });

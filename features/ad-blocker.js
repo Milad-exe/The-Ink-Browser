@@ -197,7 +197,13 @@ class AdBlocker {
     enableBlockingInSession(sess) {
         // Lazy require to avoid a load-order cycle (site-permissions ⇄ features).
         const sitePermissions = require('./site-permissions');
+        const dnr = require('./dnr');
         sess.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, cb) => {
+            // Extension content blockers first — this session's only
+            // onBeforeRequest slot, so DNR has to be composed in here too.
+            const ruled = dnr.onBeforeRequest(details);
+            if (ruled)
+                return cb(ruled);
             // Per-site protections shield (lock-icon panel). Fast path: skip the
             // URL/eTLD parsing entirely while no site has protections disabled.
             if (sitePermissions.hasAnyProtectionOff()) {

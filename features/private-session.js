@@ -24,12 +24,18 @@ const permissionPrompt = require('./permission-prompt');
 function setup(sess, opts = {}) {
     const ua = UserAgent.generate();
     sess.setUserAgent(ua);
+    // This same setup hardens BOTH private sessions and space sessions. Only the
+    // persistent ones host extensions, so declarativeNetRequest header rules are
+    // applied there and never in a private tab (Chrome keeps extensions out of
+    // incognito by default, and so do we).
+    const dnr = opts.persist === true ? require('./dnr') : null;
     // ── Single combined outbound-header handler ───────────────────────────────
     sess.webRequest.onBeforeSendHeaders((details, callback) => {
         const headers = { ...details.requestHeaders };
         // Align client-hint headers with the Chrome UA (stripping them entirely
         // contradicts the Chromium engine and trips bot detection)
         UserAgent.applyClientHintHeaders(headers);
+        dnr?.modifyHeaders(details, headers, 'request');
         // Privacy signal headers
         headers['DNT'] = '1';
         headers['Sec-GPC'] = '1'; // Global Privacy Control (legally significant in CA, CO, etc.)
@@ -57,9 +63,13 @@ function setup(sess, opts = {}) {
     // nothing on subresources, so skip the per-request header copy there.
     sess.webRequest.onHeadersReceived((details, callback) => {
         if (details.resourceType !== 'mainFrame' && details.resourceType !== 'subFrame') {
-            return callback({});
+            if (!dnr)
+                return callback({});
+            const sub = { ...details.responseHeaders };
+            return callback(dnr.modifyHeaders(details, sub, 'response') ? { responseHeaders: sub } : {});
         }
         const headers = { ...details.responseHeaders };
+        dnr?.modifyHeaders(details, headers, 'response');
         headers['Referrer-Policy'] = ['strict-origin-when-cross-origin'];
         headers['X-DNS-Prefetch-Control'] = ['off'];
         callback({ responseHeaders: headers });
