@@ -201,6 +201,32 @@ class WindowManager {
                 contextIsolation: true,
             }
         });
+        // ── Gesture / hardware navigation ────────────────────────────────────
+        // Neither of these existed, so two habits that work in every other
+        // browser silently did nothing here: the macOS swipe gesture, and the
+        // back/forward buttons on a mouse (Windows/Linux).
+        const navigate = (back) => {
+            const wd = this.getWindowByWebContents(window.webContents);
+            const tabs = wd?.tabs;
+            if (!tabs)
+                return;
+            try { back ? tabs.goBack(tabs.activeTabIndex) : tabs.goForward(tabs.activeTabIndex); }
+            catch { }
+        };
+        // macOS three-finger swipe (System Settings → Trackpad → "Swipe between
+        // pages"). The two-finger overscroll variant is a Chromium browser-side
+        // feature Electron does not expose, so it stays unavailable.
+        window.on('swipe', (_e, direction) => {
+            if (direction === 'left')
+                navigate(true);
+            else if (direction === 'right')
+                navigate(false);
+        });
+        // Mouse thumb buttons.
+        window.on('app-command', (e, cmd) => {
+            if (cmd === 'browser-backward') { e.preventDefault?.(); navigate(true); }
+            else if (cmd === 'browser-forward') { e.preventDefault?.(); navigate(false); }
+        });
         window.on('maximize', () => {
             try {
                 window.webContents.send('window-maximize-changed', true);

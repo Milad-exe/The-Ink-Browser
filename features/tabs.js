@@ -325,6 +325,10 @@ class Tabs {
             preload: preloadForPage(url),
             contextIsolation: true,
             nodeIntegration: false,
+            // Elastic overscroll. Electron defaults this OFF, which is why
+            // scrolling felt subtly unlike every other Mac browser — hitting the
+            // top or bottom of a page just stopped dead instead of rubber-banding.
+            scrollBounce: true,
         };
         if (makePrivate) {
             webPrefs.session = this._getPrivateSession();
@@ -530,6 +534,7 @@ class Tabs {
             preload: path.join(__dirname, '../preload/preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
+            scrollBounce: true, // see createTab()
         };
         if (makePrivate) {
             webPrefs.session = this._getPrivateSession();
