@@ -24,15 +24,24 @@ const { contextBridge, ipcRenderer } = require('electron');
 const bridge = {
     getMediaStreamId: (options) => ipcRenderer.invoke('ext:getMediaStreamId', options),
     reportGap: (id, api) => { try { ipcRenderer.send('ext:unsupported', { id, api }); } catch { } },
+    // chrome.scripting — Electron backs these with executeJavaScript/insertCSS.
+    executeScript: (req) => ipcRenderer.invoke('ext:scripting.executeScript', req),
+    insertCSS: (req) => ipcRenderer.invoke('ext:scripting.insertCSS', req),
+    removeCSS: (req) => ipcRenderer.invoke('ext:scripting.removeCSS', req),
+    // chrome.alarms — timers live in main so they survive worker suspension.
+    alarmCreate: (req) => ipcRenderer.invoke('ext:alarms.create', req),
+    alarmClear: (req) => ipcRenderer.invoke('ext:alarms.clear', req),
+    alarmGet: (req) => ipcRenderer.invoke('ext:alarms.get', req),
+    onAlarm: (cb) => ipcRenderer.on('ext:alarm', (_e, alarm) => cb(alarm)),
 };
 
 // Runs INSIDE the worker's own global scope.
 function mainWorldScript() {
     const api = globalThis.__inkExtBridge;
     const current = globalThis.chrome;
-    if (!api || !current || current.tabCapture)
+    if (!api || !current || (current.tabCapture && current.scripting && current.alarms))
         return;
-    const tabCapture = {
+    const tabCapture = current.tabCapture || {
         getMediaStreamId: (options = {}) => api.getMediaStreamId({
             targetTabId: options.targetTabId ?? null,
             consumerTabId: options.consumerTabId ?? null,
@@ -53,6 +62,54 @@ function mainWorldScript() {
         catch { }
     }
     Object.defineProperty(next, 'tabCapture', { value: tabCapture, enumerable: true, configurable: true });
+
+    // ── chrome.scripting ──────────────────────────────────────────────────
+    // MV3's content-injection API. func/args are stringified here because a
+    // function cannot cross IPC; files are read and evaluated in main.
+    if (!current.scripting) {
+        const scripting = {
+            executeScript: (injection = {}) => api.executeScript({
+                target: injection.target || {},
+                files: injection.files || null,
+                world: injection.world || 'ISOLATED',
+                args: injection.args || [],
+                source: typeof injection.func === 'function' ? injection.func.toString() : null,
+            }),
+            insertCSS: (injection = {}) => api.insertCSS({
+                target: injection.target || {}, css: injection.css || null, files: injection.files || null,
+            }),
+            removeCSS: (injection = {}) => api.removeCSS({
+                target: injection.target || {}, key: injection.key || null,
+            }),
+            registerContentScripts: () => Promise.resolve(),
+            getRegisteredContentScripts: () => Promise.resolve([]),
+            unregisterContentScripts: () => Promise.resolve(),
+            updateContentScripts: () => Promise.resolve(),
+        };
+        Object.defineProperty(next, 'scripting', { value: scripting, enumerable: true, configurable: true });
+    }
+
+    // ── chrome.alarms ─────────────────────────────────────────────────────
+    if (!current.alarms) {
+        const listeners = new Set();
+        api.onAlarm((alarm) => { for (const fn of listeners) { try { fn(alarm); } catch { } } });
+        const alarms = {
+            create: (name, info) => {
+                if (typeof name === 'object') { info = name; name = ''; }
+                return api.alarmCreate({ name: name || '', info: info || {} });
+            },
+            clear: (name) => api.alarmClear({ name: name || '' }),
+            clearAll: () => api.alarmClear({ all: true }),
+            get: (name) => api.alarmGet({ name: name || '' }),
+            getAll: () => api.alarmGet({ all: true }),
+            onAlarm: {
+                addListener: (fn) => listeners.add(fn),
+                removeListener: (fn) => listeners.delete(fn),
+                hasListener: (fn) => listeners.has(fn),
+            },
+        };
+        Object.defineProperty(next, 'alarms', { value: alarms, enumerable: true, configurable: true });
+    }
     try { globalThis.chrome = next; }
     catch { }
 }

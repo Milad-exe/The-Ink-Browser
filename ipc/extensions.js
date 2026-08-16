@@ -67,6 +67,20 @@ function hidePanel(wd) {
  * Gap-layer handlers (see preload/ext-polyfill.js). Bound per service worker,
  * because a worker's IPC router is its own — not the global ipcMain.
  */
+// Resolve a path inside the calling extension's own directory, refusing to
+// escape it — the source is extension-controlled.
+function _resolveExtensionFile(event, rel) {
+    try {
+        const { session } = event.serviceWorker;
+        const id = new URL(event.serviceWorker.scope).hostname;
+        const ext = (session.extensions || session).getAllExtensions?.().find((e) => e.id === id);
+        if (!ext) return null;
+        const base = path.resolve(ext.path);
+        const abs = path.resolve(base, rel.replace(/^\/+/, ''));
+        return abs.startsWith(base) && fs.existsSync(abs) ? abs : null;
+    }
+    catch { return null; }
+}
 function attachGapHandlers(router, wm) {
     // ── Extension API gap layer (see preload/ext-polyfill.js) ─────────────────
     const { webContents } = require('electron');
@@ -110,6 +124,92 @@ function attachGapHandlers(router, wm) {
         if (Array.isArray(types) && !types.includes('BACKGROUND') && !types.includes('SERVICE_WORKER'))
             return [];
         return [{ contextType: 'SERVICE_WORKER', contextId: String(_e.sender.id), documentUrl: undefined, incognito: false }];
+    });
+    // ── chrome.scripting ─────────────────────────────────────────────────────
+    const targetWc = (target = {}) => tabWcById(target.tabId);
+    router.handle('ext:scripting.executeScript', async (_e, { target, files, source, args } = {}) => {
+        const wc = targetWc(target);
+        if (!wc)
+            throw new Error('scripting: no such tab');
+        const results = [];
+        const run = async (code) => {
+            const value = await wc.executeJavaScript(code, true);
+            results.push({ frameId: 0, result: value });
+        };
+        if (source) {
+            // The function arrived as source text; call it with its args applied.
+            await run(`(${source}).apply(null, ${JSON.stringify(args || [])})`);
+        }
+        for (const rel of files || []) {
+            const abs = _resolveExtensionFile(_e, rel);
+            if (abs) await run(fs.readFileSync(abs, 'utf-8'));
+        }
+        return results;
+    });
+    router.handle('ext:scripting.insertCSS', async (_e, { target, css, files } = {}) => {
+        const wc = targetWc(target);
+        if (!wc)
+            throw new Error('scripting: no such tab');
+        const keys = [];
+        if (css)
+            keys.push(await wc.insertCSS(css));
+        for (const rel of files || []) {
+            const abs = _resolveExtensionFile(_e, rel);
+            if (abs) keys.push(await wc.insertCSS(fs.readFileSync(abs, 'utf-8')));
+        }
+        return keys;
+    });
+    router.handle('ext:scripting.removeCSS', async (_e, { target, key } = {}) => {
+        const wc = targetWc(target);
+        if (wc && key)
+            try { await wc.removeInsertedCSS(key); }
+            catch { }
+        return true;
+    });
+    // ── chrome.alarms ────────────────────────────────────────────────────────
+    // Timers live here rather than in the worker, so an alarm still fires after
+    // the service worker is suspended — which is the whole point of the API.
+    const alarms = new Map(); // name → { name, periodInMinutes, scheduledTime, timer }
+    const fire = (sw, name) => {
+        const a = alarms.get(name);
+        if (!a) return;
+        try { sw.send('ext:alarm', { name: a.name, scheduledTime: a.scheduledTime, periodInMinutes: a.periodInMinutes }); }
+        catch { }
+        if (a.periodInMinutes) {
+            a.scheduledTime = Date.now() + a.periodInMinutes * 60000;
+            a.timer = setTimeout(() => fire(sw, name), a.periodInMinutes * 60000);
+        }
+        else {
+            alarms.delete(name);
+        }
+    };
+    router.handle('ext:alarms.create', (_e, { name, info } = {}) => {
+        const key = name || '';
+        const existing = alarms.get(key);
+        if (existing?.timer) clearTimeout(existing.timer);
+        const delayMs = info?.when ? Math.max(0, info.when - Date.now())
+            : (info?.delayInMinutes ?? info?.periodInMinutes ?? 0) * 60000;
+        const rec = {
+            name: key,
+            periodInMinutes: info?.periodInMinutes || null,
+            scheduledTime: Date.now() + delayMs,
+            timer: null,
+        };
+        rec.timer = setTimeout(() => fire(_e.serviceWorker, key), delayMs);
+        alarms.set(key, rec);
+        return true;
+    });
+    router.handle('ext:alarms.clear', (_e, { name, all } = {}) => {
+        const drop = (k) => { const a = alarms.get(k); if (a?.timer) clearTimeout(a.timer); alarms.delete(k); };
+        if (all) { for (const k of [...alarms.keys()]) drop(k); return true; }
+        drop(name || '');
+        return true;
+    });
+    router.handle('ext:alarms.get', (_e, { name, all } = {}) => {
+        const pub = (a) => ({ name: a.name, scheduledTime: a.scheduledTime, periodInMinutes: a.periodInMinutes });
+        if (all) return [...alarms.values()].map(pub);
+        const a = alarms.get(name || '');
+        return a ? pub(a) : undefined;
     });
     // One line per missing API, so the next gap is named in the log.
     const seenGaps = new Set();
