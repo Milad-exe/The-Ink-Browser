@@ -42,6 +42,11 @@ function broadcastBookmarksChanged(webContents) {
         wc.send('bookmarks-changed');
     }
     catch { } });
+    // Extensions get the precise chrome.bookmarks events, worked out by diffing
+    // against the previous tree — this is the one place every mutation in the
+    // app passes through, whoever made it.
+    try { require('../features/ext-events').bookmarksChanged(); }
+    catch { }
 }
 
 module.exports = { closeWindowMenu, closeFolderDropdown, broadcastBookmarksChanged };

@@ -456,6 +456,10 @@ class WindowManager {
                 return windowData;
             if (windowData.extensionsPanel?.webContents === webContents)
                 return windowData;
+            if (windowData.sidePanel?.webContents === webContents)
+                return windowData;
+            if (windowData.sidePanelHeader?.webContents === webContents)
+                return windowData;
             if (windowData.passwordPrompt?.webContents === webContents)
                 return windowData;
             if (windowData.siteInfoView?.webContents === webContents)

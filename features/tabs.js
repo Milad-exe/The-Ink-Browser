@@ -218,6 +218,7 @@ class Tabs {
         // icon rail; otherwise clamped to [180, 460] (see clampW in ipc/tabs.js).
         const _sw = Math.round(Number(this.persistence?.get('sidebarWidth')) || 232);
         this.sidebarWidth = _sw < 132 ? 56 : Math.max(180, Math.min(460, _sw));
+        this.sidePanelWidth = 0; // set while an extension side panel is docked
         // Which workspace/profile this window is currently browsing as ('1' =
         // default session + legacy stores). Containers scope within it. Tabs are
         // tagged with the workspace they were opened in (tabProfiles) so
@@ -501,7 +502,7 @@ class Tabs {
         const wd = this.getWindowData();
         if (!wd?.window?.contentView)
             return;
-        const overlays = [this.glanceBackdrop, this.glanceView, wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt, wd.ctxMenu, wd.palette];
+        const overlays = [this.glanceBackdrop, this.glanceView, wd.sidePanel, wd.sidePanelHeader, wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt, wd.ctxMenu, wd.palette];
         overlays.forEach((view) => {
             if (!view)
                 return;
@@ -857,13 +858,16 @@ class Tabs {
             return { x: 0, y: 0, width: contentBounds.width, height: contentBounds.height };
         }
         const pad = Tabs.SHELL_PAD;
+        // An open extension side panel reserves a column on the right, so the
+        // page card shrinks rather than being covered (matching Chrome).
+        const rightInset = this.sidePanelWidth || 0;
         // Sidebar mode: tabs live in a left column, so the page starts after it
         // and only the utility bar (+ optional bookmark bar) sits above.
         if ((this.persistence?.get('tabBarSide') ?? 'side') !== 'top') {
             const yOffset = 52 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
             // Compact mode: the sidebar is hidden, so the page spans full width.
             const leftInset = this.sidebarCompact ? pad : this.sidebarWidth;
-            let width = contentBounds.width - leftInset - pad;
+            let width = contentBounds.width - leftInset - pad - rightInset;
             let height = contentBounds.height - yOffset - pad;
             if (width < 0)
                 width = 0;
@@ -874,7 +878,7 @@ class Tabs {
         // shell top inset (see body padding-top in Browser/styles.css) +
         // tab-bar (38px) + utility-bar (50px) + optional bookmark-bar (30px)
         const yOffset = 90 + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
-        let width = contentBounds.width - pad * 2;
+        let width = contentBounds.width - pad * 2 - rightInset;
         let height = contentBounds.height - yOffset - pad;
         if (width < 0)
             width = 0;
@@ -1462,6 +1466,10 @@ class Tabs {
             const profileName = profile ? (containers.meta(profile)?.name || null) : null;
             this.history.addToHistory(url, title || url, profile || null, profileName).catch(error => {
             });
+            // chrome.history.onVisited fires for REAL browsing, not just for
+            // visits an extension recorded through the API.
+            try { require('./ext-events').historyVisited(url, title, this.profileId || '1'); }
+            catch { }
         }
     }
     // ── Split view (two tabs side by side) ────────────────────────────────────
@@ -2358,6 +2366,14 @@ class Tabs {
         return false;
     }
     resizeAllTabs() {
+        // Re-clamp the side panel's reserved width BEFORE measuring the page,
+        // or a resize lays the page out against the previous width.
+        try {
+            const wd0 = this.getWindowData();
+            if (wd0?.sidePanelOpen)
+                require('./side-panel').syncWidth(wd0);
+        }
+        catch { }
         const bounds = this.getTabBounds();
         // Only the visible tab is resized immediately. Background views would
         // each relayout + repaint on every setBounds — with many tabs open
@@ -2374,6 +2390,13 @@ class Tabs {
             this._layoutSplit();
         if (this.glanceView)
             this._layoutGlance();
+        // The extension side panel shares the page row, so it re-lays out here.
+        try {
+            const wd = this.getWindowData();
+            if (wd?.sidePanelOpen)
+                require('./side-panel').layout(wd);
+        }
+        catch { }
     }
     collapseAllTabs() {
         // Move tabs off-screen so native views don't cover HTML overlays

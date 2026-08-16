@@ -78,7 +78,33 @@ class Extensions {
         try { ElectronChromeExtensions.handleCRXProtocol(session); }
         catch { }
         this._registerPolyfill(session);
+        this._wireDnr(session);
         return host;
+    }
+
+    /**
+     * Feed extension rulesets to the declarativeNetRequest engine. Rules are
+     * keyed by extension id and shared across sessions, so registering the same
+     * extension from several sessions is idempotent — but only the default
+     * session may UNregister, or unloading a space would strip rules the other
+     * spaces are still using.
+     */
+    _wireDnr(session) {
+        const dnr = require('./dnr');
+        const api = extApi(session);
+        try {
+            for (const ext of api.getAllExtensions?.() || [])
+                dnr.registerExtension(ext);
+        }
+        catch { }
+        api.on?.('extension-loaded', (_e, ext) => {
+            try { dnr.registerExtension(ext); }
+            catch { }
+        });
+        api.on?.('extension-unloaded', (_e, ext) => {
+            if (session === this.session && ext?.id)
+                dnr.unregisterExtension(ext.id);
+        });
     }
     /**
      * Fill the chrome.* gaps in extension service workers. Registered per
@@ -89,6 +115,14 @@ class Extensions {
             session.registerPreloadScript({
                 type: 'service-worker',
                 id: 'ink-ext-polyfill',
+                filePath: path.join(__dirname, '../preload/ext-polyfill.js'),
+            });
+            // Extension PAGES need the same APIs — a content blocker's popup
+            // toggles per-site rules through declarativeNetRequest. The script
+            // bails on any non-chrome-extension:// origin.
+            session.registerPreloadScript({
+                type: 'frame',
+                id: 'ink-ext-polyfill-frame',
                 filePath: path.join(__dirname, '../preload/ext-polyfill.js'),
             });
             // A service worker's IPC does NOT go through the global ipcMain — each
@@ -103,7 +137,7 @@ class Extensions {
                 if (!sw || sw._inkGapWired)
                     return;
                 sw._inkGapWired = true;
-                try { require('../ipc/extensions').attachGapHandlers(sw.ipc, this.wm); }
+                try { require('../ipc/extensions').attachGapHandlers(sw, this.wm); }
                 catch (e) { console.error('extension gap handlers:', e.message); }
             });
         }
@@ -224,6 +258,15 @@ class Extensions {
         this._saveDisabled();
         extApi(session).on?.('extension-loaded', () => this._emit());
         extApi(session).on?.('extension-unloaded', () => this._emit());
+        // DevTools-panel extensions have no DevTools frontend to load into, so
+        // their devtools_page is booted here instead and the panels it registers
+        // are surfaced in our own UI. No-op when no extension declares one.
+        try {
+            const wd = this._activeWindow();
+            if (wd)
+                require('./devtools-ext').discover(wd).catch(() => { });
+        }
+        catch { }
         this._emit();
     }
     // ── Tab wiring (called from Tabs) ──────────────────────────────────────────
