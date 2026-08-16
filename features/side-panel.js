@@ -19,6 +19,14 @@ const { resolveAppFile } = require('../app-paths');
 
 const PANEL_WIDTH = 340;
 const HEADER_H = 34;
+// Vertical gap between the header strip and the extension's page.
+//
+// Electron's setBorderRadius takes ONE radius for all four corners, so the page
+// view cannot round only its bottom. Butting it straight under the header left
+// 10px notches at the seam where the shell showed through. Separating them
+// slightly instead makes both read as rounded cards, which is what the rest of
+// the shell does anyway.
+const HEADER_GAP = 6;
 
 // extension id → { path, enabled, tabPaths: Map(tabId → path) }
 const options = new Map();
@@ -229,9 +237,9 @@ function layout(wd) {
     try {
         wd.sidePanelHeader?.setBounds({ x, y: page.y, width, height: HEADER_H });
         wd.sidePanel?.setBounds({
-            x, y: page.y + HEADER_H,
+            x, y: page.y + HEADER_H + HEADER_GAP,
             width,
-            height: Math.max(0, page.height - HEADER_H),
+            height: Math.max(0, page.height - HEADER_H - HEADER_GAP),
         });
     }
     catch { }

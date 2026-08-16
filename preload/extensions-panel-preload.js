@@ -34,4 +34,7 @@ contextBridge.exposeInMainWorld('extPanel', {
     // frontend to host them; opening one shows it in the side panel.
     devtoolsPanels: () => ipcRenderer.invoke('devtools-panels-list'),
     openDevtoolsPanel: (panelId) => ipcRenderer.invoke('devtools-panel-open', panelId),
+    // Rows are not a uniform height, so the panel measures itself and main
+    // resizes to fit rather than guessing from a row count.
+    setHeight: (h) => ipcRenderer.invoke('extensions-panel-height', h),
 });

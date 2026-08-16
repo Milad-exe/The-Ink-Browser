@@ -704,7 +704,12 @@ function register(ipcMain, { wm }) {
         try {
             const view = await ensurePanel(wd);
             const items = listWithPinned();
-            view.setBounds(panelBounds(anchor, items.length));
+            // DevTools panels get their own rows, so they count toward the
+            // height — otherwise the section opens below the fold.
+            let extraRows = 0;
+            try { extraRows = require('../features/devtools-ext').listPanels().length; }
+            catch { }
+            view.setBounds(panelBounds(anchor, items.length + extraRows));
             // Re-add on every open: newly created tab views would otherwise
             // sit above the panel in the contentView child order.
             try {
@@ -718,12 +723,38 @@ function register(ipcMain, { wm }) {
             view.webContents.send('extensions-data', items);
             view.setVisible(true);
             wd.extensionsPanelOpen = true;
+            wd.extensionsPanelAnchor = anchor; // for the self-measured resize
             return true;
         }
         catch (err) {
             console.error('extensions-panel-toggle:', err);
             return false;
         }
+    });
+    // The panel measures its own rendered height and asks to be resized. Rows
+    // are not a uniform height (the DevTools section adds a header plus rows),
+    // so a count-based estimate clipped the last row.
+    ipcMain.handle('extensions-panel-height', (_e, height) => {
+        let wd = wm.getWindowByWebContents(_e.sender);
+        if (!wd) {
+            for (const w of wm.getAllWindows()) {
+                if (w.extensionsPanel?.webContents === _e.sender) { wd = w; break; }
+            }
+        }
+        const anchor = wd?.extensionsPanelAnchor;
+        if (!wd?.extensionsPanel || !anchor || !Number.isFinite(height))
+            return false;
+        const h = Math.max(80, Math.min(MAX_PANEL_H, Math.ceil(height) + 2));
+        try {
+            wd.extensionsPanel.setBounds({
+                x: Math.max(0, Math.floor(anchor.right - PANEL_WIDTH)),
+                y: Math.floor(anchor.bottom + 6),
+                width: PANEL_WIDTH,
+                height: h,
+            });
+        }
+        catch { }
+        return true;
     });
     ipcMain.handle('extensions-panel-close', (_e) => {
         // Called from the chrome renderer OR from inside the panel itself.

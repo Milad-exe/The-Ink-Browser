@@ -818,6 +818,9 @@ html[data-tabbar="side"] .sidebar-foot {
 browser-action-list {
   display: flex; align-items: center; gap: 1px;
   --browser-action-hover-bg: var(--hover);
+  /* The library defaults this to a hardcoded #444, which reads as a dark
+     smudge around the badge on the light themes. */
+  --browser-action-badge-outline: var(--surface);
 }
 browser-action-list::part(action) { width: 30px; height: 30px; border-radius: 8px; background-size: 60%; }
 browser-action-list::part(badge) {

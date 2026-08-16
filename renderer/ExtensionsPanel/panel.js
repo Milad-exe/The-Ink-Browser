@@ -93,13 +93,13 @@
         if (!panels || !panels.length)
             return;
         const head = document.createElement('div');
-        head.className = 'border-b border-subtle bg-surface-2 px-3.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-secondary';
+        head.className = 'dt-section font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-secondary';
         head.textContent = 'DevTools panels';
         listEl.appendChild(head);
         for (const p of panels) {
             const row = document.createElement('button');
             row.tabIndex = -1;
-            row.className = 'flex w-full cursor-pointer items-center gap-2.5 border-0 border-b border-subtle bg-transparent px-3.5 py-2.5 text-left hover:bg-hover';
+            row.className = 'dt-row';
             row.title = `Open “${p.title}” from ${p.extensionName || p.extensionId}`;
             const meta = document.createElement('div');
             meta.className = 'min-w-0 flex-1';
@@ -123,6 +123,25 @@
             listEl.appendChild(row);
         }
     }
+    // The panel's height is decided by main BEFORE this content exists, from a
+    // fixed per-row estimate — which clipped the last row as soon as rows of
+    // different heights (the DevTools section) appeared. Measure what actually
+    // rendered and let main resize to fit.
+    function syncHeight() {
+        try {
+            const panel = document.getElementById('panel');
+            const list = document.getElementById('list');
+            if (!panel || !list || !window.extPanel.setHeight)
+                return;
+            // #panel is h-screen + overflow-hidden, so its own scrollHeight can
+            // never exceed the current view height — measuring it just reports
+            // back the size we already have. #list is the scrolling element, so
+            // the height we want is the chrome around it plus its full content.
+            const chromeH = panel.clientHeight - list.clientHeight;
+            window.extPanel.setHeight(Math.ceil(chromeH + list.scrollHeight));
+        }
+        catch { }
+    }
     // render() clears the list, so the devtools section is always appended after
     // it — never on its own.
     async function appendDevtools() {
@@ -130,6 +149,7 @@
             renderDevtools(await window.extPanel.devtoolsPanels());
         }
         catch { }
+        syncHeight();
     }
     async function refresh() {
         try {
