@@ -14,19 +14,20 @@ html, body {
 
 .ctx-menu {
   position: fixed; z-index: 10; min-width: 190px; padding: 5px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  background: var(--surface); border: none; border-radius: var(--r-lg);
+  box-shadow: var(--ring-2), var(--shadow-3);
 }
 .ctx-menu-item {
   display: block; width: 100%; text-align: left; border: none; background: transparent;
-  padding: 7px 11px; border-radius: 8px; color: var(--text);
-  font-family: var(--font); font-size: 12.5px; cursor: pointer; white-space: nowrap;
+  padding: 0 var(--sp-3); min-height: var(--row-h); border-radius: var(--r-md); color: var(--text);
+  font-family: var(--font); font-size: var(--fs-body); font-weight: 500;
+  letter-spacing: var(--tracking); cursor: pointer; white-space: nowrap;
 }
 .ctx-menu-item:hover { background: var(--hover); }
 .ctx-menu-item.danger { color: var(--danger); }
 .ctx-menu-item.has-sub { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .ctx-sub-arrow { color: var(--text-3); font-size: 14px; line-height: 1; flex-shrink: 0; }
-.ctx-menu-sep { height: 1px; margin: 4px 6px; background: var(--border-2); }
+.ctx-menu-sep { height: 1px; margin: var(--sp-2) var(--sp-3); background: color-mix(in srgb, var(--border) 80%, transparent); }
 
 /* Emoji picker variant */
 .emoji-pop { min-width: 250px; }

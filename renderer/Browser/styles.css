@@ -21,16 +21,23 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Faint deterministic dither in the shell — threads the new-tab's ASCII texture
-   through the chrome. A fixed overlay (not the body background) so the macOS
-   vibrancy `background:` override can't wipe it; pointer-events:none so it never
-   intercepts clicks; z-index:0 so the tab strip/toolbar (positioned, higher z)
-   sit above it and show it through their transparent backgrounds. Low opacity to
-   stay mellow; the native page view covers it in the centre. */
+/* The shell used to carry a dotted dither. On a retina panel it read as noise
+   sitting ON the UI rather than as texture behind it, and it fought every
+   hairline in the chrome. The depth now comes from light: one soft pool where
+   the toolbar meets the shell, and a single bright hairline along the window's
+   top edge — the two cues a physical panel would actually give you.
+   Fixed overlay (not the body background) so the macOS vibrancy override can't
+   wipe it; pointer-events:none so it never intercepts clicks; z-index:0 so the
+   positioned chrome sits above it. */
 body::before {
   content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background-image: radial-gradient(color-mix(in srgb, var(--text) 8%, transparent) 0.6px, transparent 0.7px);
-  background-size: 5px 5px;
+  background:
+    radial-gradient(140% 46% at 50% 0%, color-mix(in srgb, var(--text) 5%, transparent), transparent 70%);
+}
+body::after {
+  content: ''; position: fixed; left: 0; right: 0; top: 0; height: 1px;
+  z-index: 0; pointer-events: none;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
 /* Shell top inset: gives the tab strip breathing room from the window edge so
@@ -48,7 +55,11 @@ html[data-vibrancy="true"] body { background: color-mix(in srgb, var(--shell) 88
 /* The page view covers this area whenever a tab is open, so keeping it painted
    costs nothing there — and it is what shows when a space has no tabs. It must
    stay painted under vibrancy too, or that empty state is a hole to the desktop. */
-html[data-vibrancy="true"] #content-area { background: var(--page, var(--surface)); }
+html[data-vibrancy="true"] #content-area {
+  /* Hairline around the page card — the native view rounds its own corners, so
+     this only has to trace them. */
+  box-shadow: var(--ring), var(--shadow-2);
+  border-radius: var(--card-radius); background: var(--page, var(--surface)); }
 
 /* Settings → Appearance → Toolbar can remove items entirely. */
 .user-hidden { display: none !important; }
@@ -103,9 +114,10 @@ html[data-vibrancy="true"] #content-area { background: var(--page, var(--surface
 
 /* ── Tab Bar (top strip) ─────────────────── */
 #tab-bar {
-  display: flex; height: 38px; width: 100%;
+  /* Height MUST match Tabs.TAB_BAR_H — see the metrics block in ui.css. */
+  display: flex; height: var(--tabstrip-h); width: 100%;
   background: transparent;
-  align-items: center; padding: 0 8px; gap: 6px;
+  align-items: center; padding: 0 var(--sp-4); gap: var(--sp-3);
   position: relative; z-index: 10;
   overflow: hidden; flex-shrink: 0;
   -webkit-app-region: drag;
@@ -136,7 +148,7 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
 .tab-scroll-btn:hover { color: var(--text); }
 
 #tabs-container {
-  display: flex; align-items: center; height: 100%; gap: 5px;
+  display: flex; align-items: center; height: 100%; gap: var(--sp-2);
   /* Vertical padding gives the active tab's drop shadow room inside the
      scroll container, which clips at its padding box — without it the shadow
      was sheared off at the strip edge. */
@@ -150,18 +162,34 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
 
 /* Rounded pill tabs. */
 .tab-button {
-  display: flex; align-items: center; gap: 9px;
-  padding: 0 9px 0 11px;
-  height: 30px; min-width: 132px; max-width: 220px;
-  border-radius: var(--radius);
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: 0 var(--sp-3) 0 var(--sp-4);
+  height: var(--row-h); min-width: 132px; max-width: 220px;
+  border-radius: var(--r-md);
   background: transparent; border: none;
   color: var(--text-2);
-  font-family: var(--font); font-size: 12.5px; font-weight: 500; letter-spacing: -0.01em;
-  cursor: pointer; transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  font-family: var(--font); font-size: var(--fs-body); font-weight: 500;
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+              box-shadow var(--dur-1) var(--ease);
   white-space: nowrap; flex-shrink: 1;
   position: relative;
 }
 .tab-button:hover { background: var(--hover); color: var(--text); }
+/* Inactive tabs in the top strip get a whisper of a surface: without it the
+   strip reads as loose text with one pill floating in it. */
+html[data-tabbar="top"] .tab-button:not(.active) {
+  background: color-mix(in srgb, var(--surface) 45%, transparent);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--border) 60%, transparent);
+}
+html[data-tabbar="top"] .tab-button:not(.active):hover {
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+}
+html[data-tabbar="top"] .tab-favicon { flex: 0 0 var(--icon); }
+html[data-tabbar="top"] .tab-button:not(.has-favicon)::before {
+  content: ''; width: var(--icon); flex: 0 0 var(--icon);
+}
 .tab-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 10; }
 .tab-button.active {
   background: var(--surface);
@@ -182,7 +210,7 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
    offset in tabs.js getTabBounds). */
 html[data-tabbar="side"] body {
   display: grid;
-  grid-template-columns: var(--sidebar-w, 232px) minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-w, 240px) minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 /* The utility bar spans the full width at the top (as in compact mode) and the
@@ -191,8 +219,12 @@ html[data-tabbar="side"] #utility-bar { grid-column: 1 / -1; grid-row: 1; }
 html[data-tabbar="side"] #tab-bar {
   grid-column: 1; grid-row: 2 / span 2;
   flex-direction: column; align-items: stretch;
-  width: var(--sidebar-w, 232px); height: 100%; padding: 0 8px 8px; gap: 2px;
-  /* Transparent on the shell — no panel tint, no divider hairline. */
+  width: var(--sidebar-w, 240px); height: 100%;
+  /* One inset for the column; every row inside then shares --gutter for its
+     own content, so favicons, labels, folder glyphs and the foot buttons all
+     sit on the same left edge. That shared edge is most of what separates a
+     sidebar that looks designed from one that looks assembled. */
+  padding: 0 var(--sp-3) var(--sp-3); gap: var(--sp-1);
   background: transparent;
 }
 /* Right-edge drag handle to resize the sidebar (side mode only). */
@@ -214,7 +246,11 @@ html.sidebar-resizing { cursor: col-resize; }
 html.sidebar-resizing * { pointer-events: none; user-select: none; }
 html.sidebar-resizing .sidebar-resizer { pointer-events: auto; }
 html[data-tabbar="side"] .bookmark-bar { grid-column: 2; grid-row: 2; }
-html[data-tabbar="side"] #content-area { grid-column: 2; grid-row: 3; }
+html[data-tabbar="side"] #content-area {
+  /* Hairline around the page card — the native view rounds its own corners, so
+     this only has to trace them. */
+  box-shadow: var(--ring), var(--shadow-2);
+  border-radius: var(--card-radius); grid-column: 2; grid-row: 3; }
 /* In side mode the strip is a full-height working column, not a title bar, so
    it must NOT be a window-drag region — everything without an explicit no-drag
    (folder headers, the empty tab area, the space label) would otherwise swallow
@@ -232,12 +268,13 @@ html[data-tabbar="side"] #tab-bar #window-controls .wc-btn { -webkit-app-region:
    (JS sets width:72px for the top strip; height matters here instead). */
 html[data-tabbar="side"] #window-controls { display: none; }
 html[data-tabbar="side"] #tabs-container {
+  padding-inline: 0;
   /* One column: pinned tabs are rows like the rest (the tile grid belonged to
      Essentials, which has its own container above). */
   display: grid; grid-template-columns: minmax(0, 1fr);
-  align-content: start; gap: 5px;
+  align-content: start; gap: var(--sp-1);
   height: auto; width: auto; flex: 0 1 auto; min-height: 0;
-  overflow-x: hidden; overflow-y: auto; padding: 2px;
+  overflow-x: hidden; overflow-y: auto; padding: 0;
   scrollbar-width: thin; scrollbar-color: var(--border-2) transparent;
 }
 html[data-tabbar="side"] #tabs-container::-webkit-scrollbar { width: 7px; }
@@ -251,8 +288,10 @@ html[data-tabbar="side"] .essentials:not(:empty) { padding-bottom: 8px; margin-b
 /* Tab rows: favicon + title + hover close, Arc-style rounded cards. */
 html[data-tabbar="side"] .tab-button {
   width: 100%; min-width: 0; max-width: none; flex-shrink: 0;
-  height: 34px; padding: 0 8px 0 10px; gap: 9px;
-  border-radius: 9px; color: var(--text-2);
+  height: var(--row-h); padding: 0 var(--sp-3) 0 var(--gutter); gap: var(--sp-4);
+  border-radius: var(--r-md); color: var(--text-2);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+              box-shadow var(--dur-1) var(--ease);
 }
 html[data-tabbar="side"] .tab-button:hover:not(.active) { color: var(--text); background: var(--hover); }
 html[data-tabbar="side"] .tab-button .tab-title { font-size: 13px; }
@@ -260,7 +299,10 @@ html[data-tabbar="side"] .tab-button .tab-title { font-size: 13px; }
 html[data-tabbar="side"] .tab-button.active {
   color: var(--text);
   background: var(--surface-2, var(--surface));
-  box-shadow: inset 0 0 0 0.5px var(--border), 0 1px 3px rgba(8,10,20,0.18);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent),
+    var(--ring),
+    var(--shadow-1);
 }
 html[data-tabbar="side"] .tab-button.active .tab-title { font-weight: 600; }
 /* Split view: both on-screen tabs read as soft pills; the focused one is a touch
@@ -284,14 +326,30 @@ html[data-tabbar="side"] .tab-button.in-split:not(.active) {
   background: linear-gradient(to right, transparent calc(50% - 0.75px), var(--accent) calc(50% - 0.75px), var(--accent) calc(50% + 0.75px), transparent calc(50% + 0.75px));
   pointer-events: none;
 }
-/* Favicon a touch larger in the roomy side rows. */
-html[data-tabbar="side"] .tab-favicon { width: 17px; height: 17px; }
+/* A fixed icon column, not a shrink-to-fit one: a row whose favicon has not
+   loaded (or has none) used to pull its title left, which is what made the
+   list's left edge ragged. */
+html[data-tabbar="side"] .tab-favicon {
+  width: var(--icon); height: var(--icon); flex: 0 0 var(--icon);
+}
+/* A row with no favicon element at all (a blank tab) used to pull its title
+   into the icon column, so the list had two left edges. Reserve the column. */
+html[data-tabbar="side"] .tab-button:not(.has-favicon)::before {
+  content: ''; width: var(--icon); flex: 0 0 var(--icon);
+}
+html[data-tabbar="side"] .tab-favicon.default {
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font); font-size: 10px; font-weight: 700;
+  line-height: 1; letter-spacing: 0;
+  color: var(--text-3); background: color-mix(in srgb, var(--text) 7%, transparent);
+  border-radius: var(--r-xs);
+}
 /* Pinned tabs are workspace-scoped and read as NORMAL rows docked above the
    loose tabs (the big favicon tiles are the Essentials treatment, not this one).
    Only the title weight marks them out. */
 html[data-tabbar="side"] .tab-button { position: relative; grid-column: 1 / -1; }
 html[data-tabbar="side"] .tab-button.pinned {
-  padding: 0 8px 0 11px; gap: 10px; justify-content: flex-start;
+  padding: 0 var(--sp-3) 0 var(--gutter); gap: var(--sp-4); justify-content: flex-start;
 }
 /* Undo the top-strip rule that hides the label on pinned tabs — in the sidebar
    they are ordinary rows. */
@@ -304,9 +362,10 @@ html[data-tabbar="side"] .tab-button.pinned + .tab-button:not(.pinned)::before {
 /* Muted current-space label above the tab list. */
 .space-header { display: none; }
 html[data-tabbar="side"] .space-header {
-  display: block; flex-shrink: 0; padding: 2px 10px 6px;
-  font-family: var(--font); font-size: 11.5px; font-weight: 500;
-  letter-spacing: 0.01em; color: var(--text-3);
+  display: block; flex-shrink: 0;
+  padding: var(--sp-3) var(--gutter) var(--sp-2);
+  font-family: var(--font); font-size: var(--fs-micro); font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 html[data-tabbar="side"][data-rail="on"] .space-header { display: none; }
@@ -314,9 +373,10 @@ html[data-tabbar="side"][data-rail="on"] .space-header { display: none; }
 /* ── Folders (tab groups) ──────────────────────────────────────────────────── */
 html[data-tabbar="side"] .folder-header {
   grid-column: 1 / -1;
-  display: flex; align-items: center; gap: 8px; height: 34px;
-  padding: 0 8px 0 8px; border-radius: 10px; cursor: pointer;
+  display: flex; align-items: center; gap: var(--sp-3); height: var(--row-h);
+  padding: 0 var(--sp-3) 0 var(--sp-3); border-radius: var(--r-md); cursor: pointer;
   color: var(--text-2); position: relative;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 html[data-tabbar="side"] .folder-header:hover { background: var(--hover); color: var(--text); }
 html[data-tabbar="side"] .folder-header.drop-target {
@@ -380,20 +440,21 @@ html[data-tabbar="side"] #tab-actions.after-folders {
 }
 /* "+ New Tab" labelled row (Arc), not a bare plus. */
 html[data-tabbar="side"] #new-tab-btn {
-  width: 100%; height: 32px; border-radius: 9px;
+  width: 100%; height: var(--row-h); border-radius: var(--r-md);
   display: flex; justify-content: flex-start; align-items: center;
-  padding: 0 10px; gap: 9px; font-size: 0; color: var(--text-3);
+  padding: 0 var(--gutter); gap: var(--sp-4); font-size: 0; color: var(--text-3);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-/* The "+" sits in the same 17px slot a favicon would, so "New Tab" lines up
+/* The "+" occupies the same icon column a favicon would, so its label lines up
    with the tab titles above it. */
 html[data-tabbar="side"] #new-tab-btn::before {
-  content: '+'; width: 17px; flex-shrink: 0; text-align: center;
-  font-size: 17px; font-weight: 300; line-height: 1;
+  content: '+'; width: var(--icon); flex: 0 0 var(--icon); text-align: center;
+  font-size: 16px; font-weight: 300; line-height: 1;
 }
 html[data-tabbar="side"] #new-tab-btn::after {
   content: 'New Tab';
-  font-family: var(--font); font-size: 12px; font-weight: 500;
-  letter-spacing: -0.01em;
+  font-family: var(--font); font-size: var(--fs-body); font-weight: 500;
+  letter-spacing: var(--tracking);
 }
 html[data-tabbar="side"] #new-tab-btn:hover { color: var(--text); background: var(--hover); }
 html[data-tabbar="side"] #tab-drag-spacer { width: auto; min-width: 0; height: auto; min-height: 20px; flex: 1 1 auto; }
@@ -409,14 +470,15 @@ html[data-tabbar="side"] #profile-btn { display: none; }
 /* Essentials fill the width in up to ~4 columns, collapsing to fewer (wider)
    tiles when there are fewer favourites — an auto-fit fill behaviour. */
 html[data-tabbar="side"] .essentials {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(max(23%, 46px), 1fr)); gap: 6px;
-  padding: 0 2px 2px; flex-shrink: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(max(23%, 46px), 1fr));
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0 var(--sp-1); flex-shrink: 0;
   -webkit-app-region: no-drag;
 }
 html[data-tabbar="side"] .essentials:empty { display: none; }
 .essential-tile {
-  position: relative; height: 58px; border: none; cursor: pointer;
-  border-radius: 14px; background: var(--surface);
+  position: relative; height: 54px; border: none; cursor: pointer;
+  border-radius: var(--r-lg); background: var(--surface);
   display: flex; align-items: center; justify-content: center;
   box-shadow: inset 0 0 0 0.5px var(--border), 0 1px 2px rgba(8,10,20,0.06);
   transition: background 0.12s, box-shadow 0.12s, transform 0.12s;
@@ -533,8 +595,12 @@ html[data-tabbar="side"] #tab-bar.creating-space > *:not(#space-create):not(#win
 /* ── Sidebar foot: workspace switcher + settings (bottom bar) ──────────────── */
 .sidebar-foot { display: none; }
 html[data-tabbar="side"] .sidebar-foot {
-  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
-  padding: 7px 2px 0;
+  display: flex; align-items: center; gap: var(--sp-2); flex-shrink: 0;
+  /* Sits on the row inset, minus the button's own optical padding, so the gear
+     lines up with the favicons above it rather than floating in from the edge. */
+  padding: var(--sp-4) calc(var(--gutter) - 7px) var(--sp-1);
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  margin-top: var(--sp-2);
   -webkit-app-region: no-drag;
 }
 /* Profiles: a centred row of icon-only avatars between settings (left) and the
@@ -549,19 +615,21 @@ html[data-tabbar="side"] .sidebar-foot {
 .sb-workspaces::-webkit-scrollbar { display: none; }
 .sb-ws {
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  width: 30px; height: 30px; padding: 0; border: none; border-radius: 9px;
-  background: transparent; cursor: pointer; transition: background 0.12s;
+  width: var(--control-h); height: var(--control-h); padding: 0; border: none;
+  border-radius: var(--r-md);
+  background: transparent; cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
   scroll-snap-align: center;
 }
 .sb-ws:hover { background: var(--hover); }
-.sb-ws.active { background: var(--surface); box-shadow: inset 0 0 0 0.5px var(--border); }
+.sb-ws.active { background: var(--surface); box-shadow: var(--ring); }
 .sb-ws .profile-badge { width: 20px; height: 20px; font-size: 10px; }
 /* Inactive spaces keep their emoji but read as muted — greyed, not dropped. */
 .sb-ws:not(.active) .profile-badge { opacity: 0.45; filter: grayscale(1); }
 .sb-ws:hover .profile-badge { opacity: 1; filter: none; }
-.sb-add-ws { flex-shrink: 0; width: 28px; height: 28px; font-size: 16px; font-weight: 300; color: var(--text-3); }
+.sb-add-ws { flex-shrink: 0; width: var(--control-h); height: var(--control-h); font-size: 16px; font-weight: 300; color: var(--text-3); }
 .sb-add-ws:hover { color: var(--text); }
-.sb-settings, .sb-downloads { flex-shrink: 0; width: 30px; height: 30px; }
+.sb-settings, .sb-downloads { flex-shrink: 0; width: var(--control-h); height: var(--control-h); }
 .sb-downloads.hidden { display: none; }
 /* Edit-profile modal: emoji tile + name row. */
 .prf-row { display: flex; gap: 8px; align-items: center; }
@@ -666,8 +734,9 @@ html[data-tabbar="side"] .sidebar-foot {
 .ri-btn-primary:hover { background: var(--accent); filter: brightness(1.06); color: #1a1206; }
 
 .tab-favicon {
-  width: 16px; height: 16px; flex-shrink: 0; border-radius: 5px; object-fit: cover;
-  opacity: 0.85; transition: opacity 0.12s;
+  width: var(--icon); height: var(--icon); flex-shrink: 0;
+  border-radius: var(--r-xs); object-fit: cover;
+  opacity: 0.9; transition: opacity var(--dur-1) var(--ease);
 }
 .tab-button:hover .tab-favicon,
 .tab-button.active .tab-favicon { opacity: 1; }
@@ -722,10 +791,12 @@ html[data-tabbar="side"] .sidebar-foot {
 /* ── Utility Bar (toolbar) ───────────────── */
 #utility-bar {
   /* Height MUST match Tabs.UTILITY_BAR_H (features/tabs.js) — the page view is
-     positioned beneath this bar from there. */
-  display: flex; height: 40px; width: 100%;
+     positioned beneath this bar from there. 44px leaves 6px above and below a
+     32px field; at 40px the field filled the bar edge to edge, which is what
+     made the chrome feel cramped next to Safari or Arc. */
+  display: flex; height: var(--bar-h); width: 100%;
   background: transparent;
-  align-items: center; padding: 0 8px; gap: 8px;
+  align-items: center; padding: 0 var(--sp-4); gap: var(--sp-3);
   /* position:relative also anchors the out-of-flow omnibox (see below). */
   position: relative; z-index: 20; flex-shrink: 0;
   -webkit-app-region: drag;
@@ -741,16 +812,17 @@ html[data-tabbar="side"] .sidebar-foot {
    background; each button carries its own hover/active surface instead. */
 .nav-buttons,
 .trailing-icons {
-  display: flex; align-items: center; gap: 2px;
+  display: flex; align-items: center; gap: var(--sp-1);
   flex-shrink: 0;
 }
 
 .nav-btn,
 .icon-btn {
-  width: 30px; height: 30px; border: none; background: transparent;
-  border-radius: 8px; color: var(--text-2); cursor: pointer;
+  width: var(--control-h); height: var(--control-h); border: none; background: transparent;
+  border-radius: var(--r-md); color: var(--text-2); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: color 0.12s, background 0.12s; position: relative;
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+  position: relative;
 }
 .nav-btn:hover,
 .icon-btn:hover { color: var(--text); background: var(--hover); }
@@ -758,7 +830,7 @@ html[data-tabbar="side"] .sidebar-foot {
 .icon-btn:active { background: var(--active-bg); }
 .nav-btn:disabled { opacity: 0.3; background: transparent; cursor: default; }
 .nav-btn svg { pointer-events: none; }
-.icon-svg { width: 16px; height: 16px; flex-shrink: 0; pointer-events: none; }
+.icon-svg { width: var(--icon); height: var(--icon); flex-shrink: 0; pointer-events: none; }
 .icon-btn.active { color: var(--text); background: var(--active-bg); }
 
 .nav-stop { display: none; }
@@ -792,33 +864,39 @@ html[data-tabbar="side"] .sidebar-foot {
 .omnibox-wrapper { flex: 1; min-width: 0; }
 .omnibox {
   position: absolute; top: 50%; transform: translateY(-50%);
-  left: var(--omni-left, 8px); right: 8px; margin: 0 auto;
-  width: clamp(220px, calc(100% - 400px - var(--omni-left, 8px)), 720px);
-  /* Sits inside the 40px toolbar, so it has to leave air above and below. */
-  display: flex; align-items: center; height: 34px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 11px; padding: 0 13px; gap: 9px;
-  transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+  left: var(--omni-left, var(--sp-4)); right: var(--sp-4); margin: 0 auto;
+  /* 620px is about where a URL stops being readable and starts being a ruler;
+     Safari and Chrome both land near it on a wide window. */
+  width: clamp(220px, calc(100% - 400px - var(--omni-left, 8px)), 620px);
+  display: flex; align-items: center; height: var(--field-h);
+  /* Resting state is a recessed well, not a raised card: the field belongs to
+     the shell and only lifts when it takes focus. */
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  border: none; box-shadow: var(--ring-2);
+  border-radius: var(--r-md); padding: 0 var(--sp-5); gap: var(--sp-4);
+  transition: background var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
 }
+.omnibox:hover:not(:focus-within) { background: var(--bg); }
 /* Sidebar mode: the page card starts after the sidebar, so the field centres
    over that column instead. Compact mode hides the sidebar → back to the edge
    (the 8px fallback above). */
 html[data-tabbar="side"]:not([data-compact="on"]) #utility-bar {
-  --omni-left: var(--sidebar-w, 232px);
+  --omni-left: var(--sidebar-w, 240px);
 }
 .omnibox:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
   background: var(--page);
-  box-shadow: 0 0 0 2px var(--accent-wash);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+    0 0 0 3px var(--accent-wash),
+    var(--shadow-1);
 }
 
 .omni-icon {
   display: flex; align-items: center; justify-content: center;
-  width: 17px; height: 17px; flex-shrink: 0;
-  color: var(--text-3); transition: color 0.15s;
+  width: var(--icon); height: var(--icon); flex-shrink: 0;
+  color: var(--text-3); transition: color var(--dur-1) var(--ease);
 }
-.omni-icon .oi { display: none; width: 17px; height: 17px; }
+.omni-icon .oi { display: none; width: var(--icon); height: var(--icon); }
 .omnibox[data-omni="search"]   .oi-search   { display: block; }
 .omnibox[data-omni="secure"]   .oi-secure   { display: block; }
 .omnibox[data-omni="insecure"] .oi-insecure { display: block; }
@@ -995,12 +1073,22 @@ browser-action-list::part(badge) {
 /* The page view floats over this. With no tab open (or a space emptied) the
    area is what you see, so it carries the page card's own shape rather than
    showing the shell through a hole. */
+/* The page card's backdrop in the chrome. The native page view is painted over
+   it at exactly these bounds (getTabBounds in features/tabs.js), so the two have
+   to agree: same inset, same radius. It carries the hairline and the shadow —
+   the native view can round its corners but cannot draw outside itself. */
 #content-area {
-  flex: 1; width: 100%;
+  flex: 1;
+  /* Inset from the shell on both sides and the bottom, like the native view. */
+  width: auto;
+  margin: 0 var(--shell-pad) var(--shell-pad);
   background: var(--page, var(--surface));
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--card-radius);
+  box-shadow: var(--ring), var(--shadow-2);
   position: relative; overflow: hidden;
 }
+/* Sidebar mode: the sidebar already provides the left gutter. */
+html[data-tabbar="side"] #content-area { margin-left: 0; }
 
 /* ── Pomodoro Pill ───────────────────────── */
 .pomodoro-pill {

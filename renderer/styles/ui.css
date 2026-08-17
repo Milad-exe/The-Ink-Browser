@@ -762,3 +762,74 @@ html[data-private-window="true"], html[data-private-tab="true"] {
     }
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   METRICS — one rhythm for the whole browser.
+   
+   Sizes used to be written inline at each call site (a 34px row here, a 9px
+   radius there, 13.5px type somewhere else), which is why the chrome read as
+   nearly-aligned rather than aligned. Everything below is on a 2px grid, the
+   control heights are the three a browser actually needs, and the sidebar has
+   ONE content inset that every row, label and button shares — that shared left
+   edge is most of what makes a sidebar look considered.
+
+   The geometry values marked (JS) are mirrored by constants in
+   features/tabs.js, which positions the native page view: change one, change
+   the other, or the page card stops meeting the chrome.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Chrome geometry */
+  --shell-top:   6px;    /* (JS SHELL_TOP)   air above the chrome */
+  --shell-pad:   8px;    /* (JS SHELL_PAD)   gutter around the page card */
+  --bar-h:      44px;    /* (JS UTILITY_BAR_H) toolbar */
+  --tabstrip-h: 40px;    /* (JS TAB_BAR_H)   top-mode tab strip */
+  --card-radius: 10px;   /* (JS PAGE_RADIUS) page card corner */
+
+  /* Controls — three heights, no more */
+  --row-h:     32px;     /* sidebar rows, menu rows, list items */
+  --control-h: 30px;     /* icon buttons */
+  --field-h:   32px;     /* omnibox and text inputs */
+  --icon:      16px;     /* glyph size inside a control */
+  --gutter:    10px;     /* the sidebar's single content inset */
+
+  /* Spacing scale (2px grid) */
+  --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px;
+  --sp-5: 12px; --sp-6: 16px; --sp-7: 24px; --sp-8: 32px;
+
+  /* Radii */
+  --r-xs: 4px; --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-xl: 16px; --r-pill: 999px;
+
+  /* Type scale */
+  --fs-micro: 11px;   /* mono micro-labels */
+  --fs-small: 12px;   /* secondary text, badges */
+  --fs-body:  13px;   /* rows, fields, buttons — the browser's default */
+  --fs-lg:    15px;   /* dialog titles */
+  --tracking: -0.01em;
+
+  /* Elevation — layered and low-alpha; a single hard shadow reads cheap. */
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.16);
+  --shadow-2: 0 2px 8px rgba(0,0,0,0.20), 0 1px 2px rgba(0,0,0,0.14);
+  --shadow-3: 0 16px 40px rgba(0,0,0,0.36), 0 2px 10px rgba(0,0,0,0.22);
+  /* Hairline: a real half-pixel ring on retina, drawn as a shadow so it never
+     takes part in layout the way a border does. */
+  --ring: inset 0 0 0 0.5px var(--border);
+  --ring-2: inset 0 0 0 0.5px var(--border-2);
+
+  /* Motion — two durations and one curve, used everywhere. */
+  --dur-1: 110ms;
+  --dur-2: 190ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Back-compat aliases for the older radius names. */
+  --radius:      var(--r-md);
+  --radius-lg:   var(--r-xl);
+  --radius-pill: var(--r-pill);
+}
+
+/* Light themes need less shadow: the same alpha that reads as depth on a dark
+   shell reads as dirt on a pale one. */
+html[data-theme="porcelain"], html[data-theme="dune"] {
+  --shadow-1: 0 1px 2px rgba(30,35,60,0.08);
+  --shadow-2: 0 2px 8px rgba(30,35,60,0.10), 0 1px 2px rgba(30,35,60,0.06);
+  --shadow-3: 0 16px 40px rgba(30,35,60,0.16), 0 2px 10px rgba(30,35,60,0.08);
+}

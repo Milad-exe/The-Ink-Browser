@@ -628,21 +628,17 @@ class Tabs {
         });
         if (shouldActivate) {
             this.showTab(tabIndex);
-            // A freshly opened blank tab focuses the address bar (standard browser
-            // behavior). showTab() gave OS focus to the tab's view, so pull focus
-            // back to the chrome first, then focus the omnibox; fire again after the
-            // page loads since its own load can re-grab OS focus.
-            const focusOmnibox = () => {
+            // A blank tab raises the palette rather than parking the user on a
+            // page. showTab() gave OS focus to the tab's view, so this has to
+            // run after it — and again once the (near-empty) page has loaded,
+            // since its own load can re-grab focus.
+            const promptFor = () => {
                 if (this.activeTabIndex !== tabIndex || this.mainWindow.isDestroyed())
                     return;
-                try {
-                    this.mainWindow.webContents.focus();
-                    this.mainWindow.webContents.send('focus-address-bar');
-                } catch (e) { log.debug('tabs', 'focusOmnibox', e); }
+                this.promptForBlankTab();
             };
-            setImmediate(focusOmnibox);
-            setTimeout(focusOmnibox, 200);
-            tab.webContents.once('did-finish-load', () => setTimeout(focusOmnibox, 0));
+            setImmediate(promptFor);
+            tab.webContents.once('did-finish-load', () => setTimeout(promptFor, 0));
         }
         else {
             const activeTab = this.tabMap.get(previousActiveTabIndex);
@@ -844,22 +840,22 @@ class Tabs {
     // Browser/styles.css). The page floats in a rounded card on a tinted shell
     // instead of filling the window edge-to-edge.
     static SHELL_PAD = 8;
-    static PAGE_RADIUS = 12;
+    static PAGE_RADIUS = 10;
     // Width of the left tab sidebar (tabBarSide: 'side').
-    static SIDEBAR_W = 224;
+    static SIDEBAR_W = 240;
     static SIDEBAR_MAX = 460; // resize clamp (min 180)
     // Shell inset above the tab strip (matches body padding-top in
     // Browser/styles.css) so the space above the tabs matches the space below.
     static SHELL_TOP = 6;
-    // Chrome bar heights. These MUST match #utility-bar / #tab-bar in
-    // renderer/Browser/styles.css: the page view is positioned underneath them
-    // from here, and there is no build step sharing values between the two, so
-    // changing one side alone silently misaligns the page.
+    // Chrome geometry. These MUST match the --bar-h / --tabstrip-h / --card-radius
+    // tokens in renderer/styles/themes.css: the page view is positioned
+    // underneath the chrome from here, and there is no build step sharing values
+    // between the two, so changing one side alone silently misaligns the page.
     // Split-view geometry lives in features/tabs/split.js with its methods.
     static MAX_RESTORED_HISTORY = 25; // back/forward entries kept per tab in the session file
     // Glance geometry lives in features/tabs/glance.js with its methods.
-    static UTILITY_BAR_H = 40;
-    static TAB_BAR_H = 38;
+    static UTILITY_BAR_H = 44;
+    static TAB_BAR_H = 40;
     static BAR_GAP = 2; // hairline between the chrome and the page card
 
     // 0 while a video (or the OS) is truly fullscreen — the page must be
@@ -1567,6 +1563,31 @@ class Tabs {
     // features/tabs/{split,glance,organize}.js and are mixed into this
     // prototype at the bottom of the file — this class was 3k lines and the
     // three of them are self-contained.
+    /**
+     * Raise the palette over a blank tab.
+     *
+     * "New tab" used to mean "load the new-tab page", so every new tab took the
+     * user somewhere before they had said where they wanted to go — and offered
+     * a second search field competing with the address bar. Now the tab holds
+     * the space and the palette asks the question. Guarded against re-opening
+     * on the same tab within a beat, so dismissing it does not immediately
+     * summon it again when focus returns.
+     */
+    promptForBlankTab() {
+        const index = this.activeTabIndex;
+        if ((this.tabUrls.get(index) || '') !== 'newtab')
+            return;
+        const now = Date.now();
+        if (this._lastPrompt && this._lastPrompt.index === index && now - this._lastPrompt.at < 600)
+            return;
+        this._lastPrompt = { index, at: now };
+        try {
+            const wd = this.getWindowData();
+            if (wd)
+                require('../ipc/palette').openFor(wd);
+        }
+        catch (e) { log.debug('tabs', 'promptForBlankTab', e); }
+    }
     showTab(index) {
         // A glance is transient — dismiss it on any tab switch.
         this.closeGlance();
@@ -1675,6 +1696,21 @@ class Tabs {
         // Split view: after showing the active half full, lay both halves out.
         if (this.splitPair && this.splitPair.includes(index))
             this._layoutSplit();
+        // Landing on a blank tab — by switching to it, by closing the last real
+        // one, or on a fresh window — asks where to go instead of showing a page.
+        // Landing on a real page dismisses the question.
+        const blank = (this.tabUrls.get(index) || '') === 'newtab';
+        if (blank && !this.privateTabs.has(index)) {
+            setTimeout(() => this.promptForBlankTab(), 60);
+        }
+        else {
+            try {
+                const wd = this.getWindowData();
+                if (wd?.paletteOpen)
+                    require('../ipc/palette').hidePalette(wd);
+            }
+            catch (e) { log.debug('tabs', 'hide palette on switch', e); }
+        }
     }
     loadUrl(index, url) {
         // northstar:// internal pages: typing one navigates the current tab to
@@ -1700,6 +1736,17 @@ class Tabs {
             }
             tab.webContents.loadURL(url);
             this.tabUrls.set(index, url);
+            // This tab now has somewhere to be, so the palette's question is
+            // answered — whether it was answered IN the palette or elsewhere
+            // (a link opened in a new tab, a bookmark, a restored session).
+            if (index === this.activeTabIndex) {
+                try {
+                    const wd = this.getWindowData();
+                    if (wd?.paletteOpen)
+                        require('../ipc/palette').hidePalette(wd);
+                }
+                catch (e) { log.debug('tabs', 'hide palette on load', e); }
+            }
             // Set a temporary title before the page actually loads
             let tempTitle = url;
             try {
@@ -1956,6 +2003,17 @@ class Tabs {
         if (url && url !== 'newtab') {
             tab.webContents.loadURL(url);
             this.tabUrls.set(index, url);
+            // This tab now has somewhere to be, so the palette's question is
+            // answered — whether it was answered IN the palette or elsewhere
+            // (a link opened in a new tab, a bookmark, a restored session).
+            if (index === this.activeTabIndex) {
+                try {
+                    const wd = this.getWindowData();
+                    if (wd?.paletteOpen)
+                        require('../ipc/palette').hidePalette(wd);
+                }
+                catch (e) { log.debug('tabs', 'hide palette on load', e); }
+            }
         }
         else {
             const isPriv = this.privateTabs.has(index);

@@ -16,7 +16,7 @@ body {
 #list {
   display: flex;
   flex-direction: column;
-  padding: 5px;
+  padding: var(--sp-2);
   /* Fill the body's content box (body already insets 4px top/bottom). The view
      is sized to fit exactly (count*ITEM_HEIGHT + chrome in ipc/suggestions.js);
      subtracting extra here clipped the last row's bottom padding, worst with a
@@ -24,29 +24,43 @@ body {
   max-height: 100%;
   overflow-y: auto;
   background: var(--surface);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius);
+  /* Same card as every other floating surface (styles/surface.css): ring, not
+     border, and the shared shadow — this used to be a flat bordered box while
+     the palette next to it had a 24px shadow. */
+  border-radius: var(--r-lg);
+  box-shadow: var(--ring-2), var(--shadow-3);
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
 }
 #list::-webkit-scrollbar { width: 8px; }
 #list::-webkit-scrollbar-track { background: transparent; }
-#list::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: var(--radius); }
+#list::-webkit-scrollbar-thumb {
+  background: transparent; border-radius: var(--r-pill);
+  border: 2px solid transparent; background-clip: padding-box;
+}
+#list:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 16%, transparent); background-clip: padding-box; }
 
 .item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 0 12px; margin: 1px 0;
-  border-radius: var(--radius);
-  min-height: 40px;
-  font-size: 13.5px; color: var(--text-2);
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: 0 var(--sp-3); margin: 1px 0;
+  border-radius: var(--r-md);
+  /* 40px rows made a 6-row dropdown taller than most of the page behind it. */
+  min-height: 34px;
+  font-size: var(--fs-body); color: var(--text-2);
+  letter-spacing: var(--tracking);
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background var(--dur-1) var(--ease);
   overflow: hidden;
 }
-.item:hover, .item.active { background: var(--active-bg); }
+.item:hover { background: var(--hover); }
+/* The active row is the one Enter takes: accent-tinted, like the palette's. */
+.item.active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent);
+}
 
 .item img.fav {
-  width: 17px; height: 17px; border-radius: var(--radius); flex-shrink: 0;
+  width: var(--icon); height: var(--icon); border-radius: var(--r-xs); flex-shrink: 0;
 }
 
 /* Main label — one line, truncates */
@@ -61,11 +75,11 @@ body {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   color: var(--text);
 }
-.sep { color: var(--text-3); flex-shrink: 0; margin: 0 6px; }
+.sep { color: var(--text-3); flex-shrink: 0; margin: 0 var(--sp-3); }
 .secondary {
   min-width: 0; flex-shrink: 2;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: var(--text-3); font-size: 13px;
+  color: var(--text-3); font-size: var(--fs-small);
 }
 .item:hover .secondary, .item.active .secondary { color: var(--text-2); }
 
@@ -78,11 +92,7 @@ body {
 .item.active .secondary .strong { color: var(--text); }
 
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 10px; }
-::-webkit-scrollbar-track { background: var(--surface); border-left: 1px solid var(--border); }
-::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: var(--radius); border: 2px solid var(--surface); }
-::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+/* Scrollbars are on #list above; the page itself never scrolls. */
 
 /* Chrome UI text is interface, not copy — never selectable. Inputs stay editable. */
 body { user-select: none; -webkit-user-select: none; }
