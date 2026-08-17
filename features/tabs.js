@@ -1665,10 +1665,6 @@ class Tabs {
             bar.setBackgroundColor('#00000000');
             this.mainWindow.contentView.addChildView(bar);
             this.glanceBar = bar;
-            bar.webContents.once('did-finish-load', () => {
-                try { bar.webContents.send('glance:info', { url }); }
-                catch { }
-            });
             bar.webContents.loadFile(resolveAppFile('renderer/GlanceBar/index.html'));
         }
         catch { }

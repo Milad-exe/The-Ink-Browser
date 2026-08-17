@@ -471,6 +471,12 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     ipcMain.handle('folders:delete', (_e, id) => { wm.getWindowByWebContents(_e.sender)?.tabs?.deleteFolder(id); });
     ipcMain.handle('folders:toggle', (_e, id, collapsed) => { wm.getWindowByWebContents(_e.sender)?.tabs?.toggleFolder(id, collapsed); });
     ipcMain.handle('folders:icon', (_e, id, icon) => { wm.getWindowByWebContents(_e.sender)?.tabs?.setFolderIcon(id, icon); });
+    ipcMain.handle('tab:split', (_e, index) => {
+        wm.getWindowByWebContents(_e.sender)?.tabs?.splitWithActive(Number(index));
+    });
+    ipcMain.handle('tab:closeSplit', (_e) => {
+        wm.getWindowByWebContents(_e.sender)?.tabs?.closeSplit();
+    });
     ipcMain.handle('tab:reopenClosed', (_e) => { wm.getWindowByWebContents(_e.sender)?.tabs?.reopenClosedTab(); });
     ipcMain.handle('sidebar:toggleCompact', (_e) => { wm.getWindowByWebContents(_e.sender)?.tabs?.toggleCompact(); });
     ipcMain.handle('folders:assign', (_e, index, folderId) => { wm.getWindowByWebContents(_e.sender)?.tabs?.setTabFolder(index, folderId); });

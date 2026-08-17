@@ -12,20 +12,23 @@ html, body {
 #surface {
   position: fixed; inset: 0;
   display: flex; justify-content: center; align-items: flex-start;
-  padding-top: 18vh;
+  /* Sat at 18vh, which read as a floating box unrelated to the browser. The
+     address bar is the thing this replaces, so it opens just below it. */
+  padding-top: 76px;
   background: color-mix(in srgb, #05070d 46%, transparent);
 }
 #card {
-  width: min(680px, 74vw);
+  width: min(560px, 68vw);
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 16px; box-shadow: 0 28px 70px rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius-lg); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
-#field { display: flex; align-items: center; gap: 11px; padding: 0 16px; height: 54px; }
+/* 54px was far taller than the 30px address bar it stands in for. */
+#field { display: flex; align-items: center; gap: 9px; padding: 0 13px; height: 42px; }
 #glyph { color: var(--accent); flex-shrink: 0; }
 #q {
   flex: 1; min-width: 0; height: 100%; border: none; background: transparent;
-  color: var(--text); font-family: var(--font); font-size: 15.5px; outline: none;
+  color: var(--text); font-family: var(--font); font-size: 13.5px; outline: none;
   user-select: text; -webkit-user-select: text;
 }
 #q::placeholder { color: var(--text-3); }
@@ -37,6 +40,10 @@ html, body {
   cursor: pointer; text-align: left;
 }
 .row:hover, .row.sel { background: var(--hover); }
+.row .fav {
+  width: 16px; height: 16px; flex-shrink: 0;
+  border-radius: 3px; object-fit: contain;
+}
 .row .ico { width: 16px; height: 16px; flex-shrink: 0; border-radius: 4px; }
 .row .fallback {
   width: 16px; height: 16px; flex-shrink: 0; border-radius: 4px;

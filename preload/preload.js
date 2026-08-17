@@ -310,6 +310,9 @@ exposeInternal('northstarPrivate', {
 exposeInternal('tabsUI', {
     onPinTab: (handler) => ipcRenderer.on('pin-tab', (_e, { index }) => handler(index)),
     onSplitChanged: (handler) => ipcRenderer.on('split-changed', (_e, pair) => handler(pair)),
+    // Split view is driven from the sidebar tab menu, which the renderer builds.
+    split: (index) => ipcRenderer.invoke('tab:split', index),
+    closeSplit: () => ipcRenderer.invoke('tab:closeSplit'),
     reopenClosed: () => ipcRenderer.invoke('tab:reopenClosed'),
     toggleCompact: () => ipcRenderer.invoke('sidebar:toggleCompact'),
     onTabBarSide: (handler) => ipcRenderer.on('tabbar-side-changed', (_e, v) => handler(v)),

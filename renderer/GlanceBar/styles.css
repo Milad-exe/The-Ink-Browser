@@ -1,33 +1,41 @@
 @layer components {
-    /* Cap above the glance card. Written as real CSS rather than utilities
-       because renderer/styles/ui.css is a compiled Tailwind subset with no
-       build step here — a class not already used elsewhere does not exist. */
+    /* Two floating controls above the glance card rather than a titled header —
+       the card already shows the site, so a label was redundant chrome.
+
+       Written as real CSS because renderer/styles/ui.css is a compiled Tailwind
+       subset with no build step here: a class not already used elsewhere does
+       not exist and silently does nothing. */
     #bar {
-        border-radius: var(--radius);
-        border: 1px solid var(--border-2);
-        background: var(--surface);
-        padding-left: 12px;
-        padding-right: 10px;
-        box-shadow: 0 6px 18px rgba(8, 10, 20, 0.28);
+        background: transparent;
+        /* justify-content and gap live here, not as utilities: ui.css is a
+           compiled Tailwind subset, and justify-end / gap-1 were never used
+           elsewhere so they do not exist — the buttons silently sat left. */
+        justify-content: flex-end;
+        gap: 4px;
+        padding-right: 2px;
     }
 
-    #host { min-width: 0; }
-
-    #open-tab {
-        padding: 3px 8px;
-        border-radius: var(--radius);
-        flex-shrink: 0;
-    }
-    #open-tab:hover { background: var(--hover); }
-
-    #close-btn {
+    #bar button {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 20px;
-        height: 20px;
+        width: 24px;
+        height: 24px;
         flex-shrink: 0;
+        padding: 0;
+        border: 1px solid var(--border-2);
         border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text-2);
+        cursor: pointer;
+        transition: background 0.12s, color 0.12s;
+        box-shadow: 0 2px 8px rgba(8, 10, 20, 0.28);
     }
-    #close-btn:hover { background: var(--hover); }
+
+    #bar button:hover {
+        background: var(--hover);
+        color: var(--text);
+    }
+
+    #bar button svg { pointer-events: none; }
 }

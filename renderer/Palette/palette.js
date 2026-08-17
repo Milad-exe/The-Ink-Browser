@@ -29,11 +29,27 @@
             const b = document.createElement('button');
             b.className = 'row' + (i === sel ? ' sel' : '');
             b.setAttribute('role', 'option');
+            // Favicon, matching the address bar's suggestion rows. The letter
+            // block stays as the placeholder until the cached icon resolves,
+            // and remains for sites that have none.
             const fb = document.createElement('span');
             fb.className = 'fallback';
-            try { fb.textContent = new URL(r.url).hostname.replace(/^www\./, '').charAt(0).toUpperCase(); }
-            catch { fb.textContent = '·'; }
+            let host = '';
+            try { host = new URL(r.url).hostname.replace(/^www\./, ''); }
+            catch { }
+            fb.textContent = host ? host.charAt(0).toUpperCase() : '\u00b7';
             b.appendChild(fb);
+            if (host && window.browserHistory.cachedFavicon) {
+                window.browserHistory.cachedFavicon(host).then((data) => {
+                    if (!data)
+                        return;
+                    const img = document.createElement('img');
+                    img.className = 'fav';
+                    img.alt = '';
+                    img.src = data;
+                    fb.replaceWith(img);
+                }).catch(() => { });
+            }
             const t = document.createElement('span');
             t.className = 't';
             t.textContent = r.title || r.url;

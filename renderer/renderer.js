@@ -298,6 +298,8 @@
                 // Only autocomplete on insertions — autofilling right after the user
                 // deletes text would "bring back" the URL they just erased.
                 lastInputWasInsert = !!(e.inputType && e.inputType.startsWith('insert'));
+                if (lastInputWasInsert)
+                    applyInlineAutofill(searchBar.value);
                 updateSuggestions();
             });
             searchBar.addEventListener('focus', () => {
@@ -388,6 +390,47 @@
         let overlayPointerDown = false;
         let userTyping = false;
         let lastInputWasInsert = false;
+        // Hosts seen in history, kept here so inline completion can be applied on
+        // the keystroke itself. It used to run inside the debounced, awaited
+        // suggestion fetch, so the address bar rewrote itself a beat AFTER you
+        // stopped typing — a delayed, unasked-for edit of your own text, which
+        // is what made it feel wrong. Firefox and Chrome complete synchronously.
+        let hostCache = [];
+        const rememberHosts = (items) => {
+            for (const it of items || []) {
+                try {
+                    const h = new URL(it.url).hostname.toLowerCase();
+                    if (h && !hostCache.includes(h))
+                        hostCache.push(h);
+                }
+                catch { }
+            }
+            if (hostCache.length > 400)
+                hostCache = hostCache.slice(-400);
+        };
+        /** Append the completion for `typed` and select it, Firefox-style. */
+        const applyInlineAutofill = (typed) => {
+            if (!typed || typed.includes(' ') || /^[a-z]+:/i.test(typed))
+                return;
+            if (document.activeElement !== searchBar)
+                return;
+            if (searchBar.selectionStart !== typed.length || searchBar.selectionEnd !== typed.length)
+                return;
+            const ql = typed.toLowerCase();
+            let best = null;
+            for (const h of hostCache) {
+                const bare = h.replace(/^www\./, '');
+                const cand = bare.startsWith(ql) ? bare : (h.startsWith(ql) ? h : null);
+                if (!cand || cand.length <= typed.length)
+                    continue;
+                if (!best || cand.length < best.length)
+                    best = cand;
+            }
+            if (!best)
+                return;
+            searchBar.value = typed + best.slice(typed.length);
+            searchBar.setSelectionRange(typed.length, searchBar.value.length);
+        };
         let currentQuery = ''; // the user's typed text, for match highlighting
         let barEdited = false; // uncommitted typed text in the bar (survives blur)
         function getSuggestionsBounds() {
@@ -779,6 +822,7 @@
                     consider(b, -0.1);
                 for (const h of hist)
                     consider(h, 0);
+                rememberHosts(hist);
                 for (const t of openTabs)
                     consider(t, -0.2);
                 // Sort by relevance tier, then by cleanliness (short, titled URLs first).
@@ -797,7 +841,10 @@
                 // first row match what's now in the address bar so Enter is obvious.
                 const topDomain = rankedLinks.find(x => linkScore(x, ql) === 0);
                 const completed = topDomain ? computeAutofill(q, topDomain.url) : null;
-                if (completed) {
+                // Only a fallback now: if the synchronous pass already completed,
+                // there is a live selection and the bar must not be rewritten
+                // again underneath the user.
+                if (completed && searchBar.selectionStart === searchBar.selectionEnd) {
                     searchBar.value = q + completed.slice(q.length);
                     searchBar.setSelectionRange(q.length, searchBar.value.length);
                 }
@@ -2878,6 +2925,10 @@
                             window.tab.reorder([...tabsContainer.querySelectorAll('.tab-button')].map(el => +el.dataset.index));
                         }],
                     ]],
+                    ...(splitPair && splitPair.includes(idx)
+                        ? [['Close Split View', () => window.tabsUI.closeSplit()]]
+                        : (idx !== activeTabIndex ? [['Split View With Active Tab', () => window.tabsUI.split(idx)]] : [])),
+                    ['sep'],
                     ['Close Duplicate Tabs', async () => {
                         const all = [...document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden)')];
                         const seen = new Set();

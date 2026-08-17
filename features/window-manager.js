@@ -188,6 +188,12 @@ class WindowManager {
             // plus half the bar height, less half a 12px light. Derived rather
             // than hardcoded so it follows the bar height.
             trafficLightPosition: { x: 14, y: Tabs.SHELL_TOP + Math.round(Tabs.UTILITY_BAR_H / 2) - 6 },
+            // macOS otherwise swallows the first click on a window that is not
+            // key: it activates the window and the control never sees it. That
+            // is the "I had to click twice" feeling when coming back from
+            // another app, or after focus has moved into a page view. Browsers
+            // deliver that first click, so this does too.
+            acceptFirstMouse: true,
             // macOS frosted-glass: the window material shows through the
             // translucent chrome (renderer paints the chrome with alpha).
             ...(process.platform === 'darwin'

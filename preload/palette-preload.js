@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('browserHistory', {
     // history-search returns nothing for an empty query, so the palette needs
     // the raw list to show anything before you type.
     recent: () => ipcRenderer.invoke('history-get'),
+    // Local cache only — never a network fetch, so typing cannot ping every
+    // domain you have ever visited.
+    cachedFavicon: (host) => ipcRenderer.invoke('favicon-cached', host),
 });
 contextBridge.exposeInMainWorld('browserBookmarks', {
     getAll: () => ipcRenderer.invoke('bookmarks-get'),

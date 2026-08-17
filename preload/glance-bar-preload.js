@@ -20,5 +20,4 @@ ipcRenderer.on('theme-changed', (_e, theme) => {
 contextBridge.exposeInMainWorld('glanceBar', {
     close: () => ipcRenderer.send('glance:bar-close'),
     promote: () => ipcRenderer.send('glance:bar-promote'),
-    onInfo: (cb) => ipcRenderer.on('glance:info', (_e, info) => cb(info)),
 });
