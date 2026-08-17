@@ -39,6 +39,7 @@
  * NOTHING — the site may re-ask, exactly like dismissing Firefox's doorhanger.
  * Only the explicit Block button records a (temp or remembered) deny.
  */
+const log = require('./log');
 const { systemPreferences, webContents, desktopCapturer } = require('electron');
 const sitePermissions = require('./site-permissions');
 const permissionUI = require('./permission-ui');
@@ -63,7 +64,7 @@ async function ensureOsMediaAccess(names) {
                 await systemPreferences.askForMediaAccess(type);
             }
         }
-        catch { }
+        catch (e) { log.debug('permission-prompt', 'for', e); }
     }
 }
 // TIER 1 — allowed without asking. Strictly low-risk: no camera/mic/location,
@@ -274,7 +275,7 @@ function attach(sess, { persist = true } = {}) {
                             try {
                                 wc?.emit('media-capture-started', names);
                             }
-                            catch { }
+                            catch (e) { log.debug('permission-prompt', 'grant', e); }
                         }
                     }
                     callback(allowed);
@@ -324,7 +325,7 @@ function attach(sess, { persist = true } = {}) {
             try {
                 callback(false);
             }
-            catch { }
+            catch (e) { log.debug('permission-prompt', 'grant', e); }
         }
     });
     // Synchronous status checks (navigator.permissions.query, Notification
@@ -362,7 +363,7 @@ function attach(sess, { persist = true } = {}) {
         const respond = (streams) => { try {
             callback(streams);
         }
-        catch { } };
+        catch (e) { log.debug('permission-prompt', 'respond', e); } };
         try {
             const wc = req.frame ? webContents.fromFrame(req.frame) : null;
             const origin = originOf(req.securityOrigin || (req.frame && req.frame.url) || '');

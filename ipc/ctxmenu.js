@@ -10,6 +10,7 @@
  * Handlers can't cross IPC, so the chrome sends row *labels* and gets back the
  * path of indices that was picked; it owns the actual callbacks.
  */
+const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
@@ -47,9 +48,9 @@ function hideMenu(wd) {
         // The overlay took keyboard focus when it opened; hand it back or the
         // window is left with nothing focused and the next accelerator beeps.
         try { wd.window.webContents.focus(); }
-        catch { }
+        catch (e) { log.debug('ctxmenu', 'hideMenu', e); }
     }
-    catch { }
+    catch (e) { log.debug('ctxmenu', 'hideMenu', e); }
 }
 
 function register(ipcMain, { wm }) {
@@ -69,12 +70,12 @@ function register(ipcMain, { wm }) {
                 wd.window.contentView.removeChildView(view);
                 wd.window.contentView.addChildView(view);
             }
-            catch { }
+            catch (e) { log.debug('ctxmenu', 'ctxmenu:open', e); }
             view.setVisible(true);
             wd.ctxMenuOpen = true;
             view.webContents.send('ctxmenu:data', data);
             try { view.webContents.focus(); }
-            catch { }
+            catch (e) { log.debug('ctxmenu', 'ctxmenu:open', e); }
             return true;
         }
         catch (err) {
@@ -88,7 +89,7 @@ function register(ipcMain, { wm }) {
             return;
         hideMenu(wd);
         try { wd.window.webContents.send('ctxmenu:picked', result); }
-        catch { }
+        catch (e) { log.debug('ctxmenu', 'ctxmenu:pick', e); }
     });
     ipcMain.on('ctxmenu:dismiss', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
@@ -96,7 +97,7 @@ function register(ipcMain, { wm }) {
             return;
         hideMenu(wd);
         try { wd.window.webContents.send('ctxmenu:picked', null); }
-        catch { }
+        catch (e) { log.debug('ctxmenu', 'ctxmenu:dismiss', e); }
     });
 }
 

@@ -8,13 +8,13 @@
         try {
             settings = await window.northstarSettings.get();
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('settings', 'settings: ' + e); }
         // ── Sidebar navigation (hash-driven: northstar://settings/<section>) ────
         // The section lives in location.hash so the omnibox can show it as a
         // northstar://settings/<section> url and typing one lands on that section.
         const navItems = document.querySelectorAll('.nav-item');
         const sections = document.querySelectorAll('.section');
-        const VALID = ['general', 'appearance', 'focus', 'privacy', 'passwords', 'extensions', 'about'];
+        const VALID = ['general', 'appearance', 'focus', 'privacy', 'passwords', 'extensions', 'data', 'about'];
         function activateSection(section) {
             if (!VALID.includes(section))
                 section = 'general';
@@ -63,7 +63,7 @@
             try {
                 await window.northstarSettings.set(key, value);
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('settings', 'save: ' + e); }
         }
         // ── General: On startup ────────────────────────────────────────────────
         const startupRadios = document.querySelectorAll('input[name="startup"]');
@@ -75,13 +75,107 @@
                 await save('persistAllTabs', r.value === 'restore');
             });
         });
-        // ── General: Search engine ─────────────────────────────────────────────
+        // ── General: Search engines (built-ins + the user's own) ──────────────
         const searchEngineSelect = document.getElementById('search-engine');
-        searchEngineSelect.value = settings.searchEngine || 'google';
+        const engineList = document.getElementById('engine-list');
+        const engineName = document.getElementById('engine-name');
+        const engineKeyword = document.getElementById('engine-keyword');
+        const engineUrl = document.getElementById('engine-url');
+        const engineSave = document.getElementById('engine-save');
+        async function renderEngines() {
+            const engines = await window.northstarEngines.list();
+            const current = settings.searchEngine || 'google';
+            searchEngineSelect.textContent = '';
+            for (const e of engines) {
+                const opt = document.createElement('option');
+                opt.value = e.id;
+                opt.textContent = e.name;
+                searchEngineSelect.appendChild(opt);
+            }
+            searchEngineSelect.value = engines.some(e => e.id === current) ? current : 'google';
+            engineList.textContent = '';
+            for (const e of engines) {
+                const row = document.createElement('div');
+                row.className = 'engine-row';
+                const name = document.createElement('span');
+                name.className = 'name';
+                name.textContent = e.name;
+                row.appendChild(name);
+                if (e.keyword) {
+                    const kw = document.createElement('span');
+                    kw.className = 'kw';
+                    kw.textContent = e.keyword;
+                    row.appendChild(kw);
+                }
+                const host = document.createElement('span');
+                host.className = 'host';
+                try { host.textContent = new URL(e.url.replace('%s', 'q')).hostname; }
+                catch { host.textContent = ''; }
+                row.appendChild(host);
+                const del = document.createElement('button');
+                del.className = 'del';
+                del.textContent = '×';
+                del.title = e.builtIn ? 'Built-in engines cannot be removed' : `Remove ${e.name}`;
+                del.disabled = !!e.builtIn;
+                del.addEventListener('click', async () => {
+                    await window.northstarEngines.remove(e.id);
+                    if (searchEngineSelect.value === e.id)
+                        await save('searchEngine', 'google');
+                    showToast(`Removed ${e.name}`);
+                    renderEngines();
+                });
+                row.appendChild(del);
+                engineList.appendChild(row);
+            }
+        }
         searchEngineSelect.addEventListener('change', async () => {
+            settings.searchEngine = searchEngineSelect.value;
             await save('searchEngine', searchEngineSelect.value);
             showToast('Search engine updated');
         });
+        engineSave?.addEventListener('click', async () => {
+            const res = await window.northstarEngines.save({
+                name: engineName.value.trim(),
+                keyword: engineKeyword.value.trim(),
+                url: engineUrl.value.trim(),
+            });
+            if (!res?.ok) {
+                showToast(res?.error || 'Could not add that engine');
+                return;
+            }
+            engineName.value = engineKeyword.value = engineUrl.value = '';
+            showToast('Search engine added');
+            renderEngines();
+        });
+        renderEngines();
+        // ── General: Default browser ──────────────────────────────────────────
+        const defaultState = document.getElementById('default-browser-state');
+        const makeDefaultBtn = document.getElementById('make-default');
+        async function refreshDefaultBrowser() {
+            try {
+                const st = await window.userData.defaultBrowserStatus();
+                if (st.isDefault) {
+                    defaultState.textContent = 'Northstar is your default browser.';
+                    makeDefaultBtn.classList.add('hidden');
+                }
+                else {
+                    defaultState.textContent = 'Links from other apps open in a different browser.';
+                    makeDefaultBtn.classList.remove('hidden');
+                }
+            }
+            catch {
+                defaultState.textContent = 'Could not read the current default.';
+            }
+        }
+        makeDefaultBtn?.addEventListener('click', async () => {
+            const res = await window.userData.makeDefaultBrowser();
+            if (res?.openedSettings)
+                showToast('Choose Northstar in the Default Apps pane');
+            else
+                showToast(res?.isDefault ? 'Northstar is now the default browser' : 'The system did not accept the change');
+            refreshDefaultBrowser();
+        });
+        refreshDefaultBrowser();
         // ── General: Performance (tab sleeping) ────────────────────────────────
         const tabSleepToggle = document.getElementById('tabsleep-toggle');
         const tabSleepMins = document.getElementById('tabsleep-mins');
@@ -108,6 +202,36 @@
                 await save('miniPlayerEnabled', miniPlayerToggle.checked);
                 showToast(miniPlayerToggle.checked ? 'Mini player enabled' : 'Mini player disabled');
             });
+        }
+        // ── Appearance: Language ───────────────────────────────────────────────
+        const languageSelect = document.getElementById('language-select');
+        const languageNote = document.getElementById('language-note');
+        if (languageSelect) {
+            (async () => {
+                const locales = await window.northstarI18n.locales();
+                const opts = [{ id: 'system', name: 'Match system language', coverage: 'full' }, ...locales];
+                for (const loc of opts) {
+                    const opt = document.createElement('option');
+                    opt.value = loc.id;
+                    // Say how complete a translation is rather than letting
+                    // someone switch into a half-translated interface blind.
+                    opt.textContent = loc.coverage === 'partial' ? `${loc.name} (partial)` : loc.name;
+                    languageSelect.appendChild(opt);
+                }
+                languageSelect.value = settings.language || 'system';
+                const describe = () => {
+                    const chosen = opts.find(o => o.id === languageSelect.value);
+                    languageNote.textContent = chosen && chosen.coverage === 'partial'
+                        ? 'Parts of the interface that have not been translated yet stay in English.'
+                        : '';
+                };
+                describe();
+                languageSelect.addEventListener('change', async () => {
+                    await window.northstarI18n.set(languageSelect.value);
+                    describe();
+                    showToast('Language updated');
+                });
+            })();
         }
         // ── Appearance: Theme ──────────────────────────────────────────────────
         const themeSelect = document.getElementById('theme-select');
@@ -144,7 +268,7 @@
             try {
                 window.northstarSettings.toggleBookmarkBar();
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('settings', 'refreshDefaultBrowser: ' + e); }
         });
         // ── Focus: Distraction blocking ───────────────────────────────────────
         const shortformToggle = document.getElementById('shortform-toggle');
@@ -201,7 +325,7 @@
                     privacyCount.textContent = s.blocked.toLocaleString();
                 }
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('settings', 'refreshPrivacyStats: ' + e); }
         }
         refreshPrivacyStats();
         setInterval(refreshPrivacyStats, 2000);
@@ -237,7 +361,7 @@
             try {
                 items = await window.northstarPasswords.list();
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('settings', 'refreshPasswords: ' + e); }
             pwList.innerHTML = '';
             if (pwEmpty)
                 pwEmpty.style.display = items.length ? 'none' : 'block';
@@ -250,7 +374,7 @@
                 try {
                     host = new URL(entry.origin).host;
                 }
-                catch { }
+                catch (e) { window.inkLog?.debug('settings', 'refreshPasswords: ' + e); }
                 const site = document.createElement('div');
                 site.className = 'pw-site';
                 site.textContent = host;
@@ -316,7 +440,7 @@
             try {
                 items = await window.northstarExtensions.list();
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('settings', 'refreshExtensions: ' + e); }
             extList.innerHTML = '';
             extEmpty.style.display = items.length ? 'none' : 'block';
             if (extCount)
@@ -442,9 +566,166 @@
             installIdBtn.click(); });
         window.northstarExtensions?.onChanged(() => refreshExtensions());
         refreshExtensions();
-        // ── About: version ────────────────────────────────────────────────────
+        // ── Data: import / export ─────────────────────────────────────────────
+        const report = (res, verb, noun) => {
+            if (!res || res.canceled)
+                return;
+            if (!res.ok) {
+                showToast(res.error || `Could not ${verb} ${noun}`);
+                return;
+            }
+            const n = res.added ?? res.count ?? 0;
+            showToast(`${verb === 'import' ? 'Imported' : 'Exported'} ${n} ${noun}${n === 1 ? '' : 's'}`);
+            if (res.path)
+                window.userData.reveal(res.path);
+        };
+        document.getElementById('import-bookmarks')?.addEventListener('click', async () => {
+            report(await window.userData.importBookmarks(), 'import', 'bookmark');
+        });
+        document.getElementById('export-bookmarks')?.addEventListener('click', async () => {
+            report(await window.userData.exportBookmarks(), 'export', 'bookmark');
+        });
+        document.getElementById('import-passwords')?.addEventListener('click', async () => {
+            report(await window.userData.importPasswords(), 'import', 'password');
+        });
+        document.getElementById('export-passwords')?.addEventListener('click', async () => {
+            report(await window.userData.exportPasswords(), 'export', 'password');
+        });
+        document.getElementById('export-history')?.addEventListener('click', async () => {
+            report(await window.userData.exportHistory(), 'export', 'history entry');
+        });
+        // How the saved-password key is protected — stated, not assumed.
+        (async () => {
+            const el = document.getElementById('key-protection');
+            if (!el)
+                return;
+            try {
+                const mode = await window.userData.keyProtection();
+                if (mode === 'os-keychain') {
+                    el.textContent = 'Saved passwords are encrypted with a key held in your system keychain.';
+                    el.classList.remove('risk');
+                }
+                else if (mode === 'file') {
+                    el.textContent = 'Your system keychain is unavailable, so the encryption key is protected by file permissions only. Anyone with access to your user account could read saved passwords.';
+                    el.classList.add('risk');
+                }
+                else {
+                    el.textContent = 'The encryption key could not be read.';
+                    el.classList.add('risk');
+                }
+            }
+            catch {
+                el.textContent = '';
+            }
+        })();
+        // History retention
+        const historyDays = document.getElementById('history-days');
+        if (historyDays) {
+            historyDays.value = String(settings.historyDays ?? 90);
+            historyDays.addEventListener('change', async () => {
+                await save('historyDays', parseInt(historyDays.value, 10) || 0);
+                showToast('History retention updated');
+            });
+        }
+        // Session restore fidelity
+        const restoreHistoryToggle = document.getElementById('restore-tab-history');
+        if (restoreHistoryToggle) {
+            restoreHistoryToggle.checked = settings.restoreTabHistory !== false;
+            restoreHistoryToggle.addEventListener('change', () => save('restoreTabHistory', restoreHistoryToggle.checked));
+        }
+        const restoreWindowsToggle = document.getElementById('restore-all-windows');
+        if (restoreWindowsToggle) {
+            restoreWindowsToggle.checked = settings.restoreAllWindows !== false;
+            restoreWindowsToggle.addEventListener('change', () => save('restoreAllWindows', restoreWindowsToggle.checked));
+        }
+        // Per-site zoom
+        const zoomList = document.getElementById('zoom-list');
+        async function renderZoom() {
+            if (!zoomList)
+                return;
+            const rows = await window.northstarZoom.list();
+            zoomList.textContent = '';
+            if (!rows.length) {
+                const empty = document.createElement('div');
+                empty.className = 'empty-note';
+                empty.textContent = 'No sites zoomed yet.';
+                zoomList.appendChild(empty);
+                return;
+            }
+            for (const r of rows) {
+                const row = document.createElement('div');
+                row.className = 'zoom-row';
+                const origin = document.createElement('span');
+                origin.className = 'origin';
+                origin.textContent = r.origin;
+                const pct = document.createElement('span');
+                pct.className = 'pct';
+                pct.textContent = r.percent + '%';
+                const del = document.createElement('button');
+                del.className = 'del';
+                del.textContent = '×';
+                del.title = `Reset zoom for ${r.origin}`;
+                del.addEventListener('click', async () => {
+                    await window.northstarZoom.clear(r.origin);
+                    renderZoom();
+                });
+                row.append(origin, pct, del);
+                zoomList.appendChild(row);
+            }
+        }
+        document.getElementById('clear-zoom')?.addEventListener('click', async () => {
+            await window.northstarZoom.clear(null);
+            showToast('Site zoom reset');
+            renderZoom();
+        });
+        document.getElementById('clear-cert')?.addEventListener('click', async () => {
+            await window.userData.clearCertExceptions();
+            showToast('Certificate exceptions forgotten');
+        });
+        document.getElementById('open-log')?.addEventListener('click', () => window.userData.openLog());
+        renderZoom();
+        // ── About: version + updates ──────────────────────────────────────────
         if (settings._version) {
             document.getElementById('about-version').textContent = 'Version ' + settings._version;
         }
+        (async () => {
+            const grid = document.getElementById('version-grid');
+            if (!grid)
+                return;
+            try {
+                const v = await window.userData.versions();
+                for (const [k, val] of Object.entries(v)) {
+                    const key = document.createElement('span');
+                    key.className = 'k';
+                    key.textContent = k;
+                    const value = document.createElement('span');
+                    value.className = 'v';
+                    value.textContent = val;
+                    grid.append(key, value);
+                }
+            }
+            catch (e) { window.inkLog?.debug('settings', 'renderZoom: ' + e); }
+        })();
+        const updateState = document.getElementById('update-state');
+        const releaseBtn = document.getElementById('open-release');
+        let releaseUrl = '';
+        document.getElementById('check-update')?.addEventListener('click', async () => {
+            updateState.textContent = 'Checking…';
+            const res = await window.userData.checkUpdate(true);
+            releaseUrl = res?.url || '';
+            if (res?.status === 'update-available') {
+                updateState.textContent = `Version ${res.latest} is available — you have ${res.current}.`;
+                releaseBtn.classList.remove('hidden');
+            }
+            else if (res?.status === 'current') {
+                updateState.textContent = `Northstar ${res.current} is up to date.`;
+                releaseBtn.classList.add('hidden');
+            }
+            else {
+                updateState.textContent = res?.error ? `Could not check: ${res.error}` : 'Could not check for updates.';
+                releaseBtn.classList.toggle('hidden', !releaseUrl);
+            }
+        });
+        releaseBtn?.addEventListener('click', () => { if (releaseUrl) window.userData.openRelease(releaseUrl); });
     });
 })();

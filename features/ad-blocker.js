@@ -15,6 +15,7 @@
  *               On first launch the hardcoded fallback covers the gap.
  */
 'use strict';
+const log = require('./log');
 const fs = require('fs');
 const path = require('path');
 const { app, net } = require('electron');
@@ -141,7 +142,7 @@ class AdBlocker {
         try {
             fs.mkdirSync(this._cacheDir, { recursive: true });
         }
-        catch { }
+        catch (e) { log.debug('ad-blocker', 'init', e); }
         const hostsFile = path.join(this._cacheDir, 'hosts.txt');
         const easylistFile = path.join(this._cacheDir, 'easylist.txt');
         const easyprivacyFile = path.join(this._cacheDir, 'easyprivacy.txt');
@@ -162,7 +163,7 @@ class AdBlocker {
             try {
                 this._parseHosts(hostsTxt);
             }
-            catch { }
+            catch (e) { log.debug('ad-blocker', 'breathe', e); }
         }
         await breathe();
         const easylistTxt = await readIf(easylistFile);
@@ -171,7 +172,7 @@ class AdBlocker {
             try {
                 this._parseEasyList(easylistTxt);
             }
-            catch { }
+            catch (e) { log.debug('ad-blocker', 'breathe', e); }
         }
         await breathe();
         const easyprivacyTxt = await readIf(easyprivacyFile);
@@ -180,7 +181,7 @@ class AdBlocker {
             try {
                 this._parseEasyList(easyprivacyTxt);
             }
-            catch { }
+            catch (e) { log.debug('ad-blocker', 'breathe', e); }
         }
         this.initialized = true;
         // Refresh stale or missing lists in the background (non-blocking).
@@ -272,7 +273,7 @@ class AdBlocker {
                     return true;
             }
         }
-        catch { }
+        catch (e) { log.debug('ad-blocker', '_shouldBlock', e); }
         return false;
     }
     _parseHosts(text) {

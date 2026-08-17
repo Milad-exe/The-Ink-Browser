@@ -4,6 +4,7 @@
  * All mutating operations broadcast 'bookmarks-changed' to every open WebContents
  * so every view (bookmark bar, bookmarks page, history) stays in sync.
  */
+const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView, Menu } = require('electron');
@@ -132,7 +133,7 @@ function register(ipcMain, { wm, webContents }) {
                     },
                 });
                 wd.bookmarkPrompt.setBackgroundColor('#00000000');
-                try { wd.bookmarkPrompt.setBorderRadius(12); } catch { }
+                try { wd.bookmarkPrompt.setBorderRadius(12); } catch (e) { log.debug('bookmarks', 'bookmark-prompt-open', e); }
                 wd.window.contentView.addChildView(wd.bookmarkPrompt);
             }
             const x = Math.max(0, Math.floor(bounds.right) - PROMPT_W);

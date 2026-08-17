@@ -1,3 +1,4 @@
+const log = require('./log');
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
@@ -37,6 +38,22 @@ const DEFAULTS = {
     tabBarSide: 'side',
     // Width of the left tab sidebar (px), drag-resizable.
     sidebarWidth: 232,
+    // History retention: age window in days (0 = only the entry cap applies)
+    // and a hard ceiling on entries.
+    historyDays: 90,
+    historyMaxEntries: 50000,
+    // Per-origin zoom levels ({ 'https://example.com': 0.5 }) — see features/zoom.js.
+    siteZoom: {},
+    // User-defined search engines: [{ id, name, keyword, url, suggest }] where
+    // `url` contains %s. The built-ins (google/duckduckgo/bing) stay implicit.
+    customEngines: [],
+    // Session restore fidelity: per-tab back/forward entries + scroll position.
+    restoreTabHistory: true,
+    // Every window's tabs come back, not just the first window's.
+    restoreAllWindows: true,
+    // Interface language: 'system' follows the OS, otherwise a locale id from
+    // locales/*.json. Web pages are unaffected (Accept-Language is not touched).
+    language: 'system',
 };
 class Persistence {
     dir; // ~/<userData>/northstar
@@ -59,7 +76,7 @@ class Persistence {
             if (!fs.existsSync(this.dir))
                 fs.mkdirSync(this.dir, { recursive: true });
         }
-        catch { }
+        catch (e) { log.error('persistence', 'profile directory could not be created', e); }
     }
     // ── Encrypted read / write helpers (sync, for startup path) ──────────────
     readEncrypted(filePath) {
@@ -81,14 +98,14 @@ class Persistence {
                 return { ...DEFAULTS, ...obj };
             }
         }
-        catch { }
+        catch (e) { log.warn('persistence', 'settings file unreadable — starting from defaults', e); }
         return { ...DEFAULTS };
     }
     save() {
         try {
             this.writeEncrypted(this.settingsPath, this.settings);
         }
-        catch { }
+        catch (e) { log.error('persistence', 'settings could not be written — changes will be lost on restart', e); }
     }
     getAll() { return { ...this.settings }; }
     get(key) { return this.settings[key] ?? DEFAULTS[key]; }
@@ -110,12 +127,20 @@ class Persistence {
             return false;
         }
     }
+    /**
+     * Session state. v2 holds one entry PER WINDOW (`{ v: 2, windows: [...] }`);
+     * v1 was a single window's worth at the top level and every window
+     * overwrote it, so closing the browser with three windows open brought one
+     * back. v1 files still load — they read as a one-window session.
+     */
     loadState() {
         try {
             if (!fs.existsSync(this.statePath))
                 return null;
             const plaintext = this.readEncrypted(this.statePath);
             const obj = JSON.parse(plaintext);
+            if (obj && Array.isArray(obj.windows) && obj.windows.length)
+                return obj.windows[0];
             if (!obj || !Array.isArray(obj.tabs))
                 return null;
             return obj;
@@ -124,18 +149,77 @@ class Persistence {
             return null;
         }
     }
+    /** Every saved window, newest layout first. Empty array when there is none. */
+    loadAllWindowStates() {
+        try {
+            if (!fs.existsSync(this.statePath))
+                return [];
+            const obj = JSON.parse(this.readEncrypted(this.statePath));
+            if (obj && Array.isArray(obj.windows))
+                return obj.windows.filter(w => w && Array.isArray(w.tabs) && w.tabs.length);
+            if (obj && Array.isArray(obj.tabs) && obj.tabs.length)
+                return [obj];
+            return [];
+        }
+        catch {
+            return [];
+        }
+    }
+    /**
+     * Stop accepting session updates. Shutdown tears every window down tab by
+     * tab, and each removal used to write a smaller state than the last — so the
+     * snapshot taken at quit was immediately overwritten by an emptier one and
+     * the session came back with a single tab. The quit snapshot is final.
+     */
+    freeze() { this._frozen = true; }
+    /**
+     * Record one window's state and persist the whole set. Keyed by the live
+     * window id so a window that closes drops out of the file, and the order
+     * follows the order windows were opened.
+     */
+    saveWindowState(windowId, state) {
+        if (this._frozen)
+            return;
+        if (!this._windowStates)
+            this._windowStates = new Map();
+        if (state)
+            this._windowStates.set(windowId, state);
+        else
+            this._windowStates.delete(windowId);
+        this.saveState(this._composeState());
+    }
+    forgetWindowState(windowId, { flush = false } = {}) {
+        if (this._frozen)
+            return;
+        if (!this._windowStates?.has(windowId))
+            return;
+        this._windowStates.delete(windowId);
+        const composed = this._composeState();
+        if (flush)
+            this.saveStateSync(composed);
+        else
+            this.saveState(composed);
+    }
+    _composeState() {
+        const windows = [...(this._windowStates?.values() || [])];
+        // Keep the first window's fields at the top level as well: older builds
+        // (and anything reading the file directly) still find what they expect.
+        return { v: 2, windows, ...(windows[0] || { tabs: [], activeIndex: 0 }) };
+    }
     // Called (debounced) on every tab event during browsing — the encrypted
     // write happens asynchronously so it never blocks the main event loop.
     // Concurrent calls coalesce: while a write is in flight the newest state
     // waits its turn, and a quit hook flushes anything still pending.
     saveState(state) {
+        if (this._frozen)
+            return;
         this._pendingState = state;
         if (!this._quitHooked) {
             this._quitHooked = true;
             try {
                 app.on('before-quit', () => this.flushStateSync());
             }
-            catch { }
+            catch (e) { log.debug('persistence', 'saveState', e); }
         }
         if (this._savingState)
             return;
@@ -147,7 +231,7 @@ class Persistence {
                 try {
                     await fs.promises.writeFile(this.statePath, encrypt(JSON.stringify(s)));
                 }
-                catch { }
+                catch (e) { log.error('persistence', 'session state could not be written', e); }
             }
             this._savingState = false;
         })();
@@ -160,7 +244,7 @@ class Persistence {
         try {
             fs.writeFileSync(this.statePath, encrypt(JSON.stringify(s)));
         }
-        catch { }
+        catch (e) { log.error('persistence', 'session state could not be flushed on quit', e); }
     }
     // Durable save for the last-window-close / quit paths: writes synchronously so
     // the file is complete before the process exits. (The async saveState() can be

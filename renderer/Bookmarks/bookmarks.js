@@ -10,7 +10,7 @@
             try {
                 bookmarks = await window.browserBookmarks.getAll();
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('bookmarks', 'load: ' + e); }
             if (!bookmarks.length) {
                 const msg = document.createElement('p');
                 msg.className = 'empty-msg';
@@ -31,7 +31,7 @@
                         if (d) { icon.src = d; icon.style.display = ''; }
                     }).catch(() => { });
                 }
-                catch { }
+                catch (e) { window.inkLog?.debug('bookmarks', 'load: ' + e); }
                 const content = document.createElement('div');
                 content.className = 'bookmark-content';
                 const title = document.createElement('div');

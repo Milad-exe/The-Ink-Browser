@@ -5,8 +5,10 @@
  *         move tab to another window, detach to new window,
  *         and session persistence mode.
  */
+const log = require('../features/log');
 const { Menu, net } = require('electron');
 const { sanitizeUrl } = require('../features/url-security');
+const zoom = require('../features/zoom');
 const faviconStore = require('../features/favicon-store');
 // Favicon fetch cache: page/favicon URL → data-URL (or '' for a known failure).
 // Bounded; cleared wholesale when full. Lives for the process lifetime.
@@ -37,7 +39,7 @@ function fetchFaviconOnce(url) {
                         try {
                             req.abort();
                         }
-                        catch { }
+                        catch (e) { log.debug('tabs', 'done', e); }
                         return done('');
                     }
                     chunks.push(c);
@@ -54,7 +56,7 @@ function fetchFaviconOnce(url) {
             setTimeout(() => { try {
                 req.abort();
             }
-            catch { } done(''); }, 6000);
+            catch (e) { log.debug('tabs', 'done', e); } done(''); }, 6000);
             req.end();
         }
         catch {
@@ -71,7 +73,7 @@ function faviconCandidates(url) {
         const root = `${u.origin}/favicon.ico`;
         return url === root ? [url] : [url, root];
     }
-    catch { }
+    catch (e) { log.debug('tabs', 'faviconCandidates', e); }
     return [url];
 }
 // Fetch a favicon in the MAIN process and return it as a data: URL. The chrome
@@ -127,9 +129,22 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             if (p && Number.isFinite(p.x) && Number.isFinite(p.y) && (p.x || p.y))
                 return p;
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'dropPoint', e); }
         return { x: screenX || 0, y: screenY || 0 };
     };
+    // Reading position from a page's preload (throttled there). Stored per tab
+    // so buildSerializableState() can put it in the session file.
+    ipcMain.on('page:scroll', (e, y) => {
+        const wd = wm.getWindowByWebContents(e.sender);
+        if (!wd?.tabs || !Number.isFinite(y))
+            return;
+        for (const [idx, tab] of wd.tabs.tabMap) {
+            if (tab?.webContents === e.sender) {
+                wd.tabs.tabScroll.set(idx, Math.max(0, Math.round(y)));
+                return;
+            }
+        }
+    });
     // ── Basic tab operations ──────────────────────────────────────────────────
     ipcMain.handle('addTab', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
@@ -152,7 +167,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         try {
             title = new URL(safe).hostname;
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'addTabLazy', e); }
         wd.tabs.createLazyTab(safe, title, false, false, true, true);
     });
     ipcMain.handle('removeTab', (_e, index) => {
@@ -194,7 +209,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             for (const w of wm.windows.values())
                 w.window?.webContents?.send('profiles:changed');
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'broadcastProfiles', e); }
     };
     ipcMain.handle('profiles:current', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
@@ -230,7 +245,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     const MIN_FRAC = 0.105, MAX_FRAC = 0.296;
     const limitsFor = (wd) => {
         let winW = 0;
-        try { winW = wd?.window?.getContentBounds?.().width || 0; } catch { }
+        try { winW = wd?.window?.getContentBounds?.().width || 0; } catch (e) { log.debug('tabs', 'limitsFor', e); }
         if (!winW) return { min: 180, max: 460 };
         return {
             min: Math.max(178, Math.round(winW * MIN_FRAC)),
@@ -246,19 +261,19 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const t = wd.tabs;
         if (width === t.sidebarWidth) return;
         t.sidebarWidth = width;
-        try { t.resizeAllTabs(); } catch { }
-        try { wd.window.webContents.send('sidebar-width-changed', width); } catch { }
+        try { t.resizeAllTabs(); } catch (e) { log.debug('tabs', 'applyWidthLive', e); }
+        try { wd.window.webContents.send('sidebar-width-changed', width); } catch (e) { log.debug('tabs', 'applyWidthLive', e); }
     }
     function endResize(wd, width) {
         const t = wd?.tabs;
         if (!t || !t._sidebarResizing) return;
         t._sidebarResizing = false;
         if (t._sidebarInput) {
-            try { t._sidebarInput.wc.removeListener('input-event', t._sidebarInput.onInput); } catch { }
+            try { t._sidebarInput.wc.removeListener('input-event', t._sidebarInput.onInput); } catch (e) { log.debug('tabs', 'endResize', e); }
             t._sidebarInput = null;
         }
         const final = clampW(width, wd);
-        try { wm.persistence.set('sidebarWidth', final); } catch { }
+        try { wm.persistence.set('sidebarWidth', final); } catch (e) { log.debug('tabs', 'endResize', e); }
         // Width is a global setting — apply to every window so they stay in sync.
         for (const w of wm.windows.values()) {
             try {
@@ -269,7 +284,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                 // pointerup never fired — force it to drop its drag state.
                 w.window.webContents.send('sidebar-resize-ended', final);
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'endResize', e); }
         }
     }
     ipcMain.handle('sidebar:resize-start', (_e) => {
@@ -292,7 +307,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                 endResize(wd, t.sidebarWidth);
         };
         t._sidebarInput = { wc, onInput };
-        try { wc.on('input-event', onInput); } catch { }
+        try { wc.on('input-event', onInput); } catch (e) { log.debug('tabs', 'onInput', e); }
     });
     // Chrome context menus are chrome DOM, but the page is a native view painted
     // over it — a click on the page never reaches the chrome, so the menu would
@@ -303,7 +318,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     // until the chrome itself is focused.
     ipcMain.on('chrome:focus', (_e) => {
         try { wm.getWindowByWebContents(_e.sender)?.window?.webContents?.focus(); }
-        catch { }
+        catch (e) { log.debug('tabs', 'chrome:focus', e); }
     });
     ipcMain.on('chrome-menu-open', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
@@ -316,15 +331,15 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (!wc) return;
         const onInput = (_ev, input) => {
             if (input.type === 'mouseDown' || input.type === 'rawKeyDown')
-                try { wd.window.webContents.send('close-chrome-menus'); } catch { }
+                try { wd.window.webContents.send('close-chrome-menus'); } catch (e) { log.debug('tabs', 'onInput', e); }
         };
         t._menuWatch = { wc, onInput };
-        try { wc.on('input-event', onInput); } catch { }
+        try { wc.on('input-event', onInput); } catch (e) { log.debug('tabs', 'onInput', e); }
     });
     ipcMain.on('chrome-menu-close', (_e) => {
         const t = wm.getWindowByWebContents(_e.sender)?.tabs;
         if (!t?._menuWatch) return;
-        try { t._menuWatch.wc.removeListener('input-event', t._menuWatch.onInput); } catch { }
+        try { t._menuWatch.wc.removeListener('input-event', t._menuWatch.onInput); } catch (e) { log.debug('tabs', 'chrome-menu-close', e); }
         t._menuWatch = null;
     });
     ipcMain.handle('sidebar:resize', (_e, w) => {
@@ -369,13 +384,13 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         }
         for (const idx of wd.tabs.tabsInWorkspace(key))
             try { wd.tabs.removeTab(idx); }
-            catch { }
+            catch (e) { log.debug('tabs', 'workspaces:delete', e); }
         // Folders belonging to the space go with it.
         try {
             wd.tabs.folders = wd.tabs.folders.filter(f => String(f.workspace) !== key);
             wd.tabs.broadcastFolders();
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'workspaces:delete', e); }
         const ok = profiles.remove(key);
         if (ok)
             broadcastProfiles();
@@ -402,17 +417,17 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                 const p = profiles.create();
                 broadcastProfiles();
                 wm.switchWorkspace(wd, p.id);
-                try { wd.window.webContents.send('rename-profile', p.id); } catch { } // prompt to name it
+                try { wd.window.webContents.send('rename-profile', p.id); } catch (e) { log.debug('tabs', 'profiles:menu', e); } // prompt to name it
             },
         }, {
             label: 'Open in New Window',
             submenu: profiles.list().map(p => ({ label: p.name, click: () => wm.createWindow(1000, 700, { profile: p.id }) })),
         }, {
             label: 'Rename Workspace…',
-            click: () => { try { wd.window.webContents.send('rename-profile', renameTarget); } catch { } },
+            click: () => { try { wd.window.webContents.send('rename-profile', renameTarget); } catch (e) { log.debug('tabs', 'profiles:menu', e); } },
         });
         try { Menu.buildFromTemplate(template).popup({ window: wd.window, x: Math.round(x), y: Math.round(y) }); }
-        catch { }
+        catch (e) { log.debug('tabs', 'profiles:menu', e); }
     });
     // ── Essentials (pinned favourites; per profile) ────────────────────────────
     const broadcastEssentials = () => {
@@ -420,7 +435,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             for (const w of wm.windows.values())
                 w.window?.webContents?.send('essentials-changed');
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'broadcastEssentials', e); }
     };
     ipcMain.handle('essentials:list', (_e) => profiles.essentials(wm.profileOf(_e.sender)));
     ipcMain.handle('essentials:add', (_e, url, title, profile) => {
@@ -471,11 +486,68 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     ipcMain.handle('folders:delete', (_e, id) => { wm.getWindowByWebContents(_e.sender)?.tabs?.deleteFolder(id); });
     ipcMain.handle('folders:toggle', (_e, id, collapsed) => { wm.getWindowByWebContents(_e.sender)?.tabs?.toggleFolder(id, collapsed); });
     ipcMain.handle('folders:icon', (_e, id, icon) => { wm.getWindowByWebContents(_e.sender)?.tabs?.setFolderIcon(id, icon); });
-    ipcMain.handle('tab:split', (_e, index) => {
-        wm.getWindowByWebContents(_e.sender)?.tabs?.splitWithActive(Number(index));
+    ipcMain.handle('tab:split', (_e, index, position) => {
+        wm.getWindowByWebContents(_e.sender)?.tabs?.splitWithActive(Number(index), position || 'right');
     });
     ipcMain.handle('tab:closeSplit', (_e) => {
         wm.getWindowByWebContents(_e.sender)?.tabs?.closeSplit();
+    });
+    // ── Split view: divider resize, pane reposition, drop zones ───────────────
+    // The divider is a thin overlay view, so the pointer is over a PAGE view for
+    // all but the first pixel of the drag. Same trick as the sidebar resizer:
+    // watch the panes' raw input streams and drive the ratio from there.
+    function endSplitResize(t) {
+        if (!t?._splitResize)
+            return;
+        for (const { wc, onInput } of t._splitResize)
+            try { wc.removeListener('input-event', onInput); } catch (e) { log.debug('tabs', 'endSplitResize', e); }
+        t._splitResize = null;
+    }
+    ipcMain.on('split:resize-start', (_e) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        const t = wd?.tabs;
+        if (!t?.splitPair)
+            return;
+        endSplitResize(t);
+        const hooks = [];
+        t.splitPair.forEach((idx, i) => {
+            const wc = t.tabMap.get(idx)?.webContents;
+            if (!wc)
+                return;
+            // input.x/y are relative to that pane's own top-left corner — and the
+            // pane moves as the ratio changes, so re-read its bounds every event.
+            const onInput = (_ev, input) => {
+                if (input.type === 'mouseMove') {
+                    const pane = t._splitHalves()[i];
+                    const page = t.getTabBounds();
+                    const r = t.splitOrient === 'col'
+                        ? (pane.y + input.y - page.y) / Math.max(1, page.height)
+                        : (pane.x + input.x - page.x) / Math.max(1, page.width);
+                    t.setSplitRatio(r);
+                }
+                else if (input.type === 'mouseUp' || input.type === 'mouseLeave') {
+                    endSplitResize(t);
+                }
+            };
+            try { wc.on('input-event', onInput); } catch (e) { log.debug('tabs', 'onInput', e); }
+            hooks.push({ wc, onInput });
+        });
+        t._splitResize = hooks.length ? hooks : null;
+    });
+    ipcMain.on('split:resize-end', (_e) => {
+        endSplitResize(wm.getWindowByWebContents(_e.sender)?.tabs);
+    });
+    ipcMain.on('split:move', (_e, pane, dir) => {
+        wm.getWindowByWebContents(_e.sender)?.tabs?.moveSplitPane(Number(pane), dir);
+    });
+    // A tab drag released over the page card (the chrome never sees that release
+    // — the drop overlay does).
+    ipcMain.on('split-drop:drop', (_e, zone) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (!wd?.tabs)
+            return;
+        wd.tabs.handleSplitDrop(zone);
+        try { wd.window.webContents.send('tab-drag-ended'); } catch (e) { log.debug('tabs', 'split-drop:drop', e); }
     });
     ipcMain.handle('tab:reopenClosed', (_e) => { wm.getWindowByWebContents(_e.sender)?.tabs?.reopenClosedTab(); });
     ipcMain.handle('sidebar:toggleCompact', (_e) => { wm.getWindowByWebContents(_e.sender)?.tabs?.toggleCompact(); });
@@ -550,7 +622,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             try {
                 tab.webContents.stop();
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'stopTab', e); }
         }
     });
     ipcMain.handle('newWindow', () => {
@@ -616,7 +688,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             click: () => { try {
                 wd.tabs.goToHistoryIndex(index, entry.index);
             }
-            catch { } },
+            catch (e) { log.debug('tabs', 'show-nav-history-menu', e); } },
         }));
         Menu.buildFromTemplate(template).popup({
             window: wd.window,
@@ -676,7 +748,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             try {
                 wd.tabs.findDialog.show(tab);
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'menu-find', e); }
             return true;
         }
         return false;
@@ -687,7 +759,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             try {
                 tab.webContents.print();
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'menu-print', e); }
         }
         return true;
     });
@@ -706,6 +778,10 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                 else
                     level = 0; // reset
                 wc.setZoomLevel(level);
+                // Remember it for this site (never for private tabs).
+                const idx = wd.tabs.activeTabIndex;
+                zoom.remember(wd.tabs.tabUrls.get(idx) || '', level,
+                    !wd.tabs.privateTabs.has(idx) && !wd.tabs.isPrivateWindow);
             }
             return Math.round(wc.getZoomFactor() * 100);
         }
@@ -746,7 +822,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             preconnectCounts.set(e.sender.id, n);
             e.sender.session.preconnect({ url: origin, numSockets: 1 });
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'n', e); }
     });
     // ── Persistence mode ─────────────────────────────────────────────────────
     ipcMain.handle('getPersistMode', () => {
@@ -759,7 +835,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             try {
                 wd.tabs.saveStateDebounced();
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'setPersistMode', e); }
         }
         return true;
     });
@@ -787,12 +863,58 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         // prefer the one we raised under the cursor — it's the one the user sees.
         return matches.find(w => w.id === lastRaisedId) || matches[0] || null;
     };
+    // Which edge of a window's page card a screen point falls in — the same
+    // thirds rule the drop sheet paints with (EDGE in renderer/SplitDrop/drop.js).
+    // null = the middle, i.e. no split.
+    const DROP_EDGE = 0.32;
+    const cardPointIn = (wd, p) => {
+        try {
+            const cb = wd.window.getContentBounds();
+            const card = wd.tabs.getTabBounds();
+            const x = p.x - cb.x - card.x, y = p.y - cb.y - card.y;
+            if (x < 0 || y < 0 || x > card.width || y > card.height)
+                return null;
+            return { fx: x / Math.max(1, card.width), fy: y / Math.max(1, card.height) };
+        }
+        catch {
+            return null;
+        }
+    };
+    const edgeZone = (f) => {
+        if (!f)
+            return null;
+        const d = { left: f.fx, right: 1 - f.fx, top: f.fy, bottom: 1 - f.fy };
+        let best = 'left';
+        for (const k of Object.keys(d))
+            if (d[k] < d[best])
+                best = k;
+        return d[best] <= DROP_EDGE ? best : null;
+    };
+    /**
+     * Move a dragged tab into `target` (another window) and, if it was dropped on
+     * an edge, split it against the page that window was showing.
+     */
+    const moveIntoWindow = (src, tabIndex, target, url, zone) => {
+        const prevActive = target.tabs.activeTabIndex;
+        const idx = target.tabs.createTab(null, true);
+        if (url)
+            target.tabs.loadUrl(idx, url);
+        src.tabs.removeTab(tabIndex); // closes the source window if it was its last tab
+        if (zone && target.tabs.tabMap.has(prevActive))
+            target.tabs.splitWithActive(prevActive, zone);
+        try {
+            target.window.focus();
+            target.window.moveTop();
+        }
+        catch (e) { log.debug('tabs', 'moveIntoWindow', e); }
+        return 'moved';
+    };
     const setMergeHover = (wd, on) => {
         try {
             if (wd && !wd.window.isDestroyed())
                 wd.window.webContents.send('tab-merge-hover', !!on);
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'setMergeHover', e); }
     };
     const stopDragTrack = () => {
         if (!dragTrack)
@@ -800,16 +922,24 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         clearInterval(dragTrack.timer);
         if (dragTrack.hoverTarget)
             setMergeHover(dragTrack.hoverTarget, false);
+        if (dragTrack.cardTarget)
+            try { dragTrack.cardTarget.tabs.hideSplitDrop(); } catch (e) { log.debug('tabs', 'stopDragTrack', e); }
         dragTrack = null;
     };
-    ipcMain.on('tab-drag-track', (_e, on) => {
+    ipcMain.on('tab-drag-track', (_e, on, tabIndex) => {
+        const wd0 = wm.getWindowByWebContents(_e.sender);
         if (!on) {
             stopDragTrack();
+            wd0?.tabs?.hideSplitDrop();
             return;
         }
+        // Catch the drag the moment it leaves the strip for the page card: the
+        // page is a native view, so only an overlay of our own can see it there.
+        try { wd0?.tabs?.showSplitDrop(Number(tabIndex)); }
+        catch (e) { log.debug('tabs', 'tab-drag-track', e); }
         if (dragTrack)
             return;
-        const srcWd = wm.getWindowByWebContents(_e.sender);
+        const srcWd = wd0;
         dragTrack = { raisedId: null, hoverTarget: null, timer: setInterval(() => {
                 try {
                     const p = screen.getCursorScreenPoint();
@@ -824,7 +954,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                             if (srcWd && !srcWd.window.isDestroyed())
                                 srcWd.window.moveTop();
                         }
-                        catch { }
+                        catch (e) { log.debug('tabs', 'tab-drag-track', e); }
                     }
                     // Highlight the strip we'd drop into (other windows only).
                     const overStrip = over && over !== srcWd && p.y <= over.window.getBounds().y + MERGE_STRIP_H;
@@ -836,8 +966,18 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                             setMergeHover(hoverTarget, true);
                         dragTrack.hoverTarget = hoverTarget;
                     }
+                    // Over ANOTHER window's page card: that window's sheet can't
+                    // see the pointer (the drag belongs to the source window), so
+                    // drive its highlight from this poll instead.
+                    const f = (over && over !== srcWd && !overStrip) ? cardPointIn(over, p) : null;
+                    const cardTarget = f ? over : null;
+                    if (dragTrack.cardTarget && dragTrack.cardTarget !== cardTarget)
+                        try { dragTrack.cardTarget.tabs.hideSplitDrop(); } catch (e) { log.debug('tabs', 'f', e); }
+                    dragTrack.cardTarget = cardTarget;
+                    if (cardTarget)
+                        try { cardTarget.tabs.hintSplitDrop(edgeZone(f)); } catch (e) { log.debug('tabs', 'f', e); }
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'f', e); }
             }, 60) };
     });
     // Resolve a drop that ended OUTSIDE the source strip. Returns what happened.
@@ -849,6 +989,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             ? dragTrack.hoverTarget : null;
         stopDragTrack();
         const src = wm.getWindowByWebContents(_e.sender);
+        src?.tabs?.hideSplitDrop();
         if (!src)
             return 'none';
         try {
@@ -866,7 +1007,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                     const tb = target.window.getBounds();
                     insertAfter = await target.window.webContents.executeJavaScript(`window.__tabDropIndex ? window.__tabDropIndex(${Math.round(p.x - tb.x)}) : null`, true);
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'hovered', e); }
                 const idx = target.tabs.createTab(Number.isInteger(insertAfter) ? insertAfter : null, true);
                 if (safeUrl)
                     target.tabs.loadUrl(idx, safeUrl);
@@ -876,8 +1017,34 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                     target.window.focus();
                     target.window.moveTop();
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'hovered', e); }
                 return 'moved';
+            }
+            // ── Drop on THIS window's own page card → split ──────────────────
+            // Normally the drop sheet over the card reports that release itself;
+            // this is the fallback for when the chrome sees it instead (event
+            // routing between the chrome and the native page views is the
+            // platform's call). The timestamp keeps the two from both firing.
+            if (target && target.id === src.id && Date.now() - (src.tabs._splitDropAt || 0) > 400) {
+                const f = cardPointIn(src, p);
+                if (f) {
+                    src.tabs.hideSplitDrop();
+                    src.tabs.splitDropped(tabIndex, edgeZone(f));
+                    return 'split';
+                }
+            }
+            // ── Drop on ANOTHER window's page card → move the tab there ──────
+            // Dropped on an edge it splits against that window's current page,
+            // dropped in the middle it just joins as a tab. (The release is
+            // delivered to the source window — a drag keeps its origin window —
+            // so this side resolves it; the target only showed the hint sheet.)
+            if (target && target.id !== src.id) {
+                const f = cardPointIn(target, p);
+                if (f) {
+                    target.tabs.hideSplitDrop();
+                    setMergeHover(target, false);
+                    return moveIntoWindow(src, tabIndex, target, safeUrl, edgeZone(f));
+                }
             }
             // ── Drop anywhere else → detach into its own window ──────────────
             if (src.tabs.tabMap.size <= 1) {
@@ -887,7 +1054,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                 try {
                     src.window.focus();
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'hovered', e); }
                 return 'window-moved';
             }
             const newWin = wm.createWindow(900, 640);
@@ -901,14 +1068,14 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                         if (firstIdx !== undefined)
                             newWin.tabs.loadUrl(firstIdx, safeUrl);
                     }
-                    catch { }
+                    catch (e) { log.debug('tabs', 'hovered', e); }
                 });
             }
             src.tabs.removeTab(tabIndex);
             try {
                 newWin.window.focus();
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'hovered', e); }
             return 'detached';
         }
         catch (err) {
@@ -968,7 +1135,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                 dst.window.focus();
                 dst.window.moveTop();
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'move-tab-to-window', e); }
             return true;
         }
         catch (err) {
@@ -1011,7 +1178,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                             newWin.tabs.loadUrl(firstIdx, safeUrl);
                     }
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'safeUrl', e); }
             });
             src.tabs.removeTab(tabIndex);
             return true;

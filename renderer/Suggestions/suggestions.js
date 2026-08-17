@@ -48,7 +48,7 @@
                 if (item.url)
                     return new URL(item.url).host;
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('suggestions', 'hostOf: ' + e); }
             if (item.type === 'navigate' && item.query) {
                 const h = String(item.query).replace(/^https?:\/\//, '').split(/[/?#]/)[0];
                 if (/\.[a-z]{2,}$/i.test(h))
@@ -139,7 +139,7 @@
                     try {
                         window.overlaySuggestions.pointerDown && window.overlaySuggestions.pointerDown();
                     }
-                    catch { }
+                    catch (e) { window.inkLog?.debug('suggestions', 'addSecondary: ' + e); }
                     window.overlaySuggestions.select(item);
                 });
                 listEl.appendChild(el);

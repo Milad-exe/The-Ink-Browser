@@ -140,7 +140,7 @@
             const chromeH = panel.clientHeight - list.clientHeight;
             window.extPanel.setHeight(Math.ceil(chromeH + list.scrollHeight));
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('panel', 'syncHeight: ' + e); }
     }
     // render() clears the list, so the devtools section is always appended after
     // it — never on its own.
@@ -148,14 +148,14 @@
         try {
             renderDevtools(await window.extPanel.devtoolsPanels());
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('panel', 'appendDevtools: ' + e); }
         syncHeight();
     }
     async function refresh() {
         try {
             render(await window.extPanel.list());
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('panel', 'refresh: ' + e); }
         await appendDevtools();
     }
     window.extPanel.onData((items) => { render(items); appendDevtools(); });

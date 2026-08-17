@@ -14,6 +14,7 @@
  * Bounded (MAX_HOSTS, rough LRU by insertion order) and mirrored to disk
  * (debounced) so it survives restarts.
  */
+const log = require('./log');
 const fs = require('fs');
 const path = require('path');
 const { app, net } = require('electron');
@@ -53,7 +54,7 @@ function load() {
         for (const [h, d] of Object.entries(obj))
             store.set(h, d);
     }
-    catch { }
+    catch (e) { log.debug('favicon-store', 'load', e); }
 }
 function save() {
     clearTimeout(saveTimer);
@@ -62,7 +63,7 @@ function save() {
             fs.mkdirSync(path.dirname(file()), { recursive: true });
             fs.writeFileSync(file(), JSON.stringify(Object.fromEntries(store)));
         }
-        catch { }
+        catch (e) { log.warn('favicon-store', 'favicon cache could not be written', e); }
     }, 3000);
 }
 /** Cached favicon for a host (matched by registrable domain), or '' — never
@@ -93,7 +94,7 @@ function fetchDataUrl(url) {
                 }
                 res.on('data', (c) => {
                     total += c.length;
-                    if (total > FETCH_CAP) { try { req.abort(); } catch { } return finish(''); }
+                    if (total > FETCH_CAP) { try { req.abort(); } catch (e) { log.debug('favicon-store', 'finish', e); } return finish(''); }
                     chunks.push(c);
                 });
                 res.on('end', () => {

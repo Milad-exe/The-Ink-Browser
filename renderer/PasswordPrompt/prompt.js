@@ -13,7 +13,7 @@
             try {
                 host = new URL(d.origin).host;
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('prompt', 'prompt: ' + e); }
             siteEl.textContent = host;
             userEl.textContent = d.username || '(no username)';
         });

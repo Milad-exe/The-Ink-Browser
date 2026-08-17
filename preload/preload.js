@@ -310,8 +310,9 @@ exposeInternal('northstarPrivate', {
 exposeInternal('tabsUI', {
     onPinTab: (handler) => ipcRenderer.on('pin-tab', (_e, { index }) => handler(index)),
     onSplitChanged: (handler) => ipcRenderer.on('split-changed', (_e, pair) => handler(pair)),
-    // Split view is driven from the sidebar tab menu, which the renderer builds.
-    split: (index) => ipcRenderer.invoke('tab:split', index),
+    // Split view: from the sidebar tab menu, or by dropping a dragged tab onto
+    // another tab. `position` places the ACTIVE tab ('right'|'left'|'top'|'bottom').
+    split: (index, position) => ipcRenderer.invoke('tab:split', index, position),
     closeSplit: () => ipcRenderer.invoke('tab:closeSplit'),
     reopenClosed: () => ipcRenderer.invoke('tab:reopenClosed'),
     toggleCompact: () => ipcRenderer.invoke('sidebar:toggleCompact'),
@@ -325,6 +326,11 @@ exposeInternal('tabsUI', {
     resizeSidebar: (w) => ipcRenderer.invoke('sidebar:resize', w),
     commitSidebarWidth: (w) => ipcRenderer.invoke('sidebar:resize-commit', w),
     onSidebarWidth: (handler) => ipcRenderer.on('sidebar-width-changed', (_e, w) => handler(w)),
+    // Search engines were edited in Settings — the omnibox resolves typed text
+    // synchronously, so it keeps its own copy of the list.
+    onEnginesChanged: (handler) => ipcRenderer.on('engines-changed', (_e, list) => handler(list)),
+    // Interface language changed in Settings — the chrome re-labels itself.
+    onLanguageChanged: (handler) => ipcRenderer.on('language-changed', (_e, payload) => handler(payload)),
     onSidebarResizeEnded: (handler) => ipcRenderer.on('sidebar-resize-ended', (_e, w) => handler(w)),
 });
 // Reader mode + Picture-in-Picture
@@ -344,6 +350,37 @@ exposeInternal('northstarReader', {
     getArticle: () => ipcRenderer.invoke('reader-get-article'),
     exit: () => ipcRenderer.invoke('reader-exit'),
 });
+// Diagnostics bridge for the chrome's own scripts. Internal pages only: a web
+// page must never be able to write to the browser's log, and page-context
+// failures are not ours to record.
+exposeInternal('inkLog', {
+    debug: (scope, message) => ipcRenderer.send('log:write', 'debug', scope, message),
+    warn: (scope, message) => ipcRenderer.send('log:write', 'warn', scope, message),
+    error: (scope, message) => ipcRenderer.send('log:write', 'error', scope, message),
+});
+// Import / export, update checks, diagnostics — Settings → Data.
+exposeInternal('userData', {
+    importBookmarks: () => ipcRenderer.invoke('data:import-bookmarks'),
+    exportBookmarks: () => ipcRenderer.invoke('data:export-bookmarks'),
+    importPasswords: () => ipcRenderer.invoke('data:import-passwords'),
+    exportPasswords: () => ipcRenderer.invoke('data:export-passwords'),
+    exportHistory: () => ipcRenderer.invoke('data:export-history'),
+    reveal: (p) => ipcRenderer.invoke('data:reveal', p),
+    clearCertExceptions: () => ipcRenderer.invoke('cert:clear-exceptions'),
+    checkUpdate: (force) => ipcRenderer.invoke('app:check-update', force),
+    openRelease: (url) => ipcRenderer.invoke('app:open-release', url),
+    defaultBrowserStatus: () => ipcRenderer.invoke('app:default-browser-status'),
+    makeDefaultBrowser: () => ipcRenderer.invoke('app:make-default-browser'),
+    keyProtection: () => ipcRenderer.invoke('app:key-protection'),
+    openLog: () => ipcRenderer.invoke('app:open-log'),
+    logTail: () => ipcRenderer.invoke('app:log-tail'),
+    versions: () => ipcRenderer.invoke('app:version'),
+});
+// The certificate interstitial's "continue anyway" — internal pages only, so a
+// web page can never grant itself an exception.
+exposeInternal('certWarning', {
+    proceed: (host, fingerprint, url) => ipcRenderer.send('cert:proceed', host, fingerprint, url),
+});
 // Persistence controls
 exposeInternal('persist', {
     getMode: () => ipcRenderer.invoke('getPersistMode'),
@@ -354,9 +391,12 @@ exposeInternal("dragdrop", {
     getThisWindowId: () => ipcRenderer.invoke('get-this-window-id'),
     moveTabToWindow: (fromWindowId, tabIndex, targetWindowId, url) => ipcRenderer.invoke('move-tab-to-window', fromWindowId, tabIndex, targetWindowId, url),
     detachToNewWindow: (tabIndex, screenX, screenY, url) => ipcRenderer.invoke('detach-to-new-window', tabIndex, screenX, screenY, url),
-    dragTrack: (on) => ipcRenderer.send('tab-drag-track', !!on),
+    dragTrack: (on, tabIndex) => ipcRenderer.send('tab-drag-track', !!on, tabIndex),
     drop: (tabIndex, url) => ipcRenderer.invoke('tab-drag-drop', tabIndex, url),
-    onMergeHover: (fn) => ipcRenderer.on('tab-merge-hover', (_e, v) => fn(v))
+    onMergeHover: (fn) => ipcRenderer.on('tab-merge-hover', (_e, v) => fn(v)),
+    // The drag was released over the page card, so the chrome never saw the
+    // pointerup — main tells it to stand down.
+    onDragEnded: (fn) => ipcRenderer.on('tab-drag-ended', () => fn())
 });
 exposeInternal("menu", {
     open: () => ipcRenderer.invoke('open'),
@@ -426,6 +466,28 @@ exposeInternal('browserBookmarks', {
     showBarContextMenu: (item) => ipcRenderer.send('show-bookmark-bar-context-menu', item),
     openInNewTab: (url, switchToTab) => ipcRenderer.invoke('open-url-in-new-tab', url, switchToTab),
 });
+// Reading position, reported so a restored session opens the page where the
+// user left it. Throttled hard (a scroll handler runs on every frame otherwise)
+// and only for real web pages — internal pages have nothing worth restoring.
+// Also fires once on unload so a fast close still records the final position.
+if (!INTERNAL && /^https?:$/.test(location.protocol)) {
+    let lastSent = 0;
+    let pending = null;
+    const report = () => {
+        const y = Math.round(window.scrollY || 0);
+        if (y === lastSent)
+            return;
+        lastSent = y;
+        try { ipcRenderer.send('page:scroll', y); }
+        catch { }
+    };
+    window.addEventListener('scroll', () => {
+        if (pending)
+            return;
+        pending = setTimeout(() => { pending = null; report(); }, 500);
+    }, { passive: true });
+    window.addEventListener('pagehide', report);
+}
 // Any click anywhere in this webContents should close the settings menu
 document.addEventListener('mousedown', (e) => {
     if (e.button !== 0)

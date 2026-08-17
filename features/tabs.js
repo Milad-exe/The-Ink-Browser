@@ -1,5 +1,8 @@
-const { WebContentsView, Menu } = require('electron');
+const { WebContentsView, Menu, dialog } = require('electron');
 const { resolveAppFile } = require('../app-paths');
+const log = require('./log');
+const zoom = require('./zoom');
+const preloadForPage = require('./tabs/preload-for-page');
 const path = require('path');
 const UserAgent = require('./user-agent');
 const faviconStore = require('./favicon-store');
@@ -49,7 +52,7 @@ const YOUTUBE_SPACE_FIX_JS = `
             if (document.fullscreenElement) {
                 document.exitFullscreen().catch(() => {});
             } else if (player && typeof player.exitFullscreen === 'function') {
-                try { player.exitFullscreen(); } catch {}
+                try { player.exitFullscreen(); } catch (e) { log.debug('tabs', 'toggleYouTubeFullscreen', e); }
             } else {
                 const btn = document.querySelector('.ytp-fullscreen-button');
                 if (btn) btn.click();
@@ -95,17 +98,6 @@ const YOUTUBE_SPACE_FIX_JS = `
     };
 })();
 `;
-// The Settings page needs privileged APIs (passwords, extension management)
-// that must NOT be exposed to ordinary web pages, so it uses a dedicated
-// preload. Every other page (web content, History, Bookmarks, New Tab) uses
-// the general preload.
-function preloadForPage(kind) {
-    const base = path.join(__dirname, '../preload');
-    if (kind === 'settings' || (typeof kind === 'string' && kind.includes('/Settings/'))) {
-        return path.join(base, 'settings-preload.js');
-    }
-    return path.join(base, 'preload.js');
-}
 // Internal pages addressable via the northstar:// scheme, e.g. northstar://settings
 // or northstar://settings/appearance. Shown in the omnibox and typeable to navigate.
 const INTERNAL_PAGES = {
@@ -113,7 +105,7 @@ const INTERNAL_PAGES = {
     history: { file: 'renderer/History/index.html', title: 'History' },
     bookmarks: { file: 'renderer/Bookmarks/index.html', title: 'Bookmarks' },
 };
-const SETTINGS_SECTIONS = ['general', 'appearance', 'focus', 'privacy', 'passwords', 'extensions', 'about'];
+const SETTINGS_SECTIONS = ['general', 'appearance', 'focus', 'privacy', 'passwords', 'extensions', 'data', 'about'];
 // Parse a northstar:// URL → { type, section } (section only for settings), or null.
 function parseNorthstarUrl(raw) {
     const m = /^northstar:\/\/([a-z]+)(?:\/([a-z]+))?\/?$/i.exec((raw || '').trim());
@@ -143,7 +135,7 @@ function internalTokenFor(fileUrl) {
         try {
             section = new URL(fileUrl).hash.replace(/^#/, '').toLowerCase();
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'if', e); }
         // 'general' is the default section — it stays the bare northstar://settings.
         if (!SETTINGS_SECTIONS.includes(section) || section === 'general')
             section = '';
@@ -187,6 +179,9 @@ class Tabs {
     _pendingPrevActive; // tab to reactivate after a background-tab close
     constructor(mainWindow, History, Persistence, options = {}) {
         this.mainWindow = mainWindow;
+        // Identifies this window inside the multi-window session file. Set by
+        // WindowManager; a stable per-run id is all the state file needs.
+        this.windowKey = options.windowKey ?? 0;
         this.history = History;
         this.persistence = Persistence || null;
         this.navigationHistory = new NavigationHistory();
@@ -201,7 +196,7 @@ class Tabs {
         this._sleepTimer = setInterval(() => { try {
             this._sleepScan();
         }
-        catch { } }, 60_000);
+        catch (e) { log.debug('tabs', 'constructor', e); } }, 60_000);
         this.activeTabIndex = 0;
         this.nextTabIndex = 0;
         this.allowClose = false;
@@ -231,7 +226,13 @@ class Tabs {
         this.pinnedHome = new Map(); // tabIndex → the url a pinned tab resets to
         this.tabFolders = new Map(); // tabIndex → folderId
         this._folderSeq = 1;
-        this.splitPair = null; // [leftIdx, rightIdx] when split view is active
+        this.tabScroll = new Map(); // tabIndex → last reported scrollY (session restore)
+        this.splitPair = null; // [firstIdx, secondIdx] when split view is active
+        this.splitOrient = 'row'; // 'row' = side by side, 'col' = stacked
+        this.splitRatio = 0.5; // fraction of the page card taken by the first pane
+        this.splitDivider = null; // draggable bar between the two panes
+        this.splitHandles = [null, null]; // per-pane reposition handle (top centre)
+        this.splitDrop = null; // drop-zone overlay shown while a tab is dragged
         this.glanceView = null; // floating page-preview overlay ("glance")
         this.glanceBackdrop = null; // dim view behind the glance
         this.glanceBar = null; // header strip above the glance card
@@ -284,7 +285,7 @@ class Tabs {
                         if (!this.mainWindow.isDestroyed())
                             this.mainWindow.close();
                     }
-                    catch { }
+                    catch (e) { log.debug('tabs', 'constructor', e); }
                 });
             }
         });
@@ -342,7 +343,7 @@ class Tabs {
             webPrefs.session = profiles.sessionFor(this.profileId);
         }
         const tab = new WebContentsView({ webPreferences: webPrefs });
-        try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch { }
+        try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch (e) { log.debug('tabs', 'container', e); }
         if (makePrivate) {
             tab.webContents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
             tab.privateSession = webPrefs.session; // wiped when the tab closes
@@ -364,7 +365,7 @@ class Tabs {
                 try {
                     await tab.webContents.executeJavaScript('try { const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); } catch {}', true);
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'container', e); }
                 menuParams = { ...params, selectionText: '' };
             }
             const contextMenuInstance = new contextMenu(tab, menuParams, this);
@@ -405,7 +406,7 @@ class Tabs {
             try {
                 tempTitle = new URL(url).hostname;
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'afterIdx', e); }
         }
         tab.lazyTitle = tempTitle;
         this.navigationHistory.initializeTab(tabIndex, url || 'newtab');
@@ -450,11 +451,11 @@ class Tabs {
             try {
                 tab.webContents.audioMuted = true;
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'afterIdx', e); }
             try {
                 tab.webContents.loadURL(url);
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'afterIdx', e); }
         }
         return tabIndex;
     }
@@ -493,7 +494,7 @@ class Tabs {
                 this.mainWindow.setTitle(title);
             }
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'updateWindowTitle', e); }
     }
     setWindowManager(windowManager) {
         this.windowManager = windowManager;
@@ -507,7 +508,7 @@ class Tabs {
         const wd = this.getWindowData();
         if (!wd?.window?.contentView)
             return;
-        const overlays = [this.glanceBackdrop, this.glanceView, this.glanceBar, wd.sidePanel, wd.sidePanelHeader, wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt, wd.ctxMenu, wd.palette];
+        const overlays = [this.splitDivider, ...this.splitHandles, this.splitDrop, this.glanceBackdrop, this.glanceView, this.glanceBar, wd.sidePanel, wd.sidePanelHeader, wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt, wd.ctxMenu, wd.palette];
         overlays.forEach((view) => {
             if (!view)
                 return;
@@ -515,7 +516,7 @@ class Tabs {
                 wd.window.contentView.removeChildView(view);
                 wd.window.contentView.addChildView(view);
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'raiseFloatingViews', e); }
         });
     }
     setShortcuts(shortcuts) {
@@ -548,7 +549,7 @@ class Tabs {
             webPrefs.session = profiles.sessionFor(this.profileId);
         }
         const tab = new WebContentsView({ webPreferences: webPrefs });
-        try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch { }
+        try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch (e) { log.debug('tabs', 'container', e); }
         if (makePrivate) {
             tab.webContents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
             tab.privateSession = webPrefs.session; // wiped when the tab closes
@@ -568,7 +569,7 @@ class Tabs {
                 try {
                     await tab.webContents.executeJavaScript('try { const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); } catch {}', true);
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'container', e); }
                 menuParams = { ...params, selectionText: '' };
             }
             const contextMenuInstance = new contextMenu(tab, menuParams, this);
@@ -637,7 +638,7 @@ class Tabs {
                 try {
                     this.mainWindow.webContents.focus();
                     this.mainWindow.webContents.send('focus-address-bar');
-                } catch { }
+                } catch (e) { log.debug('tabs', 'focusOmnibox', e); }
             };
             setImmediate(focusOmnibox);
             setTimeout(focusOmnibox, 200);
@@ -654,7 +655,7 @@ class Tabs {
             // showTab. (media-started-playing pauses held media.)
             tab.mutedUntilShown = true;
             tab.bgHoldMedia = true;
-            try { tab.webContents.audioMuted = true; } catch { }
+            try { tab.webContents.audioMuted = true; } catch (e) { log.debug('tabs', 'focusOmnibox', e); }
         }
         this.saveStateDebounced();
         this.sendTabUpdate(tabIndex, tab, '', 'New Tab');
@@ -745,9 +746,9 @@ class Tabs {
             const idx = this.createTab(this.activeTabIndex, true, false);
             this.loadUrl(idx, url || 'http://neverssl.com/');
             try { this.mainWindow.webContents.send('captive-portal', { url: url || null }); }
-            catch { }
+            catch (e) { log.debug('tabs', 'openCaptivePortalSignIn', e); }
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'openCaptivePortalSignIn', e); }
     }
     // Open an internal page (settings/history/bookmarks) via the northstar://
     // scheme. replaceActive replaces the current tab in place (used when a
@@ -780,7 +781,7 @@ class Tabs {
                 nodeIntegration: false
             }
         });
-        try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch { }
+        try { tab.setBorderRadius(Tabs.PAGE_RADIUS); } catch (e) { log.debug('tabs', 'createTabWithPage', e); }
         this.mainWindow.contentView.addChildView(tab);
         tab.webContents.loadFile(resolveAppFile(pagePath), section ? { hash: section } : undefined);
         this.raiseFloatingViews();
@@ -837,7 +838,7 @@ class Tabs {
         try {
             tab.setBackgroundColor(internal ? '#00000000' : '#ffffff');
         }
-        catch { }
+        catch (e) { log.debug('tabs', '_applyTabBackground', e); }
     }
     // Shell margin around the floating page card (matches the shell padding in
     // Browser/styles.css). The page floats in a rounded card on a tinted shell
@@ -854,8 +855,9 @@ class Tabs {
     // renderer/Browser/styles.css: the page view is positioned underneath them
     // from here, and there is no build step sharing values between the two, so
     // changing one side alone silently misaligns the page.
-    static GLANCE_BAR_H = 30;
-    static GLANCE_BAR_GAP = 6;
+    // Split-view geometry lives in features/tabs/split.js with its methods.
+    static MAX_RESTORED_HISTORY = 25; // back/forward entries kept per tab in the session file
+    // Glance geometry lives in features/tabs/glance.js with its methods.
     static UTILITY_BAR_H = 40;
     static TAB_BAR_H = 38;
     static BAR_GAP = 2; // hairline between the chrome and the page card
@@ -920,7 +922,7 @@ class Tabs {
         try {
             tab.webContents.executeJavaScript(YOUTUBE_SPACE_FIX_JS, true);
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'applyYouTubeSpaceFix', e); }
     }
     applyYouTubeExitFullscreen(tab) {
         if (!tab || !tab.webContents || tab.webContents.isDestroyed())
@@ -931,7 +933,7 @@ class Tabs {
         try {
             tab.webContents.executeJavaScript('window.__inkYouTubeExitFullscreen && window.__inkYouTubeExitFullscreen();', true);
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'applyYouTubeExitFullscreen', e); }
     }
     setupTabListeners(tabIndex, tab) {
         let isNavigatingProgrammatically = false;
@@ -948,28 +950,20 @@ class Tabs {
                     event.preventDefault();
                 }
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'blockDangerousNav', e); }
         };
         tab.webContents.on('will-navigate', blockDangerousNav);
         tab.webContents.on('will-redirect', blockDangerousNav);
-        // Same-tab link click to a site the user has DECIDED to isolate (rule set,
-        // not 'ask') → hand it off to its tenant instance instead of loading it in
-        // this default-session tab. Only for main-frame, non-instance, non-private
-        // tabs; 'ask' sites are handled on the typed/new-tab paths (no mid-click
-        // prompt), and redirects (will-redirect) are never re-routed so SSO chains
-        // complete.
-        tab.webContents.on('will-navigate', (event, url) => {
-            try {
-                if (this.isPrivateWindow || this.privateTabs.has(tabIndex) || this.tabContainers.get(tabIndex))
-                    return;
-                return; // no per-site routing
-            }
-            catch { }
-        });
         tab.webContents.on('did-navigate', (event, url) => {
             // Keep the view backing in sync: frosted (transparent) for internal
             // pages, opaque for web content so vibrancy doesn't bleed through.
             this._applyTabBackground(tab, url);
+            // Restore the zoom this site was last read at. Chromium resets the
+            // level per navigation, so this has to run on every one.
+            zoom.apply(tab.webContents, url);
+            // Navigating away invalidates the restored reading position.
+            if (tab._restoreScroll === false)
+                this.tabScroll.delete(tabIndex);
             // Reader view loaded — keep the address bar showing the real page URL
             // and the article title instead of the internal file:// path.
             if (url.includes('/Reader/index.html')) {
@@ -982,7 +976,7 @@ class Tabs {
                 try {
                     this.mainWindow.webContents.send('reader-state', { index: tabIndex, active: true, available: true });
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'blockDangerousNav', e); }
                 isNavigatingProgrammatically = false;
                 return;
             }
@@ -993,7 +987,7 @@ class Tabs {
                 try {
                     this.mainWindow.webContents.send('reader-state', { index: tabIndex, active: false });
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'blockDangerousNav', e); }
             }
             if (!url.startsWith('file://') && !isNavigatingProgrammatically) {
                 if (lastAddedUrl !== url) {
@@ -1176,7 +1170,7 @@ class Tabs {
                             this.mainWindow.setFullScreen(false);
                         }
                     }
-                    catch { }
+                    catch (e) { log.debug('tabs', 'blockDangerousNav', e); }
                 }, 0);
             }
             else {
@@ -1189,6 +1183,57 @@ class Tabs {
                 this.resizeAllTabs();
             }
         });
+        // ── Crash + hang recovery ────────────────────────────────────────────
+        // Without these a crashed renderer leaves a blank rectangle the user can
+        // only fix by closing the tab, and a page stuck in a loop can't be
+        // stopped from the UI at all.
+        tab.webContents.on('render-process-gone', (_event, details) => {
+            // 'clean-exit' is the sleep scan discarding an idle tab on purpose.
+            if (details?.reason === 'clean-exit' || tab.slept || tab._unloading)
+                return;
+            const url = this.tabUrls.get(tabIndex) || '';
+            log.error('tabs', `renderer gone for tab ${tabIndex}: ${details?.reason} (exit ${details?.exitCode})`);
+            const params = new URLSearchParams({
+                url: url && url !== 'newtab' ? url : '',
+                reason: details?.reason || 'crashed',
+                killed: tab._killedForHang ? '1' : '',
+            });
+            tab._killedForHang = false;
+            try {
+                tab.webContents.loadFile(resolveAppFile('renderer/Crashed/index.html'), { search: '?' + params.toString() });
+            }
+            catch (e) {
+                log.error('tabs', 'could not show the crash page', e);
+            }
+        });
+        // A page pinning its main thread: offer to wait or stop it, the way
+        // every other browser does. Only for the tab the user is looking at —
+        // a background tab churning is not worth a modal.
+        tab.webContents.on('unresponsive', () => {
+            if (this.activeTabIndex !== tabIndex || tab._hangPrompt)
+                return;
+            tab._hangPrompt = true;
+            const host = (() => {
+                try { return new URL(this.tabUrls.get(tabIndex) || '').host; }
+                catch { return 'This page'; }
+            })();
+            dialog.showMessageBox(this.mainWindow, {
+                type: 'warning',
+                buttons: ['Wait', 'Stop page'],
+                defaultId: 0,
+                cancelId: 0,
+                message: `${host} isn’t responding`,
+                detail: 'You can wait for it to catch up, or stop it and reload.',
+            }).then(({ response }) => {
+                tab._hangPrompt = false;
+                if (response === 1 && !tab.webContents.isDestroyed()) {
+                    tab._killedForHang = true;
+                    try { tab.webContents.forcefullyCrashRenderer(); }
+                    catch (e) { log.error('tabs', 'could not stop the hung page', e); }
+                }
+            }).catch(() => { tab._hangPrompt = false; });
+        });
+        tab.webContents.on('responsive', () => { tab._hangPrompt = false; });
         // Error page — skip aborts (e.g. navigating away mid-load) and sub-frame errors
         tab.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
             if (!isMainFrame)
@@ -1201,7 +1246,7 @@ class Tabs {
                         tab.webContents.executeJavaScript("document.documentElement.classList.remove('leaving')", true).catch(() => { });
                     }
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'host', e); }
                 return;
             }
             const params = new URLSearchParams({
@@ -1261,12 +1306,25 @@ class Tabs {
                         this.sendLoadingState(tabIndex, false);
                     }
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'host', e); }
             }, 3000);
         });
         tab.webContents.on('did-finish-load', () => {
             this.sendNavigationUpdate(tabIndex);
             this.detectReaderable(tabIndex, tab);
+            // A tab restored from the last session opens where it was left. Once
+            // only: after this the page owns its own scrolling. Deferred a beat
+            // so late-laying-out pages don't snap back to the top.
+            const y = this.tabScroll.get(tabIndex);
+            if (y > 0 && tab._restoreScroll !== false) {
+                tab._restoreScroll = false;
+                setTimeout(() => {
+                    try {
+                        tab.webContents.executeJavaScript(`window.scrollTo(0, ${Number(y) || 0})`, true).catch(() => { });
+                    }
+                    catch (e) { log.debug('tabs', 'host', e); }
+                }, 220);
+            }
         });
         tab.webContents.on('did-stop-loading', () => {
             clearTimeout(tab._loadingCapTimer);
@@ -1283,9 +1341,9 @@ class Tabs {
             // hold, so it plays normally once the user actually opens the tab.
             if (tab.bgHoldMedia && tabIndex !== this.activeTabIndex) {
                 try {
-                    tab.webContents.executeJavaScript("(()=>{try{document.querySelectorAll('video,audio').forEach(m=>{try{m.pause();}catch(e){}});}catch(e){}})()", true).catch(() => { });
+                    tab.webContents.executeJavaScript("(()=>{try{document.querySelectorAll('video,audio').forEach(m=>{try{m.pause();}catch (e) { log.debug('tabs', 'host', e); }});}catch (e) { log.debug('tabs', 'host', e); }})()", true).catch(() => { });
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'host', e); }
                 return;
             }
             tab.hasPlayingMedia = true;
@@ -1293,13 +1351,13 @@ class Tabs {
                 try {
                     this.mainWindow.webContents.send('media-state', { index: tabIndex, playing: true });
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'host', e); }
             }
             // Mini player: media playing in a background tab shows the overlay.
             try {
                 miniPlayer.onMediaState(this.getWindowData(), tabIndex, true);
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'host', e); }
             this.sendMediaIndicators(tabIndex, tab); // muted tabs stay marked while playing
         });
         tab.webContents.on('media-paused', () => {
@@ -1308,12 +1366,12 @@ class Tabs {
                 try {
                     this.mainWindow.webContents.send('media-state', { index: tabIndex, playing: false });
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'host', e); }
             }
             try {
                 miniPlayer.onMediaState(this.getWindowData(), tabIndex, false);
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'host', e); }
             this.sendMediaIndicators(tabIndex, tab);
         });
         // ── Tab-strip media indicators ────────────────────────────────────────
@@ -1348,7 +1406,7 @@ class Tabs {
                 playing: !!tab.hasPlayingMedia,
             });
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'sendMediaIndicators', e); }
     }
     sendTabUpdate(tabIndex, tab, url, title, favicon) {
         let displayUrl = url;
@@ -1397,7 +1455,7 @@ class Tabs {
             try {
                 resolvedFavicon = `${new URL(url).origin}/favicon.ico`;
             }
-            catch (e) { }
+            catch (e) { log.debug('tabs', 'base', e); }
         }
         const ctrId = this.tabContainers.get(tabIndex) || null;
         this.mainWindow.webContents.send('url-updated', {
@@ -1453,7 +1511,7 @@ class Tabs {
                 tab.slept = true;
                 wc.forcefullyCrashRenderer(); // frees the whole renderer process
             }
-            catch { }
+            catch (e) { log.debug('tabs', '_sleepScan', e); }
         });
     }
     /**
@@ -1472,7 +1530,7 @@ class Tabs {
             return;
         tab.slept = false;
         try { tab.webContents.reload(); }
-        catch { }
+        catch (e) { log.debug('tabs', '_wakeTab', e); }
     }
     // Tell the chrome a tab started/stopped loading so it can show a tab
     // spinner and flip the reload button to a stop button (and back).
@@ -1480,7 +1538,7 @@ class Tabs {
         try {
             this.mainWindow.webContents.send('tab-loading', { index: tabIndex, loading: !!loading });
         }
-        catch (e) { }
+        catch (e) { log.debug('tabs', 'sendLoadingState', e); }
     }
     sendNavigationUpdate(tabIndex) {
         if (this.tabMap.has(tabIndex) && tabIndex === this.activeTabIndex) {
@@ -1491,8 +1549,7 @@ class Tabs {
                     canGoForward: this.canGoForward(tabIndex)
                 });
             }
-            catch (error) {
-            }
+            catch (error) { log.debug('tabs', 'sendNavigationUpdate', error); }
         }
     }
     addToHistory(url, title, profile = null) {
@@ -1503,484 +1560,19 @@ class Tabs {
             // chrome.history.onVisited fires for REAL browsing, not just for
             // visits an extension recorded through the API.
             try { require('./ext-events').historyVisited(url, title, this.profileId || '1'); }
-            catch { }
+            catch (e) { log.debug('tabs', 'addToHistory', e); }
         }
     }
-    // ── Split view (two tabs side by side) ────────────────────────────────────
-    _splitHalves() {
-        const b = this.getTabBounds();
-        const gap = 6;
-        const w = Math.max(0, Math.floor((b.width - gap) / 2));
-        return [
-            { x: b.x, y: b.y, width: w, height: b.height },
-            { x: b.x + w + gap, y: b.y, width: b.width - w - gap, height: b.height },
-        ];
-    }
-    _layoutSplit() {
-        if (!this.splitPair)
-            return;
-        const [l, r] = this.splitPair;
-        if (!this.tabMap.has(l) || !this.tabMap.has(r)) {
-            this.splitPair = null;
-            return;
-        }
-        const [lb, rb] = this._splitHalves();
-        const radius = this._pageRadius();
-        const place = (idx, bounds) => {
-            const tab = this.tabMap.get(idx);
-            if (tab.slept)
-                this._wakeTab(tab);
-            tab.setBounds(bounds);
-            try { tab.setBorderRadius(radius); } catch { }
-            tab.setVisible(true);
-        };
-        place(l, lb);
-        place(r, rb);
-        this.raiseFloatingViews();
-    }
-    splitWithActive(otherIdx) {
-        const a = this.activeTabIndex;
-        if (otherIdx == null || otherIdx === a || !this.tabMap.has(otherIdx) || !this.tabMap.has(a))
-            return;
-        // Split only within one workspace, and not private tabs.
-        if ((this.tabProfiles.get(a) || '1') !== (this.tabProfiles.get(otherIdx) || '1'))
-            return;
-        if (this.privateTabs.has(a) || this.privateTabs.has(otherIdx))
-            return;
-        this.splitPair = [a, otherIdx];
-        this.showTab(a); // lays out the split (see showTab tail)
-        try { this.mainWindow.webContents.send('split-changed', this.splitPair.slice()); } catch { }
-    }
-    closeSplit() {
-        if (!this.splitPair)
-            return;
-        const keep = this.splitPair.includes(this.activeTabIndex) ? this.activeTabIndex : this.splitPair[0];
-        this.splitPair = null;
-        try { this.mainWindow.webContents.send('split-changed', null); } catch { }
-        this.showTab(keep);
-    }
-    isSplit() { return !!this.splitPair; }
-    /**
-     * Split/unsplit from a single keystroke.
-     *
-     * Split view was previously reachable only by right-clicking a tab, which
-     * meant most people never found it. With no explicit partner to pair with,
-     * the sensible one is the tab you were on last — tabLastActive already
-     * tracks that for the sleep scan.
-     */
-    toggleSplit() {
-        if (this.splitPair) {
-            this.closeSplit();
-            return;
-        }
-        const active = this.activeTabIndex;
-        let best = null;
-        let bestAt = -1;
-        for (const [idx] of this.tabMap) {
-            if (idx === active)
-                continue;
-            // Same workspace, and never private — splitWithActive enforces this
-            // too, but picking a candidate it would reject just no-ops.
-            if ((this.tabProfiles.get(idx) || '1') !== (this.tabProfiles.get(active) || '1'))
-                continue;
-            if (this.privateTabs.has(idx) || this.privateTabs.has(active))
-                continue;
-            const at = this.tabLastActive.get(idx) || 0;
-            if (at > bestAt) {
-                bestAt = at;
-                best = idx;
-            }
-        }
-        if (best !== null)
-            this.splitWithActive(best);
-    }
-    // ── Glance (floating page preview over the current tab) ────────────────────
-    _layoutGlance() {
-        if (!this.glanceView)
-            return;
-        const b = this.getTabBounds();
-        // Dim backdrop fills the page region so the glance reads as a floating card.
-        try { this.glanceBackdrop?.setBounds(b); }
-        catch { }
-        const w = Math.min(Math.floor(b.width * 0.66), 900);
-        const total = Math.min(Math.floor(b.height * 0.80), 720);
-        const x = b.x + Math.floor((b.width - w) / 2);
-        const y = b.y + Math.floor((b.height - total) / 2);
-        // The card carries no chrome of its own, so Esc / Cmd+Enter were the
-        // only ways to act on it and neither is visible. A header strip above
-        // it names the site and offers the two actions.
-        const barH = this.glanceBar ? Tabs.GLANCE_BAR_H : 0;
-        const gap = this.glanceBar ? Tabs.GLANCE_BAR_GAP : 0;
-        try { this.glanceBar?.setBounds({ x, y, width: Math.max(0, w), height: barH }); }
-        catch { }
-        try {
-            this.glanceView.setBounds({
-                x, y: y + barH + gap,
-                width: Math.max(0, w),
-                height: Math.max(0, total - barH - gap),
-            });
-        }
-        catch { }
-    }
-    openGlance(url) {
-        if (!/^https?:/i.test(url || ''))
-            return;
-        this.closeGlance();
-        const active = this.tabMap.get(this.activeTabIndex);
-        // Dim backdrop over the page so the glance reads as a floating card; a click
-        // on it blurs the glance, which dismisses it (see the blur handler below).
-        try {
-            const backdrop = new WebContentsView({ webPreferences: { contextIsolation: true, nodeIntegration: false } });
-            try { backdrop.setBorderRadius(this._pageRadius()); } catch { }
-            backdrop.setBackgroundColor('#00000000');
-            this.mainWindow.contentView.addChildView(backdrop);
-            backdrop.webContents.loadURL('data:text/html,<body style="margin:0;height:100vh;background:rgba(8,10,20,0.5)"></body>');
-            this.glanceBackdrop = backdrop;
-        }
-        catch { }
-        // Same session as the current tab, so a glance from a profile/profile tab
-        // stays in that isolated session.
-        const sess = active?.webContents?.session;
-        const view = new WebContentsView({
-            webPreferences: {
-                preload: preloadForPage(url),
-                contextIsolation: true,
-                nodeIntegration: false,
-                ...(sess ? { session: sess } : {}),
-            },
-        });
-        try { view.setBorderRadius(14); } catch { }
-        view.setBackgroundColor('#00000000');
-        this.mainWindow.contentView.addChildView(view);
-        this.glanceView = view;
-        this.glanceUrl = url;
-        try {
-            const bar = new WebContentsView({
-                webPreferences: {
-                    preload: path.join(__dirname, '../preload/glance-bar-preload.js'),
-                    contextIsolation: true,
-                    nodeIntegration: false,
-                },
-            });
-            bar.setBackgroundColor('#00000000');
-            this.mainWindow.contentView.addChildView(bar);
-            this.glanceBar = bar;
-            bar.webContents.loadFile(resolveAppFile('renderer/GlanceBar/index.html'));
-        }
-        catch { }
-        this._glanceOpenedAt = Date.now();
-        UserAgent.setupTab(view);
-        // A link opened from within the glance promotes to a real tab.
-        view.webContents.setWindowOpenHandler(({ url: u }) => {
-            setImmediate(() => {
-                try {
-                    const idx = this.createTab(this.activeTabIndex, true, false);
-                    this.loadUrl(idx, u);
-                }
-                catch { }
-            });
-            this.closeGlance();
-            return { action: 'deny' };
-        });
-        this._layoutGlance();
-        view.webContents.loadURL(url);
-        // Esc closes; Cmd/Ctrl+Enter promotes the glance to a real tab.
-        view.webContents.on('before-input-event', (e, input) => {
-            if (input.type !== 'keyDown')
-                return;
-            if (input.key === 'Escape') { e.preventDefault(); this.closeGlance(); }
-            else if (input.key === 'Enter' && (input.meta || input.control)) { e.preventDefault(); this.promoteGlance(); }
-        });
-        // Click-away closes the glance — but only once it has actually held focus
-        // (armed on its first 'focus'), so the launching click's focus churn or a
-        // slow first paint can't dismiss it the instant it opens.
-        let armed = false;
-        view.webContents.on('focus', () => { armed = true; });
-        view.webContents.on('blur', () => {
-            if (!armed || Date.now() - (this._glanceOpenedAt || 0) < 350)
-                return;
-            // Clicking the header strip blurs the card, so closing immediately
-            // would tear the header down before its button click registered.
-            // Defer briefly and stand down if the header took the focus.
-            setTimeout(() => {
-                try {
-                    if (this.glanceBar && !this.glanceBar.webContents.isDestroyed()
-                        && this.glanceBar.webContents.isFocused())
-                        return;
-                }
-                catch { }
-                this.closeGlance();
-            }, 130);
-        });
-        // Focus on the next tick so the launching click has fully settled first.
-        setTimeout(() => { try { this.glanceView === view && view.webContents.focus(); } catch { } }, 60);
-    }
-    closeGlance() {
-        if (this.glanceBar) {
-            const bar = this.glanceBar;
-            this.glanceBar = null;
-            try { this.mainWindow.contentView.removeChildView(bar); } catch { }
-            try { bar.webContents.close?.(); } catch { }
-        }
-        if (this.glanceBackdrop) {
-            const bd = this.glanceBackdrop;
-            this.glanceBackdrop = null;
-            try { this.mainWindow.contentView.removeChildView(bd); } catch { }
-            try { bd.webContents.close?.(); } catch { }
-        }
-        if (!this.glanceView)
-            return;
-        const v = this.glanceView;
-        this.glanceView = null;
-        this.glanceUrl = null;
-        try { this.mainWindow.contentView.removeChildView(v); } catch { }
-        try { v.webContents.close?.(); } catch { }
-        try { this.tabMap.get(this.activeTabIndex)?.webContents.focus(); } catch { }
-    }
-    promoteGlance() {
-        const url = this.glanceUrl;
-        this.closeGlance();
-        if (url) {
-            const idx = this.createTab(this.activeTabIndex, true, false);
-            this.loadUrl(idx, url);
-        }
-    }
-    isGlancing() { return !!this.glanceView; }
-    // ── Workspaces (a workspace IS a profile, switched in place) ───────────────
-    // The window keeps tabs of every workspace alive in tabMap; only the active
-    // workspace's tabs are shown/counted. Switching swaps the visible set.
-    tabsInWorkspace(id) {
-        const key = String(id);
-        return this.tabOrder.filter(i => this.tabMap.has(i) && (this.tabProfiles.get(i) || '1') === key);
-    }
-    // ── Folders (tab groups within a workspace) ────────────────────────────────
-    foldersForWorkspace(id) {
-        const key = String(id);
-        return this.folders.filter(f => String(f.workspace) === key);
-    }
-    broadcastFolders() {
-        try {
-            const ws = this.profileId;
-            const folders = this.foldersForWorkspace(ws).map(f => ({ ...f }));
-            const ids = new Set(folders.map(f => f.id));
-            const assignments = [...this.tabFolders.entries()].filter(([idx, fid]) => this.tabMap.has(idx) && ids.has(fid));
-            this.mainWindow.webContents.send('folders-changed', { folders, assignments });
-        }
-        catch { }
-    }
-    // Folders nest up to MAX_FOLDER_DEPTH levels, matching the reference.
-    _folderDepth(id) {
-        let d = 0, cur = this.folders.find(f => f.id === id);
-        while (cur?.parent && d < 10) { cur = this.folders.find(f => f.id === cur.parent); d++; }
-        return d;
-    }
-    createFolder(name, workspace, parent) {
-        const id = 'f' + (this._folderSeq++);
-        let pid = parent ? String(parent) : null;
-        // Refuse to nest past the cap — the folder is created at the root instead.
-        if (pid && this._folderDepth(pid) >= 4)
-            pid = null;
-        this.folders.push({ id, name: (name || 'New Folder').slice(0, 40), collapsed: false, workspace: String(workspace || this.profileId), ...(pid ? { parent: pid } : {}) });
-        this.broadcastFolders();
-        this.saveStateDebounced?.();
-        return id;
-    }
-    renameFolder(id, name) {
-        const f = this.folders.find(x => x.id === id);
-        if (f && typeof name === 'string' && name.trim()) { f.name = name.trim().slice(0, 40); this.broadcastFolders(); this.saveStateDebounced?.(); }
-    }
-    setFolderIcon(id, icon) {
-        const f = this.folders.find(x => x.id === id);
-        if (f) { f.icon = (icon || '').slice(0, 8) || null; this.broadcastFolders(); this.saveStateDebounced?.(); }
-    }
-    toggleFolder(id, collapsed) {
-        const f = this.folders.find(x => x.id === id);
-        if (f) { f.collapsed = (collapsed == null) ? !f.collapsed : !!collapsed; this.broadcastFolders(); this.saveStateDebounced?.(); }
-    }
-    // Reorder folders within the current workspace. `ids` is the new order for
-    // this workspace only — folders in other workspaces keep their relative
-    // positions, so a reorder here can't disturb them.
-    // Rename a tab. Passing a blank label clears the override so the page title
-    // takes over again (the reference's "reset" behaviour).
-    setTabLabel(index, label) {
-        const i = Number(index);
-        const tab = this.tabMap.get(i);
-        if (!tab)
-            return;
-        const clean = (label || '').trim().slice(0, 60);
-        if (clean)
-            this.tabLabels.set(i, clean);
-        else
-            this.tabLabels.delete(i);
-        this.sendTabUpdate(i, tab, this.tabUrls.get(i) || '', clean || tab.lazyTitle);
-        this.saveStateDebounced?.();
-    }
-    // A pinned icon replaces the favicon and survives navigation; blank resets.
-    setTabIcon(index, icon) {
-        const i = Number(index);
-        if (!this.tabMap.has(i))
-            return;
-        const clean = (icon || '').trim().slice(0, 8);
-        if (clean)
-            this.tabIcons.set(i, clean);
-        else
-            this.tabIcons.delete(i);
-        try { this.mainWindow.webContents.send('tab-icon-changed', { index: i, icon: clean || null }); }
-        catch { }
-        this.saveStateDebounced?.();
-    }
-    /**
-     * Discard a tab's page while keeping its row. Rather than destroying the
-     * view (which would disturb bounds/z-order bookkeeping), this reuses the
-     * lazy-tab path: blank the contents and clear lazyLoaded, so showTab reloads
-     * the stored URL when you come back to it. The active tab is never unloaded.
-     */
-    // The url a pinned tab returns to. Blank clears it back to the current page.
-    setPinnedHome(index, url) {
-        const i = Number(index);
-        if (!this.pinnedTabs.has(i))
-            return false;
-        const clean = (url || '').trim();
-        this.pinnedHome.set(i, clean || this.tabUrls.get(i) || 'newtab');
-        this.saveStateDebounced?.();
-        return true;
-    }
-    resetPinnedTab(index) {
-        const i = Number(index);
-        const home = this.pinnedHome.get(i);
-        if (!home || !this.tabMap.has(i))
-            return false;
-        this.openUrlUserInitiated(i, home);
-        return true;
-    }
-    unloadTab(index) {
-        const i = Number(index);
-        const tab = this.tabMap.get(i);
-        const url = this.tabUrls.get(i);
-        if (!tab || i === this.activeTabIndex || !url || url === 'newtab')
-            return false;
-        if (tab.lazyLoaded === false)
-            return false; // already unloaded
-        // Capture the title first — blanking the page would otherwise lose it.
-        const keep = this.tabLabels.get(i) || this.computeDisplayTitleFor(i) || tab.lazyTitle || 'New Tab';
-        // Blanking navigates, which would drive the normal title/url handlers and
-        // leave the row reading "about:blank" with its stored url replaced — so
-        // flag it, then put the real url and title back once the blank settles.
-        tab._unloading = true;
-        try {
-            tab.webContents.stop();
-            tab.webContents.loadURL('about:blank');
-        }
-        catch { }
-        tab.lazyLoaded = false;
-        tab.lazyTitle = keep;
-        const restore = () => {
-            tab._unloading = false;
-            this.tabUrls.set(i, url);
-            tab.lazyTitle = keep;
-            this.sendTabUpdate(i, tab, url, keep);
-        };
-        try { tab.webContents.once('did-finish-load', restore); }
-        catch { }
-        setTimeout(restore, 900); // in case the blank load reports nothing
-        return true;
-    }
-    // Unload every tab in a workspace except the active one.
-    unloadWorkspace(ws) {
-        let n = 0;
-        for (const idx of this.tabsInWorkspace(ws || this.profileId))
-            if (this.unloadTab(idx)) n++;
-        return n;
-    }
-    reorderFolders(ids) {
-        const ws = String(this.profileId);
-        const wanted = (ids || []).map(String);
-        const mine = this.folders.filter(f => String(f.workspace) === ws);
-        const byId = new Map(mine.map(f => [f.id, f]));
-        const ordered = wanted.map(id => byId.get(id)).filter(Boolean);
-        if (ordered.length !== mine.length) return; // stale list — ignore
-        let i = 0;
-        this.folders = this.folders.map(f => String(f.workspace) === ws ? ordered[i++] : f);
-        this.broadcastFolders();
-        this.saveStateDebounced?.();
-    }
-    // Move a folder to another workspace. Its tabs go with it, otherwise they'd
-    // be stranded in a workspace whose folder list no longer names them.
-    moveFolderToWorkspace(id, workspace) {
-        const f = this.folders.find(x => x.id === id);
-        if (!f) return;
-        const ws = String(workspace);
-        if (ws === String(f.workspace)) return;
-        f.workspace = ws;
-        const moved = [];
-        for (const [idx, fid] of this.tabFolders.entries()) {
-            if (fid !== id || !this.tabMap.has(idx)) continue;
-            this.tabProfiles.set(idx, ws);
-            moved.push(idx);
-        }
-        if (moved.length) {
-            try { this.mainWindow.webContents.send('tabs-workspace-changed', { indices: moved, workspace: ws }); }
-            catch { }
-            // A moved-away tab must not stay on screen in the old workspace.
-            if (moved.includes(this.activeTabIndex)) {
-                const stay = this.tabsInWorkspace(this.profileId)[0];
-                if (stay !== undefined) this.showTab(stay);
-            }
-        }
-        this.broadcastFolders();
-        this.saveStateDebounced?.();
-    }
-    deleteFolder(id) {
-        // "Unpack": tabs survive, just leave the folder.
-        for (const [idx, fid] of [...this.tabFolders.entries()]) if (fid === id) this.tabFolders.delete(idx);
-        // Children would otherwise point at a folder that no longer exists.
-        const gone = this.folders.find(f => f.id === id);
-        for (const f of this.folders)
-            if (f.parent === id) {
-                if (gone?.parent) f.parent = gone.parent;
-                else delete f.parent;
-            }
-        this.folders = this.folders.filter(f => f.id !== id);
-        this.broadcastFolders();
-        this.saveStateDebounced?.();
-    }
-    reopenClosedTab() {
-        const last = this.closedTabHistory.pop();
-        if (last && last.url && last.url !== 'newtab') { const i = this.createTab(); this.loadUrl(i, last.url); }
-        else this.createTab();
-    }
-    toggleCompact() {
-        this.sidebarCompact = !this.sidebarCompact;
-        this.resizeAllTabs();
-        try { this.mainWindow.webContents.send('sidebar-compact-changed', this.sidebarCompact); } catch { }
-    }
-    setTabFolder(index, folderId) {
-        if (!this.tabMap.has(index)) return;
-        if (folderId && this.folders.some(f => f.id === folderId)) this.tabFolders.set(index, folderId);
-        else this.tabFolders.delete(index);
-        this.broadcastFolders();
-        this.saveStateDebounced?.();
-    }
-    // Focus the active workspace after a switch: show its most-recent tab, or
-    // open a fresh one if it has none. (this.profileId already points at it.)
-    applyWorkspace() {
-        const mine = this.tabsInWorkspace(this.profileId);
-        if (!mine.length) {
-            this.createTab(); // lands in the new workspace (uses this.profileId)
-            return;
-        }
-        let target = mine.includes(this.activeTabIndex) ? this.activeTabIndex : null;
-        if (target == null)
-            target = mine.reduce((a, b) => ((this.tabLastActive.get(b) || 0) > (this.tabLastActive.get(a) || 0) ? b : a), mine[0]);
-        this.showTab(target);
-        this.broadcastFolders();
-    }
+    // Split view, glance and workspace/folder management live in
+    // features/tabs/{split,glance,organize}.js and are mixed into this
+    // prototype at the bottom of the file — this class was 3k lines and the
+    // three of them are self-contained.
     showTab(index) {
         // A glance is transient — dismiss it on any tab switch.
         this.closeGlance();
         // Switching to a tab outside the split pair dissolves the split.
         if (this.splitPair && !this.splitPair.includes(index))
-            this.splitPair = null;
+            this._clearSplit();
         this.tabMap.forEach((tab, i) => {
             tab.setVisible(false);
         });
@@ -1989,7 +1581,7 @@ class Tabs {
             // Background tabs skip live resizing (see resizeAllTabs) — catch up
             // on the current bounds before this one becomes visible.
             tab.setBounds(this.getTabBounds());
-            try { tab.setBorderRadius(this._pageRadius()); } catch { }
+            try { tab.setBorderRadius(this._pageRadius()); } catch (e) { log.debug('tabs', 'showTab', e); }
             tab.setVisible(true);
             // Sleep bookkeeping: the outgoing tab starts ageing now; the incoming
             // tab is fresh. Wake it if the sleep scan discarded its renderer.
@@ -2003,7 +1595,7 @@ class Tabs {
                 try {
                     tab.webContents.audioMuted = false;
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'showTab', e); }
             }
             // Viewing the tab releases the background-media hold, so media may
             // play now that the user is actually looking at it.
@@ -2018,7 +1610,7 @@ class Tabs {
             try {
                 miniPlayer.onTabSwitch(this.getWindowData(), prevActiveIndex, index);
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'prevActiveIndex', e); }
             if (tab.lazyLoaded === false) {
                 tab.lazyLoaded = true;
                 const lazyUrl = this.tabUrls.get(index);
@@ -2059,7 +1651,7 @@ class Tabs {
             try {
                 this.sendLoadingState(index, tab.webContents.isLoading());
             }
-            catch (e) { }
+            catch (e) { log.debug('tabs', 'prevActiveIndex', e); }
             // Sync reader/PiP button visibility to the newly active tab.
             try {
                 this.mainWindow.webContents.send('media-state', { index, playing: !!tab.hasPlayingMedia });
@@ -2070,7 +1662,7 @@ class Tabs {
                     this.detectReaderable(index, tab);
                 }
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'prevActiveIndex', e); }
             // Update window title to reflect the newly active tab
             this.updateWindowTitle(index);
             // Notify the extension system of the active tab (chrome.tabs + actions)
@@ -2104,7 +1696,7 @@ class Tabs {
                 try {
                     tab.webContents.executeJavaScript("document.documentElement.classList.add('leaving')", true).catch(() => { });
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'loadUrl', e); }
             }
             tab.webContents.loadURL(url);
             this.tabUrls.set(index, url);
@@ -2113,7 +1705,7 @@ class Tabs {
             try {
                 tempTitle = new URL(url).hostname;
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'loadUrl', e); }
             tab.lazyTitle = tempTitle;
             this.sendTabUpdate(index, tab, url, tempTitle);
             this.navigationHistory.addEntry(index, url);
@@ -2127,15 +1719,15 @@ class Tabs {
         try {
             tab.webContents.audioMuted = true;
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'destroyTab', e); }
         try {
             this.mainWindow.contentView.removeChildView(tab);
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'destroyTab', e); }
         try {
             tab.webContents.destroy();
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'destroyTab', e); }
         // Private tab → its isolated session dies with it. Deferred one tick
         // so the webContents teardown settles before storage is cleared.
         if (tab.privateSession) {
@@ -2144,7 +1736,7 @@ class Tabs {
             setImmediate(() => { try {
                 privateSessions.destroyTabSession(sess);
             }
-            catch { } });
+            catch (e) { log.debug('tabs', 'destroyTab', e); } });
         }
     }
     recordClosed(index) {
@@ -2158,7 +1750,7 @@ class Tabs {
             try {
                 title = tab?.webContents?.getTitle() || url;
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'recordClosed', e); }
             this.closedTabHistory.push({ url, title });
             if (this.closedTabHistory.length > 20)
                 this.closedTabHistory.shift();
@@ -2207,16 +1799,15 @@ class Tabs {
             this.tabContainers.delete(index); // container SESSION persists (shared, reusable)
             this.tabProfiles.delete(index);
             if (this.tabFolders.delete(index)) this.broadcastFolders();
-            if (this.splitPair && this.splitPair.includes(index)) {
-                this.splitPair = null;
-                try { this.mainWindow.webContents.send('split-changed', null); } catch { }
-            }
+            if (this.splitPair && this.splitPair.includes(index))
+                this._clearSplit();
             this.tabOrder = this.tabOrder.filter(i => i !== index);
+            this.tabScroll.delete(index);
             this.tabLastActive.delete(index);
             try {
                 miniPlayer.onTabClosed(this.getWindowData(), index);
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'removeTab', e); }
             this.navigationHistory.removeTab(index);
             this.mainWindow.webContents.send('tab-removed', {
                 index: index,
@@ -2233,7 +1824,7 @@ class Tabs {
                     // to go.
                     this.activeTabIndex = -1;
                     try { this.mainWindow.webContents.send('tab-switched', { index: -1 }); }
-                    catch { }
+                    catch (e) { log.debug('tabs', 'removeTab', e); }
                 }
             }
             if (this.tabMap.size === 0) {
@@ -2268,16 +1859,15 @@ class Tabs {
             this.tabContainers.delete(index); // container SESSION persists (shared, reusable)
             this.tabProfiles.delete(index);
             if (this.tabFolders.delete(index)) this.broadcastFolders();
-            if (this.splitPair && this.splitPair.includes(index)) {
-                this.splitPair = null;
-                try { this.mainWindow.webContents.send('split-changed', null); } catch { }
-            }
+            if (this.splitPair && this.splitPair.includes(index))
+                this._clearSplit();
             this.tabOrder = this.tabOrder.filter(i => i !== index);
+            this.tabScroll.delete(index);
             this.tabLastActive.delete(index);
             try {
                 miniPlayer.onTabClosed(this.getWindowData(), index);
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'nextActive', e); }
             this.navigationHistory.removeTab(index);
             this.mainWindow.webContents.send('tab-removed', {
                 index: index,
@@ -2387,7 +1977,7 @@ class Tabs {
                 try {
                     this.mainWindow.webContents.send('reader-state', { index, active: false, available: false });
                 }
-                catch { }
+                catch (e) { log.debug('tabs', 'url', e); }
             }
             return;
         }
@@ -2396,7 +1986,7 @@ class Tabs {
             try {
                 this.mainWindow.webContents.send('reader-state', { index, active: false, available: !!ok });
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'url', e); }
         })
             .catch(() => { });
     }
@@ -2422,12 +2012,12 @@ class Tabs {
         try {
             article = await tab.webContents.executeJavaScript(EXTRACT_JS, true);
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'toggleReader', e); }
         if (!article || !article.ok) {
             try {
                 this.mainWindow.webContents.send('reader-failed', { index });
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'toggleReader', e); }
             return;
         }
         this.readerArticles.set(index, article);
@@ -2497,7 +2087,7 @@ class Tabs {
                     tab.setBounds(bounds);
                     tab.setBorderRadius(radius);
                 }
-                catch { }
+                catch (e) { log.debug('tabs', '_scheduleBackgroundResize', e); }
             });
         }, 200);
     }
@@ -2510,7 +2100,7 @@ class Tabs {
             if (wd0?.sidePanelOpen)
                 require('./side-panel').syncWidth(wd0);
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'resizeAllTabs', e); }
         const bounds = this.getTabBounds();
         // Only the visible tab is resized immediately. Background views would
         // each relayout + repaint on every setBounds — with many tabs open
@@ -2520,11 +2110,17 @@ class Tabs {
         this.tabMap.forEach((tab, index) => {
             if (index === this.activeTabIndex) {
                 tab.setBounds(bounds);
-                try { tab.setBorderRadius(radius); } catch { }
+                try { tab.setBorderRadius(radius); } catch (e) { log.debug('tabs', 'resizeAllTabs', e); }
             }
         });
         if (this.splitPair)
             this._layoutSplit();
+        if (this.splitDrop)
+            try {
+                if (this.splitDrop.getVisible())
+                    this.splitDrop.setBounds(bounds);
+            }
+            catch (e) { log.debug('tabs', 'resizeAllTabs', e); }
         if (this.glanceView)
             this._layoutGlance();
         // Every bounds change funnels through here — window resize, sidebar
@@ -2537,7 +2133,7 @@ class Tabs {
             if (wd?.sidePanelOpen)
                 require('./side-panel').layout(wd);
         }
-        catch { }
+        catch (e) { log.debug('tabs', 'resizeAllTabs', e); }
     }
     collapseAllTabs() {
         // Move tabs off-screen so native views don't cover HTML overlays
@@ -2596,9 +2192,27 @@ class Tabs {
         const selected = includeAll
             ? order.filter(idx => !this.privateTabs.has(idx))
             : order.filter(idx => this.pinnedTabs.has(idx) && !this.privateTabs.has(idx));
+        const keepHistory = this.persistence?.get('restoreTabHistory') !== false;
         const tabs = selected.map((idx) => {
             const url = this.tabUrls.get(idx) || 'newtab';
             let title = this.computeDisplayTitleFor(idx) || 'New Tab';
+            // Back/forward and scroll position, so a restored tab is the tab you
+            // left rather than a fresh load of the same address. Capped: a very
+            // long history is not worth an unbounded state file.
+            let history = null, historyIndex = 0;
+            if (keepHistory) {
+                const h = this.navigationHistory.getHistory(idx);
+                if (h && Array.isArray(h.entries) && h.entries.length > 1) {
+                    const entries = h.entries
+                        .slice()
+                        .sort((a, b) => a.index - b.index)
+                        .map(e => ({ url: e.data, title: e.title || null }));
+                    const pos = h.entries.findIndex(e => e.index === h.currentIndex);
+                    const start = Math.max(0, entries.length - Tabs.MAX_RESTORED_HISTORY);
+                    history = entries.slice(start);
+                    historyIndex = Math.max(0, (pos === -1 ? entries.length - 1 : pos) - start);
+                }
+            }
             return {
                 url,
                 title,
@@ -2609,6 +2223,8 @@ class Tabs {
                 label: this.tabLabels.get(idx) || null,
                 icon: this.tabIcons.get(idx) || null,
                 home: this.pinnedHome.get(idx) || null,
+                scroll: this.tabScroll.get(idx) || 0,
+                ...(history ? { history, historyIndex } : {}),
             };
         });
         // Map active to its ordinal within the SAVED list (selected), not the
@@ -2623,12 +2239,17 @@ class Tabs {
         clearTimeout(this.saveTimer);
         this.saveTimer = setTimeout(() => {
             try {
-                this.persistence.saveState(this.buildSerializableState());
+                this.persistence.saveWindowState(this.windowKey, this.buildSerializableState());
             }
-            catch { }
+            catch (e) { log.debug('tabs', 'saveStateDebounced', e); }
         }, 200);
     }
 }
+
+// ── Prototype mixins ─────────────────────────────────────────────────────────
+// Cohesive subsystems kept out of this file. They are plain objects of methods,
+// so `this` is the Tabs instance and nothing needs to require Tabs back.
+Object.assign(Tabs.prototype, require('./tabs/split'), require('./tabs/glance'), require('./tabs/organize'));
 
 Tabs.parseNorthstarUrl = parseNorthstarUrl;
 module.exports = Tabs;

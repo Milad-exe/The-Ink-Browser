@@ -15,6 +15,7 @@
  * onCreated/onRemoved/onChanged/onMoved from one place.
  */
 'use strict';
+const log = require('./log');
 
 // sw → profile id. A worker only hears about its own space's data.
 const workers = new Map();
@@ -48,7 +49,7 @@ function activeProfiles() {
             out.add(_wm ? String(_wm.profileOf(wc)) : '1');
         }
     }
-    catch { }
+    catch (e) { log.debug('ext-events', 'activeProfiles', e); }
     return out;
 }
 
@@ -76,10 +77,10 @@ function broadcast(channel, data, profileId) {
             if (profileId != null && _wm && String(_wm.profileOf(wc)) !== String(profileId))
                 continue;
             try { wc.send(channel, data); }
-            catch { }
+            catch (e) { log.debug('ext-events', 'for', e); }
         }
     }
-    catch { }
+    catch (e) { log.debug('ext-events', 'for', e); }
 }
 
 // ── chrome.history ───────────────────────────────────────────────────────────
@@ -203,7 +204,7 @@ async function primeBookmarks(profileId) {
     if (!_wm || snapshots.has(String(profileId)))
         return;
     try { snapshots.set(String(profileId), snapshotOf(await barNode(_wm.bookmarksFor(profileId)))); }
-    catch { }
+    catch (e) { log.debug('ext-events', 'primeBookmarks', e); }
 }
 
 module.exports = {

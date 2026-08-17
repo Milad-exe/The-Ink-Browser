@@ -4,6 +4,7 @@
  * History is stored by Features/history.js and accessed here read-only
  * (writes happen inside Features/tabs.js as pages load).
  */
+const log = require('../features/log');
 function register(ipcMain, { wm }) {
     ipcMain.handle('history-get', async (_e) => {
         try {
@@ -73,7 +74,7 @@ function isSearchResultUrl(rawUrl) {
         if (p.includes('/search') && ps.has('q'))
             return true;
     }
-    catch { }
+    catch (e) { log.debug('history', 'isSearchResultUrl', e); }
     return false;
 }
 function relevanceScore(entry, q) {

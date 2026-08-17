@@ -22,8 +22,14 @@ const UserAgent = require('./features/user-agent');
 // A browser must not die because one deferred callback touched a destroyed
 // window (e.g. a load callback firing after its window was closed). Log it and
 // keep running — the same resilience Chrome has.
+const log = require('./features/log');
 process.on('uncaughtException', (err) => {
-    console.error('[main] uncaught exception (survived):', (err && err.stack) || err);
+    log.error('main', 'uncaught exception (survived)', err);
+});
+// A rejected promise nobody awaited is the same class of bug and, until now,
+// vanished entirely.
+process.on('unhandledRejection', (reason) => {
+    log.error('main', 'unhandled rejection (survived)', reason);
 });
 // Windows: tie the running process to the installed Start-menu/taskbar shortcut.
 // electron-builder's NSIS installer stamps that shortcut with the appId as its
@@ -90,6 +96,9 @@ const siteInfoIpc = require('./ipc/site-info');
 const miniPlayerIpc = require('./ipc/mini-player');
 const ctxMenuIpc = require('./ipc/ctxmenu');
 const paletteIpc = require('./ipc/palette');
+const userDataIpc = require('./ipc/user-data');
+const certErrors = require('./features/cert-errors');
+const defaultBrowser = require('./features/default-browser');
 // ── App ──────────────────────────────────────────────────────────────────────
 class Northstar {
     windowManager;
@@ -100,7 +109,21 @@ class Northstar {
         // Test seam — exposes internals to the Playwright harness only when
         // NORTHSTAR_TEST=1. No-op (and not even referenced) in normal runs.
         if (process.env.NORTHSTAR_TEST === '1') {
-            global.__northstarTest = { wm: this.windowManager, focusMode, privacy, adBlocker, containers: require('./features/containers'), profiles: require('./features/profiles') };
+            global.__northstarTest = {
+                wm: this.windowManager, focusMode, privacy, adBlocker,
+                containers: require('./features/containers'),
+                profiles: require('./features/profiles'),
+                encryption: require('./features/encryption'),
+                searchEngines: require('./features/search-engines'),
+                zoom: require('./features/zoom'),
+                defaultBrowser,
+                certErrors,
+                updates: require('./features/updates'),
+                i18n: require('./features/i18n'),
+                userData: require('./features/user-data'),
+                history: require('./features/history'),
+                log,
+            };
         }
     }
     registerIpc() {
@@ -127,9 +150,26 @@ class Northstar {
         passwordsIpc.register(ipcMain, deps);
         siteInfoIpc.register(ipcMain, deps);
         miniPlayerIpc.register(ipcMain, deps);
+        userDataIpc.register(ipcMain, deps); // import/export, cert exceptions, updates
         permissionUI.register(ipcMain, deps); // doorhanger controller: init(wm) + IPC
     }
     initApp() {
+        // TLS failures get a real interstitial (what's wrong, which certificate,
+        // an informed way through) instead of the generic network error page.
+        certErrors.register(app);
+        // Offer to be the system's http(s) handler. Registering is not the same
+        // as being chosen — the OS still asks the user — but without it the app
+        // never appears in the list at all.
+        try {
+            defaultBrowser.registerProtocols();
+            // …and actually open what the OS hands us (open-url on macOS, argv
+            // on Windows/Linux). Registering without this would make Northstar
+            // a link black hole.
+            defaultBrowser.init(this.windowManager);
+        }
+        catch (e) {
+            log.warn('main', 'protocol registration failed', e);
+        }
         app.whenReady().then(async () => {
             // Widevine CDM (castlabs Electron build) — required to decrypt DRM
             // video such as Crunchyroll / Netflix / Spotify. Must finish loading
@@ -202,7 +242,7 @@ class Northstar {
                 const langs = [...new Set(wanted)].filter(l => !available.length || available.includes(l));
                 sess.setSpellCheckerLanguages(langs.length ? langs : ['en-US']);
             }
-            catch { }
+            catch (e) { log.debug('main', 'cycle', e); }
             // Ad blocking — network-level (cancel requests) + cosmetic (hide elements).
             // NOT awaited: parsing ~250k filter rules must not delay the first
             // window. Until it finishes, shouldBlock() just returns false.
@@ -221,7 +261,7 @@ class Northstar {
             try {
                 app.configureHostResolver({ secureDnsMode: 'automatic' });
             }
-            catch { }
+            catch (e) { log.debug('main', 'cycle', e); }
             // Private sessions are created PER TAB (Features/private-session.js
             // createTabSession) — each private tab gets its own in-memory
             // partition with the full hardening stack, so no cookies/cache/
@@ -254,7 +294,7 @@ class Northstar {
             // restore lands in the right profile.
             let startProfile = '1';
             try { startProfile = String(this.windowManager.persistence.loadState()?.profile || '1'); }
-            catch { }
+            catch (e) { log.debug('main', 'cycle', e); }
             this.windowManager.createWindow(800, 600, { profile: startProfile });
             // Captive-portal check on startup: public Wi-Fi that needs a sign-in
             // is caught before the user tries to browse, and its login page opens
@@ -269,7 +309,7 @@ class Northstar {
                             wd.tabs.openCaptivePortalSignIn(loginUrl);
                     });
                 }
-                catch { }
+                catch (e) { log.debug('main', 'cycle', e); }
             }, 2500);
             // Housekeeping: once tabs have restored, drop dormant isolated sessions
             // (no open tab + no stored login) so they don't accumulate on disk.
@@ -282,7 +322,7 @@ class Northstar {
                             active.add(id);
                     containers.gc(active);
                 }
-                catch { }
+                catch (e) { log.debug('main', 'cycle', e); }
             }, 6000);
             // Dev live reload (--dev): edits under app/renderer refresh the UI
             // instantly — internal pages reload; the chrome hot-swaps CSS only
@@ -308,7 +348,7 @@ class Northstar {
                         }, 300);
                     });
                 }
-                catch { }
+                catch (e) { log.debug('main', 'cycle', e); }
             }
             // Extensions — enable Chrome Web Store install + reload persisted
             // extensions and set up the chrome.* APIs. Runs AFTER the first
@@ -320,7 +360,7 @@ class Northstar {
                     try {
                         wd.tabs?.tabMap.forEach(tab => extensionManager.addTab(tab.webContents, wd.window));
                     }
-                    catch { }
+                    catch (e) { log.debug('main', 'cycle', e); }
                 }
             })
                 .catch(() => { });
@@ -349,7 +389,7 @@ class Northstar {
                     try {
                         this.windowManager.createWindow();
                     }
-                    catch { }
+                    catch (e) { log.debug('main', 'cycle', e); }
                 }
             });
         });
@@ -358,20 +398,20 @@ class Northstar {
             try {
                 this.windowManager.savePrimaryState();
             }
-            catch { }
+            catch (e) { log.debug('main', 'cycle', e); }
             try {
                 this.windowManager.getAllWindows().forEach(w => {
                     if (w?.tabs)
                         w.tabs.allowClose = true;
                 });
             }
-            catch { }
+            catch (e) { log.debug('main', 'cycle', e); }
             // Wipe every per-tab private session unconditionally on quit —
             // covers private tabs/windows still open when the user quits.
             try {
                 privateSessions.wipeAll();
             }
-            catch { }
+            catch (e) { log.debug('main', 'cycle', e); }
         });
         app.on('window-all-closed', () => {
             if (process.platform !== 'darwin')

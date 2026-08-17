@@ -13,6 +13,7 @@
  * Both must stay listed in raiseFloatingViews() and getWindowByWebContents().
  */
 'use strict';
+const log = require('./log');
 const path = require('path');
 const { WebContentsView } = require('electron');
 const { resolveAppFile } = require('../app-paths');
@@ -40,7 +41,7 @@ function _emit() {
     const ids = openOnActionClickIds();
     for (const fn of listeners) {
         try { fn(ids); }
-        catch { }
+        catch (e) { log.debug('side-panel', 'for', e); }
     }
 }
 /** Extensions whose action click should open the side panel instead of a popup. */
@@ -135,7 +136,7 @@ async function open(extensionId, o = {}, wm) {
         const profiles = require('./profiles');
         session = profiles.sessionFor(wd.profileId || '1');
     }
-    catch { }
+    catch (e) { log.debug('side-panel', 'open', e); }
 
     if (!wd.sidePanelHeader) {
         const header = new WebContentsView({
@@ -159,9 +160,9 @@ async function open(extensionId, o = {}, wm) {
     // fixed at construction, and the user may have switched spaces.
     if (wd.sidePanel && wd.sidePanelSession !== session) {
         try { wd.window.contentView.removeChildView(wd.sidePanel); }
-        catch { }
+        catch (e) { log.debug('side-panel', 'if', e); }
         try { wd.sidePanel.webContents.close(); }
-        catch { }
+        catch (e) { log.debug('side-panel', 'if', e); }
         wd.sidePanel = null;
     }
     if (!wd.sidePanel) {
@@ -173,7 +174,7 @@ async function open(extensionId, o = {}, wm) {
             },
         });
         try { view.setBorderRadius(10); }
-        catch { }
+        catch (e) { log.debug('side-panel', 'if', e); }
         wd.sidePanel = view;
         wd.sidePanelSession = session;
         wd.window.contentView.addChildView(view);
@@ -189,23 +190,23 @@ async function open(extensionId, o = {}, wm) {
         wd.tabs.sidePanelWidth = widthFor(wd);
     layout(wd);
     try { wd.sidePanel.setVisible(true); }
-    catch { }
+    catch (e) { log.debug('side-panel', 'if', e); }
     try { wd.sidePanelHeader.setVisible(true); }
-    catch { }
+    catch (e) { log.debug('side-panel', 'if', e); }
     // Title for the header strip.
     let name = extensionId;
     try {
         const extensions = require('./extensions');
         name = extensions.list().find(r => r.id === extensionId)?.name || extensionId;
     }
-    catch { }
+    catch (e) { log.debug('side-panel', 'if', e); }
     try {
         await wd.sidePanelHeaderReady;
         wd.sidePanelHeader.webContents.send('side-panel-info', { name });
     }
-    catch { }
+    catch (e) { log.debug('side-panel', 'if', e); }
     try { wd.tabs?.resizeAllTabs(); }
-    catch { }
+    catch (e) { log.debug('side-panel', 'if', e); }
     return true;
 }
 
@@ -214,13 +215,13 @@ function close(wd) {
         return false;
     wd.sidePanelOpen = false;
     try { wd.sidePanel?.setVisible(false); }
-    catch { }
+    catch (e) { log.debug('side-panel', 'close', e); }
     try { wd.sidePanelHeader?.setVisible(false); }
-    catch { }
+    catch (e) { log.debug('side-panel', 'close', e); }
     if (wd.tabs)
         wd.tabs.sidePanelWidth = 0;
     try { wd.tabs?.resizeAllTabs(); }
-    catch { }
+    catch (e) { log.debug('side-panel', 'close', e); }
     return true;
 }
 
@@ -242,7 +243,7 @@ function layout(wd) {
             height: Math.max(0, page.height - HEADER_H - HEADER_GAP),
         });
     }
-    catch { }
+    catch (e) { log.debug('side-panel', 'layout', e); }
 }
 
 /**

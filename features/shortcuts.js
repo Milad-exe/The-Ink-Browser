@@ -1,3 +1,5 @@
+const log = require('./log');
+const zoom = require('./zoom');
 const { app } = require('electron');
 const focusMode = require('./focus-mode');
 class Shortcuts {
@@ -108,7 +110,7 @@ class Shortcuts {
                 const wd = this.tabManager.getWindowData?.();
                 if (wd) { require('../ipc/palette').openFor(wd); return; }
             }
-            catch { }
+            catch (e) { log.debug('shortcuts', 'registerTabShortcuts', e); }
             this.tabManager.createTab();
         });
         // New private tab — fully isolated session, wiped when the tab closes
@@ -165,7 +167,7 @@ class Shortcuts {
                 try {
                     title = new URL(url).hostname;
                 }
-                catch { }
+                catch (e) { log.debug('shortcuts', 'openPrivateWindow', e); }
                 this.tabManager.createLazyTab(url, title, false, false, true, true);
             }
             else {
@@ -262,7 +264,22 @@ class Shortcuts {
         };
         this.registerShortcut('CmdOrCtrl+K', focusBar);
         this.registerShortcut('CmdOrCtrl+L', focusBar);
-        this.registerShortcut('F6', focusBar);
+        // F6 moves between the page and the chrome, as it does in Firefox: from
+        // the page it lands in the address bar (Tab then walks the toolbar and
+        // the tab strip), and from the chrome it hands focus back to the page.
+        this.registerShortcut('F6', () => {
+            const chromeFocused = (() => {
+                try { return this.mainWindow.webContents.isFocused(); }
+                catch { return false; }
+            })();
+            if (!chromeFocused) {
+                focusBar();
+                return;
+            }
+            const tab = this.activeTab();
+            try { tab?.webContents.focus(); }
+            catch (e) { log.debug('shortcuts', 'chromeFocused', e); }
+        });
         this.registerShortcut('Alt+D', focusBar); // Windows / Edge convention
     }
     // ── Page shortcuts ─────────────────────────────────────────────────────────
@@ -358,7 +375,7 @@ class Shortcuts {
                 this.mainWindow.webContents.send('sidebar-compact-changed', this.tabManager.sidebarCompact);
                 this.tabManager.resizeAllTabs();
             }
-            catch { }
+            catch (e) { log.debug('shortcuts', 'registerBrowserShortcuts', e); }
         });
         // Toggle tab bar side (left sidebar ⇄ classic top strip).
         // Applies to every window: chrome reflows + page bounds resize.
@@ -374,7 +391,7 @@ class Shortcuts {
                     wd.window.webContents.send('tabbar-side-changed', next);
                     wd.tabs.resizeAllTabs();
                 }
-                catch { }
+                catch (e) { log.debug('shortcuts', 'next', e); }
             }
         });
         // Toggle focus mode
@@ -555,20 +572,30 @@ class Shortcuts {
         return this.tabManager.tabOrder.filter(i => this.tabManager.tabMap.has(i));
     }
     // ── Zoom helpers ───────────────────────────────────────────────────────────
+    // Each of these remembers the new level for the site (features/zoom.js), so
+    // the next visit opens at the size the user chose.
+    _setZoom(level) {
+        const tab = this.activeTab();
+        if (!tab)
+            return;
+        const clamped = Math.max(-3, Math.min(5, level));
+        tab.webContents.setZoomLevel(clamped);
+        const idx = this.tabManager?.activeTabIndex;
+        const url = this.tabManager?.tabUrls?.get(idx) || '';
+        zoom.remember(url, clamped, !this.tabManager?.privateTabs?.has(idx) && !this.tabManager?.isPrivateWindow);
+    }
     zoomIn() {
         const tab = this.activeTab();
         if (tab)
-            tab.webContents.setZoomLevel(tab.webContents.getZoomLevel() + 0.5);
+            this._setZoom(tab.webContents.getZoomLevel() + 0.5);
     }
     zoomOut() {
         const tab = this.activeTab();
         if (tab)
-            tab.webContents.setZoomLevel(tab.webContents.getZoomLevel() - 0.5);
+            this._setZoom(tab.webContents.getZoomLevel() - 0.5);
     }
     resetZoom() {
-        const tab = this.activeTab();
-        if (tab)
-            tab.webContents.setZoomLevel(0);
+        this._setZoom(0);
     }
     toggleFullScreen() {
         this.mainWindow.setFullScreen(!this.mainWindow.isFullScreen());

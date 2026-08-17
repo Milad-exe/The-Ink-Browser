@@ -4,6 +4,7 @@
  * Browser-action buttons/popups are handled by the <browser-action-list>
  * element (electron-chrome-extensions), not here.
  */
+const log = require('../features/log');
 const path = require('path');
 const { dialog, WebContentsView } = require('electron');
 const { resolveAppFile } = require('../app-paths');
@@ -38,7 +39,7 @@ async function ensurePanel(wd) {
         },
     });
     view.setBackgroundColor('#00000000');
-    try { view.setBorderRadius(12) } catch {}
+    try { view.setBorderRadius(12) } catch (e) { log.debug('extensions', 'if', e); }
     view.setVisible(false);
     wd.extensionsPanel = view;
     wd.window.contentView.addChildView(view);
@@ -56,7 +57,7 @@ function hidePanel(wd) {
         try {
             wd.window.webContents.send('extensions-panel-closed');
         }
-        catch { }
+        catch (e) { log.debug('extensions', 'hidePanel', e); }
         return true;
     }
     catch {
@@ -245,7 +246,7 @@ function installGapHandlers(ctx) {
     // Keep the bookmark bar / bookmarks page in sync when an extension writes.
     const broadcastBookmarks = () => {
         try { require('./utils').broadcastBookmarksChanged(webContents); }
-        catch { }
+        catch (e) { log.debug('extensions', 'broadcastBookmarks', e); }
     };
     const toNode = (item, parentId, index) => {
         const node = {
@@ -375,7 +376,7 @@ function installGapHandlers(ctx) {
             const profiles = require('../features/profiles');
             session = profiles.sessionFor(profileIdOf(_e));
         }
-        catch { }
+        catch (e) { log.debug('extensions', 'ensurePrimed', e); }
         return require('../features/ext-identity')
             .launchWebAuthFlow(id, { url, interactive }, wd?.window || null, session);
     });
@@ -409,7 +410,7 @@ function installGapHandlers(ctx) {
     handle('ext:devtools.reload', (_e, { ignoreCache } = {}) => {
         const wc = devtoolsExt.inspectedTab(activeWindow());
         try { ignoreCache ? wc?.reloadIgnoringCache() : wc?.reload(); }
-        catch { }
+        catch (e) { log.debug('extensions', 'activeWindow', e); }
         return true;
     });
     handle('ext:devtools.createPanel', (_e, panel = {}) => devtoolsExt.registerPanel(needId(_e), panel));
@@ -448,7 +449,7 @@ function attachGapHandlers(sw, wm) {
             }
         }
     }
-    catch { }
+    catch (e) { log.debug('extensions', 'extIdOf', e); }
     const profileIdOf = () => cachedProfile;
     extEvents.addWorker(sw, cachedProfile);
     // Establish the bookmark baseline now, so this worker's first real edit
@@ -500,12 +501,12 @@ function register(ipcMain, { wm }) {
             try {
                 wd.window.webContents.send('extensions-changed');
             }
-            catch { }
+            catch (e) { log.debug('extensions', 'register', e); }
             if (wd.extensionsPanel) {
                 try {
                     wd.extensionsPanel.webContents.send('extensions-data', listWithPinned());
                 }
-                catch { }
+                catch (e) { log.debug('extensions', 'register', e); }
             }
         }
     });
@@ -517,7 +518,7 @@ function register(ipcMain, { wm }) {
     const pushBehavior = (ids) => {
         for (const wd of wm.getAllWindows()) {
             try { wd.window.webContents.send('ext-sidepanel-behavior', ids); }
-            catch { }
+            catch (e) { log.debug('extensions', 'pushBehavior', e); }
         }
     };
     sidePanelFeature.onBehaviorChanged(pushBehavior);
@@ -553,7 +554,7 @@ function register(ipcMain, { wm }) {
             const wd = wm.getMostRecentlyFocusedWindow?.() || wm.getPrimaryWindow?.();
             id = wd?.tabs?.tabMap?.get(wd.tabs.activeTabIndex)?.webContents?.id ?? -1;
         }
-        catch { }
+        catch (e) { log.debug('extensions', 'ext:devtools.tabIdSync', e); }
         e.returnValue = id;
     });
     // DevTools-panel extensions: load their devtools_page so panels register,
@@ -629,7 +630,7 @@ function register(ipcMain, { wm }) {
                     wd.tabs.showTab(idx);
                     wd.window.focus();
                 }
-                catch { }
+                catch (e) { log.debug('extensions', 'extensions-open-store', e); }
                 return true;
             }
         }
@@ -638,7 +639,7 @@ function register(ipcMain, { wm }) {
             wd.tabs.showTab(idx);
             wd.window.focus();
         }
-        catch { }
+        catch (e) { log.debug('extensions', 'extensions-open-store', e); }
         return true;
     });
     // Chrome clicks / page clicks dismiss an open action popup (Firefox behavior).
@@ -660,12 +661,12 @@ function register(ipcMain, { wm }) {
             try {
                 wd.window.webContents.send('ext-pinned-changed', map);
             }
-            catch { }
+            catch (e) { log.debug('extensions', 'extensions-set-pinned', e); }
             if (wd.extensionsPanel) {
                 try {
                     wd.extensionsPanel.webContents.send('extensions-data', listWithPinned());
                 }
-                catch { }
+                catch (e) { log.debug('extensions', 'extensions-set-pinned', e); }
             }
         }
         return true;
@@ -688,7 +689,7 @@ function register(ipcMain, { wm }) {
         try {
             wd.window.webContents.send('ext-activate-action', id);
         }
-        catch { }
+        catch (e) { log.debug('extensions', 'extensions-activate', e); }
         return true;
     });
     // Toggle the panel under the puzzle toolbar button. Returns the new state.
@@ -708,18 +709,18 @@ function register(ipcMain, { wm }) {
             // height — otherwise the section opens below the fold.
             let extraRows = 0;
             try { extraRows = require('../features/devtools-ext').listPanels().length; }
-            catch { }
+            catch (e) { log.debug('extensions', 'extensions-panel-toggle', e); }
             view.setBounds(panelBounds(anchor, items.length + extraRows));
             // Re-add on every open: newly created tab views would otherwise
             // sit above the panel in the contentView child order.
             try {
                 wd.window.contentView.removeChildView(view);
             }
-            catch { }
+            catch (e) { log.debug('extensions', 'extensions-panel-toggle', e); }
             try {
                 wd.window.contentView.addChildView(view);
             }
-            catch { }
+            catch (e) { log.debug('extensions', 'extensions-panel-toggle', e); }
             view.webContents.send('extensions-data', items);
             view.setVisible(true);
             wd.extensionsPanelOpen = true;
@@ -753,7 +754,7 @@ function register(ipcMain, { wm }) {
                 height: h,
             });
         }
-        catch { }
+        catch (e) { log.debug('extensions', 'extensions-panel-height', e); }
         return true;
     });
     ipcMain.handle('extensions-panel-close', (_e) => {

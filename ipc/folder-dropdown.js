@@ -6,6 +6,7 @@
  * cross WebContentsView boundaries, dragging an item out of the dropdown uses
  * a cursor-polling loop to forward position events to the bar renderer.
  */
+const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView, Menu } = require('electron');
@@ -35,7 +36,7 @@ function register(ipcMain, { wm, screen, webContents }) {
                 },
             });
             view.setBackgroundColor('#00000000');
-            try { view.setBorderRadius(12) } catch {}
+            try { view.setBorderRadius(12) } catch (e) { log.debug('folder-dropdown', 'folder-dropdown-open', e); }
             wd.window.contentView.addChildView(view);
             wd.folderDropdown = view;
             wd.folderDropdownId = folderData.id;
@@ -80,7 +81,7 @@ function register(ipcMain, { wm, screen, webContents }) {
             wd.window.contentView.removeChildView(wd.folderDropdown);
             wd.window.contentView.addChildView(wd.folderDropdown);
         }
-        catch { }
+        catch (e) { log.debug('folder-dropdown', 'folder-dropdown-raise', e); }
     });
     // ── Resize / navigate ─────────────────────────────────────────────────────
     ipcMain.on('folder-dropdown-update-bounds', (_e, width, height) => {
@@ -96,7 +97,7 @@ function register(ipcMain, { wm, screen, webContents }) {
                 b.x = Math.max(0, winW - b.width);
             wd.folderDropdown.setBounds(b);
         }
-        catch { }
+        catch (e) { log.debug('folder-dropdown', 'folder-dropdown-update-bounds', e); }
     });
     ipcMain.on('folder-dropdown-navigate', (_e, url) => {
         const wd = wm.getWindowByWebContents(_e.sender);
@@ -153,7 +154,7 @@ function register(ipcMain, { wm, screen, webContents }) {
             try {
                 pollWindowData.window.webContents.send('extern-bookmark-drag-position', cursor.x - winBounds.x, cursor.y - winBounds.y);
             }
-            catch { }
+            catch (e) { log.debug('folder-dropdown', 'folder-dropdown-drag-start', e); }
         }, EXTERN_DRAG_POLL_MS);
     });
     ipcMain.on('folder-dropdown-drag-end', (_e) => {
@@ -191,7 +192,7 @@ function showFolderDropdownContextMenu(wd, item, wm, webContents) {
                 renameId,
             });
         }
-        catch { }
+        catch (e) { log.debug('folder-dropdown', 'refreshPanel', e); }
     }
     const startInlineRename = (itemId, itemTitle) => {
         if (!wd.folderDropdown)
@@ -199,7 +200,7 @@ function showFolderDropdownContextMenu(wd, item, wm, webContents) {
         try {
             wd.folderDropdown.webContents.send('folder-dropdown-start-rename', { id: itemId, title: itemTitle });
         }
-        catch { }
+        catch (e) { log.debug('folder-dropdown', 'startInlineRename', e); }
     };
     // "New Folder / Divider Here" items scoped to the parent folder being viewed
     const addHereItems = parentFolderId ? [

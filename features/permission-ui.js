@@ -12,6 +12,7 @@
  * The panel is a WebContentsView overlay (same technique as the site-info panel)
  * so it draws above the tab's WebContentsView.
  */
+const log = require('./log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
@@ -72,7 +73,7 @@ async function showNext(wd) {
         if (r && Number.isFinite(r.x) && Number.isFinite(r.y))
             anchor = r;
     }
-    catch { }
+    catch (e) { log.debug('permission-ui', 'item', e); }
     if (wd.window.isDestroyed())
         return;
     let view = wd.permView;
@@ -85,7 +86,7 @@ async function showNext(wd) {
             },
         });
         view.setBackgroundColor('#00000000');
-        try { view.setBorderRadius(12) } catch {}
+        try { view.setBorderRadius(12) } catch (e) { log.debug('permission-ui', 'item', e); }
         wd.permView = view;
         wd.window.contentView.addChildView(view);
         view.webContents.loadFile(resolveAppFile('renderer/PermissionPrompt/index.html'));
@@ -108,7 +109,7 @@ async function showNext(wd) {
             try {
                 wd.window.removeListener('blur', wd.permWindowBlur);
             }
-            catch { }
+            catch (e) { log.debug('permission-ui', 'onBlur', e); }
         }
         wd.permWindowBlur = onBlur;
         wd.window.on('blur', onBlur);
@@ -119,7 +120,7 @@ async function showNext(wd) {
             wd.window.contentView.removeChildView(view);
             wd.window.contentView.addChildView(view);
         }
-        catch { }
+        catch (e) { log.debug('permission-ui', 'onBlur', e); }
     }
     const winW = wd.window.getBounds().width;
     const left = Math.max(8, Math.min(Math.round(anchor.x) - 10, winW - PANEL_W - 8));
@@ -131,14 +132,14 @@ async function showNext(wd) {
     try {
         view.webContents.focus();
     }
-    catch { }
+    catch (e) { log.debug('permission-ui', 'onBlur', e); }
 }
 function hide(wd) {
     if (wd && wd.permView && !wd.permView.webContents.isDestroyed()) {
         try {
             wd.permView.setVisible(false);
         }
-        catch { }
+        catch (e) { log.debug('permission-ui', 'hide', e); }
     }
 }
 // dismissed=true → the doorhanger was clicked away / Esc'd: the request is
@@ -175,7 +176,7 @@ function register(ipcMain, { wm }) {
                 const b = wd.permView.getBounds();
                 wd.permView.setBounds({ ...b, height: Math.max(70, Math.min(320, Math.round(height))) });
             }
-            catch { }
+            catch (e) { log.debug('permission-ui', 'permission-ui-resize', e); }
         }
         return true;
     });

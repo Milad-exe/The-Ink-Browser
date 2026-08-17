@@ -21,7 +21,7 @@
             try {
                 localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('reader', 'savePrefs: ' + e); }
         }
         function applyPrefs() {
             root.style.setProperty('--rd-font', FONT_SIZES[prefs.fontIndex] + 'px');

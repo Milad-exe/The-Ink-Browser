@@ -7,6 +7,7 @@
  * the matching origin (for autofill) or to the passwords settings page on reveal.
  */
 'use strict';
+const log = require('./log');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -30,7 +31,7 @@ class PasswordStore {
         try {
             fn();
         }
-        catch { }
+        catch (e) { log.debug('password-store', '_emit', e); }
     } }
     _load() {
         if (this.loaded)
@@ -56,7 +57,7 @@ class PasswordStore {
             const json = JSON.stringify({ records: this.records, never: this.never });
             fs.writeFileSync(this.file, encrypt(json), { mode: 0o600 });
         }
-        catch { }
+        catch (e) { log.error('password-store', 'saved passwords could not be written', e); }
     }
     // ── Autofill ────────────────────────────────────────────────────────────
     getForOrigin(origin) {

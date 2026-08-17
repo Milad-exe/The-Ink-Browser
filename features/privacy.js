@@ -16,6 +16,7 @@
  * The private session keeps its own hardened setup (Features/private-session.js);
  * this module targets normal browsing so those protections apply everywhere.
  */
+const log = require('./log');
 const UserAgent = require('./user-agent');
 const adBlocker = require('./ad-blocker');
 const dnr = require('./dnr');
@@ -158,7 +159,7 @@ function setup(sess) {
                     return cb({ redirectURL: 'https://' + url.slice(7) });
                 }
             }
-            catch { }
+            catch (e) { log.debug('privacy', 'setup', e); }
         }
         // 3. Strip tracking params from top-level navigations.
         if (isGet && config.stripTrackingParams && resourceType === 'mainFrame') {
@@ -217,7 +218,7 @@ function setup(sess) {
                             if ('referer' in headers)
                                 headers['referer'] = originOnly;
                         }
-                        catch { }
+                        catch (e) { log.debug('privacy', 'setup', e); }
                     }
                     // Third-party cookies: strip only on pure tracking beacons.
                     // Never touch XHR/fetch/media/etc. — doing so breaks cross-site

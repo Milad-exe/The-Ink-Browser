@@ -16,6 +16,7 @@
  * matches how extensions themselves are loaded (one install, every space).
  */
 'use strict';
+const log = require('./log');
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
@@ -345,7 +346,7 @@ class Dnr {
         try { this._dir = path.join(app.getPath('userData'), 'northstar', 'dnr'); }
         catch { this._dir = path.join(process.cwd(), 'dnr'); }
         try { fs.mkdirSync(this._dir, { recursive: true }); }
-        catch { }
+        catch (e) { log.debug('dnr', '_dataDir', e); }
         return this._dir;
     }
 
@@ -624,7 +625,7 @@ class Dnr {
         let initiator = details.referrer || '';
         if (!initiator && details.webContents) {
             try { initiator = details.webContents.getURL() || ''; }
-            catch { }
+            catch (e) { log.debug('dnr', '_subject', e); }
         }
         return {
             url,
@@ -741,7 +742,7 @@ class Dnr {
                 return u.toString();
             }
         }
-        catch { }
+        catch (e) { log.debug('dnr', '_redirectUrl', e); }
         return null;
     }
 

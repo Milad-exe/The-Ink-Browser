@@ -12,6 +12,7 @@
  * `system` hands control back to Electron's default (system settings).
  */
 'use strict';
+const log = require('./log');
 
 // extension id → { session, config } so clear() can put the session back.
 const applied = new Map();
@@ -94,7 +95,7 @@ async function clear(extensionId) {
         return true;
     applied.delete(extensionId);
     try { await rec.session.setProxy({ mode: 'system' }); }
-    catch { }
+    catch (e) { log.debug('ext-proxy', 'clear', e); }
     return true;
 }
 

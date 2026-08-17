@@ -9,6 +9,7 @@
  * (default + private) from main.js.
  */
 'use strict';
+const log = require('./log');
 const fs = require('fs');
 const path = require('path');
 const { app, shell } = require('electron');
@@ -42,7 +43,7 @@ class DownloadManager {
             try {
                 fn(record ? { ...record } : null);
             }
-            catch { }
+            catch (e) { log.debug('download-manager', '_emit', e); }
         }
     }
     /** Hook a session's downloads. Call once per session. */
@@ -120,22 +121,22 @@ class DownloadManager {
     cancel(id) { try {
         this.handles.get(id)?.cancel();
     }
-    catch { } }
+    catch (e) { log.debug('download-manager', 'cancel', e); } }
     pause(id) { try {
         this.handles.get(id)?.pause();
     }
-    catch { } }
+    catch (e) { log.debug('download-manager', 'pause', e); } }
     resume(id) { try {
         this.handles.get(id)?.resume();
     }
-    catch { } }
+    catch (e) { log.debug('download-manager', 'resume', e); } }
     openFile(id) {
         const r = this.items.get(id);
         if (r?.state === 'completed') {
             try {
                 shell.openPath(r.savePath);
             }
-            catch { }
+            catch (e) { log.debug('download-manager', 'openFile', e); }
         }
     }
     showInFolder(id) {
@@ -144,7 +145,7 @@ class DownloadManager {
             try {
                 shell.showItemInFolder(r.savePath);
             }
-            catch { }
+            catch (e) { log.debug('download-manager', 'showInFolder', e); }
         }
     }
     remove(id) {

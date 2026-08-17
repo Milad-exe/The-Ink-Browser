@@ -520,7 +520,7 @@
                 if (d) img.src = d; else img.remove();
             }).catch(() => img.remove());
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('dropdown', 'buildBookmarkItem: ' + e); }
         const lbl = document.createElement('span');
         lbl.className = 'item-label';
         try {

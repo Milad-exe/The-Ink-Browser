@@ -1,3 +1,4 @@
+const log = require('./log');
 const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -13,8 +14,24 @@ const { encrypt, decrypt, isEncrypted } = require('./encryption');
  * encrypted write 500 ms later (flushed synchronously on quit so nothing is
  * lost). Privacy-motivated deletions (remove / clear) flush immediately.
  */
-const MAX_ENTRIES = 1000;
+// Retention. The old 1000-entry cap was days of browsing, not months: the page
+// you half-remember from last week was routinely already gone. Chrome keeps 90
+// days; match that, with a generous entry ceiling so the file can't grow without
+// bound on a heavy day. Both are settings (see DEFAULTS in persistence.js) —
+// this module reads them through setRetention(), because History is constructed
+// before Persistence in some paths and must never depend on it.
+const DEFAULT_MAX_ENTRIES = 50000;
+const DEFAULT_MAX_DAYS = 90;
+let MAX_ENTRIES = DEFAULT_MAX_ENTRIES;
+let MAX_DAYS = DEFAULT_MAX_DAYS;
 const WRITE_DELAY_MS = 500;
+/** Apply the user's retention settings (0 days = keep until the cap). */
+function setRetention({ maxEntries, maxDays } = {}) {
+    if (Number.isFinite(maxEntries) && maxEntries > 0)
+        MAX_ENTRIES = Math.min(500000, Math.floor(maxEntries));
+    if (Number.isFinite(maxDays) && maxDays >= 0)
+        MAX_DAYS = Math.floor(maxDays);
+}
 class History {
     file; // JSON store path (userData)
     cache; // the single source of truth once loaded
@@ -84,7 +101,7 @@ class History {
             try {
                 app.on('before-quit', () => this.flushSync());
             }
-            catch { }
+            catch (e) { log.debug('history', '_scheduleWrite', e); }
         }
     }
     async _flush() {
@@ -103,11 +120,41 @@ class History {
         try {
             fsSync.writeFileSync(this.file, encrypt(JSON.stringify(this.cache)), 'utf8');
         }
-        catch { }
+        catch (e) { log.error('history', 'history could not be flushed on quit', e); }
+    }
+    /**
+     * Trim in place to the retention window. Entries are newest-first, so the
+     * age cut is a truncation once the first too-old entry is found — no scan of
+     * the whole list on every visit.
+     */
+    _prune(history) {
+        if (MAX_DAYS > 0) {
+            const cutoff = Date.now() - MAX_DAYS * 86400000;
+            for (let i = history.length - 1; i >= 0; i--) {
+                const t = Date.parse(history[i].timestamp);
+                if (Number.isFinite(t) && t >= cutoff) {
+                    if (i + 1 < history.length)
+                        history.length = i + 1;
+                    break;
+                }
+                if (i === 0)
+                    history.length = 0;
+            }
+        }
+        if (history.length > MAX_ENTRIES)
+            history.length = MAX_ENTRIES;
+        return history;
     }
     // ── Public API (signatures unchanged) ─────────────────────────────────────
     async loadHistory() {
-        return this.load();
+        const h = await this.load();
+        // An existing file may predate the retention window (or a tightened
+        // setting) — bring it inside on first read rather than on next visit.
+        const before = h.length;
+        this._prune(h);
+        if (h.length !== before)
+            this._scheduleWrite();
+        return h;
     }
     async addToHistory(url, title, profile = null, profileName = null) {
         if (isSearchResultUrl(url))
@@ -120,8 +167,7 @@ class History {
         if (i !== -1)
             history.splice(i, 1);
         history.unshift({ url, title, timestamp: new Date().toISOString(), ...(p ? { profile: p, profileName: profileName || null } : {}) });
-        if (history.length > MAX_ENTRIES)
-            history.length = MAX_ENTRIES;
+        this._prune(history);
         this._scheduleWrite();
     }
     async removeFromHistory(url, timestamp) {
@@ -182,8 +228,9 @@ function isSearchResultUrl(rawUrl) {
         if (p.includes('/search') && params.has('q'))
             return true;
     }
-    catch { }
+    catch (e) { log.debug('history', 'isSearchResultUrl', e); }
     return false;
 }
 
+History.setRetention = setRetention;
 module.exports = History;

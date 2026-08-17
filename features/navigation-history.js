@@ -14,6 +14,33 @@ class NavigationHistory {
             titles: new Map(), // history-entry index → page title
         });
     }
+    /**
+     * Rebuild a tab's tree from a saved session: `entries` oldest-first, with
+     * `currentIndex` pointing at the one being shown. Back/forward run off this
+     * tree (goBack loads the entry itself), so without it a restored tab has
+     * nowhere to go back to.
+     */
+    restoreTab(tabIndex, entries, currentIndex = 0) {
+        const list = (entries || []).filter(e => e && (typeof e === 'string' || e.url));
+        if (!list.length)
+            return;
+        const bst = new BinarySearchTree();
+        const titles = new Map();
+        list.forEach((entry, i) => {
+            const url = typeof entry === 'string' ? entry : entry.url;
+            bst.insert(url, i);
+            const title = typeof entry === 'string' ? null : entry.title;
+            if (title)
+                titles.set(i, title);
+        });
+        const pos = Math.max(0, Math.min(list.length - 1, Number(currentIndex) || 0));
+        this.tabHistories.set(tabIndex, {
+            tree: bst,
+            currentIndex: pos,
+            maxIndex: list.length - 1,
+            titles,
+        });
+    }
     // Record the page title for the entry the tab is currently viewing.
     setCurrentTitle(tabIndex, title) {
         const tabHistory = this.tabHistories.get(tabIndex);

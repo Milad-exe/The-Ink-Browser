@@ -1,0 +1,72 @@
+@layer components {
+    /* Three tiny overlay views share this page (see splitUI.role): the divider
+       between the panes, and one reposition handle per pane.
+
+       Written as real CSS because renderer/styles/ui.css is a compiled Tailwind
+       subset with no build step here — a class not already used elsewhere does
+       not exist and silently does nothing. */
+    html, body { height: 100%; }
+    .hidden { display: none !important; }
+
+    /* ── Divider ─────────────────────────────────────────────────────────────
+       Fills its (thin) view, so the whole strip is the grab target. The visible
+       grip is a short rounded bar that lights up on hover / while dragging. */
+    #divider {
+        display: flex; align-items: center; justify-content: center;
+        width: 100%; height: 100%;
+        cursor: col-resize;
+    }
+    body[data-orient="col"] #divider { cursor: row-resize; }
+    #divider .grip {
+        display: block; border-radius: 3px;
+        background: color-mix(in srgb, var(--text) 22%, transparent);
+        opacity: 0; transition: opacity 0.12s, background 0.12s;
+        width: 3px; height: 44px;
+    }
+    body[data-orient="col"] #divider .grip { width: 44px; height: 3px; }
+    #divider:hover .grip,
+    body.dragging #divider .grip { opacity: 1; background: var(--accent); }
+
+    /* ── Pane handle ─────────────────────────────────────────────────────────
+       Rests as a small pill; the whole view is the hover surface, so the
+       reposition pad appears as soon as the pointer nears the pane's top edge. */
+    #handle {
+        display: flex; align-items: center; justify-content: center;
+        width: 100%; height: 100%;
+        position: relative;
+    }
+    #handle .pill,
+    #handle .pad {
+        display: flex; align-items: center; justify-content: center;
+        border: 1px solid var(--border-2);
+        border-radius: var(--radius-pill, 999px);
+        background: var(--surface);
+        box-shadow: 0 2px 10px rgba(8, 10, 20, 0.32);
+        transition: opacity 0.12s, transform 0.12s;
+    }
+    #handle .pill {
+        width: 34px; height: 18px;
+        color: var(--text-3);
+        cursor: grab;
+    }
+    #handle .pad {
+        position: absolute; top: 2px;
+        gap: 1px; padding: 2px 3px;
+        opacity: 0; transform: translateY(-4px); pointer-events: none;
+    }
+    /* Hover anywhere in the strip swaps the pill for the pad. */
+    #handle:hover .pill { opacity: 0; }
+    #handle:hover .pad { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+    #handle .dir {
+        display: flex; align-items: center; justify-content: center;
+        width: 22px; height: 18px; padding: 0;
+        border: none; border-radius: 6px;
+        background: transparent; color: var(--text-2);
+        cursor: pointer; transition: background 0.1s, color 0.1s;
+    }
+    #handle .dir:hover { background: var(--hover); color: var(--text); }
+    #handle .dir:active { background: var(--active-bg); }
+    #handle .dir.current { color: var(--accent); }
+    #handle svg { pointer-events: none; }
+}

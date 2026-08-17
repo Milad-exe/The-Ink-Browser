@@ -16,6 +16,7 @@
  * UserAgent.setupSession — Electron allows only ONE listener per webRequest
  * event per session; registering both would silently drop whichever was first.
  */
+const log = require('./log');
 const path = require('path');
 const UserAgent = require('./user-agent');
 const adBlocker = require('./ad-blocker');
@@ -51,7 +52,7 @@ function setup(sess, opts = {}) {
                     if (refOrigin !== reqOrigin)
                         headers['Referer'] = refOrigin + '/';
                 }
-                catch { }
+                catch (e) { log.debug('private-session', 'setup', e); }
             }
         }
         callback({ requestHeaders: headers });
@@ -93,11 +94,11 @@ function createTabSession() {
     try {
         adBlocker.enableBlockingInSession(sess);
     }
-    catch { }
+    catch (e) { log.debug('private-session', 'createTabSession', e); }
     try {
         downloadManager.attach(sess, { private: true });
     }
-    catch { }
+    catch (e) { log.debug('private-session', 'createTabSession', e); }
     for (const [id, file] of [
         ['chrome-spoof-private', 'chrome-spoof.js'],
         ['adblock-cosmetic-private', 'ad-block-cosmetic.js'],
@@ -106,7 +107,7 @@ function createTabSession() {
         try {
             sess.registerPreloadScript({ type: 'frame', id, filePath: path.join(__dirname, '../preload', file) });
         }
-        catch { }
+        catch (e) { log.debug('private-session', 'for', e); }
     }
     liveSessions.add(sess);
     return sess;
@@ -118,14 +119,14 @@ function destroyTabSession(sess) {
     try {
         permissionPrompt.detach(sess);
     }
-    catch { } // drop temp grants / panel overrides
+    catch (e) { log.debug('private-session', 'destroyTabSession', e); } // drop temp grants / panel overrides
     try {
         sess.clearStorageData(); // cookies, localStorage, IndexedDB, …
         sess.clearCache(); // in-memory HTTP cache
         sess.clearHostResolverCache(); // DNS cache
         sess.clearAuthCache(); // HTTP auth credentials
     }
-    catch { }
+    catch (e) { log.debug('private-session', 'destroyTabSession', e); }
 }
 function wipeAll() {
     for (const s of [...liveSessions])

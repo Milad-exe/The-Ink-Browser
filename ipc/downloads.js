@@ -6,6 +6,7 @@
  * then shown/hidden). Item updates are pushed both to the chrome renderer
  * (toolbar button state) and to the open panel (list rows).
  */
+const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView, shell, app } = require('electron');
@@ -37,7 +38,7 @@ async function ensurePanel(wd) {
         },
     });
     view.setBackgroundColor('#00000000');
-    try { view.setBorderRadius(12) } catch {}
+    try { view.setBorderRadius(12) } catch (e) { log.debug('downloads', 'if', e); }
     view.setVisible(false);
     wd.downloadsPanel = view;
     wd.window.contentView.addChildView(view);
@@ -55,7 +56,7 @@ function hidePanel(wd) {
         try {
             wd.window.webContents.send('downloads-panel-closed');
         }
-        catch { }
+        catch (e) { log.debug('downloads', 'hidePanel', e); }
         return true;
     }
     catch {
@@ -69,12 +70,12 @@ function register(ipcMain, { wm }) {
             try {
                 wd.window.webContents.send('downloads-changed', record);
             }
-            catch { }
+            catch (e) { log.debug('downloads', 'register', e); }
             if (wd.downloadsPanel) {
                 try {
                     wd.downloadsPanel.webContents.send('downloads-data', downloadManager.getAll());
                 }
-                catch { }
+                catch (e) { log.debug('downloads', 'register', e); }
             }
         }
     });
@@ -105,7 +106,7 @@ function register(ipcMain, { wm }) {
             case 'show-all':
                 // No downloads library page exists — reveal the folder instead.
                 try { shell.openPath(app.getPath('downloads')); }
-                catch { }
+                catch (e) { log.debug('downloads', 'downloads-action', e); }
                 break;
         }
         return true;

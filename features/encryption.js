@@ -1,57 +1,170 @@
 /**
  * Northstar — At-rest encryption
  *
- * Uses AES-256-GCM — the symmetric cipher mandated by OpenPGP (RFC 4880bis §9.3)
- * for modern PGP symmetric encryption.  The master key is generated once with a
- * CSPRNG and stored in userData/northstar/.key (mode 0600 on Unix).
- *
- * Every encrypted blob is a JSON object:
+ * AES-256-GCM over a master key generated once with a CSPRNG. The GCM auth tag
+ * gives tamper-detection equivalent to an HMAC. Blob shape:
  *   { v: 1, iv: <base64-12B>, tag: <base64-16B>, data: <base64-ciphertext> }
  *
- * The GCM authentication tag provides tamper-detection equivalent to an HMAC.
+ * KEY PROTECTION. The key used to live in `userData/northstar/.key` as raw
+ * bytes at mode 0600, which meant saved passwords were protected by file
+ * permissions alone: any process running as the user, any backup, any copied
+ * disk image handed over the plaintext. The key is now *wrapped* with Electron's
+ * safeStorage — the OS keychain (Keychain on macOS, libsecret on Linux, DPAPI on
+ * Windows) — and only the wrapped form is written (`.key.enc`). An existing raw
+ * key is migrated on first run and the raw file deleted.
+ *
+ * safeStorage is not always available (a Linux box with no keyring, an
+ * unsigned build the user denied keychain access to). Rather than refuse to
+ * start or silently downgrade every user, we fall back to the raw key file and
+ * record that fact in `keyProtection()`, which Settings → Privacy surfaces so
+ * the weaker state is visible rather than assumed.
+ *
+ * A key file that exists but can't be used is NEVER silently replaced: doing so
+ * makes every saved password and the whole history file permanently unreadable.
+ * It is moved aside as `.key.broken-<timestamp>` first, so the data is at least
+ * recoverable if the cause was transient (a locked keychain, a half-written
+ * file).
  */
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const log = require('./log');
 const ALGO = 'aes-256-gcm';
 const KEY_BYTES = 32; // 256-bit key
 const IV_BYTES = 12; // 96-bit IV — optimal for GCM
 const TAG_BYTES = 16; // 128-bit auth tag
 let cachedKey = null;
-let cachedKeyPath = null;
-// ── Key path ────────────────────────────────────────────────────────────────
-function resolveKeyPath() {
-    if (cachedKeyPath)
-        return cachedKeyPath;
+let cachedKeyDir = null;
+let protection = 'unknown'; // 'os-keychain' | 'file' — see keyProtection()
+
+// ── Key paths ───────────────────────────────────────────────────────────────
+function keyDir() {
+    if (cachedKeyDir)
+        return cachedKeyDir;
     try {
         const { app } = require('electron');
-        cachedKeyPath = path.join(app.getPath('userData'), 'northstar', '.key');
+        cachedKeyDir = path.join(app.getPath('userData'), 'northstar');
     }
     catch {
-        cachedKeyPath = path.join(process.cwd(), '.ink-key');
+        cachedKeyDir = process.cwd();
     }
-    return cachedKeyPath;
+    return cachedKeyDir;
 }
+const rawKeyPath = () => path.join(keyDir(), '.key');
+const wrappedKeyPath = () => path.join(keyDir(), '.key.enc');
+
+function safeStorage() {
+    try {
+        const { safeStorage } = require('electron');
+        return safeStorage?.isEncryptionAvailable() ? safeStorage : null;
+    }
+    catch {
+        return null;
+    }
+}
+
+/** Move a key we cannot use out of the way instead of destroying the data. */
+function quarantine(file) {
+    try {
+        if (fs.existsSync(file))
+            fs.renameSync(file, `${file}.broken-${Date.now()}`);
+    }
+    catch (e) {
+        log.error('encryption', 'could not set aside an unusable key file', e);
+    }
+}
+
+function writeKey(key) {
+    const ss = safeStorage();
+    if (ss) {
+        try {
+            fs.writeFileSync(wrappedKeyPath(), ss.encryptString(key.toString('base64')), { mode: 0o600 });
+            protection = 'os-keychain';
+            return;
+        }
+        catch (e) {
+            log.warn('encryption', 'keychain write failed; falling back to a file-protected key', e);
+        }
+    }
+    fs.writeFileSync(rawKeyPath(), key, { mode: 0o600 });
+    protection = 'file';
+}
+
 // ── Key loading / generation ─────────────────────────────────────────────────
 function getKey() {
     if (cachedKey)
         return cachedKey;
-    const keyPath = resolveKeyPath();
-    const dir = path.dirname(keyPath);
-    if (!fs.existsSync(dir)) {
+    const dir = keyDir();
+    if (!fs.existsSync(dir))
         fs.mkdirSync(dir, { recursive: true });
+    const ss = safeStorage();
+    // 1. Wrapped key — the normal path once migrated.
+    if (fs.existsSync(wrappedKeyPath())) {
+        if (!ss) {
+            // The keychain is unavailable *right now* (locked session, denied
+            // access). Unwrapping is impossible; regenerating would orphan the
+            // user's data, so fail loudly instead.
+            throw new Error('encryption key is keychain-wrapped but the OS keychain is unavailable');
+        }
+        try {
+            const b64 = ss.decryptString(fs.readFileSync(wrappedKeyPath()));
+            const key = Buffer.from(b64, 'base64');
+            if (key.length === KEY_BYTES) {
+                cachedKey = key;
+                protection = 'os-keychain';
+                return cachedKey;
+            }
+            throw new Error('wrapped key had the wrong length');
+        }
+        catch (e) {
+            log.error('encryption', 'wrapped key unreadable — set aside, starting a new one', e);
+            quarantine(wrappedKeyPath());
+        }
     }
-    if (fs.existsSync(keyPath)) {
-        const stored = fs.readFileSync(keyPath);
+    // 2. Raw key from before keychain wrapping — adopt it, then re-wrap.
+    if (fs.existsSync(rawKeyPath())) {
+        const stored = fs.readFileSync(rawKeyPath());
         if (stored.length === KEY_BYTES) {
             cachedKey = stored;
+            if (ss) {
+                try {
+                    fs.writeFileSync(wrappedKeyPath(), ss.encryptString(stored.toString('base64')), { mode: 0o600 });
+                    fs.unlinkSync(rawKeyPath()); // the plaintext copy is the whole problem
+                    protection = 'os-keychain';
+                    log.info('encryption', 'migrated the at-rest key into the OS keychain');
+                }
+                catch (e) {
+                    protection = 'file';
+                    log.warn('encryption', 'keychain migration failed; key stays file-protected', e);
+                }
+            }
+            else {
+                protection = 'file';
+            }
             return cachedKey;
         }
-        // Key file corrupt — regenerate (existing data will be unreadable; safer than no encryption)
+        log.error('encryption', 'key file is the wrong size — set aside rather than overwritten');
+        quarantine(rawKeyPath());
     }
+    // 3. First run (or everything above was unusable) — mint a fresh key.
     cachedKey = crypto.randomBytes(KEY_BYTES);
-    fs.writeFileSync(keyPath, cachedKey, { mode: 0o600 });
+    writeKey(cachedKey);
     return cachedKey;
+}
+
+/**
+ * How the master key is protected: 'os-keychain' (wrapped by the OS), or 'file'
+ * (permissions only — weaker). Settings surfaces this rather than implying the
+ * strong case.
+ */
+function keyProtection() {
+    try {
+        getKey();
+    }
+    catch {
+        return 'unavailable';
+    }
+    return protection;
 }
 // ── Public API ────────────────────────────────────────────────────────────────
 /**
@@ -99,4 +212,4 @@ function isEncrypted(str) {
     }
 }
 
-module.exports = { encrypt, decrypt, isEncrypted };
+module.exports = { encrypt, decrypt, isEncrypted, keyProtection };

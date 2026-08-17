@@ -1036,3 +1036,77 @@ Unregisters shortcuts and calls `close()` on every open `BrowserWindow`, then cl
 | `cachedPersistence` | `Persistence\|null` | Lazily-initialised shared `Persistence` service |
 | `restored` | `boolean` | Flag that ensures tab state is restored into the first window only |
 | `lastFocusedWindowId` | `number\|null` | ID of the most recently focused window |
+
+---
+
+## log.js
+
+Rotating diagnostic log at `userData/logs/northstar.log` (512 KB, one previous
+file kept), plus the console for `warn`/`error`. `log.debug|info|warn|error(scope,
+message, err?)`; `log.path()` and `log.tail(n)` back Settings → Data →
+Diagnostics. Never records page content or URLs' query strings. Failures inside
+the logger disable it rather than propagating — a broken log must not break the
+browser.
+
+## encryption.js — key protection
+
+The AES-256-GCM master key is **wrapped with Electron `safeStorage`** (the OS
+keychain) and stored as `userData/northstar/.key.enc`. A pre-existing raw `.key`
+is migrated on first run and deleted. Where the keychain is unavailable the key
+falls back to a file at mode 0600 and `keyProtection()` returns `'file'` so
+Settings can say so plainly instead of implying the strong case. A key that
+exists but can't be used is moved aside as `.key.broken-<ts>`, never silently
+replaced — replacing it would make every saved password and the history file
+permanently unreadable.
+
+## cert-errors.js
+
+Turns a TLS failure into an interstitial (`renderer/CertWarning/`) that names the
+fault, the host and the certificate. "Continue anyway" records an exception keyed
+by **host + certificate fingerprint**, in memory only: a different bad
+certificate on the same host prompts again, and nothing survives a restart.
+
+## default-browser.js
+
+Registers `http`/`https` handlers *and* accepts what the OS then sends —
+`open-url` on macOS, an argv entry on a second launch on Windows/Linux, and a URL
+in the first argv on a cold start. `status()` reports what the OS actually says,
+not what was requested.
+
+## zoom.js
+
+Per-origin zoom levels (Chromium's log scale, 0 = 100%) persisted in the
+`siteZoom` setting and re-applied on every `did-navigate`. Private tabs read
+remembered levels but never write one.
+
+## search-engines.js
+
+The three built-ins plus the user's own, each with an optional **keyword**: `w
+electron` searches the engine whose keyword is `w` without changing the default.
+`resolve(input, defaultId)` is the single place typed text becomes a search URL;
+the omnibox gets the list through the settings payload so it can resolve
+synchronously.
+
+## user-data.js
+
+Import/export parsers: Netscape bookmark HTML (in and out) and password CSV (in
+and out, matching the column names Chrome, Firefox and Bitwarden emit), plus
+history CSV export. Tolerant by design — a bookmark file that fails to import is
+a user who stays in their old browser.
+
+## updates.js
+
+Checks the GitHub releases feed on demand and reports `current` /
+`update-available` / `unknown`. Never downloads or installs: silent self-update
+needs signed builds and a release channel first.
+
+## i18n.js
+
+Interface localisation. `t(key, vars)` reads `locales/<lang>.json` with English
+fallback, so a missing translation degrades to readable English rather than a
+blank label; `catalogue()` ships the resolved strings to renderers inside the
+settings payload (the chrome paints labels before any async round trip could
+answer). The language follows the OS unless Settings → Appearance overrides it,
+and `locales()` reports each catalogue's `coverage` so the picker can say when a
+translation is partial. `Accept-Language` is deliberately untouched — that is a
+fingerprinting surface (see privacy.js), not a UI preference.

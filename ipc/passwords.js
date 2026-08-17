@@ -6,6 +6,7 @@
  * "save?" offer is held only in the main process (per window) and is never sent
  * to the prompt UI — the prompt only shows the origin and username.
  */
+const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
@@ -29,7 +30,7 @@ function register(ipcMain, { wm }) {
             try {
                 wd.window.webContents.send('passwords-changed');
             }
-            catch { }
+            catch (e) { log.debug('passwords', 'register', e); }
         }
     });
     // ── Autofill (called from a tab's content script) ────────────────────────
@@ -111,7 +112,7 @@ function register(ipcMain, { wm }) {
                     },
                 });
                 view.setBackgroundColor('#00000000');
-                try { view.setBorderRadius(12) } catch {}
+                try { view.setBorderRadius(12) } catch (e) { log.debug('passwords', 'showPrompt', e); }
                 wd.passwordPrompt = view;
                 wd.window.contentView.addChildView(view);
                 view.webContents.loadFile(resolveAppFile('renderer/PasswordPrompt/index.html'));
@@ -123,7 +124,7 @@ function register(ipcMain, { wm }) {
                 wd.window.contentView.removeChildView(wd.passwordPrompt);
                 wd.window.contentView.addChildView(wd.passwordPrompt);
             }
-            catch { }
+            catch (e) { log.debug('passwords', 'showPrompt', e); }
             wd.passwordPrompt.setVisible(true);
             wd.passwordPrompt.webContents.send('password-prompt-data', data);
         }
@@ -136,7 +137,7 @@ function register(ipcMain, { wm }) {
             try {
                 wd.passwordPrompt.setVisible(false);
             }
-            catch { }
+            catch (e) { log.debug('passwords', 'closePrompt', e); }
         }
     }
 }

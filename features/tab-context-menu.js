@@ -1,3 +1,4 @@
+const log = require('./log');
 const { clipboard, shell } = require('electron');
 const { sanitizeUrl, isSafeExternal } = require('./url-security');
 const downloadManager = require('./download-manager');
@@ -40,7 +41,7 @@ class TabContextMenu {
         try {
             title = new URL(safe).hostname;
         }
-        catch { }
+        catch (e) { log.debug('tab-context-menu', 'openInNewTab', e); }
         this.tabManager.createLazyTab(safe, title, false, false, true, true);
     }
     addPageItems(params) {
@@ -54,14 +55,14 @@ class TabContextMenu {
             click: () => { try {
                 wc.navigationHistory.goBack();
             }
-            catch { } },
+            catch (e) { log.debug('tab-context-menu', 'addPageItems', e); } },
         }, {
             label: 'Forward',
             enabled: wc.navigationHistory?.canGoForward() ?? false,
             click: () => { try {
                 wc.navigationHistory.goForward();
             }
-            catch { } },
+            catch (e) { log.debug('tab-context-menu', 'addPageItems', e); } },
         }, {
             label: 'Reload',
             click: () => wc.reload(),
@@ -136,7 +137,7 @@ class TabContextMenu {
             click: () => { try {
                 sess.addWordToSpellCheckerDictionary(params.misspelledWord);
             }
-            catch { } },
+            catch (e) { log.debug('tab-context-menu', 'addSpellcheckItems', e); } },
         });
     }
     addEditableItems(params) {
@@ -213,7 +214,7 @@ class TabContextMenu {
                             let v = vids.find(x => x.currentSrc === src || x.src === src)
                                  || vids.filter(x => !x.paused)[0] || vids[0];
                             if (v && v.requestPictureInPicture) v.requestPictureInPicture().catch(()=>{});
-                        } catch (e) {}
+                        } catch (e) { log.debug('tab-context-menu', 'addMediaItems', e); }
                     })()`, true).catch(() => { });
                 },
             });

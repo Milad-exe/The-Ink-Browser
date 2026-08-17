@@ -45,7 +45,7 @@
         try {
             info = await api.getInfo();
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('siteinfo', 'render: ' + e); }
         const conn = document.getElementById('conn');
         conn.className = 'conn ' + (info.secure ? 'secure' : 'insecure');
         conn.innerHTML =
@@ -81,7 +81,7 @@
             try {
                 await api.clearData();
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('siteinfo', 'render: ' + e); }
             btn.textContent = 'Cleared ✓';
             setTimeout(() => api.close(), 700);
         });

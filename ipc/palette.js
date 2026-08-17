@@ -5,6 +5,7 @@
  * you commit, so there is no blank new-tab page to pass through. Hosted in its
  * own WebContentsView because the page is composited over the chrome.
  */
+const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
@@ -40,9 +41,9 @@ function hidePalette(wd) {
         // The overlay took keyboard focus when it opened; hand it back or the
         // window is left with nothing focused and the next accelerator beeps.
         try { wd.window.webContents.focus(); }
-        catch { }
+        catch (e) { log.debug('palette', 'hidePalette', e); }
     }
-    catch { }
+    catch (e) { log.debug('palette', 'hidePalette', e); }
 }
 
 // Raise the palette for a window. Every user-facing "new tab" goes through
@@ -57,12 +58,12 @@ async function openFor(wd) {
             wd.window.contentView.removeChildView(view);
             wd.window.contentView.addChildView(view);
         }
-        catch { }
+        catch (e) { log.debug('palette', 'openFor', e); }
         view.setVisible(true);
         wd.paletteOpen = true;
         view.webContents.send('palette:data', {});
         try { view.webContents.focus(); }
-        catch { }
+        catch (e) { log.debug('palette', 'openFor', e); }
         return true;
     }
     catch (err) {
@@ -84,12 +85,12 @@ function register(ipcMain, { wm }) {
                 wd.window.contentView.removeChildView(view);
                 wd.window.contentView.addChildView(view);
             }
-            catch { }
+            catch (e) { log.debug('palette', 'palette:open', e); }
             view.setVisible(true);
             wd.paletteOpen = true;
             view.webContents.send('palette:data', {});
             try { view.webContents.focus(); }
-            catch { }
+            catch (e) { log.debug('palette', 'palette:open', e); }
             return true;
         }
         catch (err) {

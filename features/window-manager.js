@@ -7,6 +7,10 @@ const History = require('./history');
 const Bookmarks = require('./bookmarks');
 const Shortcuts = require('./shortcuts');
 const contextMenu = require('./window-context-menu');
+const zoom = require('./zoom');
+const searchEngines = require('./search-engines');
+const i18n = require('./i18n');
+const log = require('./log');
 class WindowManager {
     windows; // windowId → { id, window, tabs, shortcuts, menu, … overlays }
     nextWindowId;
@@ -34,6 +38,20 @@ class WindowManager {
     get persistence() {
         if (!this.cachedPersistence) {
             this.cachedPersistence = new Persistence();
+            // Modules that hold user preferences but must not depend on
+            // Persistence (construction order) are fed from here, once.
+            try {
+                History.setRetention({
+                    maxDays: this.cachedPersistence.get('historyDays'),
+                    maxEntries: this.cachedPersistence.get('historyMaxEntries'),
+                });
+                zoom.init(this.cachedPersistence);
+                searchEngines.init(this.cachedPersistence);
+                i18n.init(this.cachedPersistence);
+            }
+            catch (e) {
+                log.warn('window-manager', 'could not apply stored preferences', e);
+            }
         }
         return this.cachedPersistence;
     }
@@ -84,7 +102,7 @@ class WindowManager {
         try {
             wd.tabs.applyWorkspace();
         }
-        catch { }
+        catch (e) { log.debug('window-manager', 'switchWorkspace', e); }
         try {
             wd.window.webContents.send('workspace-switched', id);
             // These views are per-workspace — re-emit their change events so the
@@ -92,12 +110,12 @@ class WindowManager {
             wd.window.webContents.send('bookmarks-changed');
             wd.window.webContents.send('essentials-changed');
         }
-        catch { }
+        catch (e) { log.debug('window-manager', 'switchWorkspace', e); }
         // Folders are per-workspace too. Without this the strip keeps the old
         // workspace's folders — and on the startup restore, which switches into
         // the saved workspace, they never appear at all.
         try { wd.tabs.broadcastFolders(); }
-        catch { }
+        catch (e) { log.debug('window-manager', 'switchWorkspace', e); }
     }
     _clampBoundsToDisplays(bounds) {
         try {
@@ -115,7 +133,7 @@ class WindowManager {
                 return { x: primary.x, y: primary.y, width, height };
             }
         }
-        catch { }
+        catch (e) { log.debug('window-manager', '_clampBoundsToDisplays', e); }
         return bounds;
     }
     _persistWindowBounds(window, options = {}) {
@@ -144,7 +162,7 @@ class WindowManager {
                 });
             }
         }
-        catch { }
+        catch (e) { log.debug('window-manager', 'normalBounds', e); }
     }
     _persistPrimaryWindowBounds() {
         try {
@@ -157,7 +175,7 @@ class WindowManager {
             if (primary?.window)
                 this._persistWindowBounds(primary.window);
         }
-        catch { }
+        catch (e) { log.debug('window-manager', '_persistPrimaryWindowBounds', e); }
     }
     createWindow(width = 800, height = 600, options = {}) {
         const windowId = this.nextWindowId++;
@@ -218,7 +236,7 @@ class WindowManager {
             if (!tabs)
                 return;
             try { back ? tabs.goBack(tabs.activeTabIndex) : tabs.goForward(tabs.activeTabIndex); }
-            catch { }
+            catch (e) { log.debug('window-manager', 'navigate', e); }
         };
         // macOS three-finger swipe (System Settings → Trackpad → "Swipe between
         // pages"). The two-finger overscroll variant is a Chromium browser-side
@@ -238,14 +256,14 @@ class WindowManager {
             try {
                 window.webContents.send('window-maximize-changed', true);
             }
-            catch { }
+            catch (e) { log.debug('window-manager', 'navigate', e); }
             this._persistWindowBounds(window);
         });
         window.on('unmaximize', () => {
             try {
                 window.webContents.send('window-maximize-changed', false);
             }
-            catch { }
+            catch (e) { log.debug('window-manager', 'navigate', e); }
             this._persistWindowBounds(window);
         });
         window.on('enter-full-screen', () => {
@@ -266,13 +284,13 @@ class WindowManager {
                 else if (shouldMaximize)
                     window.maximize();
             }
-            catch { }
+            catch (e) { log.debug('window-manager', 'navigate', e); }
             // inactive: tab tear-off — focusing a new window mid-drag would
             // break mouse capture.
             try {
                 options?.inactive ? window.showInactive() : window.show();
             }
-            catch { }
+            catch (e) { log.debug('window-manager', 'navigate', e); }
         });
         window.loadFile(resolveAppFile('renderer/Browser/index.html'));
         // Safety net: if the renderer never signals ready-to-show (load error),
@@ -282,7 +300,7 @@ class WindowManager {
                 if (!window.isDestroyed() && !window.isVisible())
                     window.show();
             }
-            catch { }
+            catch (e) { log.debug('window-manager', 'navigate', e); }
         }, 3000);
         // Save window bounds whenever it moves or resizes (debounced)
         let _saveBoundsTimer = null;
@@ -299,14 +317,29 @@ class WindowManager {
         // already been removed from the map, so savePrimaryState() finds no
         // primary window — this is the last reliable moment to save.
         window.on('close', () => {
-            if (this.windows.size === 1) {
-                this._persistWindowBounds(window);
-                try {
-                    if (tabs.tabMap.size > 0 && !tabs.isPrivateWindow) {
-                        this.persistence.saveStateSync(tabs.buildSerializableState());
-                    }
+            this._persistWindowBounds(window);
+            // Quitting already took the whole-session snapshot (savePrimaryState)
+            // and froze it, so there is nothing to do here.
+            if (this._quitting)
+                return;
+            try {
+                if (!tabs.tabMap.size || tabs.isPrivateWindow)
+                    return;
+                if (this.windows.size === 1) {
+                    // Closing the last window IS ending the session — and on
+                    // Windows/Linux 'before-quit' arrives too late to see it.
+                    this.persistence.saveWindowState(windowId, tabs.buildSerializableState());
+                    this.persistence.flushStateSync();
+                    this.persistence.freeze();
                 }
-                catch { }
+                else {
+                    // One window of several, closed by hand: the user threw it
+                    // away, so it should not come back next launch.
+                    this.persistence.forgetWindowState(windowId);
+                }
+            }
+            catch (e) {
+                log.warn('window-manager', 'could not save the window session', e);
             }
         });
         // Track focus order: most recently focused is considered primary for persistence
@@ -316,7 +349,7 @@ class WindowManager {
         // Each window belongs to one profile: its tabs browse on that profile's
         // session and record into that profile's history/bookmarks.
         const profileId = String(options?.profile || '1');
-        const tabs = new Tabs(window, this.historyFor(profileId), this.persistence, { private: !!options?.private, profile: profileId });
+        const tabs = new Tabs(window, this.historyFor(profileId), this.persistence, { private: !!options?.private, profile: profileId, windowKey: windowId });
         const shortcuts = new Shortcuts(window, tabs, this);
         tabs.setShortcuts(shortcuts);
         tabs.setWindowManager(this);
@@ -339,7 +372,7 @@ class WindowManager {
                 params.rightClickedTabIndex = contextInfo.rightClickedTabIndex;
                 params.targetAreaIsTabBar = contextInfo.targetAreaIsTabBar;
             }
-            catch (_) { }
+            catch (_) { log.debug('window-manager', '_saveBounds', _); }
             const contextMenuInstance = new contextMenu(window, params, this);
             if (contextMenuInstance.getTemplate().length === 0) {
                 return;
@@ -361,9 +394,15 @@ class WindowManager {
             if (options?.private) {
                 window.webContents.send('set-private-window', true);
             }
-            // Restore only once into the first opened window (if any state exists),
-            // and only into a window of the profile the state was saved under.
-            const state = (!this.restored && this.persistence.hasState()) ? this.persistence.loadState() : null;
+            // Restore only once into the first opened window (if any state
+            // exists), and only into a window of the profile the state was saved
+            // under. A window created FOR a restore carries its slice with it.
+            let state = options?.restoreState || null;
+            if (!state && !this.restored && this.persistence.hasState()) {
+                const saved = this.persistence.loadAllWindowStates();
+                state = saved[0] || null;
+                this._pendingWindowStates = saved.slice(1);
+            }
             if (state && state.tabs && state.tabs.length > 0 && String(state.profile || '1') === profileId) {
                 try {
                     // Rebuild every workspace's tabs (each tagged with its own
@@ -371,7 +410,14 @@ class WindowManager {
                     const tabKeys = [];
                     state.tabs.forEach((t) => {
                         tabs.createLazyTab(t.url, t.title, t.pinned, false, false, false, t.container || null, t.workspace || '1');
-                        tabKeys.push(tabs.nextTabIndex - 1);
+                        const key = tabs.nextTabIndex - 1;
+                        tabKeys.push(key);
+                        // Bring the tab's own back/forward tree and reading
+                        // position with it, not just its address.
+                        if (Array.isArray(t.history) && t.history.length > 1)
+                            tabs.navigationHistory.restoreTab(key, t.history, t.historyIndex || 0);
+                        if (t.scroll > 0)
+                            tabs.tabScroll.set(key, t.scroll);
                     });
                     // Restore tab folders (tab groups) + their tab membership.
                     if (Array.isArray(state.folders) && state.folders.length) {
@@ -401,11 +447,11 @@ class WindowManager {
                     try {
                         const wc = windowData.window.webContents;
                         if (wc.isLoading())
-                            wc.once('did-finish-load', () => { try { tabs.broadcastFolders(); } catch { } });
+                            wc.once('did-finish-load', () => { try { tabs.broadcastFolders(); } catch (e) { log.debug('window-manager', '_saveBounds', e); } });
                         else
                             tabs.broadcastFolders();
                     }
-                    catch { }
+                    catch (e) { log.debug('window-manager', '_saveBounds', e); }
                     // Focus the saved active tab if it's in the active workspace,
                     // else the active workspace's first tab.
                     const inWs = tabs.tabsInWorkspace(tabs.profileId);
@@ -416,16 +462,24 @@ class WindowManager {
                     else
                         tabs.createTab();
                 }
-                catch {
-                    // Fallback: at least one tab
+                catch (e) {
+                    // A failed restore used to be silent, so a session that came
+                    // back empty looked like the state file was simply missing.
+                    log.error('window-manager', 'session restore failed', e);
                     if (tabs.getTotalTabs() === 0)
                         tabs.createTab();
                 }
                 this.restored = true;
+                // The rest of last session's windows, once this one is up.
+                this._restoreRemainingWindows();
             }
             else {
                 tabs.createTab();
             }
+            // Whether or not there was anything to restore, the restore slot is
+            // now spent: a window opened LATER in the session must start empty,
+            // not re-run the restore and clone another window's tabs.
+            this.restored = true;
             shortcuts.registerAllShortcuts();
         });
         window.on('closed', () => {
@@ -452,10 +506,10 @@ class WindowManager {
                                         activeTab.webContents.focus();
                                     }
                                 }
-                                catch { }
+                                catch (e) { log.debug('window-manager', 'focusIdx', e); }
                             }, 20);
                         }
-                        catch { }
+                        catch (e) { log.debug('window-manager', 'focusIdx', e); }
                     }
                 }
                 // After a window closes, persist bounds from the remaining primary window.
@@ -505,6 +559,12 @@ class WindowManager {
                 return windowData;
             if (windowData.tabs?.glanceBar?.webContents === webContents)
                 return windowData;
+            if (windowData.tabs?.splitDivider?.webContents === webContents)
+                return windowData;
+            if (windowData.tabs?.splitDrop?.webContents === webContents)
+                return windowData;
+            if (windowData.tabs?.splitHandles?.some?.(v => v?.webContents === webContents))
+                return windowData;
             // Match tab WebContentsViews
             if (windowData.tabs) {
                 for (const [, tab] of windowData.tabs.tabMap) {
@@ -543,17 +603,49 @@ class WindowManager {
         const entries = Array.from(this.windows.entries()).sort((a, b) => a[0] - b[0]);
         return entries[0][1] || null;
     }
-    // Save the current state from the primary window (synchronously) into persistence
+    /** Re-open the other windows from last session, offset so they don't stack. */
+    _restoreRemainingWindows() {
+        const pending = this._pendingWindowStates || [];
+        this._pendingWindowStates = [];
+        if (!pending.length || this.persistence.get('restoreAllWindows') === false)
+            return;
+        pending.forEach((state, i) => {
+            setTimeout(() => {
+                try {
+                    this.createWindow(1000, 700, {
+                        profile: String(state.profile || '1'),
+                        restoreState: state,
+                    });
+                }
+                catch (e) {
+                    log.warn('window-manager', 'could not restore an extra window', e);
+                }
+            }, 400 * (i + 1));
+        });
+    }
+    /**
+     * Quit path: record EVERY open window, synchronously, so the whole session
+     * comes back. Also flips `_quitting`, which tells each window's 'close'
+     * handler to keep its slice instead of dropping it (a window closed by hand
+     * during a session is meant to be gone; one closed by quitting is not).
+     */
     savePrimaryState() {
+        this._quitting = true;
         try {
-            const primary = this.getPrimaryWindow();
-            if (!primary || !primary.tabs)
+            const all = this.getAllWindows().filter(w => w?.tabs && !w.tabs.isPrivateWindow && w.tabs.tabMap.size);
+            if (!all.length)
                 return false;
-            const state = primary.tabs.buildSerializableState();
-            this.persistence.saveStateSync(state);
+            const keepAll = this.persistence.get('restoreAllWindows') !== false;
+            for (const w of (keepAll ? all : all.slice(0, 1))) {
+                try { this.persistence.saveWindowState(w.id, w.tabs.buildSerializableState()); }
+                catch (e) { log.warn('window-manager', 'could not record a window for restore', e); }
+            }
+            this.persistence.flushStateSync();
+            this.persistence.freeze(); // teardown must not rewrite the snapshot
             return true;
         }
         catch (e) {
+            log.error('window-manager', 'session save failed', e);
             return false;
         }
     }

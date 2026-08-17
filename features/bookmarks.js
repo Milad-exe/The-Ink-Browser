@@ -1,3 +1,4 @@
+const log = require('./log');
 const { app } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
@@ -47,7 +48,7 @@ class Bookmarks {
         try {
             await fs.writeFile(this.file, encrypt(JSON.stringify(this.cache, null, 2)), 'utf8');
         }
-        catch { }
+        catch (e) { log.debug('bookmarks', 'save', e); }
     }
     // ── Public API ───────────────────────────────────────────────────────────
     async getAll() {

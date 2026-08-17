@@ -36,7 +36,7 @@
             fb.className = 'fallback';
             let host = '';
             try { host = new URL(r.url).hostname.replace(/^www\./, ''); }
-            catch { }
+            catch (e) { window.inkLog?.debug('palette', 'paint: ' + e); }
             fb.textContent = host ? host.charAt(0).toUpperCase() : '\u00b7';
             b.appendChild(fb);
             if (host && window.browserHistory.cachedFavicon) {
@@ -86,7 +86,7 @@
                     if (rows.length >= 6) break;
                 }
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('palette', 'recent: ' + e); }
         }
         if (q) {
             const direct = toUrl(q);
@@ -102,7 +102,7 @@
                     rows.push({ url: h.url, title: h.title || h.url, badge: 'History' });
                 }
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('palette', 'hits: ' + e); }
             try {
                 const marks = (await window.browserBookmarks.getAll()) || [];
                 for (const m of marks) {
@@ -113,7 +113,7 @@
                     if (rows.length > 10) break;
                 }
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('palette', 'marks: ' + e); }
         }
         sel = rows.length ? 0 : -1;
         paint();
@@ -125,7 +125,7 @@
             const idx = await window.tab.add();
             if (typeof idx === 'number') window.tab.loadUrl(idx, url);
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('palette', 'go: ' + e); }
         window.overlayPalette.done();
     };
 

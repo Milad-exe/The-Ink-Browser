@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none';" />
+  <title>Split</title>
+  <link rel="stylesheet" href="../styles/ui.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="m-0 select-none overflow-hidden bg-transparent font-sans text-primary">
+  <!-- Divider: drag to resize the two panes. -->
+  <div id="divider" class="hidden"><span class="grip"></span></div>
+
+  <!-- Pane handle: a grab pill at the top centre of a pane. Hovering swaps it
+       for the reposition pad — send this pane to the top / left / right / bottom. -->
+  <div id="handle" class="hidden">
+    <div class="pill" title="Move this pane">
+      <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true">
+        <circle cx="4.5" cy="6" r="1.15"/><circle cx="8" cy="6" r="1.15"/><circle cx="11.5" cy="6" r="1.15"/>
+        <circle cx="4.5" cy="10" r="1.15"/><circle cx="8" cy="10" r="1.15"/><circle cx="11.5" cy="10" r="1.15"/>
+      </svg>
+    </div>
+    <div class="pad" role="group" aria-label="Move pane">
+      <button class="dir" data-dir="top" tabindex="-1" title="Move to top" aria-label="Move to top">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12.5V4"/><path d="M4.5 7.5L8 4l3.5 3.5"/></svg>
+      </button>
+      <button class="dir" data-dir="left" tabindex="-1" title="Move to left" aria-label="Move to left">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 8H4"/><path d="M7.5 4.5L4 8l3.5 3.5"/></svg>
+      </button>
+      <button class="dir" data-dir="right" tabindex="-1" title="Move to right" aria-label="Move to right">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8H12"/><path d="M8.5 4.5L12 8l-3.5 3.5"/></svg>
+      </button>
+      <button class="dir" data-dir="bottom" tabindex="-1" title="Move to bottom" aria-label="Move to bottom">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.5V12"/><path d="M4.5 8.5L8 12l3.5-3.5"/></svg>
+      </button>
+    </div>
+  </div>
+  <script src="bar.js"></script>
+</body>
+</html>

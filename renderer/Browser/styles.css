@@ -270,6 +270,20 @@ html[data-tabbar="side"] .tab-button.in-split:not(.active) {
   background: color-mix(in srgb, var(--surface) 70%, transparent);
   box-shadow: inset 0 0 0 0.5px var(--border);
 }
+/* Hover-to-split: a tab dwelt on mid-drag lights up as the split partner, so
+   releasing there pairs the two instead of reordering the strip. */
+.tab-button.split-target {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.tab-button.split-target::after {
+  content: ''; position: absolute; right: 7px; top: 50%;
+  width: 11px; height: 11px; margin-top: -5.5px;
+  border: 1.5px solid var(--accent); border-radius: 2px;
+  /* A split square: the vertical rule is the divider. */
+  background: linear-gradient(to right, transparent calc(50% - 0.75px), var(--accent) calc(50% - 0.75px), var(--accent) calc(50% + 0.75px), transparent calc(50% + 0.75px));
+  pointer-events: none;
+}
 /* Favicon a touch larger in the roomy side rows. */
 html[data-tabbar="side"] .tab-favicon { width: 17px; height: 17px; }
 /* Pinned tabs are workspace-scoped and read as NORMAL rows docked above the
@@ -712,6 +726,7 @@ html[data-tabbar="side"] .sidebar-foot {
   display: flex; height: 40px; width: 100%;
   background: transparent;
   align-items: center; padding: 0 8px; gap: 8px;
+  /* position:relative also anchors the out-of-flow omnibox (see below). */
   position: relative; z-index: 20; flex-shrink: 0;
   -webkit-app-region: drag;
 }
@@ -768,16 +783,29 @@ html[data-tabbar="side"] .sidebar-foot {
 }
 
 /* ── Address bar (omnibox) ───────────────── */
+/* The wrapper stays in the flex flow purely as the spacer that keeps the
+   trailing icons on the right; the field itself is positioned out of flow so it
+   can centre over the PAGE CARD rather than over the toolbar's leftovers (in
+   sidebar mode the card starts after the sidebar — see --omni-left).
+   Width shrinks with the window so the field never reaches under the icon
+   groups: 400px ≈ the two groups plus breathing room. */
 .omnibox-wrapper { flex: 1; min-width: 0; }
 .omnibox {
-  /* Sits inside the 40px toolbar, so it has to leave air above and below —
-     at 38px it filled the bar edge to edge. Safari and Chrome both keep the
-     field around 28-30px in a bar this tall. */
-  display: flex; align-items: center; height: 30px;
+  position: absolute; top: 50%; transform: translateY(-50%);
+  left: var(--omni-left, 8px); right: 8px; margin: 0 auto;
+  width: clamp(220px, calc(100% - 400px - var(--omni-left, 8px)), 720px);
+  /* Sits inside the 40px toolbar, so it has to leave air above and below. */
+  display: flex; align-items: center; height: 34px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 9px; padding: 0 12px; gap: 8px;
+  border-radius: 11px; padding: 0 13px; gap: 9px;
   transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+}
+/* Sidebar mode: the page card starts after the sidebar, so the field centres
+   over that column instead. Compact mode hides the sidebar → back to the edge
+   (the 8px fallback above). */
+html[data-tabbar="side"]:not([data-compact="on"]) #utility-bar {
+  --omni-left: var(--sidebar-w, 232px);
 }
 .omnibox:focus-within {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
@@ -787,10 +815,10 @@ html[data-tabbar="side"] .sidebar-foot {
 
 .omni-icon {
   display: flex; align-items: center; justify-content: center;
-  width: 15px; height: 15px; flex-shrink: 0;
+  width: 17px; height: 17px; flex-shrink: 0;
   color: var(--text-3); transition: color 0.15s;
 }
-.omni-icon .oi { display: none; }
+.omni-icon .oi { display: none; width: 17px; height: 17px; }
 .omnibox[data-omni="search"]   .oi-search   { display: block; }
 .omnibox[data-omni="secure"]   .oi-secure   { display: block; }
 .omnibox[data-omni="insecure"] .oi-insecure { display: block; }
@@ -802,16 +830,30 @@ html[data-tabbar="side"] .sidebar-foot {
 
 .omni-input { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
 #searchBar {
-  width: 100%; background: transparent; border: none; outline: none;
-  font-family: var(--font); font-size: 13.5px; font-weight: 500;
+  /* padding:0 is load-bearing: the UA default (1px 2px) would offset the input's
+     glyphs from the #omni-ghost / #url-display overlays painted at left:0. */
+  width: 100%; padding: 0; background: transparent; border: none; outline: none;
+  font-family: var(--font); font-size: 15px; font-weight: 500;
   letter-spacing: -0.01em; color: var(--text);
 }
 #searchBar::placeholder { color: var(--text-3); }
 
+/* Inline completion. Must match #searchBar's metrics exactly — the typed half
+   is painted transparent and only spaces the dim remainder into place. */
+#omni-ghost {
+  position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+  display: none; white-space: pre; overflow: hidden;
+  font-family: var(--font); font-size: 15px; font-weight: 500;
+  letter-spacing: -0.01em; color: var(--text-3);
+  pointer-events: none;
+}
+#omni-ghost .typed { color: transparent; }
+.omnibox.has-ghost #omni-ghost { display: block; }
+
 #url-display {
   position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
   display: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-family: var(--font); font-size: 13.5px; font-weight: 500;
+  font-family: var(--font); font-size: 15px; font-weight: 500;
   letter-spacing: -0.01em; color: var(--text-2);
   pointer-events: none;
 }
@@ -1092,4 +1134,32 @@ html[data-tabbar="side"] .sb-workspaces.reordering .sb-ws { cursor: grab; }
 @layer components {
 /* Multi-selected tabs read as a group without stealing the active tab's look. */
 html[data-tabbar="side"] .tab-button.multi-selected { box-shadow: inset 0 0 0 1.5px var(--accent-2, var(--accent)); }
+}
+
+/* ── Keyboard reachability ─────────────────────────────────────────────────
+   The chrome used to set tabindex="-1" on every control, so a keyboard-only
+   user could reach nothing above the page. Controls are now normal tab stops;
+   these rings are what make that usable. :focus-visible only — a mouse click
+   still gets no ring. */
+.nav-btn:focus-visible,
+.icon-btn:focus-visible,
+.tab-add:focus-visible,
+.tab-scroll-btn:focus-visible,
+.sb-workspaces button:focus-visible,
+.sc-btn:focus-visible,
+.sc-row:focus-visible,
+.folder-header:focus-visible,
+.essentials .ess-tile:focus-visible,
+.bookmark-bar-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 8px;
+}
+.omnibox:focus-within { outline: none; } /* the omnibox draws its own focus state */
+/* The strip is a tab list: the focused row reads like the active one so the
+   keyboard position is never ambiguous. */
+.tab-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  z-index: 10;
 }

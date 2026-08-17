@@ -12,39 +12,39 @@
   <!-- Tab Bar (top strip — sits beside the native window controls) -->
   <div id="tab-bar">
     <!-- Drag handle on the sidebar's right edge (side mode) to resize it -->
-    <div id="sidebar-resizer" class="sidebar-resizer" title="Drag to resize"></div>
+    <div id="sidebar-resizer" class="sidebar-resizer" title="Drag to resize" data-i18n-title="chrome.resizeSidebar"></div>
     <!-- Window controls — position/style set by JS based on platform -->
     <div id="window-controls" class="window-controls"></div>
     <!-- Create-a-Space form. Lives in the sidebar (chrome, outside the page
          bounds) so unlike the modals it needs no page-view collapse. -->
-    <div id="space-create" class="space-create hidden" role="dialog" aria-label="Create a Space">
+    <div id="space-create" class="space-create hidden" role="dialog" aria-label="Create a Space" data-i18n-label="chrome.createSpace">
       <div class="sc-title">Create a Space</div>
       <div class="sc-sub">Spaces keep their own tabs, essentials and history.</div>
       <div class="sc-namerow">
-        <button type="button" id="sc-emoji" class="sc-emoji" tabindex="-1" aria-label="Choose icon" title="Choose icon"></button>
-        <input id="sc-name" class="sc-input" maxlength="24" placeholder="Space Name" tabindex="-1">
+        <button type="button" id="sc-emoji" class="sc-emoji" aria-label="Choose icon" title="Choose icon" data-i18n-label="chrome.chooseIcon" data-i18n-title="chrome.chooseIcon"></button>
+        <input id="sc-name" class="sc-input" maxlength="24" placeholder="Space Name" data-i18n-placeholder="chrome.spaceName">
       </div>
       <div id="sc-emoji-picker" class="emoji-picker hidden" role="listbox" aria-label="Icon"></div>
       <!-- Which cookie jar this space's tabs use: its own, the shared Default,
            or a named container shared with other spaces. -->
-      <button class="sc-row sc-pick" id="sc-profile" tabindex="-1">
+      <button class="sc-row sc-pick" id="sc-profile">
         <span>Profile</span><span class="sc-pick-val" id="sc-profile-val">Own</span>
       </button>
-      <button class="sc-row" id="sc-theme" tabindex="-1">Edit Theme…</button>
+      <button class="sc-row" id="sc-theme">Edit Theme…</button>
       <div class="sc-actions">
-        <button id="sc-create" class="sc-btn sc-btn-primary" tabindex="-1">Create Space</button>
-        <button id="sc-cancel" class="sc-btn" tabindex="-1">Cancel</button>
+        <button id="sc-create" class="sc-btn sc-btn-primary">Create Space</button>
+        <button id="sc-cancel" class="sc-btn">Cancel</button>
       </div>
     </div>
     <!-- Essentials: pinned favourites (sidebar mode only, per profile) -->
-    <div id="essentials" class="essentials" aria-label="Essentials"></div>
+    <div id="essentials" class="essentials" aria-label="Essentials" data-i18n-label="chrome.essentials"></div>
     <!-- Muted current-space label above the tab list (a "Space" header) -->
     <div id="space-header" class="space-header"></div>
-    <button id="tab-scroll-left" class="tab-scroll-btn" tabindex="-1" aria-label="Scroll tabs left">‹</button>
+    <button id="tab-scroll-left" class="tab-scroll-btn" aria-label="Scroll tabs left" data-i18n-label="chrome.scrollTabsLeft">‹</button>
     <div id="tabs-container"></div>
-    <button id="tab-scroll-right" class="tab-scroll-btn" tabindex="-1" aria-label="Scroll tabs right">›</button>
+    <button id="tab-scroll-right" class="tab-scroll-btn" aria-label="Scroll tabs right" data-i18n-label="chrome.scrollTabsRight">›</button>
     <div id="tab-actions">
-      <button id="new-tab-btn" class="tab-add" tabindex="-1" aria-label="New tab">+</button>
+      <button id="new-tab-btn" class="tab-add" aria-label="New tab" data-i18n-label="chrome.newTab">+</button>
     </div>
     <!-- Draggable filler: keeps the + next to the last tab, taking the slack up
          to the window controls / private badge. Collapses to 0 once tabs fill
@@ -63,32 +63,32 @@
     <!-- Sidebar foot (side mode only): workspace switcher (an avatar
          per workspace, active one labelled) + add + settings. -->
     <div id="sidebar-foot" class="sidebar-foot">
-      <button id="sb-downloads" class="icon-btn sb-downloads hidden" tabindex="-1" title="Downloads">
+      <button id="sb-downloads" class="icon-btn sb-downloads hidden" title="Downloads" data-i18n-title="chrome.downloads">
         <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/>
         </svg>
       </button>
-      <button id="sb-settings" class="icon-btn sb-settings" tabindex="-1" title="Settings">
+      <button id="sb-settings" class="icon-btn sb-settings" title="Settings" data-i18n-title="chrome.settings">
         <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
       </button>
       <div id="sb-workspaces" class="sb-workspaces"></div>
-      <button id="sb-add-ws" class="icon-btn sb-add-ws" tabindex="-1" title="New workspace">+</button>
+      <button id="sb-add-ws" class="icon-btn sb-add-ws" title="New workspace" data-i18n-title="chrome.newWorkspace">+</button>
     </div>
   </div>
 
   <!-- Navigation / address bar -->
   <div id="utility-bar">
     <div class="nav-buttons">
-      <button id="back-btn" tabindex="-1" class="nav-btn" title="Back">
+      <button id="back-btn" class="nav-btn" title="Back" data-i18n-title="chrome.back">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <button id="forward-btn" tabindex="-1" class="nav-btn" title="Forward">
+      <button id="forward-btn" class="nav-btn" title="Forward" data-i18n-title="chrome.forward">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
       </button>
-      <button id="reload-btn" tabindex="-1" class="nav-btn" title="Reload">
+      <button id="reload-btn" class="nav-btn" title="Reload" data-i18n-title="chrome.reload">
         <svg class="nav-reload" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
           <path d="M21 4v4.2h-4.2"/>
@@ -100,7 +100,7 @@
     </div>
 
       <!-- Compact mode: hide/show the sidebar -->
-      <button id="compact-btn" tabindex="-1" class="icon-btn" title="Toggle Compact Mode">
+      <button id="compact-btn" class="icon-btn" title="Toggle Compact Mode" data-i18n-title="chrome.compact">
         <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/>
           <path d="M9.5 4.5v15"/>
@@ -126,7 +126,11 @@
           </svg>
         </span>
         <div class="omni-input">
-          <input id="searchBar" placeholder="Search or enter URL" type="text">
+          <input id="searchBar" placeholder="Search or enter URL" data-i18n-placeholder="chrome.omnibox" type="text">
+          <!-- Inline completion, shown as dim text AFTER the caret. The typed
+               half is transparent so the suggestion lines up with the input's
+               own glyphs; Tab (or clicking the row) accepts it. -->
+          <div id="omni-ghost" aria-hidden="true"><span class="typed"></span><span class="rest"></span></div>
           <!-- Firefox-style resting URL: host bright, scheme/path dimmed.
                Painted over the (text-transparent) input while it's unfocused. -->
           <div id="url-display" aria-hidden="true"></div>
@@ -135,7 +139,7 @@
     </div>
 
     <!-- Inline pomodoro pill — hidden until focus mode/timer is active -->
-    <div id="pomodoro-pill" class="pomodoro-pill hidden" title="Click to manage timer">
+    <div id="pomodoro-pill" class="pomodoro-pill hidden" title="Click to manage timer" data-i18n-title="chrome.timer">
       <svg class="pill-ring" viewBox="0 0 28 28" width="28" height="28">
         <circle class="pill-ring-bg"   cx="14" cy="14" r="11"/>
         <circle class="pill-ring-fill" id="pill-ring-fill" cx="14" cy="14" r="11"/>
@@ -146,34 +150,34 @@
 
     <div class="trailing-icons">
       <!-- Profile switcher: coloured initial of this window's profile -->
-      <button id="profile-btn" tabindex="-1" class="icon-btn" title="Profiles">
+      <button id="profile-btn" class="icon-btn" title="Profiles" data-i18n-title="chrome.profiles">
         <span id="profile-badge" class="profile-badge">P</span>
       </button>
       <!-- Extension browser-action buttons (electron-chrome-extensions) -->
       <browser-action-list id="ext-actions"></browser-action-list>
       <!-- Extensions: lists installed extensions; links to the Chrome Web Store -->
-      <button id="extensions-btn" tabindex="-1" class="icon-btn" title="Extensions">
+      <button id="extensions-btn" class="icon-btn" title="Extensions" data-i18n-title="chrome.extensions">
         <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/>
           <rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>
         </svg>
       </button>
       <!-- Reader mode: hidden until the page looks like an article -->
-      <button id="reader-btn" tabindex="-1" class="icon-btn reader-btn hidden" title="Reader View">
+      <button id="reader-btn" class="icon-btn reader-btn hidden" title="Reader View" data-i18n-title="chrome.reader">
         <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <rect x="4" y="4" width="16" height="16" rx="2.5"/>
           <path d="M8 9h8M8 12.5h8M8 16h5"/>
         </svg>
       </button>
       <!-- Picture-in-Picture: hidden until the active tab plays video -->
-      <button id="pip-btn" tabindex="-1" class="icon-btn pip-btn hidden" title="Picture-in-Picture">
+      <button id="pip-btn" class="icon-btn pip-btn hidden" title="Picture-in-Picture" data-i18n-title="chrome.pip">
         <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="5" width="18" height="14" rx="2.5"/>
           <rect x="12.5" y="11.5" width="6.5" height="5" rx="1" fill="currentColor" stroke="none"/>
         </svg>
       </button>
       <!-- Downloads: hidden until the first download of the session -->
-      <button id="downloads-btn" tabindex="-1" class="icon-btn downloads-btn hidden" title="Downloads">
+      <button id="downloads-btn" class="icon-btn downloads-btn hidden" title="Downloads" data-i18n-title="chrome.downloads">
         <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 4v10M8 10.5l4 4 4-4"/>
           <path d="M5 19.5h14"/>
@@ -181,7 +185,7 @@
         <span class="downloads-dot"></span>
       </button>
       <!-- Bookmark: filled ribbon when bookmarked, outline when not -->
-      <button id="bookmark-btn" tabindex="-1" class="icon-btn" title="Bookmark">
+      <button id="bookmark-btn" class="icon-btn" title="Bookmark" data-i18n-title="chrome.bookmark">
         <svg class="icon-svg bookmark-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4-7 4V4.5a1 1 0 0 1 1-1z"/>
         </svg>
@@ -190,13 +194,13 @@
         </svg>
       </button>
       <!-- Focus: clock icon -->
-      <button id="focus-btn" tabindex="-1" class="icon-btn" title="Focus Mode">
+      <button id="focus-btn" class="icon-btn" title="Focus Mode" data-i18n-title="chrome.focusMode">
         <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="8.5"/>
           <path d="M12 7v5l3.2 2"/>
         </svg>
       </button>
-      <button id="menu-btn" tabindex="-1" class="icon-btn menu-btn" title="Menu">
+      <button id="menu-btn" class="icon-btn menu-btn" title="Menu" data-i18n-title="chrome.menu">
         <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
           <path d="M4 7h16M4 12h16M4 17h16"/>
         </svg>
@@ -218,12 +222,12 @@
       <div class="pomodoro-phase" id="pomodoro-phase">Focus</div>
       <div class="pomodoro-time" id="pomodoro-time">25:00</div>
       <div class="pomodoro-controls">
-        <button id="pomodoro-start" tabindex="-1" class="pom-btn pom-btn-primary">Start</button>
-        <button id="pomodoro-skip" tabindex="-1"  class="pom-btn">Skip</button>
-        <button id="pomodoro-reset" tabindex="-1" class="pom-btn">Reset</button>
+        <button id="pomodoro-start" class="pom-btn pom-btn-primary">Start</button>
+        <button id="pomodoro-skip"  class="pom-btn">Skip</button>
+        <button id="pomodoro-reset" class="pom-btn">Reset</button>
       </div>
       <div class="pomodoro-sessions" id="pomodoro-sessions"></div>
-      <button id="pomodoro-close" tabindex="-1" class="pom-close" title="Close">✕</button>
+      <button id="pomodoro-close" class="pom-close" title="Close" data-i18n-title="chrome.close">✕</button>
     </div>
   </div>
 
@@ -231,22 +235,28 @@
 
   <!-- Rename this window's profile -->
   <div id="profile-rename-modal" class="cm-overlay hidden">
-    <div class="ri-card" role="dialog" aria-label="Edit profile">
+    <div class="ri-card" role="dialog" aria-label="Edit profile" data-i18n-label="chrome.editProfile">
       <div class="ri-title">Edit profile</div>
       <div class="prf-row">
-        <button type="button" id="prf-emoji" class="prf-emoji" tabindex="-1" aria-label="Choose emoji" title="Choose emoji">🙂</button>
-        <input id="prf-input" class="ri-input" maxlength="24" placeholder="e.g. Work" tabindex="-1">
+        <button type="button" id="prf-emoji" class="prf-emoji" aria-label="Choose emoji" title="Choose emoji" data-i18n-label="chrome.chooseEmoji" data-i18n-title="chrome.chooseEmoji">🙂</button>
+        <input id="prf-input" class="ri-input" maxlength="24" placeholder="e.g. Work">
       </div>
       <div id="prf-emoji-picker" class="emoji-picker hidden" role="listbox" aria-label="Emoji"></div>
       <div class="prf-hint">Choose the dot to keep the avatar minimal.</div>
       <div class="ri-actions">
-        <button id="prf-cancel" class="ri-btn" tabindex="-1">Cancel</button>
-        <button id="prf-save" class="ri-btn ri-btn-primary" tabindex="-1">Save</button>
+        <button id="prf-cancel" class="ri-btn">Cancel</button>
+        <button id="prf-save" class="ri-btn ri-btn-primary">Save</button>
       </div>
     </div>
   </div>
 
   <script src="../../node_modules/dompurify/dist/purify.min.js"></script>
+  <!-- Chrome modules (classic scripts, no bundler): each registers a factory on
+       window.Ink, which renderer.js wires up. Order matters — these must run
+       before renderer.js. -->
+  <script src="../lib/i18n.js"></script>
+  <script src="../lib/util.js"></script>
+  <script src="../lib/bookmark-bar.js"></script>
   <script src="../renderer.js"></script>
 </body>
 </html>

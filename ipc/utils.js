@@ -3,24 +3,25 @@
  * Import only what you need — keep deps lightweight.
  */
 /** Remove and destroy the hamburger menu WebContentsView for a window. */
+const log = require('../features/log');
 function closeWindowMenu(windowData) {
     if (!windowData || !windowData.menu)
         return;
     try {
         windowData.window.contentView.removeChildView(windowData.menu);
     }
-    catch { }
+    catch (e) { log.debug('utils', 'closeWindowMenu', e); }
     windowData.menu = null;
     try {
         windowData.window.webContents.send('menu-closed');
     }
-    catch { }
+    catch (e) { log.debug('utils', 'closeWindowMenu', e); }
     if (windowData.menuCleanups) {
         for (const fn of windowData.menuCleanups) {
             try {
                 fn();
             }
-            catch { }
+            catch (e) { log.debug('utils', 'if', e); }
         }
         windowData.menuCleanups = null;
     }
@@ -32,7 +33,7 @@ function closeFolderDropdown(windowData) {
     try {
         windowData.window.contentView.removeChildView(windowData.folderDropdown);
     }
-    catch { }
+    catch (e) { log.debug('utils', 'closeFolderDropdown', e); }
     windowData.folderDropdown = null;
     windowData.folderDropdownId = null;
 }
@@ -41,12 +42,12 @@ function broadcastBookmarksChanged(webContents) {
     webContents.getAllWebContents().forEach(wc => { try {
         wc.send('bookmarks-changed');
     }
-    catch { } });
+    catch (e) { log.debug('utils', 'broadcastBookmarksChanged', e); } });
     // Extensions get the precise chrome.bookmarks events, worked out by diffing
     // against the previous tree — this is the one place every mutation in the
     // app passes through, whoever made it.
     try { require('../features/ext-events').bookmarksChanged(); }
-    catch { }
+    catch (e) { log.debug('utils', 'broadcastBookmarksChanged', e); }
 }
 
 module.exports = { closeWindowMenu, closeFolderDropdown, broadcastBookmarksChanged };

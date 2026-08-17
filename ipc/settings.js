@@ -5,8 +5,13 @@
  * (tab resize), overlay open/close (collapse/restore tab views), and
  * address bar focus forwarding.
  */
+const log = require('../features/log');
 const { loginWithGoogle } = require('../features/google-auth');
 const privacy = require('../features/privacy');
+const searchEngines = require('../features/search-engines');
+const i18n = require('../features/i18n');
+const History = require('../features/history');
+const zoom = require('../features/zoom');
 // Privacy / tracking-protection settings routed through the privacy orchestrator.
 const PRIVACY_KEYS = [
     'adBlockEnabled', 'blockThirdPartyCookies', 'httpsUpgrade',
@@ -17,15 +22,77 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
     // Seed every privacy layer from persisted settings (defaults are maximal).
     PRIVACY_KEYS.forEach(k => privacy.setConfig(k, wm.persistence.get(k)));
     // ── Settings ──────────────────────────────────────────────────────────────
+    // The renderer resolves typed text to a URL synchronously, so it needs the
+    // engine list in the settings payload — built-ins included, so there is one
+    // definition of them (features/search-engines.js) rather than a copy in the
+    // omnibox.
+    const withEngines = (s) => {
+        s.engines = searchEngines.all();
+        // The chrome paints its labels during startup, so the catalogue has to
+        // travel with the settings rather than in a later round trip.
+        s.i18n = { locale: i18n.currentLocale(), catalogue: i18n.catalogue() };
+        return s;
+    };
     ipcMain.handle('settings-get', () => {
-        const s = wm.persistence.getAll();
+        const s = withEngines(wm.persistence.getAll());
         s._version = app.getVersion();
         return s;
     });
     // Synchronous read used by preload scripts at startup
     ipcMain.on('settings-get-sync', (_e) => {
-        _e.returnValue = wm.persistence.getAll();
+        _e.returnValue = withEngines(wm.persistence.getAll());
     });
+    // ── Language ──────────────────────────────────────────────────────────────
+    ipcMain.handle('i18n:locales', () => i18n.locales());
+    ipcMain.handle('i18n:set', (_e, id) => {
+        const resolved = i18n.setLanguage(id);
+        // Every window re-reads its labels; the pages that own their own markup
+        // localise on load.
+        webContents.getAllWebContents().forEach(wc => {
+            try { wc.send('language-changed', { locale: resolved, catalogue: i18n.catalogue() }); }
+            catch (e) { log.debug('settings', 'language broadcast', e); }
+        });
+        return resolved;
+    });
+    // ── Per-site zoom ─────────────────────────────────────────────────────────
+    ipcMain.handle('zoom:list', () => zoom.all());
+    ipcMain.handle('zoom:clear', (_e, origin) => {
+        zoom.clear(origin || null);
+        // Apply immediately to anything currently showing that origin.
+        wm.getAllWindows().forEach(w => {
+            w.tabs?.tabMap?.forEach((tab, idx) => {
+                const url = w.tabs.tabUrls.get(idx) || '';
+                if (!origin || zoom.originOf(url) === origin)
+                    zoom.apply(tab.webContents, url);
+            });
+        });
+        return true;
+    });
+    // ── Search engines ────────────────────────────────────────────────────────
+    ipcMain.handle('engines:list', () => searchEngines.all());
+    ipcMain.handle('engines:save', (_e, engine) => {
+        try {
+            const saved = searchEngines.upsert(engine);
+            broadcastEngines();
+            return { ok: true, engine: saved };
+        }
+        catch (err) {
+            return { ok: false, error: err?.message || 'Could not save that engine.' };
+        }
+    });
+    ipcMain.handle('engines:remove', (_e, id) => {
+        const removed = searchEngines.remove(id);
+        if (removed)
+            broadcastEngines();
+        return removed;
+    });
+    function broadcastEngines() {
+        const list = searchEngines.all();
+        webContents.getAllWebContents().forEach(wc => {
+            try { wc.send('engines-changed', list); }
+            catch (e) { log.debug('settings', 'broadcastEngines', e); }
+        });
+    }
     ipcMain.handle('settings-set', (_e, key, value) => {
         wm.persistence.set(key, value);
         if (key === 'theme') {
@@ -34,7 +101,7 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
                 try {
                     wc.send('theme-changed', value);
                 }
-                catch { }
+                catch (e) { log.debug('settings', 'settings-set', e); }
             });
         }
         if (key === 'utilityBar') {
@@ -43,7 +110,7 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
                 try {
                     w.window.webContents.send('utility-bar-changed', value);
                 }
-                catch { }
+                catch (e) { log.debug('settings', 'settings-set', e); }
             });
         }
         if (key === 'persistAllTabs') {
@@ -52,11 +119,18 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
                 try {
                     wd.tabs.saveStateDebounced();
                 }
-                catch { }
+                catch (e) { log.debug('settings', 'settings-set', e); }
             }
         }
         if (key === 'blockShortform') {
             focusMode.setShortformEnabled(wm, !!value);
+        }
+        // Retention changes take effect on the next read, not the next restart.
+        if (key === 'historyDays' || key === 'historyMaxEntries') {
+            History.setRetention({
+                maxDays: wm.persistence.get('historyDays'),
+                maxEntries: wm.persistence.get('historyMaxEntries'),
+            });
         }
         if (PRIVACY_KEYS.includes(key)) {
             privacy.setConfig(key, value);
@@ -67,7 +141,7 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
                     try {
                         wc.send('adblock-set-enabled', !!value);
                     }
-                    catch { }
+                    catch (e) { log.debug('settings', 'settings-set', e); }
                 });
             }
         }
@@ -112,13 +186,13 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
                 try {
                     await sess.clearAuthCache();
                 }
-                catch { }
+                catch (e) { log.debug('settings', 'clear-browsing-data', e); }
             }
             // Notify chrome so the history/bookmark UIs can refresh.
             try {
                 wm.getAllWindows().forEach(w => w.window.webContents.send('browsing-data-cleared'));
             }
-            catch { }
+            catch (e) { log.debug('settings', 'clear-browsing-data', e); }
             return { ok: true };
         }
         catch (err) {

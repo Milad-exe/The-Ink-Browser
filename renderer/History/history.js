@@ -8,7 +8,7 @@
             try {
                 await window.menu?.close();
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('history', 'history: ' + e); }
         });
         try {
             const historyData = await window.browserHistory.get();
@@ -54,7 +54,9 @@
         urlElement.className = 'history-url';
         const timestampElement = document.createElement('div');
         const date = new Date(entry.timestamp);
-        timestampElement.textContent = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        timestampElement.textContent = window.Ink?.i18n
+            ? window.Ink.i18n.dateTime(date)
+            : date.toLocaleString();
         timestampElement.className = 'history-timestamp';
         const removeButton = document.createElement('button');
         removeButton.textContent = '×';
@@ -67,7 +69,7 @@
                 if (ok)
                     entryDiv.remove();
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('history', 'createHistoryEntry: ' + e); }
         });
         contentDiv.addEventListener('click', () => {
             if (!entry.url)

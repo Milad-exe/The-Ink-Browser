@@ -40,6 +40,39 @@ contextBridge.exposeInMainWorld('northstarSettings', {
     openBookmarksTab: () => ipcRenderer.invoke('open-bookmarks-tab'),
     cachedFavicon: (host) => ipcRenderer.invoke('favicon-cached', host),
 });
+// Search engines, per-site zoom, import/export, updates, diagnostics — the
+// Settings page is the only surface that manages these.
+contextBridge.exposeInMainWorld('northstarEngines', {
+    list: () => ipcRenderer.invoke('engines:list'),
+    save: (engine) => ipcRenderer.invoke('engines:save', engine),
+    remove: (id) => ipcRenderer.invoke('engines:remove', id),
+    onChanged: (cb) => ipcRenderer.on('engines-changed', (_e, list) => cb(list)),
+});
+contextBridge.exposeInMainWorld('northstarI18n', {
+    locales: () => ipcRenderer.invoke('i18n:locales'),
+    set: (id) => ipcRenderer.invoke('i18n:set', id),
+});
+contextBridge.exposeInMainWorld('northstarZoom', {
+    list: () => ipcRenderer.invoke('zoom:list'),
+    clear: (origin) => ipcRenderer.invoke('zoom:clear', origin),
+});
+contextBridge.exposeInMainWorld('userData', {
+    importBookmarks: () => ipcRenderer.invoke('data:import-bookmarks'),
+    exportBookmarks: () => ipcRenderer.invoke('data:export-bookmarks'),
+    importPasswords: () => ipcRenderer.invoke('data:import-passwords'),
+    exportPasswords: () => ipcRenderer.invoke('data:export-passwords'),
+    exportHistory: () => ipcRenderer.invoke('data:export-history'),
+    reveal: (p) => ipcRenderer.invoke('data:reveal', p),
+    clearCertExceptions: () => ipcRenderer.invoke('cert:clear-exceptions'),
+    checkUpdate: (force) => ipcRenderer.invoke('app:check-update', force),
+    openRelease: (url) => ipcRenderer.invoke('app:open-release', url),
+    defaultBrowserStatus: () => ipcRenderer.invoke('app:default-browser-status'),
+    makeDefaultBrowser: () => ipcRenderer.invoke('app:make-default-browser'),
+    keyProtection: () => ipcRenderer.invoke('app:key-protection'),
+    openLog: () => ipcRenderer.invoke('app:open-log'),
+    logTail: () => ipcRenderer.invoke('app:log-tail'),
+    versions: () => ipcRenderer.invoke('app:version'),
+});
 contextBridge.exposeInMainWorld('northstarPasswords', {
     list: () => ipcRenderer.invoke('passwords-list'),
     reveal: (id) => ipcRenderer.invoke('passwords-reveal', id),

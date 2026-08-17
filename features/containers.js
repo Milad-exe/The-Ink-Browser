@@ -17,6 +17,7 @@
  * userData/northstar/containers.json. (Internally these are still called
  * "containers" — the session partition scheme — but the user sees "instances".)
  */
+const log = require('./log');
 const path = require('path');
 const fs = require('fs');
 const { app } = require('electron');
@@ -49,7 +50,7 @@ function load() {
             return _registry;
         }
     }
-    catch { }
+    catch (e) { log.debug('containers', 'load', e); }
     _registry = { nextId: 1, list: [] }; // start empty — instances are made on demand
     return _registry;
 }
@@ -59,7 +60,7 @@ function save() {
         fs.mkdirSync(path.dirname(file()), { recursive: true });
         fs.writeFileSync(file(), JSON.stringify(_registry, null, 2));
     }
-    catch { }
+    catch (e) { log.debug('containers', 'save', e); }
 }
 
 /** All instances (safe copies), newest last. */
@@ -87,7 +88,7 @@ function labelForUrl(url) {
         if (base && /[a-z]/i.test(base))
             return base.charAt(0).toUpperCase() + base.slice(1);
     }
-    catch { }
+    catch (e) { log.debug('containers', 'labelForUrl', e); }
     return 'Instance';
 }
 
@@ -129,7 +130,7 @@ function subdomainOf(host) {
 function instanceForHost(url, space = '1') {
     let host = null;
     try { host = new URL(url).hostname; }
-    catch { }
+    catch (e) { log.debug('containers', 'instanceForHost', e); }
     if (!host)
         return createForUrl(url, space);
     const reg = load();
@@ -213,7 +214,7 @@ function remove(id) {
         sess.clearStorageData();
         sess.clearCache();
     }
-    catch { }
+    catch (e) { log.debug('containers', 'remove', e); }
     sessions.delete(key);
     return true;
 }
@@ -228,9 +229,9 @@ function get(id) {
     const sess = session.fromPartition(`persist:container-${key}`);
     setup(sess, { persist: true });
     try { adBlocker.enableBlockingInSession(sess); }
-    catch { }
+    catch (e) { log.debug('containers', 'get', e); }
     try { downloadManager.attach(sess); }
-    catch { }
+    catch (e) { log.debug('containers', 'get', e); }
     for (const [pid, f] of [
         [`chrome-spoof-ctr-${key}`, 'chrome-spoof.js'],
         [`adblock-cosmetic-ctr-${key}`, 'ad-block-cosmetic.js'],
@@ -238,7 +239,7 @@ function get(id) {
         try {
             sess.registerPreloadScript({ type: 'frame', id: pid, filePath: path.join(__dirname, '../preload', f) });
         }
-        catch { }
+        catch (e) { log.debug('containers', 'for', e); }
     }
     sessions.set(key, sess);
     return sess;
@@ -264,7 +265,7 @@ async function gc(activeIds) {
             if (!cookies || cookies.length === 0)
                 remove(c.id);
         }
-        catch { }
+        catch (e) { log.debug('containers', 'gc', e); }
     }
 }
 

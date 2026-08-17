@@ -7,6 +7,7 @@
  * user was typing, which stole Electron-level focus from the address bar and
  * swallowed the next key press.
  */
+const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
@@ -30,7 +31,7 @@ async function ensureView(wd) {
         },
     });
     view.setBackgroundColor('#00000000');
-    try { view.setBorderRadius(12) } catch {}
+    try { view.setBorderRadius(12) } catch (e) { log.debug('suggestions', 'if', e); }
     view.setVisible(false);
     wd.suggestions = view;
     wd.window.contentView.addChildView(view);
@@ -38,7 +39,7 @@ async function ensureView(wd) {
     try {
         wd.window.webContents.send('suggestions-created');
     }
-    catch { }
+    catch (e) { log.debug('suggestions', 'if', e); }
     view.webContents.loadFile(resolveAppFile('renderer/Suggestions/index.html'));
     wd.suggestionsReady = new Promise(res => view.webContents.once('did-finish-load', () => res()));
     await wd.suggestionsReady;
@@ -46,7 +47,7 @@ async function ensureView(wd) {
     try {
         wd.window.webContents.focus();
     }
-    catch { }
+    catch (e) { log.debug('suggestions', 'if', e); }
     return view;
 }
 function hideView(wd) {
@@ -91,7 +92,7 @@ function register(ipcMain, { wm }) {
                 wd.window.contentView.removeChildView(view);
                 wd.window.contentView.addChildView(view);
             }
-            catch { }
+            catch (e) { log.debug('suggestions', 'suggestions-open', e); }
             view.setVisible(true);
             view.webContents.send('suggestions-data', { items, activeIndex, query, engine });
             return true;
@@ -146,7 +147,7 @@ function register(ipcMain, { wm }) {
                 try {
                     w.window.webContents.send('suggestions-pointer-down');
                 }
-                catch { }
+                catch (e) { log.debug('suggestions', 'suggestions-pointer-down', e); }
                 break;
             }
         }

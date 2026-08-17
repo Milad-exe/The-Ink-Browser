@@ -4,6 +4,7 @@
  * The menu is a transparent WebContentsView that slides in from the top-right.
  * It must be dismissed when the user clicks anywhere outside it.
  */
+const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
@@ -25,7 +26,7 @@ function register(ipcMain, { wm }) {
             },
         });
         wd.menu.setBackgroundColor('#00000000');
-        try { wd.menu.setBorderRadius(12); } catch { }
+        try { wd.menu.setBorderRadius(12); } catch (e) { log.debug('menu', 'open', e); }
         wd.window.contentView.addChildView(wd.menu);
         wd.menu.webContents.loadFile(resolveAppFile('renderer/Menu/index.html'));
         const browserWidth = wd.window.getBounds().width;

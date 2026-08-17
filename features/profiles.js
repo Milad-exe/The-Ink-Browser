@@ -14,6 +14,7 @@
  * migration; every other profile gets its own persist: partition hardened
  * exactly like a profile session, plus its own store files.
  */
+const log = require('./log');
 const path = require('path');
 const fs = require('fs');
 const { app } = require('electron');
@@ -47,7 +48,7 @@ function load() {
             return _reg;
         }
     }
-    catch { }
+    catch (e) { log.debug('profiles', 'load', e); }
     _reg = { nextId: 2, list: [{ id: '1', name: 'Personal', color: COLORS[0], emoji: EMOJIS[0], essentials: [] }] };
     save();
     return _reg;
@@ -58,7 +59,7 @@ function save() {
         fs.mkdirSync(path.dirname(file()), { recursive: true });
         fs.writeFileSync(file(), JSON.stringify(_reg, null, 2));
     }
-    catch { }
+    catch (e) { log.debug('profiles', 'save', e); }
 }
 
 function _find(id) { return load().list.find(p => p.id === String(id)) || null; }
@@ -152,9 +153,9 @@ function sessionFor(id) {
     const sess = session.fromPartition(`persist:profile-${key}`);
     setup(sess, { persist: true });
     try { adBlocker.enableBlockingInSession(sess); }
-    catch { }
+    catch (e) { log.debug('profiles', 'if', e); }
     try { downloadManager.attach(sess); }
-    catch { }
+    catch (e) { log.debug('profiles', 'if', e); }
     for (const [pid, f] of [
         [`chrome-spoof-prof-${key}`, 'chrome-spoof.js'],
         [`adblock-cosmetic-prof-${key}`, 'ad-block-cosmetic.js'],
@@ -162,7 +163,7 @@ function sessionFor(id) {
         try {
             sess.registerPreloadScript({ type: 'frame', id: pid, filePath: path.join(__dirname, '../preload', f) });
         }
-        catch { }
+        catch (e) { log.debug('profiles', 'for', e); }
     }
     sessions.set(key, sess);
     return sess;
@@ -192,7 +193,7 @@ function remove(id) {
             const { session } = require('electron');
             session.fromPartition(`persist:profile-${key}`).clearStorageData();
         }
-        catch { }
+        catch (e) { log.debug('profiles', 'if', e); }
     }
     return true;
 }

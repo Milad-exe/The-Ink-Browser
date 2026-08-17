@@ -14,6 +14,7 @@
  * error. It rejects with a message naming launchWebAuthFlow instead.
  */
 'use strict';
+const log = require('./log');
 const { BrowserWindow } = require('electron');
 
 const WINDOW_W = 480;
@@ -60,7 +61,7 @@ function launchWebAuthFlow(extensionId, { url, interactive = true } = {}, parent
                 return;
             settled = true;
             try { win.destroy(); }
-            catch { }
+            catch (e) { log.debug('ext-identity', 'finish', e); }
             fn(arg);
         };
         // The redirect target does not resolve, so the navigation to it may fail

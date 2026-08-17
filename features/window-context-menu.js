@@ -1,3 +1,4 @@
+const log = require('./log');
 class WindowContextMenu {
     window; // BrowserWindow the menu belongs to
     windowManager;
@@ -113,13 +114,13 @@ class WindowContextMenu {
                         const profiles = require('./profiles');
                         let title = u;
                         try { title = new URL(u).hostname.replace(/^www\./, ''); }
-                        catch { }
+                        catch (e) { log.debug('window-context-menu', 'isMuted', e); }
                         profiles.addEssential(windowData.tabs.profileId || '1', {
                             url: u, title,
                             profile: windowData.tabs.tabContainers.get(tabIndex) || null,
                         });
                         try { windowData.window.webContents.send('essentials-changed'); }
-                        catch { }
+                        catch (e) { log.debug('window-context-menu', 'isMuted', e); }
                     },
                 });
             }

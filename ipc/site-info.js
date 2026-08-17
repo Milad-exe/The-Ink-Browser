@@ -5,6 +5,7 @@
  * above the page. Opened from the chrome renderer when the address-bar lock icon
  * is clicked; the panel's own preload (siteinfo-preload.js) reads/writes data.
  */
+const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView, session } = require('electron');
@@ -62,7 +63,7 @@ function reloadOriginTabs(wm, origin, { privateSession = null } = {}) {
                     return;
                 w.tabs.reload(index);
             }
-            catch { }
+            catch (e) { log.debug('site-info', 'reloadOriginTabs', e); }
         });
     }
 }
@@ -72,11 +73,11 @@ function closePanel(wd) {
     try {
         wd.window.contentView.removeChildView(wd.siteInfoView);
     }
-    catch { }
+    catch (e) { log.debug('site-info', 'closePanel', e); }
     try {
         wd.siteInfoView.webContents.close?.();
     }
-    catch { }
+    catch (e) { log.debug('site-info', 'closePanel', e); }
     wd.siteInfoView = null;
     wd.siteInfoInfo = null;
     wd.siteInfoSession = null;
@@ -85,7 +86,7 @@ function closePanel(wd) {
         try {
             wd.siteInfoCleanup();
         }
-        catch { }
+        catch (e) { log.debug('site-info', 'if', e); }
         wd.siteInfoCleanup = null;
     }
 }
@@ -143,7 +144,7 @@ function register(ipcMain, { wm }) {
             },
         });
         view.setBackgroundColor('#00000000');
-        try { view.setBorderRadius(12) } catch {}
+        try { view.setBorderRadius(12) } catch (e) { log.debug('site-info', 'open-site-info', e); }
         wd.window.contentView.addChildView(view);
         view.webContents.loadFile(resolveAppFile('renderer/SiteInfo/index.html'));
         const winW = wd.window.getBounds().width;
@@ -157,7 +158,7 @@ function register(ipcMain, { wm }) {
         view.webContents.once('dom-ready', () => { try {
             view.webContents.focus();
         }
-        catch { } });
+        catch (e) { log.debug('site-info', 'open-site-info', e); } });
         const onContentsBlur = () => closePanel(wd);
         const onWindowBlur = () => closePanel(wd);
         view.webContents.on('blur', onContentsBlur);
@@ -166,11 +167,11 @@ function register(ipcMain, { wm }) {
             try {
                 view.webContents.removeListener('blur', onContentsBlur);
             }
-            catch { }
+            catch (e) { log.debug('site-info', 'onWindowBlur', e); }
             try {
                 wd.window.removeListener('blur', onWindowBlur);
             }
-            catch { }
+            catch (e) { log.debug('site-info', 'onWindowBlur', e); }
         };
         return true;
     });
@@ -213,7 +214,7 @@ function register(ipcMain, { wm }) {
                 await sess.clearStorageData({ origin: info.origin });
                 return true;
             }
-            catch { }
+            catch (e) { log.debug('site-info', 'sess', e); }
         }
         return false;
     });
@@ -225,7 +226,7 @@ function register(ipcMain, { wm }) {
                 const b = wd.siteInfoView.getBounds();
                 wd.siteInfoView.setBounds({ ...b, height: Math.max(80, Math.min(560, Math.round(height))) });
             }
-            catch { }
+            catch (e) { log.debug('site-info', 'site-info-resize', e); }
         }
     });
     // Per-site protections shield: persist, close the panel, reload the page so
@@ -240,7 +241,7 @@ function register(ipcMain, { wm }) {
         try {
             wd.tabs.reload(wd.tabs.activeTabIndex);
         }
-        catch { }
+        catch (e) { log.debug('site-info', 'site-protection-set', e); }
         return true;
     });
     // One async round trip answering "should cosmetic hiding stay on for this

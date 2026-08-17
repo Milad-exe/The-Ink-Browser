@@ -26,6 +26,7 @@
  * (which is how React and Vue DevTools mainly work) has what it needs.
  */
 'use strict';
+const log = require('./log');
 const { WebContentsView } = require('electron');
 
 // extension id → { view, panels: [{ id, title, iconPath, pagePath }] }
@@ -42,7 +43,7 @@ function candidates(session) {
                 out.push({ id: ext.id, name: ext.name, page: String(page).replace(/^\/+/, '') });
         }
     }
-    catch { }
+    catch (e) { log.debug('devtools-ext', 'candidates', e); }
     return out;
 }
 
@@ -67,7 +68,7 @@ async function ensureHost(wd, ext, session) {
     // renderer, and must never be visible.
     view.setBounds({ x: -10000, y: -10000, width: 1, height: 1 });
     try { wd.window.contentView.addChildView(view); }
-    catch { }
+    catch (e) { log.debug('devtools-ext', 'ensureHost', e); }
     const url = `chrome-extension://${ext.id}/${ext.page}?__inkDevtools=1`;
     try { await view.webContents.loadURL(url); }
     catch (e) { console.error(`[devtools] ${ext.id}: ${e.message}`); }
@@ -110,7 +111,7 @@ async function discover(wd) {
         const profiles = require('./profiles');
         session = profiles.sessionFor(wd.profileId || '1');
     }
-    catch { }
+    catch (e) { log.debug('devtools-ext', 'discover', e); }
     const found = candidates(session || require('electron').session.defaultSession);
     for (const ext of found)
         await ensureHost(wd, ext, session);
@@ -136,9 +137,9 @@ function inspectedTab(wd) {
 function teardown(wd) {
     for (const [id, rec] of hosts) {
         try { wd?.window?.contentView?.removeChildView(rec.view); }
-        catch { }
+        catch (e) { log.debug('devtools-ext', 'for', e); }
         try { rec.view.webContents.close(); }
-        catch { }
+        catch (e) { log.debug('devtools-ext', 'for', e); }
         hosts.delete(id);
     }
 }

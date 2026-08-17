@@ -9,11 +9,11 @@
         const close = async () => { try {
             await api.closeMenu();
         }
-        catch { } };
+        catch (e) { window.inkLog?.debug('menu', 'close: ' + e); } };
         const act = (fn) => async () => { try {
             await fn();
         }
-        catch { } await close(); };
+        catch (e) { window.inkLog?.debug('menu', 'act: ' + e); } await close(); };
         // Fill keyboard-shortcut hints (platform-aware).
         document.querySelectorAll('.sc[data-sc]').forEach(el => {
             el.textContent = MOD + el.dataset.sc;
@@ -31,7 +31,7 @@
                 document.getElementById('bookmark-bar-check').classList.add('visible');
             }
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('menu', 'act: ' + e); }
         // ── Actions ────────────────────────────────────────────────────────────
         document.getElementById('btn-new-tab').addEventListener('click', act(() => api.addTab()));
         document.getElementById('btn-new-private-tab').addEventListener('click', act(() => api.addPrivateTab()));
@@ -53,7 +53,7 @@
                 if (typeof pct === 'number')
                     zoomLevel.textContent = pct + '%';
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('menu', 'setZoom: ' + e); }
         };
         document.getElementById('zoom-out').addEventListener('click', () => setZoom('out'));
         document.getElementById('zoom-in').addEventListener('click', () => setZoom('in'));

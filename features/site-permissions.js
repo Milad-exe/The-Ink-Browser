@@ -11,6 +11,7 @@
  * Emits 'change' (origin, name, value) whenever a stored decision changes so the
  * permission layer can drop stale in-memory (temporary) grants for that origin.
  */
+const log = require('./log');
 const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
@@ -61,7 +62,7 @@ class SitePermissions extends EventEmitter {
         try {
             fs.writeFileSync(this.file, encrypt(JSON.stringify(this.data)), { mode: 0o600 });
         }
-        catch { }
+        catch (e) { log.debug('site-permissions', '_save', e); }
     }
     originOf(url) { try {
         return new URL(url).origin;

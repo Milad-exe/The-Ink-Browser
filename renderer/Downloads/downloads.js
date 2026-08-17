@@ -50,9 +50,14 @@
         const SVG_PAUSE = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 4v12M13 4v12"/></svg>';
         const SVG_RESUME = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M6 4l10 6-10 6V4z"/></svg>';
         const SVG_RETRY = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a6 6 0 1 1-1.76-4.24"/><path d="M16 2v4h-4"/></svg>';
+        // Sizes follow the user's locale (1,5 MB vs 1.5 MB) — see
+        // renderer/lib/i18n.js. Falls back to the plain format if the shared
+        // module is not loaded on this page.
         function fmtBytes(n) {
             if (!n || n < 0)
                 return '0 B';
+            if (window.Ink?.i18n)
+                return window.Ink.i18n.bytes(n);
             const units = ['B', 'KB', 'MB', 'GB', 'TB'];
             let i = 0;
             while (n >= 1024 && i < units.length - 1) {

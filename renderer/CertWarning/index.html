@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none';" />
+  <title>Connection is not private</title>
+  <link rel="stylesheet" href="../styles/ui.css">
+  <script src="../lib/i18n.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%; font-family: var(--font);
+      background: var(--page); color: var(--text);
+      overflow: auto; -webkit-font-smoothing: antialiased;
+      user-select: none; -webkit-user-select: none;
+    }
+    /* Warning wallpaper: the danger token instead of the accent, so this page
+       never reads like an ordinary error. */
+    .scene {
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(120% 82% at 50% 0%, color-mix(in srgb, var(--danger) 18%, transparent), transparent 60%),
+        linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 44%, var(--page) 100%);
+    }
+    .stage {
+      position: relative; z-index: 1; min-height: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 56px 40px; text-align: center;
+    }
+    .badge {
+      width: 56px; height: 56px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: color-mix(in srgb, var(--danger) 16%, transparent);
+      color: var(--danger); margin-bottom: 20px;
+    }
+    .title { font-size: clamp(21px, 2.6vw, 27px); font-weight: 700; letter-spacing: -0.02em; }
+    .host { font-family: var(--mono); font-size: 13px; color: var(--danger); margin-top: 8px; user-select: text; }
+    .detail { font-size: 14px; color: var(--text-2); margin-top: 14px; max-width: 480px; line-height: 1.5; }
+    .code { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); margin-top: 10px; letter-spacing: 0.04em; }
+
+    .actions { display: flex; gap: 10px; margin-top: 26px; flex-wrap: wrap; justify-content: center; }
+    button {
+      cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 600;
+      padding: 9px 20px; border-radius: var(--radius);
+      transition: filter 0.15s, background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .btn-primary { border: 1px solid transparent; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.06); }
+    .btn-ghost { border: 1px solid var(--border-2); background: transparent; color: var(--text-2); }
+    .btn-ghost:hover { border-color: var(--text-3); background: var(--hover); color: var(--text); }
+
+    /* The way through is deliberately plain text, not a button: proceeding is
+       the rare, informed case, not the obvious next step. */
+    .advanced {
+      margin-top: 26px; width: 100%; max-width: 560px;
+      text-align: left;
+    }
+    .adv-toggle {
+      background: none; border: none; color: var(--text-3); font-size: 12.5px;
+      padding: 4px 0; font-weight: 500;
+    }
+    .adv-toggle:hover { color: var(--text-2); }
+    .adv-body { display: none; margin-top: 12px; }
+    .advanced.open .adv-body { display: block; }
+    .cert {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); padding: 12px 14px;
+      font-family: var(--mono); font-size: 11.5px; color: var(--text-2);
+      user-select: text; -webkit-user-select: text;
+    }
+    .cert div { display: flex; gap: 10px; padding: 2px 0; word-break: break-all; }
+    .cert span:first-child { color: var(--text-3); min-width: 92px; flex-shrink: 0; }
+    .proceed {
+      margin-top: 12px; background: none; border: none; padding: 4px 0;
+      color: var(--danger); font-size: 12.5px; font-weight: 600; text-align: left;
+    }
+    .proceed:hover { filter: brightness(1.15); }
+    .proceed-note { color: var(--text-3); font-size: 11.5px; margin-top: 4px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="scene" aria-hidden="true"></div>
+  <main class="stage">
+    <div class="badge" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l8 3.5v5c0 4.2-3.2 8-8 9.5-4.8-1.5-8-5.3-8-9.5v-5z"/><path d="M12 9v4.2M12 16.4h.01"/>
+      </svg>
+    </div>
+    <h1 class="title" id="title">This connection is not private</h1>
+    <div class="host" id="host"></div>
+    <p class="detail" id="detail"></p>
+    <div class="code" id="code"></div>
+
+    <div class="actions">
+      <button class="btn-primary" id="btn-back" data-i18n="cert.backToSafety">Back to safety</button>
+      <button class="btn-ghost" id="btn-retry" data-i18n="cert.tryAgain">Try again</button>
+    </div>
+
+    <div class="advanced" id="advanced">
+      <button class="adv-toggle" id="adv-toggle" aria-expanded="false">Advanced ▸</button>
+      <div class="adv-body">
+        <div class="cert" id="cert"></div>
+        <button class="proceed" id="btn-proceed">Continue to <span id="proceed-host"></span> anyway</button>
+        <div class="proceed-note">
+          Only if you know why this certificate is wrong. Attackers use this screen's
+          exact conditions to read what you send. The exception applies to this
+          certificate on this host, and is forgotten when the browser closes.
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    try { window.Ink.i18n.init((window.northstarSettings?.getSync() || {}).i18n || {}); window.Ink.i18n.apply(document); } catch {}
+    const T = (k, v) => { try { return window.Ink.i18n.t(k, v); } catch { return k; } };
+    const p = new URLSearchParams(location.search);
+    const failedUrl = p.get('url') || '';
+    const host = p.get('host') || '';
+    const fingerprint = p.get('fingerprint') || '';
+
+    document.getElementById('title').textContent = p.get('title') || 'This connection is not private';
+    document.getElementById('detail').textContent = p.get('detail') || '';
+    document.getElementById('host').textContent = host;
+    document.getElementById('proceed-host').textContent = host;
+    document.getElementById('code').textContent = p.get('error') || '';
+    document.title = (p.get('title') || 'Connection is not private');
+
+    const fmt = (iso) => { if (!iso) return '—'; try { return window.Ink.i18n.dateTime(iso); } catch { return iso; } };
+    const rows = [
+      [T('cert.issuedTo'), p.get('subject')],
+      [T('cert.issuedBy'), p.get('issuer')],
+      [T('cert.validFrom'), fmt(p.get('validFrom'))],
+      [T('cert.validTo'), fmt(p.get('validTo'))],
+      [T('cert.fingerprint'), fingerprint],
+    ];
+    const cert = document.getElementById('cert');
+    for (const [label, value] of rows) {
+      const row = document.createElement('div');
+      const l = document.createElement('span'); l.textContent = label;
+      const v = document.createElement('span'); v.textContent = value || '—';
+      row.append(l, v);
+      cert.appendChild(row);
+    }
+
+    const adv = document.getElementById('advanced');
+    document.getElementById('adv-toggle').addEventListener('click', (e) => {
+      const open = adv.classList.toggle('open');
+      e.target.textContent = T('cert.advanced') + (open ? ' ▾' : ' ▸');
+      e.target.setAttribute('aria-expanded', String(open));
+    });
+
+    document.getElementById('btn-back').addEventListener('click', () => window.electronAPI.activeTabGoBack());
+    document.getElementById('btn-retry').addEventListener('click', () => {
+      if (failedUrl) window.electronAPI.navigateActiveTab(failedUrl);
+    });
+    document.getElementById('btn-proceed').addEventListener('click', () => {
+      window.certWarning.proceed(host, fingerprint, failedUrl);
+    });
+  </script>
+</body>
+</html>

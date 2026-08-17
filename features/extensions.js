@@ -12,6 +12,7 @@
  * Chrome's "not allowed in incognito by default" behavior.
  */
 'use strict';
+const log = require('./log');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -68,15 +69,15 @@ class Extensions {
             removeWindow: (win) => { try {
                 win.close();
             }
-            catch { } },
+            catch (e) { log.debug('extensions', '_makeHost', e); } },
         });
         host.on?.('browser-action-popup-created', (popup) => {
             this.popups.add(popup);
             try { popup.browserWindow?.once('closed', () => this.popups.delete(popup)); }
-            catch { }
+            catch (e) { log.debug('extensions', '_makeHost', e); }
         });
         try { ElectronChromeExtensions.handleCRXProtocol(session); }
-        catch { }
+        catch (e) { log.debug('extensions', '_makeHost', e); }
         this._registerPolyfill(session);
         this._wireDnr(session);
         return host;
@@ -96,10 +97,10 @@ class Extensions {
             for (const ext of api.getAllExtensions?.() || [])
                 dnr.registerExtension(ext);
         }
-        catch { }
+        catch (e) { log.debug('extensions', '_wireDnr', e); }
         api.on?.('extension-loaded', (_e, ext) => {
             try { dnr.registerExtension(ext); }
-            catch { }
+            catch (e) { log.debug('extensions', '_wireDnr', e); }
         });
         api.on?.('extension-unloaded', (_e, ext) => {
             if (session === this.session && ext?.id)
@@ -133,7 +134,7 @@ class Extensions {
                     return;
                 let sw = null;
                 try { sw = session.serviceWorkers.getWorkerFromVersionID(versionId); }
-                catch { }
+                catch (e) { log.debug('extensions', '_registerPolyfill', e); }
                 if (!sw || sw._inkGapWired)
                     return;
                 sw._inkGapWired = true;
@@ -184,7 +185,7 @@ class Extensions {
         try {
             fn();
         }
-        catch { }
+        catch (e) { log.debug('extensions', '_emit', e); }
     } }
     /** Call once in app.whenReady, after the session is configured. */
     async setup(session, wm) {
@@ -215,7 +216,7 @@ class Extensions {
             try {
                 popup.browserWindow?.once('closed', () => this.popups.delete(popup));
             }
-            catch { }
+            catch (e) { log.debug('extensions', 'setup', e); }
         });
         // Serve extension icons (crx://extension-icon/...) so the toolbar
         // <browser-action-list> buttons actually render their icons.
@@ -239,7 +240,7 @@ class Extensions {
                 try {
                     await extApi(session).loadExtension(dir, { allowFileAccess: true });
                 }
-                catch { }
+                catch (e) { log.debug('extensions', 'setup', e); }
             }
         }
         // Re-apply "disabled" state: the web store loader enabled everything, so
@@ -252,7 +253,7 @@ class Extensions {
                 try {
                     api.removeExtension(id);
                 }
-                catch { }
+                catch (e) { log.debug('extensions', 'ext', e); }
             }
         }
         this._saveDisabled();
@@ -274,14 +275,14 @@ class Extensions {
             // tab-specific extensions outside the default space.
             this._hostFor(webContents)?.addTab(webContents, browserWindow);
         }
-        catch { }
+        catch (e) { log.debug('extensions', 'addTab', e); }
     }
     selectTab(webContents) {
         this.closePopups(); // switching tabs dismisses an open action popup (Firefox behavior)
         try {
             this._hostFor(webContents)?.selectTab(webContents);
         }
-        catch { }
+        catch (e) { log.debug('extensions', 'selectTab', e); }
     }
     /** Close any open browser-action popups. */
     closePopups() {
@@ -289,7 +290,7 @@ class Extensions {
             try {
                 popup.destroy();
             }
-            catch { }
+            catch (e) { log.debug('extensions', 'closePopups', e); }
             this.popups.delete(popup);
         }
     }
@@ -381,7 +382,7 @@ class Extensions {
                 try {
                     await api.loadExtension(rec.path, { allowFileAccess: true });
                 }
-                catch { }
+                catch (e) { log.debug('extensions', 'setEnabled', e); }
             }
             delete this.disabled[id];
         }
@@ -392,7 +393,7 @@ class Extensions {
                 try {
                     api.removeExtension(id);
                 }
-                catch { }
+                catch (e) { log.debug('extensions', 'ext', e); }
             }
         }
         this._saveDisabled();
@@ -411,14 +412,14 @@ class Extensions {
             try {
                 wd.tabs.showTab(idx);
             }
-            catch { }
+            catch (e) { log.debug('extensions', 'ext', e); }
         }
         return true;
     }
     _saveDisabled() { try {
         fs.writeFileSync(this.disabledFile, JSON.stringify(this.disabled, null, 2));
     }
-    catch { } }
+    catch (e) { log.debug('extensions', '_saveDisabled', e); } }
     async installById(id) {
         const cleanId = String(id || '').trim().match(/[a-p]{32}/i)?.[0] || String(id || '').trim();
         loadLibs();
@@ -467,7 +468,7 @@ class Extensions {
             try {
                 extApi(this.session).removeExtension(id);
             }
-            catch { }
+            catch (e) { log.debug('extensions', 'remove', e); }
         }
         this._removeUnpackedById(id);
         this._emit();
@@ -486,7 +487,7 @@ class Extensions {
     _writeUnpacked(list) { try {
         fs.writeFileSync(this.unpackedFile, JSON.stringify(list, null, 2));
     }
-    catch { } }
+    catch (e) { log.debug('extensions', '_writeUnpacked', e); } }
     _addUnpacked(dir) { const l = this._readUnpacked(); if (!l.includes(dir)) {
         l.push(dir);
         this._writeUnpacked(l);

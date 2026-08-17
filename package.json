@@ -24,6 +24,7 @@
     "vmp-sign": "node scripts/vmp-sign.js node_modules/electron/dist",
     "test:permissions": "electron scripts/test-permissions.js",
     "smoke": "node scripts/smoke.js",
+    "test:unit": "node tests/unit.js",
     "test:e2e": "node tests/e2e.js",
     "test:e2e:quick": "node tests/e2e.js --quick"
   },
@@ -34,7 +35,7 @@
       "mirror": "https://github.com/castlabs/electron-releases/releases/download/"
     },
     "productName": "Northstar",
-    "copyright": "Copyright © 2025 Milad Rakhshbahar",
+    "copyright": "Copyright \u00a9 2025 Milad Rakhshbahar",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "directories": {
       "output": "dist"
@@ -69,7 +70,11 @@
       "target": [
         "dmg"
       ],
-      "category": "public.app-category.utilities"
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "linux": {
       "icon": "icons/icon.png",
@@ -81,7 +86,16 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "protocols": [
+      {
+        "name": "Web link",
+        "schemes": [
+          "http",
+          "https"
+        ]
+      }
+    ]
   },
   "dependencies": {
     "dompurify": "^3.4.10",

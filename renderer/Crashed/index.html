@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none';" />
+  <title>This page stopped responding</title>
+  <link rel="stylesheet" href="../styles/ui.css">
+  <script src="../lib/i18n.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%; font-family: var(--font);
+      background: var(--page); color: var(--text);
+      overflow: hidden; -webkit-font-smoothing: antialiased;
+      user-select: none; -webkit-user-select: none;
+    }
+    .scene {
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(120% 82% at 50% 0%, var(--accent-wash), transparent 60%),
+        linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 44%, var(--page) 100%);
+    }
+    .stage {
+      position: relative; z-index: 1; height: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 0 40px; text-align: center;
+    }
+    .glyph { color: var(--text-3); margin-bottom: 18px; }
+    .title { font-size: clamp(20px, 2.6vw, 26px); font-weight: 700; letter-spacing: -0.02em; }
+    .detail { font-size: 14px; color: var(--text-2); margin-top: 10px; max-width: 440px; line-height: 1.5; }
+    .url { font-family: var(--mono); font-size: 12.5px; color: var(--text-3); margin-top: 10px; max-width: 560px; word-break: break-all; user-select: text; }
+    .reason { font-family: var(--mono); font-size: 11px; color: var(--text-3); margin-top: 8px; letter-spacing: 0.04em; }
+    .actions { display: flex; gap: 10px; margin-top: 26px; }
+    button {
+      cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 600;
+      padding: 9px 20px; border-radius: var(--radius); transition: filter 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .btn-primary { border: 1px solid transparent; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.06); }
+    .btn-ghost { border: 1px solid var(--border-2); background: transparent; color: var(--text); }
+    .btn-ghost:hover { border-color: var(--text-3); background: var(--hover); }
+  </style>
+</head>
+<body>
+  <div class="scene" aria-hidden="true"></div>
+  <main class="stage">
+    <div class="glyph" aria-hidden="true">
+      <svg viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="6" y="9" width="36" height="26" rx="3"/><path d="M16 41h16"/><path d="M19 18l10 8M29 18l-10 8"/>
+      </svg>
+    </div>
+    <h1 class="title" id="title" data-i18n="crash.title">This page stopped responding</h1>
+    <p class="detail" id="detail" data-i18n="crash.detail">Its process ended unexpectedly. Reloading usually brings it back — the rest of your tabs are untouched.</p>
+    <p class="url" id="url"></p>
+    <p class="reason" id="reason"></p>
+    <div class="actions">
+      <button class="btn-ghost" id="btn-back" data-i18n="crash.back">Go Back</button>
+      <button class="btn-primary" id="btn-reload" data-i18n="crash.reload">Reload Page</button>
+    </div>
+  </main>
+  <script>
+    // Localise before reading any label back out of the DOM.
+    try { window.Ink.i18n.init((window.northstarSettings?.getSync() || {}).i18n || {}); window.Ink.i18n.apply(document); } catch {}
+    const T = (k, v) => { try { return window.Ink.i18n.t(k, v); } catch { return k; } };
+    const p = new URLSearchParams(location.search);
+    const failedUrl = p.get('url') || '';
+    const reason = p.get('reason') || '';
+    const killed = p.get('killed') === '1';
+    if (failedUrl) document.getElementById('url').textContent = failedUrl;
+    if (reason) document.getElementById('reason').textContent = 'reason: ' + reason;
+    if (killed) {
+      document.getElementById('title').textContent = T('crash.killedTitle');
+      document.getElementById('detail').textContent = T('crash.killedDetail');
+    }
+    document.getElementById('btn-reload').addEventListener('click', () => {
+      if (failedUrl) window.electronAPI.navigateActiveTab(failedUrl);
+    });
+    document.getElementById('btn-back').addEventListener('click', () => window.electronAPI.activeTabGoBack());
+  </script>
+</body>
+</html>

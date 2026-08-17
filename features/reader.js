@@ -12,6 +12,7 @@
  */
 'use strict';
 // Quick "is this readerable" probe — kept cheap so it can run on every load.
+const log = require('./log');
 const READERABLE_JS = `(() => {
   try {
     if (!/^https?:/.test(location.href)) return false;
@@ -78,8 +79,8 @@ const EXTRACT_JS = `(() => {
       if ((w && w < 50) || /1x1|pixel|spacer|blank/.test(img.src)) img.remove();
     });
     // Absolutize links/images against the document.
-    root.querySelectorAll('a[href]').forEach(a => { try { a.href = new URL(a.getAttribute('href'), location.href).href; a.target='_top'; } catch(_){} });
-    root.querySelectorAll('img[src]').forEach(i => { try { i.src = new URL(i.getAttribute('src'), location.href).href; } catch(_){} });
+    root.querySelectorAll('a[href]').forEach(a => { try { a.href = new URL(a.getAttribute('href'), location.href).href; a.target='_top'; } catch (_) { log.debug('reader', 'len', _); } });
+    root.querySelectorAll('img[src]').forEach(i => { try { i.src = new URL(i.getAttribute('src'), location.href).href; } catch (_) { log.debug('reader', 'len', _); } });
     // Strip inline styles/handlers so the reader theme wins.
     root.querySelectorAll('[style]').forEach(n => n.removeAttribute('style'));
     root.querySelectorAll('*').forEach(n => { for (const a of Array.from(n.attributes)) { if (/^on/i.test(a.name)) n.removeAttribute(a.name); } });

@@ -19,21 +19,12 @@
         ? (html) => DOMPurify.sanitize(html, { FORCE_BODY: false })
         : (html) => html;
     /** Returns a debounced wrapper around `fn` with a `.cancel()` method. */
-    function debounce(fn, delay = 150) {
-        let t;
-        const db = (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
-        db.cancel = () => clearTimeout(t);
-        return db;
-    }
-    /** Paint a cached favicon (from sites you've actually visited) onto an <img>,
-     *  or remove the <img> if we have none — NO network fetch. This is why typing
-     *  in the omnibox / rendering the bookmark bar never pings a site's favicon. */
     function paintCachedFavicon(imgEl, url) {
         let host = '';
         try {
             host = new URL(url).host;
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('renderer', 'paintCachedFavicon: ' + e); }
         if (!host || !window.tab?.cachedFavicon) {
             imgEl.remove();
             return;
@@ -67,6 +58,10 @@
         // IPC is processed until every declaration and init function has run.
         let tabs = new Map(); // tabIndex → <div.tab-button>
         let splitPair = null; // [idxA, idxB] when split view is active
+        // Hover a tab this long mid-drag and the drop splits with it instead of
+        // reordering. Long enough that dragging past a tab never arms it.
+        const SPLIT_DWELL_MS = 420;
+        let activeTabDrag = null; // { cancel } while a tab drag is in flight
         let folderState = { folders: [], assign: new Map() }; // tab folders
         let tabUrls = new Map(); // tabIndex → url string
         let tabPrivate = new Map(); // tabIndex → boolean (private flag)
@@ -86,20 +81,49 @@
         // native focus-restore that pulls the bar on launch / new window.
         let omniFocusIntent = false;
         let currentTabTitle = '';
+        // ── Shared helpers (renderer/lib/util.js) ─────────────────────────────────
+        // Bound here, above the init sequence: anything declared after it is TDZ
+        // while init runs (see CLAUDE.md invariant 2).
+        const { debounce, looksLikeUrl, normalizeUrl, linkScore, isLowValueMatch,
+                cleanliness, urlDisplayParts } = window.Ink.util;
         // ── Settings (synchronous) ────────────────────────────────────────────────
         let settings = {};
         try {
             settings = window.northstarSettings.getSync() || {};
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('renderer', 'filterTabsByWorkspace: ' + e); }
+        // ── Localisation (renderer/lib/i18n.js) ───────────────────────────────────
+        // The catalogue rides along in the settings payload, so labels can be
+        // resolved before the first paint. Language changes re-apply live.
+        const i18n = window.Ink.i18n;
+        i18n.init(settings.i18n || {});
+        i18n.apply(document);
+        try {
+            window.tabsUI?.onLanguageChanged?.((payload) => {
+                i18n.init(payload);
+                i18n.apply(document);
+            });
+        }
+        catch (e) { window.inkLog?.debug('renderer', 'language listener: ' + e); }
         const getSearchEngine = () => settings.searchEngine || 'google';
+        // Engines come from the main process (features/search-engines.js) so the
+        // built-ins have one definition; `engines-changed` keeps this fresh when
+        // the user edits them in Settings.
+        let engineList = Array.isArray(settings.engines) && settings.engines.length
+            ? settings.engines
+            : [{ id: 'google', name: 'Google', keyword: 'g', url: 'https://www.google.com/search?q=%s' }];
+        try { window.tabsUI?.onEnginesChanged?.((list) => { if (Array.isArray(list) && list.length) engineList = list; }); }
+        catch (e) { window.inkLog?.debug('renderer', 'getSearchEngine: ' + e); }
+        const engineById = (id) => engineList.find(e => e.id === id) || engineList[0];
+        /** Search URL for typed text, honouring a leading engine keyword. */
+        const searchUrlFor = (text) => window.Ink.util.searchUrl(text, engineList, getSearchEngine());
         const getPomSetting = (key, def) => (typeof settings[key] === 'number' ? settings[key] : def);
         // ── Private window detection (synchronous) ────────────────────────────────
         let isPrivateWindow = false;
         try {
             isPrivateWindow = window.northstarPrivate?.isPrivateWindowSync?.() ?? false;
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('renderer', 'getPomSetting: ' + e); }
         if (isPrivateWindow) {
             document.documentElement.setAttribute('data-private-window', 'true');
         }
@@ -111,13 +135,6 @@
         });
         // ── Shared state ──────────────────────────────────────────────────────────
         let menuOpen = false;
-        // ── Bookmark bar state (must be declared before initBookmarkBar() is called) ──
-        let bookmarkBarVisible = !!settings.bookmarkBarVisible;
-        let hasBookmarks = false;
-        let renamingFolderId = null;
-        let refreshSeq = 0;
-        let openDropdownId = null; // id of the anchor button whose dropdown is open
-        let dropdownCleanup = null;
         // ── DOM references ─────────────────────────────────────────────────────────
         const tabBar = document.getElementById('tab-bar');
         const tabsContainer = document.getElementById('tabs-container');
@@ -128,12 +145,30 @@
         const omnibox = document.querySelector('.omnibox');
         const omniIcon = document.getElementById('omni-icon');
         const urlDisplay = document.getElementById('url-display');
+        const omniGhost = document.getElementById('omni-ghost');
         const menuBtn = document.getElementById('menu-btn');
         const addBtn = document.getElementById('new-tab-btn');
         const tabDragSpacer = document.getElementById('tab-drag-spacer');
         const bookmarkBtn = document.getElementById('bookmark-btn');
         const bookmarkBar = document.getElementById('bookmark-bar');
         const bookmarkBarItems = document.getElementById('bookmark-bar-items');
+        // ── Bookmark bar (renderer/lib/bookmark-bar.js) ───────────────────────────
+        // Constructed BEFORE the init sequence below: `initBookmarkBar` is a const,
+        // so calling it from the init calls while this line sits further down the
+        // file is a TDZ throw (CLAUDE.md invariant 2 — it bit exactly here).
+        const bookmarks = window.Ink.createBookmarkBar({
+            bar: bookmarkBar,
+            items: bookmarkBarItems,
+            button: bookmarkBtn,
+            initiallyVisible: !!settings.bookmarkBarVisible,
+            currentUrl: () => currentTabUrl,
+            currentTitle: () => currentTabTitle,
+            activeTabIndex: () => activeTabIndex,
+            paintCachedFavicon,
+            makeFolderIcon,
+        });
+        const initBookmarkBar = bookmarks.init;
+        const updateBookmarkBtn = bookmarks.updateButton;
         // ── Init sequence ─────────────────────────────────────────────────────────
         initTabBarSide(); // set side/top layout BEFORE anything measures the strip
         initTabBar(); // registers all tab IPC listeners
@@ -157,11 +192,9 @@
             const el = document.getElementById('chrome-clock');
             if (!el)
                 return;
-            const paint = () => {
-                const n = new Date();
-                const h = n.getHours(), m = n.getMinutes();
-                el.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-            };
+            // 12- or 24-hour according to the user's locale — this used to be
+            // hardcoded 24-hour, which is simply wrong in most of the world.
+            const paint = () => { el.textContent = i18n.time(); };
             paint();
             // Align to the top of the next minute, then tick each minute.
             setTimeout(() => { paint(); setInterval(paint, 60000); }, (60 - new Date().getSeconds()) * 1000);
@@ -298,11 +331,15 @@
                 // Only autocomplete on insertions — autofilling right after the user
                 // deletes text would "bring back" the URL they just erased.
                 lastInputWasInsert = !!(e.inputType && e.inputType.startsWith('insert'));
+                ghostAccepted = null;
                 if (lastInputWasInsert)
                     applyInlineAutofill(searchBar.value);
+                else
+                    clearGhost();
                 updateSuggestions();
             });
             searchBar.addEventListener('focus', () => {
+                clearGhost();
                 updateUrlDisplay();
                 updateOmniboxIcon();
                 if (userTyping) {
@@ -321,6 +358,8 @@
                 }
             });
             searchBar.addEventListener('blur', () => {
+                clearGhost();
+                ghostAccepted = null;
                 // Uncommitted typed text stays in the bar (Firefox); otherwise rest
                 // on the full URL with the host emphasised (url-display overlay).
                 if (!barEdited && currentTabUrl)
@@ -336,6 +375,9 @@
                 }, 400);
             });
             searchBar.addEventListener('keydown', onSearchKeyDown);
+            // Moving the caret invalidates a completion that was drawn for the end
+            // of the text.
+            searchBar.addEventListener('mouseup', () => setTimeout(clearGhost, 0));
             // Lock / security icon → Firefox-style site-info panel (connection,
             // permissions, clear data). Only meaningful on real http(s) pages.
             omniIcon?.addEventListener('mousedown', (e) => {
@@ -348,7 +390,7 @@
                 try {
                     window.siteInfo.open({ x: Math.round(r.left), y: Math.round(r.bottom) });
                 }
-                catch { }
+                catch (e) { window.inkLog?.debug('renderer', 'warmSuggestions: ' + e); }
             });
             // Overlay view was (re)created — restore focus to the address bar, but
             // only if the user was actually typing (the overlay is also pre-warmed
@@ -357,7 +399,7 @@
                 try {
                     searchBar.focus();
                 }
-                catch { }
+                catch (e) { window.inkLog?.debug('renderer', 'warmSuggestions: ' + e); }
             } });
             window.suggestions.onSelected(onSuggestionSelected);
             window.suggestions.onPointerDown(() => {
@@ -379,7 +421,7 @@
                     searchBar.focus();
                     searchBar.select();
                 }
-                catch { }
+                catch (e) { window.inkLog?.debug('renderer', 'warmSuggestions: ' + e); }
             });
             window.addEventListener('resize', positionSuggestions);
             window.addEventListener('scroll', positionSuggestions, true);
@@ -403,19 +445,73 @@
                     if (h && !hostCache.includes(h))
                         hostCache.push(h);
                 }
-                catch { }
+                catch (e) { window.inkLog?.debug('renderer', 'rememberHosts: ' + e); }
             }
             if (hostCache.length > 400)
                 hostCache = hostCache.slice(-400);
         };
-        /** Append the completion for `typed` and select it, Firefox-style. */
-        const applyInlineAutofill = (typed) => {
+        // ── Inline completion (ghost text) ────────────────────────────────────────
+        // The completion is NOT written into the input: typing "go" used to leave
+        // "google.com" selected in the bar, so Enter navigated somewhere the user
+        // never typed. Instead the remainder is painted dim after the caret and
+        // only becomes real text when the user accepts it (Tab, →, or clicking the
+        // matching suggestion row); Shift+Tab takes an accepted one back.
+        let ghostRest = ''; // the un-accepted remainder currently painted
+        let ghostAccepted = null; // { typed, full } for Shift+Tab undo
+        function clearGhost() {
+            ghostRest = '';
+            if (!omniGhost)
+                return;
+            omniGhost.querySelector('.typed').textContent = '';
+            omniGhost.querySelector('.rest').textContent = '';
+            omnibox?.classList.remove('has-ghost');
+        }
+        function setGhost(typed, rest) {
+            if (!omniGhost || !rest) {
+                clearGhost();
+                return;
+            }
+            ghostRest = rest;
+            omniGhost.querySelector('.typed').textContent = typed;
+            omniGhost.querySelector('.rest').textContent = rest;
+            omnibox?.classList.add('has-ghost');
+            // Long text scrolls the input, which would leave the ghost floating
+            // over the wrong glyphs — drop it rather than lie about the position.
+            if (searchBar.scrollWidth > searchBar.clientWidth + 1 || searchBar.scrollLeft > 0)
+                clearGhost();
+        }
+        /** Accept the painted completion into the bar. */
+        function acceptGhost() {
+            if (!ghostRest)
+                return false;
+            const typed = searchBar.value;
+            searchBar.value = typed + ghostRest;
+            clearGhost();
+            ghostAccepted = { typed, full: searchBar.value };
+            searchBar.setSelectionRange(searchBar.value.length, searchBar.value.length);
+            updateSuggestions();
+            return true;
+        }
+        /** Undo the last acceptance, putting the remainder back as ghost text. */
+        function unacceptGhost() {
+            if (!ghostAccepted || searchBar.value !== ghostAccepted.full)
+                return false;
+            const { typed, full } = ghostAccepted;
+            ghostAccepted = null;
+            searchBar.value = typed;
+            searchBar.setSelectionRange(typed.length, typed.length);
+            setGhost(typed, full.slice(typed.length));
+            updateSuggestions();
+            return true;
+        }
+        /** Best host in the local cache that extends `typed`; '' if none. */
+        const ghostFromHistory = (typed) => {
             if (!typed || typed.includes(' ') || /^[a-z]+:/i.test(typed))
-                return;
+                return '';
             if (document.activeElement !== searchBar)
-                return;
+                return '';
             if (searchBar.selectionStart !== typed.length || searchBar.selectionEnd !== typed.length)
-                return;
+                return '';
             const ql = typed.toLowerCase();
             let best = null;
             for (const h of hostCache) {
@@ -426,10 +522,14 @@
                 if (!best || cand.length < best.length)
                     best = cand;
             }
-            if (!best)
-                return;
-            searchBar.value = typed + best.slice(typed.length);
-            searchBar.setSelectionRange(typed.length, searchBar.value.length);
+            return best ? best.slice(typed.length) : '';
+        };
+        const applyInlineAutofill = (typed) => {
+            const rest = ghostFromHistory(typed);
+            if (rest)
+                setGhost(typed, rest);
+            else
+                clearGhost();
         };
         let currentQuery = ''; // the user's typed text, for match highlighting
         let barEdited = false; // uncommitted typed text in the bar (survives blur)
@@ -444,6 +544,7 @@
         }
         function hideSuggestions() {
             userTyping = false;
+            clearGhost();
             updateSuggestions.cancel();
             window.suggestions.close();
             currentSuggestions = [];
@@ -469,8 +570,10 @@
                 newIndex = 0;
             activeSuggestionIndex = newIndex;
             const item = currentSuggestions[newIndex];
-            if (item)
+            if (item) {
+                clearGhost();
                 searchBar.value = item.url || item.query || '';
+            }
             window.suggestions.update(getSuggestionsBounds(), currentSuggestions, activeSuggestionIndex, currentQuery, getSearchEngine());
         }
         /**
@@ -481,6 +584,7 @@
         function commitNavigation(value) {
             barEdited = false;
             userTyping = false;
+            ghostAccepted = null;
             const formatted = loadUrlInActiveTab(value);
             if (formatted)
                 currentTabUrl = formatted; // optimistic; url-updated confirms
@@ -515,7 +619,7 @@
             try {
                 searchBar.focus();
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'onSuggestionSelected: ' + e); }
             if (item.type === 'switch-tab') {
                 hideSuggestions();
                 searchBar.blur();
@@ -536,6 +640,29 @@
             }
         }
         function onSearchKeyDown(e) {
+            // Inline completion first: Tab (or → / End with the caret at the end)
+            // turns the dim remainder into real text, Shift+Tab takes it back.
+            // Only when there is something to act on — otherwise Tab keeps cycling
+            // the suggestion list.
+            if (e.key === 'Tab' && !e.shiftKey && ghostRest) {
+                e.preventDefault();
+                acceptGhost();
+                return;
+            }
+            if (e.key === 'Tab' && e.shiftKey && ghostAccepted && searchBar.value === ghostAccepted.full) {
+                e.preventDefault();
+                unacceptGhost();
+                return;
+            }
+            if ((e.key === 'ArrowRight' || e.key === 'End') && ghostRest
+                && searchBar.selectionStart === searchBar.value.length
+                && searchBar.selectionEnd === searchBar.value.length) {
+                e.preventDefault();
+                acceptGhost();
+                return;
+            }
+            if (e.key === 'ArrowLeft' || e.key === 'Home')
+                clearGhost();
             // Firefox: Ctrl/Cmd+Enter wraps a bare term in www. … .com; anything
             // that already looks like a URL just navigates normally.
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -571,8 +698,8 @@
                 if (e.key === 'Enter' && activeSuggestionIndex >= 0) {
                     e.preventDefault();
                     const item = currentSuggestions[activeSuggestionIndex];
-                    // The action/navigate row's query is the raw typed prefix — use
-                    // the live bar value so inline domain autofill is what loads.
+                    // The action/navigate row mirrors what is actually in the bar —
+                    // an unaccepted ghost completion must NOT be what loads.
                     if (item?.type === 'action' || item?.type === 'navigate') {
                         const url = searchBar.value.trim();
                         if (url)
@@ -589,6 +716,8 @@
                 e.preventDefault();
                 barEdited = false;
                 userTyping = false;
+                clearGhost();
+                ghostAccepted = null;
                 searchBar.value = currentTabUrl || '';
                 searchBar.select();
                 updateOmniboxIcon();
@@ -699,63 +828,10 @@
             }
         }
         /**
-         * Relevance rank for a history/bookmark/tab entry against the query.
-         * Lower is better; -1 means "not relevant enough, hide it".
-         *
-         * This is what stops noise like `gymshark.com` / `spotify.com` showing for
-         * "y" just because the letter appears somewhere inside them — a bare
-         * substring only counts once the query is at least 3 chars long.
-         */
-        function linkScore(item, ql) {
-            let host = '', path = '';
-            const title = (item.title || '').toLowerCase();
-            try {
-                const u = new URL(item.url);
-                host = u.hostname.replace(/^www\./, '').toLowerCase();
-                path = (u.pathname + u.search).toLowerCase();
-            }
-            catch {
-                host = (item.url || '').toLowerCase();
-            }
-            if (host.startsWith(ql))
-                return 0; // youtube.com for "you"
-            if (host.split('.').some(l => l.startsWith(ql)))
-                return 1; // sub-label: m.youtube.com
-            if (title.split(/[\s\-–—_/|:.()]+/).some(w => w.startsWith(ql)))
-                return 2; // title word start
-            if (ql.length >= 3 && (host.includes(ql) || title.includes(ql) || path.includes(ql)))
-                return 3;
-            return -1;
-        }
-        /**
-         * Firefox surfaces clean, high-frecency pages — not OAuth/sign-in redirects
-         * or giant tracking URLs. We lack visit counts, so approximate: a weak match
-         * (title/substring only, score ≥ 2) that lands on a login redirect or a long
-         * param-heavy URL is almost never what the user wants. Strong host matches
-         * (score < 2, e.g. youtube.com/watch?v=…) are always kept.
-         */
-        function isLowValueMatch(url, score) {
-            if (score < 2)
-                return false;
-            const u = url || '';
-            if (u.length > 90)
-                return true;
-            if (/[?&](continue|dsh|ifkv|flowName|flowEntry|checkConnection|gclid|gclsrc|gad_)/i.test(u))
-                return true;
-            if (/\/(signin|oauth2?|auth|login|challenge)\b/i.test(u))
-                return true;
-            return false;
-        }
-        /** Lower = cleaner: short URLs with a real title sort ahead of long/untitled ones. */
-        function cleanliness(item) {
-            const hasTitle = item.title && item.title !== item.url;
-            return (item.url || '').length + (hasTitle ? 0 : 40);
-        }
-        /**
          * Firefox-style inline autocomplete: if the top domain match extends what
          * the user typed, return the completed host (e.g. "you" → "youtube.com").
-         * Returns null when it isn't safe to autofill (caret not at end, user is
-         * deleting, query has spaces, etc.). Caller applies it to the input.
+         * Returns null when it isn't safe to complete (caret not at end, user is
+         * deleting, query has spaces, etc.). Caller paints it as ghost text.
          */
         function computeAutofill(q, url) {
             if (!lastInputWasInsert || !userTyping)
@@ -780,15 +856,6 @@
             const bare = host.replace(/^www\./, '');
             const match = bare.startsWith(ql) ? bare : (host.startsWith(ql) ? host : null);
             return (match && match.length > q.length) ? match : null;
-        }
-        /** Does the typed text look like a URL/domain rather than a search? */
-        function looksLikeUrl(q) {
-            if (/^https?:\/\//i.test(q))
-                return true;
-            if (/\s/.test(q))
-                return false;
-            // bare domain / host[:port][/path] — needs a dot with a TLD-ish tail
-            return /^[^\s/]+\.[a-z]{2,}([:/].*)?$/i.test(q) || /^localhost([:/].*)?$/i.test(q);
         }
         const updateSuggestions = debounce(async () => {
             const q = searchBar.value.trim();
@@ -837,25 +904,24 @@
                     seenLinks.add(key);
                     rankedLinks.push(item);
                 }
-                // Inline-autofill from the top domain-prefix match, and make the
-                // first row match what's now in the address bar so Enter is obvious.
+                // Ghost-complete from the top domain-prefix match. The bar itself
+                // keeps exactly what was typed — the completion is only painted —
+                // so the first row (what Enter runs) stays the typed query, and the
+                // completed domain stays reachable as its own row below.
                 const topDomain = rankedLinks.find(x => linkScore(x, ql) === 0);
                 const completed = topDomain ? computeAutofill(q, topDomain.url) : null;
-                // Only a fallback now: if the synchronous pass already completed,
-                // there is a live selection and the bar must not be rewritten
-                // again underneath the user.
-                if (completed && searchBar.selectionStart === searchBar.selectionEnd) {
-                    searchBar.value = q + completed.slice(q.length);
-                    searchBar.setSelectionRange(q.length, searchBar.value.length);
-                }
-                const base = completed
-                    ? { type: 'navigate', query: completed }
-                    : (looksLikeUrl(q) ? { type: 'navigate', query: q } : { type: 'action', query: q });
-                // The heuristic already represents the autofilled domain — don't
-                // repeat it as a history row right underneath (Firefox collapses this).
-                const heuristicKey = completed ? normalizeUrl('https://' + completed) : null;
+                if (completed && searchBar.value === q)
+                    setGhost(q, completed.slice(q.length));
+                const base = looksLikeUrl(q)
+                    ? { type: 'navigate', query: q }
+                    : { type: 'action', query: q };
                 const merged = [base];
                 const seenQuery = new Set([String(base.query).toLowerCase()]);
+                // The ghost-completed domain sits directly under the typed row, so
+                // the row you click is the completion you can see in the bar.
+                const ghostKey = completed ? normalizeUrl(topDomain.url) : null;
+                if (ghostKey)
+                    merged.push(topDomain);
                 // Search suggestions right under the heuristic row (max 3); skip
                 // base-query dupes. Firefox's default order shows suggestions
                 // ahead of history/bookmarks.
@@ -874,7 +940,7 @@
                 // without scrolling — see MAX_HEIGHT in ipc/suggestions.js.
                 let linkCount = 0;
                 for (const link of rankedLinks) {
-                    if (heuristicKey && normalizeUrl(link.url) === heuristicKey)
+                    if (ghostKey && normalizeUrl(link.url) === ghostKey)
                         continue;
                     merged.push(link);
                     if (++linkCount >= 4)
@@ -884,16 +950,6 @@
             }
             catch { /* keep base rendered */ }
         }, 120);
-        // Normalize for dedup: host (without www) + path, lowercased, no trailing slash.
-        function normalizeUrl(u) {
-            try {
-                const n = new URL(u);
-                return (n.hostname.replace(/^www\./, '') + n.pathname).toLowerCase().replace(/\/$/, '');
-            }
-            catch {
-                return (u || '').toLowerCase();
-            }
-        }
         // ── URL loading ───────────────────────────────────────────────────────────
         // Turn omnibox / dropped input into a loadable URL: pass through real
         // URLs, http-ify bare domains, and send anything else to the search engine.
@@ -904,12 +960,7 @@
             if (/^northstar:\/\//i.test(text)) return text; // internal-page scheme
             if (/^(file|about|data|blob):/i.test(text)) return text; // dropped file:// etc.
             if (text.includes('.') && !/\s/.test(text)) return 'https://' + text;
-            const engines = {
-                google: 'https://www.google.com/search?q=',
-                duckduckgo: 'https://duckduckgo.com/?q=',
-                bing: 'https://www.bing.com/search?q=',
-            };
-            return (engines[getSearchEngine()] || engines.google) + encodeURIComponent(text);
+            return searchUrlFor(text);
         }
         function loadUrlInActiveTab(url) {
             const formatted = formatToUrl(url);
@@ -939,26 +990,6 @@
         // #url-display overlay: host in full text colour, scheme and path dimmed.
         // The input underneath keeps the complete URL (transparent text) so focus
         // and select-all behave normally.
-        // Parse `url` into [dimmed prefix, host, dimmed rest]; null if it isn't a
-        // plain displayable http(s) URL.
-        function urlDisplayParts(url) {
-            let u;
-            try {
-                u = new URL(url);
-            }
-            catch {
-                return null;
-            }
-            if (u.protocol !== 'https:' && u.protocol !== 'http:')
-                return null;
-            // Split on the raw string, not the parsed origin — IDN hosts, uppercase
-            // schemes and credential forms would otherwise fall back to domain-only
-            // and make the rest of the URL vanish from the bar.
-            const m = url.match(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/(?:[^/?#@]*@)?)([^/?#]+)([\s\S]*)$/);
-            if (!m)
-                return null;
-            return [m[1], m[2], m[3]];
-        }
         // Resting input value: the full URL for http(s) pages, the legacy domain
         // fallback for internal pages (newtab, file://).
         function restingValueFor(url) {
@@ -1036,916 +1067,15 @@
             reloadBtn.title = loading ? 'Stop' : 'Reload';
         }
         // ─────────────────────────────────────────────────────────────────────────
-        // Bookmark bar
-        // ─────────────────────────────────────────────────────────────────────────
-        // ── Dropdown (overflow + folder sub-panels) ──────────────────────────────
-        function closeDropdown() {
-            document.getElementById('bm-dropdown')?.remove();
-            document.getElementById('bm-subdropdown')?.remove();
-            if (dropdownCleanup) {
-                dropdownCleanup();
-                dropdownCleanup = null;
-            }
-            openDropdownId = null;
-        }
-        function openDropdown(anchorBtn, anchorId, buildFn) {
-            if (openDropdownId === anchorId) {
-                closeDropdown();
-                return;
-            }
-            closeDropdown();
-            openDropdownId = anchorId;
-            const panel = document.createElement('div');
-            panel.id = 'bm-dropdown';
-            panel.className = 'bookmark-overflow-dropdown';
-            buildFn(panel);
-            document.body.appendChild(panel);
-            const rect = anchorBtn.getBoundingClientRect();
-            const panelW = 200;
-            panel.style.left = Math.min(rect.left, window.innerWidth - panelW - 4) + 'px';
-            panel.style.top = rect.bottom + 'px';
-            const handler = (e) => {
-                if (!panel.contains(e.target) && e.target !== anchorBtn) {
-                    closeDropdown();
-                    document.removeEventListener('mousedown', handler, true);
-                }
-            };
-            document.addEventListener('mousedown', handler, true);
-            dropdownCleanup = () => document.removeEventListener('mousedown', handler, true);
-        }
-        // ── Dropdown item builder ─────────────────────────────────────────────────
-        function makeDropdownItem(entry, parentFolderId) {
-            if (entry.type === 'divider') {
-                const sep = document.createElement('div');
-                sep.className = 'bookmark-overflow-sep';
-                return sep;
-            }
-            const item = document.createElement('button');
-            item.className = 'bookmark-overflow-item';
-            item.dataset.id = entry.id;
-            item.dataset.parentFolderId = parentFolderId || '';
-            if (parentFolderId) {
-                item.draggable = true;
-                item.addEventListener('dragstart', (e) => {
-                    dragSrcId = entry.id;
-                    dragSrcFolderId = parentFolderId;
-                    bmDragActive = true;
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', entry.id);
-                    closeDropdown();
-                });
-                item.addEventListener('dragend', () => {
-                    dragSrcId = null;
-                    dragSrcFolderId = null;
-                    bmDragActive = false;
-                    clearDragClasses();
-                    clearSpring(true);
-                });
-            }
-            if (entry.type === 'folder') {
-                item.classList.add('bookmark-overflow-folder-item');
-                item.appendChild(makeFolderIcon('bookmark-overflow-folder-icon'));
-                const lbl = document.createElement('span');
-                lbl.textContent = entry.title || 'Folder';
-                item.appendChild(lbl);
-                const arrow = document.createElement('span');
-                arrow.className = 'bookmark-overflow-submenu-arrow';
-                arrow.textContent = '▶';
-                item.appendChild(arrow);
-                // Hover to open (Firefox-style)
-                item.addEventListener('mouseenter', () => {
-                    clearTimeout(overflowCloseTimer);
-                    clearTimeout(overflowHoverTimer);
-                    overflowHoverTimer = setTimeout(() => openFolderSubPanel(item, entry), 220);
-                });
-                item.addEventListener('mouseleave', (e) => {
-                    clearTimeout(overflowHoverTimer);
-                    const sub = document.getElementById('bm-subdropdown');
-                    if (sub && (e.relatedTarget === sub || sub.contains(e.relatedTarget)))
-                        return;
-                    overflowCloseTimer = setTimeout(() => {
-                        document.getElementById('bm-subdropdown')?.remove();
-                        document.querySelectorAll('#bm-dropdown .has-submenu-open')
-                            .forEach(el => el.classList.remove('has-submenu-open'));
-                    }, 220);
-                });
-                // Click also opens (fallback)
-                item.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    clearTimeout(overflowHoverTimer);
-                    const existing = document.getElementById('bm-subdropdown');
-                    if (existing && existing.dataset.forId === entry.id) {
-                        existing.remove();
-                        item.classList.remove('has-submenu-open');
-                    }
-                    else {
-                        openFolderSubPanel(item, entry);
-                    }
-                });
-            }
-            else {
-                const img = document.createElement('img');
-                img.className = 'bookmark-bar-favicon';
-                item.appendChild(img);
-                paintCachedFavicon(img, entry.url);
-                const lbl = document.createElement('span');
-                try {
-                    lbl.textContent = entry.title || new URL(entry.url).hostname;
-                }
-                catch {
-                    lbl.textContent = entry.url;
-                }
-                item.appendChild(lbl);
-                item.addEventListener('click', () => { closeDropdown(); window.tab.loadUrl(activeTabIndex, entry.url); });
-                item.addEventListener('auxclick', (e) => {
-                    if (e.button !== 1)
-                        return;
-                    e.preventDefault();
-                    closeDropdown();
-                    window.browserBookmarks.openInNewTab(entry.url, false);
-                });
-            }
-            item.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.browserBookmarks.showBarContextMenu({ type: entry.type, id: entry.id, url: entry.url, title: entry.title });
-            });
-            return item;
-        }
-        // ── Folder bar click → floating folder WebContentsView ───────────────────
-        async function openFolderPanel(btn, entry) {
-            const rect = btn.getBoundingClientRect();
-            closeDropdown();
-            try {
-                await window.electronAPI.openFolderDropdown({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, entry);
-            }
-            catch { }
-        }
-        /**
-         * Fill a panel div with the items of a folder entry.
-         * Each folder item shows a ▶ arrow; hovering over it for 300ms opens a
-         * side-panel (same pattern as the overflow subfolder).
-         * Drag from any item sets dragSrcId/FolderId and closes the panel.
-         */
-        function buildFolderPanelItems(panel, folderEntry) {
-            const folderId = folderEntry.id;
-            const children = folderEntry.children || [];
-            if (!children.length) {
-                const empty = document.createElement('div');
-                empty.className = 'bookmark-overflow-empty';
-                empty.textContent = '(empty)';
-                panel.appendChild(empty);
-                return;
-            }
-            // Local spring state for subfolders within this panel
-            let panelSpringTimer = null;
-            let panelSpringRow = null;
-            function clearPanelSpring() {
-                if (panelSpringTimer) {
-                    clearTimeout(panelSpringTimer);
-                    panelSpringTimer = null;
-                }
-                panelSpringRow = null;
-            }
-            children.forEach(child => {
-                if (child.type === 'divider') {
-                    const sep = document.createElement('div');
-                    sep.className = 'bookmark-overflow-sep';
-                    panel.appendChild(sep);
-                    return;
-                }
-                const row = document.createElement('button');
-                row.className = 'bookmark-overflow-item';
-                row.dataset.id = child.id;
-                row.dataset.parentFolderId = folderId;
-                if (child.type === 'folder') {
-                    row.classList.add('bookmark-overflow-folder-item');
-                    row.appendChild(makeFolderIcon('bookmark-overflow-folder-icon'));
-                    const lbl = document.createElement('span');
-                    lbl.textContent = child.title || 'Folder';
-                    row.appendChild(lbl);
-                    const arr = document.createElement('span');
-                    arr.className = 'bookmark-overflow-submenu-arrow';
-                    arr.textContent = '▶';
-                    row.appendChild(arr);
-                    // Click drills in: rebuild the panel contents for the subfolder
-                    row.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        // Clear current contents down to the header+sep then refill
-                        const panelEl = document.getElementById('bm-dropdown');
-                        if (!panelEl)
-                            return;
-                        // Remove everything after the separator
-                        while (panelEl.children.length > 2)
-                            panelEl.removeChild(panelEl.lastChild);
-                        // Update header text
-                        const hdr = panelEl.querySelector('.bookmark-folder-panel-header');
-                        if (hdr)
-                            hdr.textContent = child.title || 'Folder';
-                        buildFolderPanelItems(panelEl, child);
-                    });
-                }
-                else {
-                    const img = document.createElement('img');
-                    img.className = 'bookmark-bar-favicon';
-                    row.appendChild(img);
-                    paintCachedFavicon(img, child.url);
-                    const lbl = document.createElement('span');
-                    try {
-                        lbl.textContent = child.title || new URL(child.url).hostname;
-                    }
-                    catch {
-                        lbl.textContent = child.url;
-                    }
-                    row.appendChild(lbl);
-                    row.addEventListener('click', () => {
-                        closeDropdown();
-                        window.tab.loadUrl(activeTabIndex, child.url);
-                    });
-                    row.addEventListener('auxclick', (e) => {
-                        if (e.button !== 1)
-                            return;
-                        e.preventDefault();
-                        closeDropdown();
-                        window.browserBookmarks.openInNewTab(child.url, false);
-                    });
-                }
-                // Drag — same pattern as makeDropdownItem
-                row.draggable = true;
-                row.addEventListener('dragstart', (e) => {
-                    dragSrcId = child.id;
-                    dragSrcFolderId = folderId;
-                    bmDragActive = true;
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', child.id);
-                    closeDropdown();
-                });
-                row.addEventListener('dragend', () => {
-                    dragSrcId = null;
-                    dragSrcFolderId = null;
-                    bmDragActive = false;
-                    clearDragClasses();
-                    clearSpring(true);
-                });
-                // Drag-over target: spring into subfolder, or show drop-before line
-                row.addEventListener('dragenter', (e) => {
-                    if (!bmDragActive || dragSrcId === child.id)
-                        return;
-                    e.preventDefault();
-                    if (panelSpringRow === row)
-                        return;
-                    clearDragClasses();
-                    clearPanelSpring();
-                    if (child.type === 'folder') {
-                        row.classList.add('drag-into');
-                        panelSpringRow = row;
-                        panelSpringTimer = setTimeout(() => {
-                            if (panelSpringRow !== row)
-                                return;
-                            panelSpringRow = null;
-                            panelSpringTimer = null;
-                            const panelEl = document.getElementById('bm-dropdown');
-                            if (!panelEl)
-                                return;
-                            while (panelEl.children.length > 2)
-                                panelEl.removeChild(panelEl.lastChild);
-                            const hdr = panelEl.querySelector('.bookmark-folder-panel-header');
-                            if (hdr)
-                                hdr.textContent = child.title || 'Folder';
-                            buildFolderPanelItems(panelEl, child);
-                        }, 500);
-                    }
-                    else {
-                        row.classList.add('drop-before');
-                    }
-                });
-                row.addEventListener('dragover', (e) => {
-                    if (!bmDragActive || dragSrcId === child.id)
-                        return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.dataTransfer.dropEffect = 'move';
-                });
-                row.addEventListener('dragleave', (e) => {
-                    if (row.contains(e.relatedTarget))
-                        return;
-                    const moved = e.relatedTarget?.closest?.('.bookmark-overflow-item');
-                    if (moved && moved !== row) {
-                        if (panelSpringRow === row)
-                            clearPanelSpring();
-                        row.classList.remove('drop-before', 'drag-into');
-                    }
-                });
-                row.addEventListener('drop', async (e) => {
-                    if (!dragSrcId || dragSrcId === child.id)
-                        return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    row.classList.remove('drop-before', 'drag-into');
-                    clearSpring(true);
-                    clearPanelSpring();
-                    if (child.type === 'folder') {
-                        await window.browserBookmarks.moveIntoFolder(dragSrcId, child.id, null);
-                    }
-                    else {
-                        await window.browserBookmarks.moveIntoFolder(dragSrcId, folderId, child.id);
-                    }
-                });
-                row.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window.browserBookmarks.showBarContextMenu({
-                        type: child.type, id: child.id, url: child.url, title: child.title,
-                    });
-                });
-                panel.appendChild(row);
-            });
-            // Drop on empty space within the panel → append to folder end
-            panel.addEventListener('dragover', (e) => {
-                if (!bmDragActive || e.target.closest('.bookmark-overflow-item, .bookmark-overflow-sep'))
-                    return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-            });
-            panel.addEventListener('drop', async (e) => {
-                if (!dragSrcId || e.target.closest('.bookmark-overflow-item, .bookmark-overflow-sep'))
-                    return;
-                e.preventDefault();
-                clearSpring(true);
-                await window.browserBookmarks.moveIntoFolder(dragSrcId, folderId, null);
-            });
-        }
-        function openFolderSubPanel(anchorItem, entry) {
-            document.querySelectorAll('#bm-dropdown .has-submenu-open')
-                .forEach(el => el.classList.remove('has-submenu-open'));
-            document.getElementById('bm-subdropdown')?.remove();
-            const sub = document.createElement('div');
-            sub.id = 'bm-subdropdown';
-            sub.className = 'bookmark-overflow-dropdown';
-            sub.dataset.forId = entry.id;
-            if (!entry.children?.length) {
-                const empty = document.createElement('div');
-                empty.className = 'bookmark-overflow-empty';
-                empty.textContent = '(empty)';
-                sub.appendChild(empty);
-            }
-            else {
-                entry.children.forEach(child => sub.appendChild(makeDropdownItem(child, entry.id)));
-            }
-            document.body.appendChild(sub);
-            const r = anchorItem.getBoundingClientRect();
-            // Flip left if sub would overflow the right edge
-            const subW = 200;
-            const spaceRight = window.innerWidth - r.right;
-            sub.style.left = (spaceRight >= subW ? r.right : r.left - subW) + 'px';
-            sub.style.top = r.top + 'px';
-            anchorItem.classList.add('has-submenu-open');
-            // Keep sub open while cursor is inside it
-            sub.addEventListener('mouseenter', () => clearTimeout(overflowCloseTimer));
-            sub.addEventListener('mouseleave', (e) => {
-                if (e.relatedTarget === anchorItem || anchorItem.contains(e.relatedTarget))
-                    return;
-                overflowCloseTimer = setTimeout(() => {
-                    sub.remove();
-                    anchorItem.classList.remove('has-submenu-open');
-                }, 220);
-            });
-        }
-        // ── Drag and drop ─────────────────────────────────────────────────────────
-        let dragSrcId = null;
-        let dragSrcFolderId = null;
-        let bmDragActive = false;
-        let externDragId = null;
-        let externLastTarget = null;
-        // Spring-load state — folder opens after a hover delay during drag
-        let springTimer = null;
-        let springFolderId = null;
-        let springOpen = false;
-        // Overflow dropdown subfolder hover-open state
-        let overflowHoverTimer = null;
-        let overflowCloseTimer = null;
-        function clearDragClasses() {
-            document.querySelectorAll('.drag-into, .drop-before')
-                .forEach(el => el.classList.remove('drag-into', 'drop-before'));
-        }
-        function clearSpring(closePanel = false) {
-            if (springTimer) {
-                clearTimeout(springTimer);
-                springTimer = null;
-            }
-            springFolderId = null;
-            if (closePanel && springOpen) {
-                closeDropdown();
-                window.electronAPI.closeFolderDropdown();
-                springOpen = false;
-            }
-        }
-        // Prevent bookmark drags from bubbling to the tab bar's own dragover handler
-        document.addEventListener('dragover', (e) => {
-            if (!bmDragActive)
-                return;
-            const inBar = !!e.target.closest('#bookmark-bar');
-            const inDropdown = !!e.target.closest('#bm-dropdown');
-            if (!inBar && !inDropdown)
-                e.stopPropagation();
-        }, true);
-        function makeDraggable(el, item, getAllFn) {
-            el.draggable = true;
-            el.addEventListener('dragstart', (e) => {
-                dragSrcId = item.id;
-                dragSrcFolderId = null;
-                bmDragActive = true;
-                el.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', item.id);
-            });
-            el.addEventListener('dragend', () => {
-                dragSrcId = null;
-                dragSrcFolderId = null;
-                bmDragActive = false;
-                el.classList.remove('dragging');
-                clearDragClasses();
-                clearSpring(true);
-            });
-            el.addEventListener('dragover', (e) => {
-                if (!bmDragActive)
-                    return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                clearDragClasses();
-                if (item.type === 'folder') {
-                    if (springOpen && springFolderId === item.id) {
-                        el.classList.add('drag-into');
-                    }
-                    else {
-                        el.classList.add('drop-before');
-                        if (springFolderId !== item.id) {
-                            clearSpring(false);
-                            springFolderId = item.id;
-                            springTimer = setTimeout(async () => {
-                                springOpen = true;
-                                el.classList.remove('drop-before');
-                                el.classList.add('drag-into');
-                                const rect = el.getBoundingClientRect();
-                                closeDropdown();
-                                try {
-                                    await window.electronAPI.openFolderDropdown({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, item);
-                                }
-                                catch { }
-                            }, 500);
-                        }
-                    }
-                }
-                else {
-                    el.classList.add('drop-before');
-                }
-            });
-            el.addEventListener('dragleave', (e) => {
-                clearDragClasses();
-                if (item.type === 'folder' && springFolderId === item.id) {
-                    const dropdown = document.getElementById('bm-dropdown');
-                    if (dropdown?.contains(e.relatedTarget))
-                        return;
-                    clearSpring(false);
-                }
-            });
-            el.addEventListener('drop', async (e) => {
-                e.preventDefault();
-                clearDragClasses();
-                const wasSpringOpen = springOpen;
-                clearSpring(true);
-                if (!dragSrcId || dragSrcId === item.id)
-                    return;
-                if (dragSrcFolderId) {
-                    await window.browserBookmarks.moveOutOfFolder(dragSrcId, dragSrcFolderId, item.id);
-                }
-                else if (item.type === 'folder' && wasSpringOpen) {
-                    await window.browserBookmarks.moveIntoFolder(dragSrcId, item.id);
-                }
-                else {
-                    const all = getAllFn();
-                    const ids = all.map(b => b.id);
-                    const from = ids.indexOf(dragSrcId);
-                    const to = ids.indexOf(item.id);
-                    if (from === -1 || to === -1)
-                        return;
-                    ids.splice(from, 1);
-                    ids.splice(to, 0, dragSrcId);
-                    await window.browserBookmarks.reorder(ids);
-                }
-            });
-        }
-        /** Build a spring-loaded folder panel where every row is a drop target. */
-        function buildSpringPanel(panel, folderEntry) {
-            const children = folderEntry.children || [];
-            function makeDropRow(child) {
-                const row = makeDropdownItem(child, folderEntry.id);
-                row.addEventListener('dragenter', (e) => {
-                    if (!bmDragActive || dragSrcId === child.id)
-                        return;
-                    e.preventDefault();
-                    clearDragClasses();
-                    // Show drop target. Folders get drag-into (drop inside), bookmarks get drop-before.
-                    // No sub-spring: rebuilding the panel DOM during a live drag causes macOS to
-                    // fire spurious dragleave/dragend. Drop onto a folder moves into it directly.
-                    row.classList.add(child.type === 'folder' ? 'drag-into' : 'drop-before');
-                });
-                row.addEventListener('dragover', (e) => {
-                    if (!bmDragActive || dragSrcId === child.id)
-                        return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.dataTransfer.dropEffect = 'move';
-                });
-                row.addEventListener('dragleave', (e) => {
-                    if (row.contains(e.relatedTarget))
-                        return;
-                    row.classList.remove('drop-before', 'drag-into');
-                });
-                row.addEventListener('drop', async (e) => {
-                    if (!dragSrcId || dragSrcId === child.id)
-                        return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    row.classList.remove('drop-before', 'drag-into');
-                    clearSpring(true);
-                    if (child.type === 'folder') {
-                        await window.browserBookmarks.moveIntoFolder(dragSrcId, child.id, null);
-                    }
-                    else {
-                        await window.browserBookmarks.moveIntoFolder(dragSrcId, folderEntry.id, child.id);
-                    }
-                });
-                return row;
-            }
-            if (!children.length) {
-                const empty = document.createElement('div');
-                empty.className = 'bookmark-overflow-empty';
-                empty.textContent = '(empty)';
-                panel.appendChild(empty);
-            }
-            else {
-                children.forEach(child => panel.appendChild(makeDropRow(child)));
-            }
-            panel.addEventListener('dragover', (e) => {
-                if (!bmDragActive || e.target.closest('.bookmark-overflow-item, .bookmark-overflow-sep'))
-                    return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-            });
-            panel.addEventListener('drop', async (e) => {
-                if (!dragSrcId || e.target.closest('.bookmark-overflow-item, .bookmark-overflow-sep'))
-                    return;
-                e.preventDefault();
-                clearSpring(true);
-                await window.browserBookmarks.moveIntoFolder(dragSrcId, folderEntry.id, null);
-            });
-        }
-        // ── Extern drag (from folder dropdown to bookmark bar) ────────────────────
-        window.electronAPI.onExternBookmarkDragStart((id, folderId) => {
-            dragSrcId = id;
-            dragSrcFolderId = folderId;
-            bmDragActive = true;
-            externDragId = id;
-            externLastTarget = null;
-        });
-        window.electronAPI.onExternBookmarkDragPosition((x, y) => {
-            if (!externDragId)
-                return;
-            clearDragClasses();
-            const el = document.elementFromPoint(x, y);
-            const barItem = el?.closest('.bookmark-bar-item, .bookmark-bar-divider');
-            const overflowItem = el?.closest('.bookmark-overflow-item');
-            if (barItem) {
-                externLastTarget = barItem;
-                barItem.classList.add(barItem.classList.contains('bookmark-bar-folder') ? 'drag-into' : 'drop-before');
-            }
-            else if (overflowItem && overflowItem.dataset.id && overflowItem.dataset.id !== externDragId) {
-                externLastTarget = overflowItem;
-                overflowItem.classList.add(overflowItem.classList.contains('bookmark-overflow-folder-item') ? 'drag-into' : 'drop-before');
-            }
-            else {
-                externLastTarget = null;
-            }
-        });
-        window.electronAPI.onExternBookmarkDragEnd(async () => {
-            if (!externDragId)
-                return;
-            const srcId = dragSrcId, srcFolder = dragSrcFolderId, target = externLastTarget;
-            dragSrcId = null;
-            dragSrcFolderId = null;
-            bmDragActive = false;
-            externDragId = null;
-            externLastTarget = null;
-            clearDragClasses();
-            clearSpring(true);
-            if (!target || !srcId)
-                return;
-            const targetId = target.dataset.id;
-            if (!targetId || targetId === srcId)
-                return;
-            // Target is inside a spring-opened overflow panel (subfolder)
-            if (target.classList.contains('bookmark-overflow-item')) {
-                const parentFolderId = target.dataset.parentFolderId;
-                if (target.classList.contains('bookmark-overflow-folder-item')) {
-                    // Drop onto a folder → append to its end
-                    await window.browserBookmarks.moveIntoFolder(srcId, targetId, null);
-                }
-                else if (parentFolderId) {
-                    // Drop before a bookmark inside the spring folder
-                    await window.browserBookmarks.moveIntoFolder(srcId, parentFolderId, targetId);
-                }
-                return;
-            }
-            // Target is a bar item
-            if (target.classList.contains('bookmark-bar-folder')) {
-                await window.browserBookmarks.moveIntoFolder(srcId, targetId);
-            }
-            else if (srcFolder) {
-                await window.browserBookmarks.moveOutOfFolder(srcId, srcFolder, targetId);
-            }
-            else {
-                const all = await window.browserBookmarks.getAll();
-                const ids = all.map(b => b.id);
-                const from = ids.indexOf(srcId), to = ids.indexOf(targetId);
-                if (from !== -1 && to !== -1) {
-                    ids.splice(from, 1);
-                    ids.splice(to, 0, srcId);
-                    await window.browserBookmarks.reorder(ids);
-                }
-            }
-        });
-        // ── Bar item builder ──────────────────────────────────────────────────────
-        function makeBarElement(entry, bookmarks) {
-            if (entry.type === 'divider') {
-                const el = document.createElement('div');
-                el.className = 'bookmark-bar-divider';
-                el.dataset.id = entry.id;
-                makeDraggable(el, entry, () => bookmarks);
-                el.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window.browserBookmarks.showBarContextMenu({ type: 'divider', id: entry.id });
-                });
-                return el;
-            }
-            const btn = document.createElement('button');
-            btn.dataset.id = entry.id;
-            if (entry.type === 'folder') {
-                btn.className = 'bookmark-bar-item bookmark-bar-folder';
-                btn.title = entry.title || 'Folder';
-                btn.appendChild(makeFolderIcon('bookmark-folder-icon'));
-                const lbl = document.createElement('span');
-                lbl.className = 'bookmark-bar-label';
-                lbl.textContent = entry.title || 'Folder';
-                btn.appendChild(lbl);
-                btn.addEventListener('click', () => openFolderPanel(btn, entry));
-            }
-            else {
-                btn.className = 'bookmark-bar-item';
-                btn.title = entry.title || entry.url;
-                const img = document.createElement('img');
-                img.className = 'bookmark-bar-favicon';
-                btn.appendChild(img);
-                paintCachedFavicon(img, entry.url);
-                const lbl = document.createElement('span');
-                lbl.className = 'bookmark-bar-label';
-                try {
-                    lbl.textContent = entry.title || new URL(entry.url).hostname;
-                }
-                catch {
-                    lbl.textContent = entry.url;
-                }
-                btn.appendChild(lbl);
-                if (entry.profile)
-                btn.addEventListener('click', () => {
-                    if (entry.profile)
-                        window.tab.openInContainer(entry.profile, entry.url);
-                    else
-                        window.tab.loadUrl(activeTabIndex, entry.url);
-                });
-                btn.addEventListener('auxclick', (e) => {
-                    if (e.button !== 1)
-                        return;
-                    e.preventDefault();
-                    window.browserBookmarks.openInNewTab(entry.url, false);
-                });
-            }
-            btn.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.browserBookmarks.showBarContextMenu({ type: entry.type, id: entry.id, url: entry.url, title: entry.title });
-            });
-            makeDraggable(btn, entry, () => bookmarks);
-            return btn;
-        }
-        // ── Bar render ────────────────────────────────────────────────────────────
-        function reportChromeHeight() {
-            const showBar = bookmarkBarVisible && hasBookmarks;
-            bookmarkBar.classList.toggle('hidden', !showBar);
-            window.electronAPI.reportChromeHeight(showBar ? 30 : 0); /* must match .bookmark-bar height */
-        }
-        reportChromeHeight();
-        async function refreshBookmarkBar() {
-            if (renamingFolderId)
-                return;
-            closeDropdown();
-            bookmarkBarItems.innerHTML = '';
-            if (!bookmarkBarVisible) {
-                hasBookmarks = false;
-                reportChromeHeight();
-                return;
-            }
-            const seq = ++refreshSeq;
-            let bookmarks = [];
-            try {
-                bookmarks = await window.browserBookmarks.getAll();
-            }
-            catch { }
-            if (seq !== refreshSeq)
-                return; // stale — a newer refresh started
-            hasBookmarks = bookmarks.length > 0;
-            reportChromeHeight();
-            if (!hasBookmarks)
-                return;
-            const rendered = [];
-            bookmarks.forEach(entry => {
-                const el = makeBarElement(entry, bookmarks);
-                bookmarkBarItems.appendChild(el);
-                rendered.push({ el, entry });
-            });
-            // Overflow detection: hide items that don't fit and add a "» N" button
-            requestAnimationFrame(() => {
-                const barRight = bookmarkBarItems.getBoundingClientRect().right;
-                const OVERFLOW_W = 40;
-                const anyOverflow = rendered.some(r => r.el.getBoundingClientRect().right > barRight);
-                if (!anyOverflow)
-                    return;
-                let overflowStart = -1;
-                for (let i = 0; i < rendered.length; i++) {
-                    if (rendered[i].el.getBoundingClientRect().right > barRight - OVERFLOW_W) {
-                        overflowStart = i;
-                        break;
-                    }
-                }
-                if (overflowStart !== -1) {
-                    for (let i = overflowStart; i < rendered.length; i++)
-                        rendered[i].el.style.display = 'none';
-                    const hidden = rendered.slice(overflowStart).map(r => r.entry);
-                    const count = hidden.filter(e => e.type !== 'divider').length;
-                    const more = document.createElement('button');
-                    more.className = 'bookmark-bar-item bookmark-bar-more';
-                    more.textContent = `» ${count}`;
-                    more.title = `${count} more`;
-                    more.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        openDropdown(more, '__overflow__', (panel) => {
-                            // Pass '__root__' as parentFolderId so drag handlers are attached
-                            hidden.forEach(entry => panel.appendChild(makeDropdownItem(entry, '__root__')));
-                        });
-                    });
-                    bookmarkBarItems.appendChild(more);
-                }
-            });
-        }
-        // ── Bar context menu events ───────────────────────────────────────────────
-        bookmarkBar.addEventListener('contextmenu', (e) => {
-            if (e.target.closest('.bookmark-bar-item, .bookmark-bar-divider'))
-                return;
-            e.preventDefault();
-            window.browserBookmarks.showBarContextMenu({ type: 'bar-bg', bookmarkBarVisible });
-        });
-        bookmarkBar.addEventListener('dragover', (e) => {
-            if (!bmDragActive || !dragSrcFolderId)
-                return;
-            if (e.target.closest('.bookmark-bar-item, .bookmark-bar-divider'))
-                return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-        });
-        bookmarkBar.addEventListener('drop', async (e) => {
-            if (!dragSrcId || !dragSrcFolderId)
-                return;
-            if (e.target.closest('.bookmark-bar-item, .bookmark-bar-divider'))
-                return;
-            e.preventDefault();
-            await window.browserBookmarks.moveOutOfFolder(dragSrcId, dragSrcFolderId, null);
-        });
-        new ResizeObserver(() => { if (bookmarkBarVisible && hasBookmarks)
-            refreshBookmarkBar(); })
-            .observe(bookmarkBarItems);
-        // ── Bookmark ★ button ─────────────────────────────────────────────────────
-        async function updateBookmarkBtn(url) {
-            if (!url || url === 'newtab' || url.startsWith('file://')) {
-                bookmarkBtn.classList.remove('bookmarked');
-                return;
-            }
-            try {
-                const has = await window.browserBookmarks.has(url);
-                bookmarkBtn.classList.toggle('bookmarked', has);
-            }
-            catch { }
-        }
-        bookmarkBtn.addEventListener('click', async () => {
-            if (!currentTabUrl || currentTabUrl === 'newtab' || currentTabUrl.startsWith('file://'))
-                return;
-            const rect = bookmarkBtn.getBoundingClientRect();
-            let hasObj = false, bkmkTitle = currentTabTitle || currentTabUrl, bkmkId = null;
-            try {
-                const all = await window.browserBookmarks.getAll();
-                const existing = all.find(b => b.type === 'bookmark' && b.url === currentTabUrl);
-                if (existing) {
-                    hasObj = true;
-                    bkmkTitle = existing.title || existing.url;
-                    bkmkId = existing.id;
-                }
-            }
-            catch { }
-            await window.electronAPI.openBookmarkPrompt({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, currentTabUrl, bkmkTitle, hasObj, bkmkId);
-        });
-        // ── Bookmark bar event wiring ─────────────────────────────────────────────
-        function initBookmarkBar() {
-            window.electronAPI.onBookmarkAddPrompt(() => {
-                if (!currentTabUrl || currentTabUrl === 'newtab' || currentTabUrl.startsWith('file://'))
-                    return;
-                const rect = bookmarkBtn.getBoundingClientRect();
-                window.electronAPI.openBookmarkPrompt({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, currentTabUrl, currentTabTitle, false, null);
-            });
-            window.electronAPI.onBookmarkEditPrompt(({ id, url, title }) => {
-                const rect = bookmarkBtn.getBoundingClientRect();
-                window.electronAPI.openBookmarkPrompt({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, url, title, true, id);
-            });
-            window.electronAPI.onBookmarkFolderRename(({ id, title }) => {
-                const rect = bookmarkBtn.getBoundingClientRect();
-                window.electronAPI.openBookmarkPrompt({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, null, title, true, id, 'folder-rename');
-            });
-            window.electronAPI.onBookmarkNewFolderPrompt(async () => {
-                window.electronAPI.closeFolderDropdown();
-                const id = await window.browserBookmarks.addFolder('New Folder');
-                await refreshBookmarkBar();
-                startInlineBarRename(id, 'New Folder');
-            });
-            window.electronAPI.onToggleBookmarkBar(() => {
-                bookmarkBarVisible = !bookmarkBarVisible;
-                window.northstarSettings.set('bookmarkBarVisible', bookmarkBarVisible);
-                refreshBookmarkBar();
-            });
-            window.browserBookmarks.onChanged(() => { refreshBookmarkBar(); updateBookmarkBtn(currentTabUrl); });
-            window.electronAPI.onBookmarkPromptClosed(() => updateBookmarkBtn(currentTabUrl));
-            refreshBookmarkBar();
-        }
-        /** Inline rename for a folder label directly in the bookmark bar. */
-        function startInlineBarRename(folderId, defaultName) {
-            const btn = bookmarkBarItems.querySelector(`[data-id="${folderId}"]`);
-            if (!btn)
-                return;
-            const lbl = btn.querySelector('.bookmark-bar-label');
-            if (!lbl)
-                return;
-            renamingFolderId = folderId;
-            lbl.style.display = 'none';
-            const input = document.createElement('input');
-            input.className = 'bookmark-bar-rename-input';
-            input.value = defaultName || '';
-            input.size = Math.max((defaultName || '').length, 8);
-            btn.appendChild(input);
-            btn.addEventListener('click', (e) => e.stopPropagation(), { capture: true, once: true });
-            requestAnimationFrame(() => { input.focus(); input.select(); });
-            let done = false;
-            async function commit() {
-                if (done)
-                    return;
-                done = true;
-                const name = input.value.trim() || 'New Folder';
-                renamingFolderId = null;
-                await window.browserBookmarks.updateById(folderId, { title: name });
-            }
-            function cancel() {
-                if (done)
-                    return;
-                done = true;
-                renamingFolderId = null;
-                input.removeEventListener('blur', commit);
-                refreshBookmarkBar();
-            }
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    commit();
-                }
-                if (e.key === 'Escape') {
-                    e.preventDefault();
-                    cancel();
-                }
-            });
-            input.addEventListener('blur', commit, { once: true });
-        }
         // ─────────────────────────────────────────────────────────────────────────
         // Tab bar
         // ─────────────────────────────────────────────────────────────────────────
         function initTabBar() {
             // Another window's torn-off tab is hovering over our strip → light up.
             window.dragdrop.onMergeHover?.((v) => tabBar.classList.toggle('merge-target', !!v));
+            // Released over the page card: the drop sheet there handled it, and
+            // this side never saw a pointerup — drop the gesture.
+            window.dragdrop.onDragEnded?.(() => { try { activeTabDrag?.cancel(); } catch (e) { window.inkLog?.debug('renderer', 'initTabBar: ' + e); } });
             window.pinActiveTab = () => window.tab.pin(activeTabIndex);
             // ── IPC events from main process ──────────────────────────────────────
             window.tab.onTabCreated((_e, data) => {
@@ -2017,7 +1147,7 @@
                 setTabLoading(data.index, data.loading);
             });
             try { window.tab.onIconChanged(({ index, icon }) => applyCustomTabIcon(Number(index), icon)); }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'initTabBar: ' + e); }
             window.tabsUI?.onPinTab((index) => {
                 const btn = document.querySelector(`#tabs-container .tab-button[data-index="${index}"]`);
                 if (!btn)
@@ -2042,7 +1172,7 @@
                     applySplitMarks();
                 });
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'initTabBar: ' + e); }
             // Folders: main sends the active workspace's folders + tab assignments.
             try {
                 const applyFolders = (data) => {
@@ -2069,7 +1199,7 @@
                 pullFolders();
                 setTimeout(pullFolders, 600);
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'pullFolders: ' + e); }
             // Called by the main process (executeJavaScript) when a tab dragged
             // from ANOTHER window drops on our strip: x (px from our left edge) →
             // where to insert it. Returns the data-index of the tab to insert
@@ -2211,12 +1341,12 @@
                 return;
             let seen = true;
             try { seen = !!(window.northstarSettings.getSync() || {}).isolationHintSeen; }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'maybeShowIsolationHint: ' + e); }
             if (seen)
                 return;
             isoHintShownThisSession = true;
             try { window.northstarSettings.set('isolationHintSeen', true); }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'maybeShowIsolationHint: ' + e); }
             const el = document.getElementById('iso-hint');
             if (!el)
                 return;
@@ -2234,14 +1364,14 @@
                 mode = (s.tabBarSide ?? 'side');
                 width = snapSidebar(Number(s.sidebarWidth) || 232);
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'initTabBarSide: ' + e); }
             document.documentElement.dataset.tabbar = mode === 'top' ? 'top' : 'side';
             applySidebarWidth(width);
             initSidebarResizer();
             try { window.tabsUI.onCloseMenus(() => { _closeCtxMenu?.(); }); }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'initTabBarSide: ' + e); }
             try { window.tabsUI.onSidebarWidth((w) => applySidebarWidth(w)); }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'initTabBarSide: ' + e); }
             try {
                 window.tabsUI.onTabBarSide((v) => {
                     document.documentElement.dataset.tabbar = v === 'top' ? 'top' : 'side';
@@ -2249,7 +1379,7 @@
                     updateScrollShadows();
                 });
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'initTabBarSide: ' + e); }
             // Compact mode: collapse the sidebar (page full-bleed).
             try {
                 window.tabsUI.onCompact((on) => {
@@ -2257,7 +1387,7 @@
                     updateTabWidths(tabs.size);
                 });
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'initTabBarSide: ' + e); }
         }
         // Drag the right edge of the sidebar to resize it (side mode). Live-resizes
         // the page view; persists (globally) on release.
@@ -2284,7 +1414,7 @@
                 pid = e.pointerId;
                 handle.setPointerCapture(e.pointerId);
                 document.documentElement.classList.add('sidebar-resizing');
-                try { window.tabsUI.startSidebarResize(); } catch { }
+                try { window.tabsUI.startSidebarResize(); } catch (e) { window.inkLog?.debug('renderer', 'initSidebarResizer: ' + e); }
                 e.preventDefault();
             });
             handle.addEventListener('pointermove', (e) => {
@@ -2301,7 +1431,7 @@
                 if (!dragging)
                     return;
                 dragging = false;
-                try { if (pid != null) handle.releasePointerCapture(pid); } catch { }
+                try { if (pid != null) handle.releasePointerCapture(pid); } catch (e) { window.inkLog?.debug('renderer', 'stop: ' + e); }
                 document.documentElement.classList.remove('sidebar-resizing');
                 if (commit)
                     window.tabsUI.commitSidebarWidth(pending);
@@ -2316,7 +1446,7 @@
             window.addEventListener('blur', () => stop(true));
             document.addEventListener('keydown', (e) => { if (e.key === 'Escape') stop(true); });
             // Main fires this when the release happened over the page view.
-            try { window.tabsUI.onSidebarResizeEnded((w) => { pending = clamp(w); stop(false); }); } catch { }
+            try { window.tabsUI.onSidebarResizeEnded((w) => { pending = clamp(w); stop(false); }); } catch (e) { window.inkLog?.debug('renderer', 'stop: ' + e); }
         }
         // ── Essentials (pinned favourites; sidebar top, per profile) ──────────────
         function initEssentials() {
@@ -2326,16 +1456,15 @@
             const render = async () => {
                 let items = [];
                 try { items = (await window.essentials.list()) || []; }
-                catch { }
+                catch (e) { window.inkLog?.debug('renderer', 'render: ' + e); }
                 grid.innerHTML = '';
                 for (const it of items) {
                     const tile = document.createElement('button');
                     tile.className = 'essential-tile';
-                    tile.tabIndex = -1;
                     tile.title = it.title || it.url;
                     let letter = '•';
                     try { letter = new URL(it.url).hostname.replace(/^www\./, '').charAt(0).toUpperCase(); }
-                    catch { }
+                    catch (e) { window.inkLog?.debug('renderer', 'render: ' + e); }
                     const fb = document.createElement('span');
                     fb.className = 'ess-fallback';
                     fb.textContent = letter;
@@ -2370,7 +1499,7 @@
                         }
                         let origin = null;
                         try { origin = new URL(it.url).origin; }
-                        catch { }
+                        catch (e) { window.inkLog?.debug('renderer', 'render: ' + e); }
                         if (origin) {
                             for (const [idx, u] of tabUrls) {
                                 try {
@@ -2379,7 +1508,7 @@
                                         return;
                                     }
                                 }
-                                catch { }
+                                catch (e) { window.inkLog?.debug('renderer', 'render: ' + e); }
                             }
                         }
                         window.browserBookmarks.openInNewTab(it.url, true);
@@ -2403,7 +1532,7 @@
             };
             render();
             try { window.essentials.onChanged(render); }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'render: ' + e); }
         }
         // ── Profiles ──────────────────────────────────────────────────────────────
         // The toolbar badge shows this window's profile (coloured initial); click
@@ -2441,7 +1570,7 @@
             pullContainers();
             setTimeout(pullContainers, 800);
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('renderer', 'pullContainers: ' + e); }
         function initProfiles() {
             const btn = document.getElementById('profile-btn');
             const badge = document.getElementById('profile-badge');
@@ -2528,7 +1657,7 @@
                     nameEl.value = '';
                     panel.classList.remove('hidden');
                     bar.classList.add('creating-space');
-                    try { window.tabsUI.focusChrome(); } catch { }
+                    try { window.tabsUI.focusChrome(); } catch (e) { window.inkLog?.debug('renderer', 'close: ' + e); }
                     nameEl.focus();
                 };
                 emojiEl.addEventListener('click', (e) => {
@@ -2551,7 +1680,7 @@
                     // before the first await or it is null by the time we need it.
                     const r = e.currentTarget.getBoundingClientRect();
                     let named = [];
-                    try { named = (await window.containers.listNamed()) || []; } catch { }
+                    try { named = (await window.containers.listNamed()) || []; } catch (e) { window.inkLog?.debug('renderer', 'setContainer: ' + e); }
                     const rows = [
                         ['Own (isolated)', () => setContainer(null, 'Own')],
                         ['Default (shared)', () => setContainer('default', 'Default')],
@@ -2573,7 +1702,7 @@
                         if (name) patch.name = name;
                         if (chosen) patch.emoji = chosen;
                         if (container) patch.container = container;
-                        try { await window.profiles.update(p.id, patch); } catch { }
+                        try { await window.profiles.update(p.id, patch); } catch (e) { window.inkLog?.debug('renderer', 'create: ' + e); }
                     }
                     close();
                     if (p?.id) window.profiles.switch(p.id);
@@ -2588,9 +1717,9 @@
             const refresh = async () => {
                 let cur = null, all = [];
                 try { cur = await window.profiles.current(); }
-                catch { }
+                catch (e) { window.inkLog?.debug('renderer', 'refresh: ' + e); }
                 try { all = (await window.profiles.list()) || []; }
-                catch { }
+                catch (e) { window.inkLog?.debug('renderer', 'refresh: ' + e); }
                 _spacesCache = all; // menus need the space list without awaiting
                 if (cur) {
                     // Restored tabs are tagged and filtered before this resolves, so
@@ -2618,7 +1747,6 @@
                         b.className = 'sb-ws' + (p.id === activeWorkspace ? ' active' : '');
                         b.dataset.space = p.id;
                         b.draggable = true;
-                        b.tabIndex = -1;
                         b.title = p.name; // native hover label (survives foot overflow-scroll)
                         // Every space keeps its emoji; inactive ones are greyed
                         // out (CSS) rather than reduced to a dot.
@@ -2671,9 +1799,9 @@
             initCreateSpace();
             refresh();
             try { window.profiles.onChanged(refresh); }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'refresh: ' + e); }
             try { window.profiles.onForceSwitch((id) => window.profiles.switch(id)); }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'refresh: ' + e); }
             try {
                 window.profiles.onSwitched((id) => {
                     activeWorkspace = String(id);
@@ -2683,7 +1811,7 @@
                     // which main re-emits on switch (they're per-workspace now).
                 });
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'refresh: ' + e); }
             if (btn) {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -2711,14 +1839,14 @@
             if (dl && window.downloads) {
                 const revealIfAny = async () => {
                     try { if (((await window.downloads.getAll()) || []).length) dl.classList.remove('hidden'); }
-                    catch { }
+                    catch (e) { window.inkLog?.debug('renderer', 'revealIfAny: ' + e); }
                 };
                 dl.addEventListener('click', () => {
                     const r = dl.getBoundingClientRect();
                     window.downloads.togglePanel({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
                 });
                 try { window.downloads.onChanged(() => dl.classList.remove('hidden')); }
-                catch { }
+                catch (e) { window.inkLog?.debug('renderer', 'revealIfAny: ' + e); }
                 revealIfAny();
             }
             // Edit-profile modal (name + emoji)
@@ -2757,7 +1885,7 @@
                 modal.dataset.editId = '';
                 // Bring the page (native view) back up from behind the chrome.
                 try { window.focusMode.overlayClose(); }
-                catch { }
+                catch (e) { window.inkLog?.debug('renderer', 'close: ' + e); }
             };
             const save = async () => {
                 const id = modal.dataset.editId;
@@ -2773,7 +1901,7 @@
                 modal.dataset.editId = String(id);
                 let p = null;
                 try { p = ((await window.profiles.list()) || []).find(x => x.id === String(id)); }
-                catch { }
+                catch (e) { window.inkLog?.debug('renderer', 'save: ' + e); }
                 input.value = p?.name || '';
                 setEmojiField(p?.emoji || '');
                 picker?.classList.add('hidden');
@@ -2781,11 +1909,11 @@
                 // The page is a native view that paints OVER the chrome DOM, so
                 // collapse it while the modal is up or the modal hides behind it.
                 try { window.focusMode.overlayOpen(); }
-                catch { }
+                catch (e) { window.inkLog?.debug('renderer', 'save: ' + e); }
                 input.focus(); input.select();
             };
             try { window.profiles.onRename((id) => openProfileModal(id)); }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'save: ' + e); }
             document.getElementById('prf-save')?.addEventListener('click', save);
             document.getElementById('prf-cancel')?.addEventListener('click', close);
             input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') close(); });
@@ -2809,8 +1937,22 @@
             if (String(workspace) !== activeWorkspace)
                 btn.classList.add('ws-hidden');
             btn.draggable = false; // pointer-tracked drag below, not HTML5 DnD
-            // Not keyboard-focusable: the tab strip should never be a Tab-key stop.
-            btn.tabIndex = -1;
+            // Keyboard-reachable: a div needs the role and the tab stop spelled
+            // out, or the whole strip is invisible to keyboard and screen-reader
+            // users. Enter/Space switch to the tab (see the keydown below).
+            btn.tabIndex = 0;
+            btn.setAttribute('role', 'tab');
+            btn.setAttribute('aria-label', title || `Tab ${index + 1}`);
+            btn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    window.tab.switch(parseInt(btn.dataset.index));
+                }
+                else if (e.key === 'Delete' || e.key === 'Backspace') {
+                    e.preventDefault();
+                    window.tab.remove(parseInt(btn.dataset.index));
+                }
+            });
             if (isPrivate)
                 btn.dataset.private = 'true';
             if (isolated) {
@@ -3009,6 +2151,15 @@
                 let outside = false; // pointer currently beyond the strip
                 let savedOrder = null; // DOM order at drag start, for cancel
                 let dropFolder = undefined; // folder id under the cursor (null = ungrouped, undefined = untracked)
+                let splitTarget = null; // tab dwelt on long enough to split with
+                let frozen = false; // reorder preview paused while the pointer rests
+                let lastMoveAt = Date.now(), lastPX = e.clientX, lastPY = e.clientY;
+                let dwellTimer = null;
+                const clearSplitTarget = () => {
+                    splitTarget = null;
+                    tabsContainer.querySelectorAll('.tab-button.split-target')
+                        .forEach(b => b.classList.remove('split-target'));
+                };
                 const restoreOrder = () => {
                     if (!savedOrder)
                         return;
@@ -3018,13 +2169,50 @@
                         if (el.isConnected)
                             tabsContainer.appendChild(el);
                 };
+                // Hover-to-split. The reorder preview keeps the dragged tab under
+                // the cursor, so there is never another tab to hit-test while the
+                // pointer is moving. Holding still is the gesture: the strip
+                // settles back to its real order and whatever tab is under the
+                // cursor arms as the split partner. Any movement resumes the
+                // reorder.
+                const onDwell = () => {
+                    if (mode !== 'drag' || outside || Date.now() - lastMoveAt < SPLIT_DWELL_MS)
+                        return;
+                    if (!frozen) {
+                        frozen = true;
+                        restoreOrder();
+                    }
+                    const over = document.elementFromPoint(lastPX, lastPY)?.closest?.('.tab-button');
+                    const idx = (over && over !== btn && !over.classList.contains('ws-hidden'))
+                        ? parseInt(over.dataset.index) : null;
+                    if (idx === splitTarget)
+                        return;
+                    clearSplitTarget();
+                    if (idx !== null) {
+                        splitTarget = idx;
+                        over.classList.add('split-target');
+                    }
+                };
                 const onMove = (ev) => {
+                    if (mode === 'drag' && Math.hypot(ev.clientX - lastPX, ev.clientY - lastPY) > 3) {
+                        lastMoveAt = Date.now();
+                        if (frozen || splitTarget !== null) {
+                            frozen = false;
+                            clearSplitTarget();
+                        }
+                    }
+                    lastPX = ev.clientX;
+                    lastPY = ev.clientY;
                     if (mode === 'idle' && Math.hypot(ev.clientX - startX, ev.clientY - startY) > 5) {
                         mode = 'drag';
                         savedOrder = [...tabsContainer.querySelectorAll('.tab-button')];
                         btn.classList.add('dragging');
                         document.documentElement.classList.add('tab-dragging'); // kills text selection
-                        window.dragdrop.dragTrack?.(true); // main raises windows under the cursor
+                        // Main raises windows under the cursor, and puts the
+                        // split drop-zone sheet over the page card.
+                        window.dragdrop.dragTrack?.(true, idxNum);
+                        activeTabDrag = { cancel: () => finish(false, true) };
+                        dwellTimer = setInterval(onDwell, 90);
                     }
                     if (mode !== 'drag')
                         return;
@@ -3039,6 +2227,7 @@
                     }
                     if (out) {
                         stopEdgeScroll();
+                        clearSplitTarget();
                         return;
                     }
                     edgeAutoScroll(ev.clientX, ev.clientY);
@@ -3062,16 +2251,31 @@
                     document.removeEventListener('keydown', onKey, true);
                     document.documentElement.classList.remove('tab-dragging');
                     btn.classList.remove('dragging', 'drag-outside');
+                    clearSplitTarget();
+                    clearInterval(dwellTimer);
                     stopEdgeScroll();
+                    activeTabDrag = null;
                     window.dragdrop.dragTrack?.(false);
                 };
-                const finish = async (drop) => {
-                    const wasMode = mode, wasOutside = outside;
+                // `handled` — the drop already landed somewhere else (the split
+                // drop sheet over the page), so this side only stands down.
+                const finish = async (drop, handled) => {
+                    const wasMode = mode, wasOutside = outside, wasSplit = splitTarget;
                     cleanup();
+                    if (handled) {
+                        if (wasMode === 'drag')
+                            restoreOrder();
+                        return;
+                    }
+                    if (wasMode === 'drag' && wasSplit !== null && drop) {
+                        restoreOrder(); // a split is not a reorder
+                        window.tabsUI.split(wasSplit, 'right');
+                        return;
+                    }
                     if (wasMode !== 'drag') {
                         if (pinnedGlance) {
                             const u = tabUrls.get(parseInt(index)) || await window.tab.getTabUrl(index);
-                            if (u) { try { window.glance.open(u); } catch { } }
+                            if (u) { try { window.glance.open(u); } catch (e) { window.inkLog?.debug('renderer', 'finish: ' + e); } }
                         }
                         return;
                     }
@@ -3091,15 +2295,16 @@
                         if (dropFolder !== undefined) {
                             const cur = folderState.assign.get(parseInt(index)) || null;
                             const next = dropFolder || null;
-                            if (cur !== next) { try { window.folders.assign(parseInt(index), next); } catch { } }
+                            if (cur !== next) { try { window.folders.assign(parseInt(index), next); } catch (e) { window.inkLog?.debug('renderer', 'finish: ' + e); } }
                         }
                         return;
                     }
-                    // Released outside the strip → main decides: move into the
-                    // window under the cursor, or detach into a new one.
+                    // Released outside the strip → main decides: split into a page
+                    // card (this window's or another's), move into the window
+                    // under the cursor, or detach into a new one.
                     const url = await window.tab.getTabUrl(index);
                     const res = await window.dragdrop.drop(index, url);
-                    if (res === 'none' || res === 'window-moved')
+                    if (res === 'none' || res === 'window-moved' || res === 'split')
                         restoreOrder();
                 };
                 const onUp = () => finish(true);
@@ -3180,7 +2385,20 @@
             const h = document.createElement('div');
             h.className = 'folder-header';
             h.dataset.folder = f.id;
-            h.tabIndex = -1;
+            // Keyboard-reachable, like the tab rows it groups.
+            h.tabIndex = 0;
+            h.setAttribute('role', 'button');
+            h.setAttribute('aria-expanded', String(!f.collapsed));
+            h.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    window.folders.toggle(f.id);
+                }
+                else if (e.key === 'F2') {
+                    e.preventDefault();
+                    startFolderRename(h, f.id);
+                }
+            });
             h.innerHTML = '<span class="folder-chevron">▸</span><span class="folder-icon">📁</span><span class="folder-name"></span><button class="folder-del" tabindex="-1" title="Delete folder">×</button>';
             h.addEventListener('click', (e) => {
                 if (h.classList.contains('renaming') || e.target.closest('.folder-del')) return;
@@ -3251,7 +2469,7 @@
                 if (fn) fn(result);
             });
         }
-        catch { }
+        catch (e) { window.inkLog?.debug('renderer', 'onKey: ' + e); }
         // rows: ['Label', fn, className?] | ['Label', [subRows], className?] | ['sep'].
         // The menu itself is rendered by the CtxMenu overlay view — chrome DOM
         // cannot paint above the page's native view. Handlers can't cross IPC, so
@@ -3286,7 +2504,7 @@
             };
             _closeCtxMenu = () => { _ctxPending = null; };
             try { window.ctxMenu.open({ kind: 'menu', x, y, rows: serialize(rows) }); }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'resolve: ' + e); }
         }
         // Shared emoji set with search keywords, rendered by the overlay. A
         // function declaration so every scope sees it regardless of init order.
@@ -3325,7 +2543,7 @@
             };
             _closeCtxMenu = () => { _ctxPending = null; };
             try { window.ctxMenu.open({ kind: 'emoji', x, y, emojis: emojiSet(), allowNone: !!allowNone }); }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'openEmojiPicker: ' + e); }
         }
         function showFolderMenu(x, y, id) {
             // Spaces other than the current one; the folder and its tabs move together.
@@ -3352,7 +2570,7 @@
                 ['Unpack Folder', () => window.folders.remove(id)],
                 ['Delete Folder', () => {
                     const members = [...folderState.assign.entries()].filter(([, fid]) => fid === id).map(([i]) => i);
-                    for (const i of members) { try { window.tab.remove(i); } catch { } }
+                    for (const i of members) { try { window.tab.remove(i); } catch (e) { window.inkLog?.debug('renderer', 'spaceRows: ' + e); } }
                     window.folders.remove(id);
                 }, 'danger'],
             ]);
@@ -3361,7 +2579,7 @@
         // both scopes see it regardless of init order.
         async function newFolderInline() {
             let id = null;
-            try { id = await window.folders.create('New Folder'); } catch { }
+            try { id = await window.folders.create('New Folder'); } catch (e) { window.inkLog?.debug('renderer', 'newFolderInline: ' + e); }
             if (id) setTimeout(() => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }, 140);
         }
         // Inline rename for a tab row — double-click or the Change Label item.
@@ -3377,7 +2595,7 @@
             input.value = initial || '';
             input.maxLength = 300;
             label.replaceWith(input);
-            try { window.tabsUI.focusChrome(); } catch { }
+            try { window.tabsUI.focusChrome(); } catch (e) { window.inkLog?.debug('renderer', 'startInlineEdit: ' + e); }
             input.focus(); input.select();
             const done = (save) => {
                 if (!btn.classList.contains('renaming'))
@@ -3404,7 +2622,7 @@
             input.value = label.textContent;
             input.maxLength = 60;
             label.replaceWith(input);
-            try { window.tabsUI.focusChrome(); } catch { }
+            try { window.tabsUI.focusChrome(); } catch (e) { window.inkLog?.debug('renderer', 'startTabRename: ' + e); }
             input.focus(); input.select();
             const done = (save) => {
                 if (!btn.classList.contains('renaming'))
@@ -3431,7 +2649,7 @@
             name.replaceWith(input);
             // Pull keyboard focus to the chrome first, else the caret shows but
             // every keystroke goes to the page view that still owns focus.
-            try { window.tabsUI.focusChrome(); } catch { }
+            try { window.tabsUI.focusChrome(); } catch (e) { window.inkLog?.debug('renderer', 'startFolderRename: ' + e); }
             input.focus(); input.select();
             const done = (save) => {
                 if (!h.classList.contains('renaming')) return;
@@ -3610,7 +2828,7 @@
             try {
                 dataUrl = await window.tab.fetchFavicon?.(url);
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'onFaviconError: ' + e); }
             if (dataUrl && el.isConnected) {
                 el.onload = () => markFaviconResolved(index);
                 el.onerror = () => setFaviconFallback(index, el); // data URL shouldn't fail, but be safe
@@ -3654,7 +2872,7 @@
                         ch = host.charAt(0).toUpperCase();
                 }
             }
-            catch { }
+            catch (e) { window.inkLog?.debug('renderer', 'setFaviconFallback: ' + e); }
             const custom = tabs.get(index)?.dataset.customIcon;
             if (custom) return applyCustomTabIcon(index, custom);
             div.textContent = ch;
@@ -3789,7 +3007,7 @@
         // ─────────────────────────────────────────────────────────────────────────
         function initFocusModeAndPomodoro() {
             document.getElementById('compact-btn')?.addEventListener('click', () => {
-                try { window.tabsUI.toggleCompact(); } catch { }
+                try { window.tabsUI.toggleCompact(); } catch (e) { window.inkLog?.debug('renderer', 'initFocusModeAndPomodoro: ' + e); }
             });
             const focusBtn = document.getElementById('focus-btn');
             const utilityBar = document.getElementById('utility-bar');

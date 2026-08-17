@@ -1,0 +1,44 @@
+@layer components {
+    /* Transparent sheet over the page card while a tab is dragged. Real CSS,
+       not Tailwind utilities: renderer/styles/ui.css is a compiled subset. */
+    html, body { height: 100%; }
+    body { background: transparent; cursor: grabbing; }
+
+    #zone {
+        position: absolute; inset: 0;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--accent) 22%, transparent);
+        border: 1.5px solid var(--accent);
+        opacity: 0;
+        transition: opacity 0.12s, left 0.12s, right 0.12s, top 0.12s, bottom 0.12s;
+        pointer-events: none;
+    }
+    body[data-zone] #zone { opacity: 1; }
+    body[data-zone="left"]   #zone { right: 50%; }
+    body[data-zone="right"]  #zone { left: 50%; }
+    body[data-zone="top"]    #zone { bottom: 50%; }
+    body[data-zone="bottom"] #zone { top: 50%; }
+
+    /* Faint wash over the whole card so it's obvious the drag is being caught. */
+    body::before {
+        content: ''; position: absolute; inset: 0;
+        background: rgba(8, 10, 20, 0.18);
+        opacity: 0; transition: opacity 0.12s;
+        pointer-events: none;
+    }
+    body.armed::before { opacity: 1; }
+
+    #hint {
+        position: absolute; left: 50%; top: 50%;
+        transform: translate(-50%, -50%);
+        padding: 7px 13px; border-radius: 999px;
+        border: 1px solid var(--border-2);
+        background: var(--surface); color: var(--text-2);
+        font-size: 12px; font-weight: 500; letter-spacing: -0.01em;
+        box-shadow: 0 4px 16px rgba(8, 10, 20, 0.34);
+        opacity: 0; transition: opacity 0.12s;
+        pointer-events: none;
+    }
+    body.armed #hint { opacity: 1; }
+    body[data-zone] #hint { opacity: 0; }
+}

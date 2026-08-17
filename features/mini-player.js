@@ -10,6 +10,7 @@
  * media tab, dismisses it (until a different tab plays), or the tab closes.
  * Toggleable in Settings → General ("miniPlayerEnabled").
  */
+const log = require('./log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
@@ -101,7 +102,7 @@ function show(wd, tabIndex) {
         },
     });
     view.setBackgroundColor('#00000000');
-    try { view.setBorderRadius(12); } catch { }
+    try { view.setBorderRadius(12); } catch (e) { log.debug('mini-player', 'if', e); }
     wd.window.contentView.addChildView(view);
     view.webContents.loadFile(resolveAppFile('renderer/MiniPlayer/index.html'));
     view.setBounds(panelBounds(wd));
@@ -109,14 +110,14 @@ function show(wd, tabIndex) {
     const onResize = () => { try {
         view.setBounds(panelBounds(wd));
     }
-    catch { } };
+    catch (e) { log.debug('mini-player', 'onResize', e); } };
     wd.window.on('resize', onResize);
     const poll = setInterval(() => pushState(wd), 1000);
     wd.miniPlayerCleanup = () => {
         try {
             wd.window.removeListener('resize', onResize);
         }
-        catch { }
+        catch (e) { log.debug('mini-player', 'onResize', e); }
         clearInterval(poll);
     };
     view.webContents.once('did-finish-load', () => pushState(wd));
@@ -127,16 +128,16 @@ function hide(wd) {
     try {
         wd.miniPlayerCleanup?.();
     }
-    catch { }
+    catch (e) { log.debug('mini-player', 'hide', e); }
     wd.miniPlayerCleanup = null;
     try {
         wd.window.contentView.removeChildView(wd.miniPlayer);
     }
-    catch { }
+    catch (e) { log.debug('mini-player', 'hide', e); }
     try {
         wd.miniPlayer.webContents.close?.();
     }
-    catch { }
+    catch (e) { log.debug('mini-player', 'hide', e); }
     wd.miniPlayer = null;
     wd.miniPlayerTab = null;
 }
@@ -156,7 +157,7 @@ function showIfAudible(wd, index) {
                 return;
             show(wd, index);
         }
-        catch { }
+        catch (e) { log.debug('mini-player', 'showIfAudible', e); }
     }, 300);
 }
 async function pushState(wd) {
@@ -171,7 +172,7 @@ async function pushState(wd) {
     try {
         s = await tab.webContents.executeJavaScript(READ_STATE_JS, true);
     }
-    catch { }
+    catch (e) { log.debug('mini-player', 'pushState', e); }
     if (!s) {
         // No media element or session left on the bound tab (it navigated away,
         // or the media ended and was removed) and nothing is audible — the panel
@@ -179,7 +180,7 @@ async function pushState(wd) {
         // event) reopens it if audio starts again. Fixes the panel lingering
         // after leaving a media page.
         let audible = false;
-        try { audible = tab.webContents.isCurrentlyAudible(); } catch { }
+        try { audible = tab.webContents.isCurrentlyAudible(); } catch (e) { log.debug('mini-player', 'if', e); }
         if (!tab.hasPlayingMedia && !audible) {
             hide(wd);
             return;
@@ -188,14 +189,14 @@ async function pushState(wd) {
         try {
             title = tab.webContents.getTitle() || '';
         }
-        catch { }
+        catch (e) { log.debug('mini-player', 'if', e); }
         s = { title, artist: '', cur: 0, dur: 0, paused: !tab.hasPlayingMedia };
     }
     s.muted = !!tab.webContents.audioMuted;
     try {
         wd.miniPlayer.webContents.send('mp-state', s);
     }
-    catch { }
+    catch (e) { log.debug('mini-player', 'if', e); }
 }
 // ── Hooks called by the tab manager ───────────────────────────────────────────
 function onMediaState(wd, index, playing) {
@@ -241,14 +242,14 @@ async function action(wd, act, value) {
         try {
             await tab.webContents.executeJavaScript(TOGGLE_JS, true);
         }
-        catch { }
+        catch (e) { log.debug('mini-player', 'if', e); }
         pushState(wd);
     }
     else if (act === 'mute') {
         try {
             tab.webContents.audioMuted = !tab.webContents.audioMuted;
         }
-        catch { }
+        catch (e) { log.debug('mini-player', 'if', e); }
         pushState(wd);
     }
     else if (act === 'seek') {
@@ -256,7 +257,7 @@ async function action(wd, act, value) {
         try {
             await tab.webContents.executeJavaScript(SEEK_JS(frac), true);
         }
-        catch { }
+        catch (e) { log.debug('mini-player', 'if', e); }
         pushState(wd);
     }
     else if (act === 'volume') {
@@ -264,7 +265,7 @@ async function action(wd, act, value) {
         try {
             await tab.webContents.executeJavaScript(VOLUME_JS(vol), true);
         }
-        catch { }
+        catch (e) { log.debug('mini-player', 'if', e); }
         pushState(wd);
     }
     else if (act === 'goto') {
@@ -273,7 +274,7 @@ async function action(wd, act, value) {
         try {
             wd.tabs.showTab(t);
         }
-        catch { }
+        catch (e) { log.debug('mini-player', 'if', e); }
     }
     else if (act === 'close') {
         wd.miniPlayerDismissedFor = wd.miniPlayerTab;

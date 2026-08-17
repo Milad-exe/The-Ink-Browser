@@ -1,3 +1,4 @@
+const log = require('../log');
 const { applyGrayscale, removeGrayscale } = require('./grayscale');
 const { pauseMedia } = require('./media');
 const { getFocusInjectionForUrl, getShortformInjectionForUrl } = require('./injections');
@@ -72,7 +73,7 @@ class FocusMode {
             try {
                 wc.executeJavaScript(js);
             }
-            catch { }
+            catch (e) { log.debug('focus-mode', 'injectFocus', e); }
         }
     }
     injectShortform(wc, url) {
@@ -81,7 +82,7 @@ class FocusMode {
             try {
                 wc.executeJavaScript(js);
             }
-            catch { }
+            catch (e) { log.debug('focus-mode', 'injectShortform', e); }
         }
     }
     applyShortformToAll(windowData) {
