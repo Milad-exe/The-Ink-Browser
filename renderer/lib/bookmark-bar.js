@@ -743,10 +743,6 @@
             const showBar = bookmarkBarVisible && hasBookmarks;
             bookmarkBar.classList.toggle('hidden', !showBar);
             window.electronAPI.reportChromeHeight(showBar ? 30 : 0); /* must match .bookmark-bar height */
-            // The bar shares the page column with the card in the single-surface
-            // layout, so the card has to move down by exactly its height (the
-            // native view is offset by the same number from tabs.js).
-            document.documentElement.style.setProperty('--bm-h', showBar ? '30px' : '0px');
         }
         reportChromeHeight();
         async function refreshBookmarkBar() {
