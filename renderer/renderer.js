@@ -1734,6 +1734,10 @@
                         badge.textContent = cur.emoji || (cur.name || 'P').charAt(0);
                         badge.style.setProperty('--pf-color', cur.color || '');
                     }
+                    // The space's colour drives the whole rail — its wash, the
+                    // active row's edge — so switching spaces reads as moving
+                    // somewhere rather than as the tab list changing contents.
+                    document.documentElement.style.setProperty('--space', cur.color || 'var(--accent)');
                     if (btn)
                         btn.title = `Workspace: ${cur.name}`;
                     const sh = document.getElementById('space-header');

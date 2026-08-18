@@ -208,25 +208,116 @@ html[data-tabbar="top"] .tab-button:not(.has-favicon)::before {
      "+ New Tab" row → slack (window drag) → clock → profile/settings foot.
    The utility bar / bookmark bar / page occupy the right column (page bounds
    offset in tabs.js getTabBounds). */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SINGLE-SURFACE CHROME (sidebar mode)
+
+   The browser used to wear two bands of chrome: a full-width toolbar across the
+   top and a sidebar down the left, with the page boxed in below and to the
+   right of both. That is the 2010 browser silhouette, and it costs a strip of
+   every window to a bar that is mostly empty space around one field.
+
+   Everything the toolbar held now lives in the sidebar — address field, nav,
+   actions — so the chrome is ONE surface in one corner and the page card runs
+   the full height of the window, top to bottom. The page is the app; the
+   browser is a rail beside it.
+
+   Geometry mirrored by getTabBounds() in features/tabs.js.
+   ═══════════════════════════════════════════════════════════════════════════ */
 html[data-tabbar="side"] body {
   display: grid;
   grid-template-columns: var(--sidebar-w, 240px) minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr);
+  /* rail (toolbar block) → tab list → page column spans both */
+  grid-template-rows: auto minmax(0, 1fr);
 }
-/* The utility bar spans the full width at the top (as in compact mode) and the
-   sidebar hangs below it, rather than the sidebar running the whole height. */
-html[data-tabbar="side"] #utility-bar { grid-column: 1 / -1; grid-row: 1; }
+/* The toolbar becomes the head of the sidebar rather than a band of its own.
+   An explicit grid, not flex: the field spans the rail, and the control strip
+   under it has three named slots so nothing can wrap unpredictably at narrow
+   sidebar widths. */
+html[data-tabbar="side"] #utility-bar {
+  grid-column: 1; grid-row: 1;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  grid-template-areas:
+    "field field field"
+    "nav   compact actions"
+    "pom   pom     pom";
+  align-items: center;
+  gap: var(--sp-2);
+  height: auto; width: 100%;
+  /* macOS traffic lights sit over this corner — reserve their row. */
+  padding: var(--traffic-h, var(--sp-2)) var(--sp-3) var(--sp-3);
+}
+html[data-platform="darwin"][data-tabbar="side"] #utility-bar { --traffic-h: 32px; }
+html[data-tabbar="side"] .omnibox-wrapper { grid-area: field; }
+html[data-tabbar="side"] .nav-buttons { grid-area: nav; }
+html[data-tabbar="side"] #compact-btn { grid-area: compact; }
+html[data-tabbar="side"] .trailing-icons { grid-area: actions; justify-content: flex-end; }
+html[data-tabbar="side"] .pomodoro-pill { grid-area: pom; justify-self: start; }
+html[data-tabbar="side"] #tab-bar { grid-column: 1; grid-row: 2; }
+html[data-tabbar="side"] .bookmark-bar {
+  grid-column: 2; grid-row: 1 / -1; align-self: start; z-index: 5;
+}
+html[data-tabbar="side"] #content-area { margin-top: var(--bm-h, 0); }
+html[data-tabbar="side"] #content-area { grid-column: 2; grid-row: 1 / -1; }
+
+/* The address field: full width of the rail, and the widest thing in it. It is
+   the only element in the chrome that gets to be big. */
+html[data-tabbar="side"] .omnibox-wrapper { flex: 0 0 100%; }
+html[data-tabbar="side"] .omnibox {
+  position: static; transform: none; width: 100%; margin: 0;
+  height: 34px; padding: 0 var(--sp-4); gap: var(--sp-3);
+  border-radius: var(--r-md);
+}
+html[data-tabbar="side"] #searchBar,
+html[data-tabbar="side"] #url-display { font-size: var(--fs-small); }
+
+/* One control strip under the field: navigation left, page actions right.
+   Everything that is not about THIS page (extensions, focus, profile) moved to
+   the menu and the foot — a 240px rail cannot hold nine buttons without
+   wrapping into a second ragged row, which is what it was doing. */
+html[data-tabbar="side"] #utility-bar > .nav-buttons { order: 2; gap: 0; }
+html[data-tabbar="side"] #utility-bar > .trailing-icons {
+  order: 3; flex: 1 1 auto; justify-content: flex-end; gap: 0;
+}
+html[data-tabbar="side"] #compact-btn { order: 4; }
+html[data-tabbar="side"] .nav-btn,
+html[data-tabbar="side"] .trailing-icons .icon-btn,
+html[data-tabbar="side"] #compact-btn { width: 26px; height: 26px; border-radius: var(--r-sm); }
+html[data-tabbar="side"] .nav-btn svg,
+html[data-tabbar="side"] .icon-btn svg,
+html[data-tabbar="side"] .icon-svg { width: 14px; height: 14px; }
+/* The profile chip is redundant with the space avatars in the foot. */
+html[data-tabbar="side"] #profile-btn { display: none; }
+/* Foot controls sit on the same 26px rhythm as the head's. */
+html[data-tabbar="side"] .sidebar-foot .icon-btn { width: 28px; height: 28px; }
+html[data-tabbar="side"] .sidebar-foot browser-action-list { display: flex; align-items: center; }
+
+/* The rail itself: lit from its own top-left corner so the chrome reads as a
+   panel the page sits beside, not as leftover margin. The tint comes from the
+   active space (--space, set by the renderer), which is what makes switching
+   spaces feel like moving somewhere rather than swapping a list. */
+html[data-tabbar="side"] #utility-bar,
 html[data-tabbar="side"] #tab-bar {
-  grid-column: 1; grid-row: 2 / span 2;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--space, var(--accent)) 9%, transparent),
+      transparent 340px);
+}
+
+/* The tab list column: it now starts directly under the rail's head rather
+   than under a full-width toolbar, and runs to the foot. */
+html[data-tabbar="side"] #tab-bar {
+  grid-column: 1; grid-row: 2;
   flex-direction: column; align-items: stretch;
-  width: var(--sidebar-w, 240px); height: 100%;
+  width: var(--sidebar-w, 240px); height: 100%; min-height: 0;
   /* One inset for the column; every row inside then shares --gutter for its
      own content, so favicons, labels, folder glyphs and the foot buttons all
-     sit on the same left edge. That shared edge is most of what separates a
-     sidebar that looks designed from one that looks assembled. */
+     sit on the same left edge. */
   padding: 0 var(--sp-3) var(--sp-3); gap: var(--sp-1);
-  background: transparent;
+  position: relative;
 }
+
 /* Right-edge drag handle to resize the sidebar (side mode only). */
 .sidebar-resizer { display: none; }
 html[data-tabbar="side"]:not([data-compact="on"]) .sidebar-resizer {
@@ -245,12 +336,10 @@ html.sidebar-resizing .sidebar-resizer::after { background: var(--accent); }
 html.sidebar-resizing { cursor: col-resize; }
 html.sidebar-resizing * { pointer-events: none; user-select: none; }
 html.sidebar-resizing .sidebar-resizer { pointer-events: auto; }
-html[data-tabbar="side"] .bookmark-bar { grid-column: 2; grid-row: 2; }
 html[data-tabbar="side"] #content-area {
-  /* Hairline around the page card — the native view rounds its own corners, so
-     this only has to trace them. */
   box-shadow: var(--ring), var(--shadow-2);
-  border-radius: var(--card-radius); grid-column: 2; grid-row: 3; }
+  border-radius: var(--card-radius);
+}
 /* In side mode the strip is a full-height working column, not a title bar, so
    it must NOT be a window-drag region — everything without an explicit no-drag
    (folder headers, the empty tab area, the space label) would otherwise swallow
@@ -298,11 +387,26 @@ html[data-tabbar="side"] .tab-button .tab-title { font-size: 13px; }
 /* Active tab: a soft filled pill — no accent bar. */
 html[data-tabbar="side"] .tab-button.active {
   color: var(--text);
-  background: var(--surface-2, var(--surface));
+  background:
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--space, var(--accent)) 14%, transparent),
+      transparent 60%),
+    var(--surface-2, var(--surface));
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent),
     var(--ring),
     var(--shadow-1);
+}
+/* A short accent edge on the active row — the one place the space colour is
+   fully saturated, so the eye lands on it immediately.
+   On ::after, not ::before: ::before is the icon-column spacer that keeps rows
+   without a favicon aligned, and doubling up turned the edge into a block. */
+html[data-tabbar="side"] .tab-button.active::after {
+  content: ''; position: absolute; left: 0; top: 50%;
+  width: 3px; height: 16px; margin-top: -8px;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  background: var(--space, var(--accent));
+  pointer-events: none;
 }
 html[data-tabbar="side"] .tab-button.active .tab-title { font-weight: 600; }
 /* Split view: both on-screen tabs read as soft pills; the focused one is a touch
@@ -507,12 +611,27 @@ html[data-tabbar="side"] .essentials:empty { display: none; }
 /* Tabs not in the active workspace are hidden from the strip. */
 .tab-button.ws-hidden { display: none !important; }
 
-/* Compact mode: collapse the sidebar; the page (native view) goes full-bleed. */
-html[data-tabbar="side"][data-compact="on"] body { grid-template-columns: 0 minmax(0, 1fr); }
+/* Compact mode: the tab rail collapses, and the rail's head becomes a slim
+   floating strip across the top of the page column — the address field is the
+   one control that can never go away with the sidebar. */
+html[data-tabbar="side"][data-compact="on"] body {
+  grid-template-columns: 0 minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
 html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
+html[data-tabbar="side"][data-compact="on"] #utility-bar {
+  grid-column: 2; grid-row: 1;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "nav compact field actions";
+  padding: var(--sp-2) var(--sp-4);
+  padding-left: 84px;                      /* macOS traffic lights */
+}
+html[data-tabbar="side"][data-compact="on"] .omnibox {
+  max-width: 620px; margin: 0 auto;
+}
+html[data-tabbar="side"][data-compact="on"] #content-area { grid-row: 2; }
 /* The utility bar now runs the full width in side mode, so on macOS the native
    traffic lights sit over its left end in every mode — always reserve them. */
-html[data-platform="darwin"][data-tabbar="side"] #utility-bar { padding-left: 84px; }
 
 /* Icon rail: drag the divider narrow to collapse tab rows to favicons only
    (Arc). Labels, close buttons and the "New Tab" caption fall away; every

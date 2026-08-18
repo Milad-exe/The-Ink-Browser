@@ -855,6 +855,9 @@ class Tabs {
     static MAX_RESTORED_HISTORY = 25; // back/forward entries kept per tab in the session file
     // Glance geometry lives in features/tabs/glance.js with its methods.
     static UTILITY_BAR_H = 44;
+    // Compact mode's floating head (the rail's head, laid out across the top).
+    // Matches #utility-bar in Browser/styles.css under [data-compact="on"].
+    static RAIL_HEAD_H = 42;
     static TAB_BAR_H = 40;
     static BAR_GAP = 2; // hairline between the chrome and the page card
 
@@ -877,7 +880,14 @@ class Tabs {
         // Sidebar mode: tabs live in a left column, so the page starts after it
         // and only the utility bar (+ optional bookmark bar) sits above.
         if ((this.persistence?.get('tabBarSide') ?? 'side') !== 'top') {
-            const yOffset = Tabs.UTILITY_BAR_H + Tabs.BAR_GAP + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
+            // Single-surface chrome: the toolbar lives INSIDE the sidebar, so
+            // nothing sits above the page — it runs the full height of the
+            // window beside the rail. (Browser/styles.css mirrors this.)
+            //
+            // Compact mode is the exception: the rail collapses and its head
+            // becomes a slim strip across the top, so the page starts below it.
+            const yOffset = Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0)
+                + (this.sidebarCompact ? Tabs.RAIL_HEAD_H : 0);
             // Compact mode: the sidebar is hidden, so the page spans full width.
             const leftInset = this.sidebarCompact ? pad : this.sidebarWidth;
             let width = contentBounds.width - leftInset - pad - rightInset;
