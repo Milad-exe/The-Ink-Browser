@@ -1,0 +1,165 @@
+/* renderer/styles/page.css
+ *
+ * What an internal PAGE is — History, Bookmarks, Settings, Reader.
+ *
+ * These load inside a tab, so they sit exactly where a website would: inside the
+ * page card the chrome draws. They should therefore share that card's ground
+ * (`--page`) and the browser's own type scale, and they should look like each
+ * other. They didn't: History and Bookmarks were a translucent grey wash with a
+ * darker block of rows floating in it (elevation inverted — a card DARKER than
+ * its page), Settings was a third grey again, and each used its own type sizes.
+ *
+ * Structure here, specifics in the page's own stylesheet:
+ *   .page            the ground
+ *   .page-column     the centred reading column
+ *   .page-head       title row, with room for actions on the right
+ *   .page-search     the filter field these pages all need
+ *   .card            a group of rows (raised from the page, never sunk into it)
+ *   .list-row        favicon + title + meta + hover action
+ *   .page-empty      the "nothing here yet" state
+ */
+@layer components {
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  .page {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--page);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: var(--fs-body);
+    letter-spacing: var(--tracking);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page-column {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: var(--sp-8) var(--sp-7) calc(var(--sp-8) * 2);
+  }
+
+  /* ── Head ─────────────────────────────────────────────────────────────────
+     A page title, not a banner: same weight as a section heading elsewhere in
+     the browser, with actions sharing its baseline. */
+  .page-head {
+    display: flex; align-items: center; gap: var(--sp-5);
+    margin-bottom: var(--sp-6);
+  }
+  .page-head h1 {
+    margin: 0; flex: 1; min-width: 0;
+    font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .page-head .count {
+    font-family: var(--mono); font-size: var(--fs-micro);
+    color: var(--text-3); letter-spacing: 0.04em;
+  }
+
+  .page-search {
+    display: flex; align-items: center; gap: var(--sp-4);
+    height: var(--field-h); padding: 0 var(--sp-5);
+    margin-bottom: var(--sp-6);
+    background: color-mix(in srgb, var(--bg) 70%, transparent);
+    border-radius: var(--r-md); box-shadow: var(--ring);
+    transition: background var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+  }
+  .page-search:focus-within {
+    background: var(--bg);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+      0 0 0 3px var(--accent-wash);
+  }
+  .page-search svg { width: var(--icon); height: var(--icon); color: var(--text-3); flex-shrink: 0; }
+  .page-search input {
+    flex: 1; min-width: 0; height: 100%;
+    border: none; background: transparent; outline: none;
+    color: var(--text); font-family: var(--font); font-size: var(--fs-body);
+    letter-spacing: var(--tracking);
+  }
+  .page-search input::placeholder { color: var(--text-3); }
+
+  /* ── Groups + rows ────────────────────────────────────────────────────────
+     A card is RAISED from the page (surface over page), which is the one rule
+     these screens were getting backwards. */
+  .card {
+    background: var(--surface);
+    border-radius: var(--r-lg);
+    box-shadow: var(--ring), var(--shadow-1);
+    overflow: hidden;
+    margin-bottom: var(--sp-5);
+  }
+  .group-label {
+    padding: var(--sp-5) var(--sp-2) var(--sp-3);
+    font-size: var(--fs-micro); font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--text-3);
+  }
+
+  .list-row {
+    display: flex; align-items: center; gap: var(--sp-4);
+    min-height: 44px; padding: var(--sp-2) var(--sp-4);
+    color: var(--text); cursor: pointer;
+    transition: background var(--dur-1) var(--ease);
+    position: relative;
+  }
+  .list-row + .list-row::before {
+    content: ''; position: absolute; left: 46px; right: 0; top: 0; height: 1px;
+    background: color-mix(in srgb, var(--border) 60%, transparent);
+  }
+  .list-row:hover { background: var(--hover); }
+  .list-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .list-row .icon,
+  .list-row .icon-fallback {
+    width: var(--icon); height: var(--icon); flex: 0 0 var(--icon);
+    border-radius: var(--r-xs); object-fit: contain;
+  }
+  .list-row .icon-fallback {
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text-3); font-size: 10px; font-weight: 700;
+  }
+  .list-row .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .list-row .title {
+    font-size: var(--fs-body); font-weight: 500; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .list-row .sub {
+    font-size: var(--fs-small); color: var(--text-3);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .list-row .meta {
+    flex-shrink: 0; font-family: var(--mono); font-size: var(--fs-micro);
+    color: var(--text-3); letter-spacing: 0.02em;
+  }
+  /* Row actions appear on hover — always-visible × buttons make a list noisy. */
+  .list-row .row-action {
+    flex-shrink: 0; width: 24px; height: 24px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    border: none; border-radius: var(--r-sm); background: transparent;
+    color: var(--text-3); cursor: pointer; opacity: 0;
+    transition: opacity var(--dur-1) var(--ease), background var(--dur-1) var(--ease),
+                color var(--dur-1) var(--ease);
+  }
+  .list-row:hover .row-action,
+  .list-row:focus-within .row-action { opacity: 1; }
+  .list-row .row-action:hover { background: var(--hover); color: var(--danger); }
+
+  .page-empty {
+    padding: calc(var(--sp-8) * 1.5) var(--sp-5);
+    text-align: center; color: var(--text-3); font-size: var(--fs-body);
+  }
+  .page-empty strong { display: block; color: var(--text-2); font-weight: 600; margin-bottom: var(--sp-2); }
+
+  /* Buttons shared by the internal pages. */
+  .page-btn {
+    height: var(--control-h); padding: 0 var(--sp-5);
+    border: none; border-radius: var(--r-md);
+    background: transparent; box-shadow: var(--ring-2);
+    color: var(--text-2); font-family: var(--font); font-size: var(--fs-small);
+    font-weight: 600; cursor: pointer;
+    transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+  }
+  .page-btn:hover { background: var(--hover); color: var(--text); }
+  .page-btn.danger:hover { color: var(--danger); }
+}

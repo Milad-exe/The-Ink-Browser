@@ -28,9 +28,9 @@ body {
 
 #find-input {
   width: 100%; border: 1px solid var(--border-2); outline: none;
-  font-size: 12.5px; font-family: inherit; padding: 8px 11px;
+  font-size: var(--fs-body); font-family: inherit; padding: 8px 11px;
   background: var(--bg); color: var(--text);
-  border-radius: var(--radius); transition: border-color 0.14s, box-shadow 0.14s;
+  border-radius: var(--radius); transition: border-color var(--dur-1) var(--ease), box-shadow 0.14s;
 }
 #find-input::placeholder { color: var(--text-3); }
 #find-input:focus { border-color: color-mix(in srgb, var(--accent) 50%, var(--border-2)); }
@@ -44,9 +44,9 @@ body {
 .find-btn {
   background: transparent; border: 1px solid var(--border-2);
   color: var(--text-2); cursor: pointer; padding: 5px 8px; border-radius: var(--radius);
-  font-size: 11px; font-family: inherit;
+  font-size: var(--fs-micro); font-family: inherit;
   display: flex; align-items: center; justify-content: center;
-  min-width: 26px; height: 26px; transition: color 0.1s, background 0.1s, border-color 0.1s;
+  min-width: 26px; height: 26px; transition: color var(--dur-1) var(--ease), background 0.1s, border-color 0.1s;
 }
 .find-btn:hover { color: var(--text); background: var(--active-bg); border-color: var(--border-2); }
 .find-btn:active { background: var(--hover); }
@@ -54,14 +54,14 @@ body {
 .find-btn:disabled:hover { color: var(--text-2); background: transparent; }
 
 .close-btn {
-  color: var(--text-3); font-size: 13px; background: transparent; border: none;
-  cursor: pointer; padding: 4px 6px; border-radius: var(--radius); transition: color 0.1s, background 0.1s;
+  color: var(--text-3); font-size: var(--fs-body); background: transparent; border: none;
+  cursor: pointer; padding: 4px 6px; border-radius: var(--radius); transition: color var(--dur-1) var(--ease), background 0.1s;
   font-family: inherit;
 }
 .close-btn:hover { color: var(--text); background: var(--active-bg); }
 
 .match-counter {
-  font-size: 11px; color: var(--text-2); margin: 0 4px; min-width: 46px;
+  font-size: var(--fs-micro); color: var(--text-2); margin: 0 4px; min-width: 46px;
   text-align: center; font-weight: 500;
   font-family: var(--mono, 'Menlo', monospace); letter-spacing: 0.04em;
 }

@@ -30,13 +30,13 @@ html, body {
 }
 
 #title {
-  font-size: 12px; font-weight: 600; color: var(--text);
+  font-size: var(--fs-small); font-weight: 600; color: var(--text);
   letter-spacing: 0.04em; text-transform: uppercase;
 }
 
 #clear-btn {
   background: none; border: none; cursor: pointer;
-  font-family: var(--font); font-size: 11.5px;
+  font-family: var(--font); font-size: var(--fs-micro);
   color: var(--text-3); padding: 2px 6px; border-radius: var(--radius);
 }
 #clear-btn:hover { color: var(--text); background: var(--hover); }
@@ -45,7 +45,7 @@ html, body {
 
 .empty {
   padding: 18px 12px; text-align: center;
-  font-size: 12px; color: var(--text-3);
+  font-size: var(--fs-small); color: var(--text-3);
 }
 
 /* Footer row, divided from the list — reveals the downloads folder, since
@@ -63,7 +63,7 @@ html, body {
   display: flex; align-items: center; gap: 10px;
   padding: 9px 10px; margin: 1px 0;
   border-radius: var(--radius);
-  cursor: default; transition: background 0.1s;
+  cursor: default; transition: background var(--dur-1) var(--ease);
 }
 .dl-item:hover { background: var(--active-bg); }
 .dl-item.completed { cursor: pointer; }
@@ -73,11 +73,11 @@ html, body {
 .dl-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 
 .dl-name {
-  font-size: 12.5px; color: var(--text); font-weight: 500;
+  font-size: var(--fs-body); color: var(--text); font-weight: 500;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-.dl-status { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+.dl-status { font-size: var(--fs-micro); color: var(--text-3); white-space: nowrap; }
 .dl-status.error { color: var(--danger); }
 
 .dl-progress {
@@ -88,7 +88,7 @@ html, body {
 .dl-progress-fill {
   height: 100%; border-radius: var(--radius);
   background: var(--text-2);
-  transition: width 0.15s linear;
+  transition: width var(--dur-1) var(--ease) linear;
 }
 
 .dl-actions { display: flex; gap: 2px; flex-shrink: 0; }

@@ -1,74 +1,168 @@
 "use strict";
-// IIFE: compiled as a classic <script>; the wrapper keeps this page's
-// top-level names out of the shared global scope.
+// Bookmarks — folders as sections, bookmarks as rows, filterable.
+//
+// The old page rendered folders and bookmarks as identical rows, so a folder
+// read as a bookmark with a missing URL, and there was no way to search.
 (() => {
     document.addEventListener('DOMContentLoaded', async () => {
-        const container = document.getElementById('container');
-        async function load() {
-            container.innerHTML = '';
-            let bookmarks = [];
-            try {
-                bookmarks = await window.browserBookmarks.getAll();
+        const listEl = document.getElementById('list');
+        const searchEl = document.getElementById('search');
+        const countEl = document.getElementById('count');
+        const i18n = window.Ink?.i18n;
+        try { i18n?.init((window.northstarSettings?.getSync() || {}).i18n || {}); i18n?.apply(document); }
+        catch (e) { window.inkLog?.debug('bookmarks', 'i18n: ' + e); }
+        // t() falls through to the key when a string is missing, so a plain
+        // `|| fallback` never fires. This one checks for that.
+        const T = (key, fallback) => {
+            const v = i18n?.t(key);
+            return (!v || v === key) ? fallback : v;
+        };
+
+        const FOLDER_SVG = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v6.3a1.7 1.7 0 0 1-1.7 1.7H4.2a1.7 1.7 0 0 1-1.7-1.7z"/></svg>';
+
+        let tree = [];
+        const load = async () => {
+            try { tree = await window.browserBookmarks.getAll() || []; }
+            catch (e) { window.inkLog?.debug('bookmarks', 'load: ' + e); tree = []; }
+        };
+
+        const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
+
+        function makeRow(entry) {
+            const row = document.createElement('div');
+            row.className = 'list-row';
+            row.tabIndex = 0;
+            row.setAttribute('role', 'link');
+
+            const host = hostOf(entry.url);
+            const fallback = document.createElement('span');
+            fallback.className = 'icon-fallback';
+            fallback.textContent = (host || '·').charAt(0).toUpperCase();
+            row.appendChild(fallback);
+            (async () => {
+                try {
+                    const data = await window.faviconCache?.get(host);
+                    if (!data) return;
+                    const img = document.createElement('img');
+                    img.className = 'icon';
+                    img.src = data;
+                    img.alt = '';
+                    fallback.replaceWith(img);
+                }
+                catch (e) { window.inkLog?.debug('bookmarks', 'favicon: ' + e); }
+            })();
+
+            const text = document.createElement('div');
+            text.className = 'text';
+            const title = document.createElement('div');
+            title.className = 'title';
+            title.textContent = entry.title || host || entry.url;
+            const sub = document.createElement('div');
+            sub.className = 'sub';
+            sub.textContent = entry.url;
+            text.append(title, sub);
+            row.appendChild(text);
+
+            const remove = document.createElement('button');
+            remove.className = 'row-action';
+            remove.title = T('bookmarks.remove', 'Remove bookmark');
+            remove.innerHTML = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+            remove.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                try {
+                    if (entry.id) await window.browserBookmarks.removeById(entry.id);
+                    else await window.browserBookmarks.remove(entry.url);
+                    await load();
+                    render(searchEl.value);
+                }
+                catch (err) { window.inkLog?.debug('bookmarks', 'remove: ' + err); }
+            });
+            row.appendChild(remove);
+
+            const open = () => {
+                if (!entry.url) return;
+                if (entry.profile && window.tab?.openInContainer)
+                    window.tab.openInContainer(entry.profile, entry.url);
+                else
+                    window.electronAPI.navigateActiveTab(entry.url);
+            };
+            row.addEventListener('click', open);
+            row.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+            });
+            return row;
+        }
+
+        function matches(entry, q) {
+            if (!q) return true;
+            return (entry.title || '').toLowerCase().includes(q) || (entry.url || '').toLowerCase().includes(q);
+        }
+
+        function section(labelText, items, isFolder) {
+            const wrap = document.createElement('section');
+            if (labelText) {
+                const label = document.createElement('div');
+                label.className = isFolder ? 'folder-label' : 'group-label';
+                if (isFolder) {
+                    const glyph = document.createElement('span');
+                    glyph.innerHTML = FOLDER_SVG;
+                    label.appendChild(glyph.firstChild);
+                }
+                label.append(labelText);
+                const n = document.createElement('span');
+                n.className = 'n';
+                n.textContent = String(items.length);
+                label.appendChild(n);
+                wrap.appendChild(label);
             }
-            catch (e) { window.inkLog?.debug('bookmarks', 'load: ' + e); }
-            if (!bookmarks.length) {
-                const msg = document.createElement('p');
-                msg.className = 'empty-msg';
-                msg.textContent = 'No bookmarks yet. Click ★ in the address bar to bookmark a page.';
-                container.appendChild(msg);
+            const card = document.createElement('div');
+            card.className = 'card';
+            items.forEach(item => card.appendChild(makeRow(item)));
+            wrap.appendChild(card);
+            return wrap;
+        }
+
+        function render(query = '') {
+            const q = query.trim().toLowerCase();
+            listEl.textContent = '';
+            const loose = tree.filter(e => e.type !== 'folder' && e.type !== 'divider' && matches(e, q));
+            const folders = tree
+                .filter(e => e.type === 'folder')
+                .map(f => ({ ...f, children: (f.children || []).filter(c => c.type !== 'divider' && matches(c, q)) }))
+                .filter(f => f.children.length || (!q && true));
+
+            const total = loose.length + folders.reduce((n, f) => n + f.children.length, 0);
+            countEl.textContent = total
+                ? (total === 1
+                    ? T('bookmarks.countOne', '1 bookmark')
+                    : T('bookmarks.count', '{n} bookmarks').replace('{n}', i18n ? i18n.number(total) : total))
+                : '';
+
+            if (!total) {
+                const empty = document.createElement('div');
+                empty.className = 'page-empty';
+                const strong = document.createElement('strong');
+                strong.textContent = q
+                    ? (T('bookmarks.noMatches', 'No matching bookmarks'))
+                    : (T('bookmarks.empty', 'No bookmarks yet'));
+                empty.append(strong, q
+                    ? (T('bookmarks.noMatchesHint', 'Try a different word.'))
+                    : (T('bookmarks.emptyHint', 'Press the ★ in the address bar to keep a page.')));
+                listEl.appendChild(empty);
                 return;
             }
-            bookmarks.forEach(entry => {
-                const row = document.createElement('div');
-                row.className = 'bookmark-entry';
-                const icon = document.createElement('img');
-                icon.className = 'bookmark-favicon';
-                icon.style.display = 'none';
-                // From the local favicon cache (visited sites) — no network fetch.
-                try {
-                    const host = new URL(entry.url).host;
-                    window.northstarSettings?.cachedFavicon?.(host).then((d) => {
-                        if (d) { icon.src = d; icon.style.display = ''; }
-                    }).catch(() => { });
-                }
-                catch (e) { window.inkLog?.debug('bookmarks', 'load: ' + e); }
-                const content = document.createElement('div');
-                content.className = 'bookmark-content';
-                const title = document.createElement('div');
-                title.className = 'bookmark-title';
-                title.textContent = entry.title || entry.url;
-                const url = document.createElement('div');
-                url.className = 'bookmark-url';
-                url.textContent = entry.url;
-                content.appendChild(title);
-                content.appendChild(url);
-                const removeBtn = document.createElement('button');
-                removeBtn.className = 'bookmark-remove';
-                removeBtn.title = 'Remove bookmark';
-                removeBtn.textContent = '×';
-                removeBtn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    await window.browserBookmarks.remove(entry.url);
-                    row.remove();
-                    if (!container.querySelector('.bookmark-entry'))
-                        load();
-                });
-                row.appendChild(icon);
-                row.appendChild(content);
-                row.appendChild(removeBtn);
-                row.addEventListener('click', () => {
-                    window.electronAPI.navigateActiveTab(entry.url);
-                });
-                row.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    window.browserBookmarks.showContextMenu(entry.url);
-                });
-                container.appendChild(row);
-            });
+
+            if (loose.length)
+                listEl.appendChild(section(null, loose, false));
+            for (const folder of folders) {
+                if (!folder.children.length) continue;
+                listEl.appendChild(section(folder.title || 'Folder', folder.children, true));
+            }
         }
-        window.browserBookmarks.onChanged(() => {
-            load();
-        });
+
+        searchEl.addEventListener('input', () => render(searchEl.value));
+        window.browserBookmarks.onChanged?.(async () => { await load(); render(searchEl.value); });
         await load();
+        render();
     });
 })();

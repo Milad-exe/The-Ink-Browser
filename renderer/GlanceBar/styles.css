@@ -28,7 +28,7 @@
         background: var(--surface);
         color: var(--text-2);
         cursor: pointer;
-        transition: background 0.12s, color 0.12s;
+        transition: background var(--dur-1) var(--ease), color 0.12s;
         box-shadow: 0 2px 8px rgba(8, 10, 20, 0.28);
     }
 

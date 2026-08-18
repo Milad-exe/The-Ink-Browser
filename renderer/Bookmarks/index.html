@@ -1,20 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none';" />
   <title>Bookmarks</title>
   <link rel="stylesheet" href="../styles/ui.css">
+  <link rel="stylesheet" href="../styles/page.css">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-  <div class="page">
-    <div class="header">
-      <h1>Bookmarks</h1>
+<body class="page">
+  <div class="page-column">
+    <div class="page-head">
+      <h1 data-i18n="bookmarks.title">Bookmarks</h1>
+      <span class="count" id="count"></span>
     </div>
-    <div id="container"></div>
+
+    <label class="page-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+      </svg>
+      <input id="search" type="text" placeholder="Search bookmarks" data-i18n-placeholder="bookmarks.search"
+             autocomplete="off" spellcheck="false">
+    </label>
+
+    <div id="list"></div>
   </div>
+  <script src="../lib/i18n.js"></script>
   <script src="bookmarks.js"></script>
 </body>
 </html>

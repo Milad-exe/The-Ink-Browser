@@ -10,7 +10,7 @@ body {
   margin: 0; padding: 4px;
   font-family: var(--font);
   background: transparent;
-  font-size: 13px; color: var(--text);
+  font-size: var(--fs-body); color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -24,7 +24,7 @@ body {
 
 h3 {
   margin: 0;
-  font-size: 11px; font-weight: 600;
+  font-size: var(--fs-micro); font-weight: 600;
   letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--text-3);
   padding-bottom: 10px;
@@ -41,12 +41,12 @@ h3 {
 
 .field input {
   padding: 8px 10px;
-  font-family: var(--font); font-size: 12.5px;
+  font-family: var(--font); font-size: var(--fs-body);
   border: 1px solid var(--border-2);
   background: var(--bg);
   color: var(--text);
   border-radius: var(--radius); outline: none;
-  transition: border-color 0.14s, box-shadow 0.14s;
+  transition: border-color var(--dur-1) var(--ease), box-shadow 0.14s;
 }
 .field input:focus { border-color: var(--text-3); }
 
@@ -57,9 +57,9 @@ button {
   background: transparent;
   border: 1px solid var(--border-2);
   border-radius: var(--radius);
-  font-family: var(--font); font-size: 12px; font-weight: 500;
+  font-family: var(--font); font-size: var(--fs-small); font-weight: 500;
   color: var(--text-2); cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition: background var(--dur-1) var(--ease), color 0.1s;
 }
 button:hover { background: var(--active-bg); color: var(--text); }
 button:active { background: var(--hover); }

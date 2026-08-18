@@ -406,7 +406,14 @@ exposeInternal("menu", {
 exposeInternal("browserHistory", {
     get: () => ipcRenderer.invoke('history-get'),
     search: (query, limit) => ipcRenderer.invoke('history-search', query, limit),
-    remove: (url, timestamp) => ipcRenderer.invoke('remove-history-entry', url, timestamp)
+    remove: (url, timestamp) => ipcRenderer.invoke('remove-history-entry', url, timestamp),
+    // The history page's "Clear history" — same handler Settings uses.
+    clear: () => ipcRenderer.invoke('settings-clear-history'),
+});
+// Cached favicons for the internal list pages (History, Bookmarks): the letter
+// block shows until this resolves, and stays for sites that have none.
+exposeInternal('faviconCache', {
+    get: (host) => ipcRenderer.invoke('favicon-cached', host),
 });
 // Suggestions overlay controls from the main renderer
 exposeInternal('suggestions', {

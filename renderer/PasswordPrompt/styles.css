@@ -13,20 +13,20 @@ html, body { margin: 0; padding: 0; background: transparent; font-family: var(--
   border-radius: var(--radius);
 }
 #head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-#title { font-size: 13px; font-weight: 600; color: var(--text); }
+#title { font-size: var(--fs-body); font-weight: 600; color: var(--text); }
 #close {
   background: none; border: none; color: var(--text-3); cursor: pointer;
-  font-size: 13px; width: 22px; height: 22px; border-radius: var(--radius);
+  font-size: var(--fs-body); width: 22px; height: 22px; border-radius: var(--radius);
 }
 #close:hover { background: var(--hover); color: var(--text); }
 
 #cred { margin-bottom: 14px; }
-#site { font-size: 12.5px; color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#user { font-size: 12px; color: var(--text-3); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#site { font-size: var(--fs-body); color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#user { font-size: var(--fs-small); color: var(--text-3); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 #actions { display: flex; justify-content: flex-end; gap: 8px; }
 button.btn-primary, button.btn-ghost {
-  font-family: var(--font); font-size: 12px; font-weight: 500;
+  font-family: var(--font); font-size: var(--fs-small); font-weight: 500;
   padding: 7px 16px; border-radius: var(--radius); cursor: pointer;
   letter-spacing: 0.03em;
 }
