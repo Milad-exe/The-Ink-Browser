@@ -20,7 +20,7 @@
     background: var(--surface);
     border-radius: var(--r-lg);
     /* The ring does the work a border used to: no layout, crisp at any DPR. */
-    box-shadow: var(--ring-2), var(--shadow-3);
+    box-shadow: var(--ring-2), var(--shadow-pop);
     overflow: hidden;
     font-family: var(--font);
     -webkit-font-smoothing: antialiased;

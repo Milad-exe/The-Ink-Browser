@@ -3,6 +3,13 @@
 // platform's own notation. Everything else this page used to do (greeting,
 // clock, its own search field) belongs to the palette now.
 (() => {
+    // file:// pages get the settings bridge, so the catalogue is available
+    // synchronously — the same init the error/crash pages do.
+    try {
+        window.Ink.i18n.init((window.northstarSettings?.getSync() || {}).i18n || {});
+        window.Ink.i18n.apply(document);
+    }
+    catch (e) { window.inkLog?.debug('newtab', 'i18n init failed', e); }
     const hint = document.getElementById('hint');
     if (!hint)
         return;

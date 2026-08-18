@@ -29,7 +29,7 @@
         color: var(--text-2);
         cursor: pointer;
         transition: background var(--dur-1) var(--ease), color 0.12s;
-        box-shadow: 0 2px 8px rgba(8, 10, 20, 0.28);
+        box-shadow: var(--shadow-pop);
     }
 
     #bar button:hover {

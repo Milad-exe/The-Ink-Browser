@@ -28,7 +28,7 @@ body {
      border, and the shared shadow — this used to be a flat bordered box while
      the palette next to it had a 24px shadow. */
   border-radius: var(--r-lg);
-  box-shadow: var(--ring-2), var(--shadow-3);
+  box-shadow: var(--ring-2), var(--shadow-pop);
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
 }

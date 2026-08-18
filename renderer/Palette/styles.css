@@ -26,7 +26,7 @@ html, body {
   width: min(600px, 72vw);
   background: color-mix(in srgb, var(--surface) 96%, transparent);
   border-radius: var(--r-xl);
-  box-shadow: var(--ring-2), var(--shadow-3);
+  box-shadow: var(--ring-2), var(--shadow-pop);
   overflow: hidden;
   /* A short rise on open: enough to register as arriving, short enough that it
      never delays typing. */

@@ -856,7 +856,9 @@ class Tabs {
     // Glance geometry lives in features/tabs/glance.js with its methods.
     static UTILITY_BAR_H = 44;
     static TAB_BAR_H = 40;
-    static BAR_GAP = 2; // hairline between the chrome and the page card
+    // The page card is inset from the shell by SHELL_PAD on every side — top
+    // included. (Browser/styles.css mirrors this with margin on #content-area;
+    // an unmatched gap here showed as a sliver of chrome above the page.)
 
     // 0 while a video (or the OS) is truly fullscreen — the page must be
     // edge-to-edge and square there; otherwise the rounded floating card.
@@ -877,7 +879,7 @@ class Tabs {
         // Sidebar mode: tabs live in a left column, so the page starts after it
         // and only the utility bar (+ optional bookmark bar) sits above.
         if ((this.persistence?.get('tabBarSide') ?? 'side') !== 'top') {
-            const yOffset = Tabs.UTILITY_BAR_H + Tabs.BAR_GAP + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
+            const yOffset = Tabs.UTILITY_BAR_H + Tabs.SHELL_PAD + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
             // Compact mode: the sidebar is hidden, so the page spans full width.
             const leftInset = this.sidebarCompact ? pad : this.sidebarWidth;
             let width = contentBounds.width - leftInset - pad - rightInset;
@@ -890,7 +892,7 @@ class Tabs {
         }
         // shell top inset (see body padding-top in Browser/styles.css) +
         // tab-bar + utility-bar + optional bookmark-bar (30px)
-        const yOffset = Tabs.TAB_BAR_H + Tabs.UTILITY_BAR_H + Tabs.BAR_GAP
+        const yOffset = Tabs.TAB_BAR_H + Tabs.UTILITY_BAR_H + Tabs.SHELL_PAD
             + Tabs.SHELL_TOP + (this.bookmarkBarHeight || 0);
         let width = contentBounds.width - pad * 2 - rightInset;
         let height = contentBounds.height - yOffset - pad;

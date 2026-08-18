@@ -18,7 +18,7 @@ body {
   border: 1px solid var(--border-2);
   border-radius: var(--radius);
   padding: 13px 14px 12px;
-  box-shadow: var(--ring-2), var(--shadow-3);
+  box-shadow: var(--ring-2), var(--shadow-pop);
 }
 
 /* ── Header: icon + question ── */

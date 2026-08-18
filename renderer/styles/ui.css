@@ -806,12 +806,15 @@ html[data-private-window="true"], html[data-private-tab="true"] {
   --fs-lg:    15px;   /* dialog titles */
   --tracking: -0.01em;
 
-  /* Elevation — layered and low-alpha; a single hard shadow reads cheap. */
-  --shadow-1: 0 1px 2px rgba(0,0,0,0.16);
-  --shadow-2: 0 2px 8px rgba(0,0,0,0.20), 0 1px 2px rgba(0,0,0,0.14);
-  --shadow-3: 0 16px 40px rgba(0,0,0,0.36), 0 2px 10px rgba(0,0,0,0.22);
-  /* Hairline: a real half-pixel ring on retina, drawn as a shadow so it never
-     takes part in layout the way a border does. */
+  /* Elevation. A shadow means "this floats above the page" — a menu, the
+     palette, a prompt. Anything embedded in the chrome or in a page (the page
+     card, the active tab, a settings card, a list) gets a hairline and a fill
+     instead: stacking soft shadows on flat furniture is what makes an interface
+     look padded rather than precise.
+       --shadow-pop  the only elevation, for true overlays
+       --ring        a real half-pixel hairline, drawn as a shadow so it never
+                     takes part in layout the way a border does */
+  --shadow-pop: 0 10px 30px rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.18);
   --ring: inset 0 0 0 0.5px var(--border);
   --ring-2: inset 0 0 0 0.5px var(--border-2);
 
@@ -829,7 +832,5 @@ html[data-private-window="true"], html[data-private-tab="true"] {
 /* Light themes need less shadow: the same alpha that reads as depth on a dark
    shell reads as dirt on a pale one. */
 html[data-theme="porcelain"], html[data-theme="dune"] {
-  --shadow-1: 0 1px 2px rgba(30,35,60,0.08);
-  --shadow-2: 0 2px 8px rgba(30,35,60,0.10), 0 1px 2px rgba(30,35,60,0.06);
-  --shadow-3: 0 16px 40px rgba(30,35,60,0.16), 0 2px 10px rgba(30,35,60,0.08);
+  --shadow-pop: 0 10px 30px rgba(30,35,60,0.14), 0 2px 6px rgba(30,35,60,0.08);
 }

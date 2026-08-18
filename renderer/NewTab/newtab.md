@@ -1,55 +1,35 @@
-# src/renderer/NewTab/newtab.ts
+# renderer/NewTab/
 
 ## Purpose
 
-Renderer script for the home / new-tab page. Displays a live clock, a
-time-of-day greeting, today's date, and a search box. The clock and greeting
-update once per minute (aligned to the top of the minute).
+The surface behind a blank tab — and deliberately almost nothing. Opening a tab
+raises the palette (`ipc/palette.js`, via `Tabs.promptForBlankTab()`), so this
+page holds the space until a real page arrives instead of being a destination
+of its own. It has no search field: a second one competing with the address bar
+is what the palette replaced.
 
-The page makes **no network requests of its own** — no weather, no
-geolocation, no external fonts. It relies on the theme's system-font fallback
-and never phones home.
+It makes **no network requests** — no weather, no geolocation, no external
+fonts.
 
----
+| File | What it is |
+|---|---|
+| `index.html` | the blank surface: a faint mark and one hint line |
+| `private.html` | the same surface with violet light and a PRIVATE marker |
+| `styles.css` | shared by both; `.rest` / `.mark` / `.hint`, plus the leave fade |
+| `newtab.js` | shared by both; localises the page and writes the hint |
 
-## Module-level Constants
+## `newtab.js`
 
-| Constant | Type | Purpose |
-|---|---|---|
-| `DAYS` | `string[]` | Uppercase weekday names, indexed by `Date.getDay()` |
-| `MONTHS` | `string[]` | Uppercase month names, indexed by `Date.getMonth()` |
+Both pages are `file://`, so the settings bridge is present and the i18n
+catalogue can be read synchronously: the script calls `Ink.i18n.init()` +
+`apply(document)` (which localises `data-i18n` markup, e.g. the PRIVATE pill),
+then fills `#hint` with the shortcut that reopens the palette — `⌘T` on macOS,
+`Ctrl+T` elsewhere — through `newtab.hint` / `newtab.hintTail`. Strings fall
+back to the English already in the markup if no catalogue is available.
 
----
+## Fading out
 
-## Functions
-
-### `greetingForHour(hour)`
-Returns the greeting for the given hour: `Good night` (0–4, 22–23),
-`Good morning` (5–11), `Good afternoon` (12–17), `Good evening` (18–21).
-- **`hour`** — `number` — current hour (0–23)
-- **Returns** `string`
-
-### `pad(n)`
-Zero-pads a number to two digits.
-
-### `tick()`
-Reads the current time and updates `#time-display` (`HH:MM`),
-`#greeting-text`, and `#date-display` (`DAY, MONTH DATE`).
-
-### `resolveQuery(raw)`
-Turns the search box value into a destination URL, mirroring the omnibox:
-- starts with `http(s)://` → used as-is
-- contains `.` and no spaces → prepended with `https://`
-- otherwise → `https://www.google.com/search?q=...`
-- **Returns** `string | null` (null for empty input)
-
----
-
-## Initialization (`DOMContentLoaded`)
-
-1. Calls `tick()` immediately, then schedules it aligned to the next minute
-   boundary and every 60 s thereafter.
-2. Wires the `#search-form` submit handler → `resolveQuery()` →
-   `window.location.href`.
-3. Registers a `window.electronAPI.windowClick` forwarder so clicks on the
-   page dismiss any open chrome overlay (menu, prompts).
+Chromium keeps the old document painted until the next one commits, so
+`features/tabs.js` adds `html.leaving` when a real navigation starts; the CSS
+fades `.rest` out over 140 ms rather than letting the blank surface sit there
+for the whole network wait.
