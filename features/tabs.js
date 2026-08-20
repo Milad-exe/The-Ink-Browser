@@ -212,7 +212,7 @@ class Tabs {
         this.isPrivateWindow = options?.private ?? false;
         // Live sidebar width (px) — drag-resizable, persisted. 56 = collapsed
         // icon rail; otherwise clamped to [180, 460] (see clampW in ipc/tabs.js).
-        const _sw = Math.round(Number(this.persistence?.get('sidebarWidth')) || 232);
+        const _sw = Math.round(Number(this.persistence?.get('sidebarWidth')) || Tabs.SIDEBAR_W);
         this.sidebarWidth = _sw < 132 ? 56 : Math.max(180, Math.min(460, _sw));
         this.sidePanelWidth = 0; // set while an extension side panel is docked
         // Which workspace/profile this window is currently browsing as ('1' =
@@ -841,9 +841,9 @@ class Tabs {
     // Browser/styles.css). The page floats in a rounded card on a tinted shell
     // instead of filling the window edge-to-edge.
     static SHELL_PAD = 8;
-    static PAGE_RADIUS = 10;
+    static PAGE_RADIUS = 12;
     // Width of the left tab sidebar (tabBarSide: 'side').
-    static SIDEBAR_W = 240;
+    static SIDEBAR_W = 256;
     static SIDEBAR_MAX = 460; // resize clamp (min 180)
     // Shell inset above the tab strip (matches body padding-top in
     // Browser/styles.css) so the space above the tabs matches the space below.
@@ -855,8 +855,8 @@ class Tabs {
     // Split-view geometry lives in features/tabs/split.js with its methods.
     static MAX_RESTORED_HISTORY = 25; // back/forward entries kept per tab in the session file
     // Glance geometry lives in features/tabs/glance.js with its methods.
-    static UTILITY_BAR_H = 44;
-    static TAB_BAR_H = 40;
+    static UTILITY_BAR_H = 48;
+    static TAB_BAR_H = 44;
     // The page card is inset from the shell by SHELL_PAD on every side — top
     // included. (Browser/styles.css mirrors this with margin on #content-area;
     // an unmatched gap here showed as a sliver of chrome above the page.)

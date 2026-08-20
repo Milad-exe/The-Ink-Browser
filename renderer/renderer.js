@@ -1395,11 +1395,11 @@
         }
         function sideTabs() { return document.documentElement.dataset.tabbar !== 'top'; }
         function initTabBarSide() {
-            let mode = 'side', width = 232;
+            let mode = 'side', width = 256;
             try {
                 const s = window.northstarSettings.getSync();
                 mode = (s.tabBarSide ?? 'side');
-                width = snapSidebar(Number(s.sidebarWidth) || 232);
+                width = snapSidebar(Number(s.sidebarWidth) || 256);
             }
             catch (e) { window.inkLog?.debug('renderer', 'initTabBarSide: ' + e); }
             document.documentElement.dataset.tabbar = mode === 'top' ? 'top' : 'side';
@@ -1442,7 +1442,7 @@
             const handle = document.getElementById('sidebar-resizer');
             if (!handle)
                 return;
-            let dragging = false, raf = null, pending = 232, pid = null;
+            let dragging = false, raf = null, pending = 256, pid = null;
             const clamp = snapSidebar;
             handle.addEventListener('pointerdown', (e) => {
                 if (sideTabs() === false)

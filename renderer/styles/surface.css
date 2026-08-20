@@ -47,7 +47,7 @@
 
   /* ── Rows ───────────────────────────────────────────────────────────────── */
   .surface-row {
-    display: flex; align-items: center; gap: var(--sp-4);
+    display: flex; align-items: center; gap: var(--sp-5);
     width: 100%; min-height: var(--row-h);
     padding: 0 var(--sp-4); border: none; border-radius: var(--r-md);
     background: transparent; color: var(--text);
@@ -103,14 +103,14 @@
      (close, clear) hard right. Uppercase mono headers made small panels read
      like system dialogs. */
   .surface-head {
-    display: flex; align-items: center; gap: var(--sp-4);
+    display: flex; align-items: center; gap: var(--sp-5);
     height: var(--bar-h); flex-shrink: 0;
-    padding: 0 var(--sp-3) 0 var(--sp-5);
+    padding: 0 var(--sp-4) 0 var(--sp-5);
     border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   }
   .surface-title {
     flex: 1; min-width: 0;
-    font-size: var(--fs-body); font-weight: 600; letter-spacing: var(--tracking);
+    font-size: var(--fs-lg); font-weight: 600; letter-spacing: var(--tracking);
     color: var(--text);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
@@ -118,7 +118,7 @@
   /* One action, full width, reading as part of the panel rather than as a
      button dropped into it. */
   .surface-foot {
-    display: flex; align-items: center; gap: var(--sp-4);
+    display: flex; align-items: center; gap: var(--sp-5);
     width: 100%; height: var(--row-h); flex-shrink: 0;
     margin-top: var(--sp-2); padding: 0 var(--sp-5);
     border: none; border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);

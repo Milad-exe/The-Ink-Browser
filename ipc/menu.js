@@ -14,7 +14,7 @@ const MENU_WIDTH = W_SM;
 // Rows (12 x --row-h) + the zoom row + four separators + the card's own
 // padding. Measured from the rendered card rather than guessed: an oversized
 // menu window is invisible but still swallows clicks below the card.
-const MENU_HEIGHT = 468;
+const MENU_HEIGHT = 520; // 12 rows + the zoom row + separators, at --row-h
 // (12 rows + zoom + separators; adding a row without raising this clips the menu)
 function register(ipcMain, { wm }) {
     // ── Open ─────────────────────────────────────────────────────────────────

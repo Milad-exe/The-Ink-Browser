@@ -18,7 +18,7 @@ body {
 
 /* Row icons sit back until the row is the one you mean. */
 .menu-row { color: var(--text-2); }
-.menu-row svg { width: var(--icon); height: var(--icon); flex-shrink: 0; opacity: 0.75; }
+.menu-row svg { width: var(--icon); height: var(--icon); flex-shrink: 0; opacity: 0.8; }
 .menu-row:hover { color: var(--text); }
 .menu-row:hover svg { opacity: 1; }
 

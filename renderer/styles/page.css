@@ -52,11 +52,11 @@
      the browser, with actions sharing its baseline. */
   .page-head {
     display: flex; align-items: center; gap: var(--sp-5);
-    margin-bottom: var(--sp-6);
+    margin-bottom: var(--sp-7);
   }
   .page-head h1 {
     margin: 0; flex: 1; min-width: 0;
-    font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
+    font-size: 26px; font-weight: 700; letter-spacing: -0.025em;
     color: var(--text);
   }
   .page-head .count {
@@ -65,7 +65,7 @@
   }
 
   .page-search {
-    display: flex; align-items: center; gap: var(--sp-4);
+    display: flex; align-items: center; gap: var(--sp-5);
     height: var(--field-h); padding: 0 var(--sp-6);
     margin-bottom: var(--sp-6);
     background: color-mix(in srgb, var(--bg) 70%, transparent);
@@ -104,8 +104,8 @@
   }
 
   .list-row {
-    display: flex; align-items: center; gap: var(--sp-4);
-    min-height: 44px; padding: var(--sp-2) var(--sp-6);
+    display: flex; align-items: center; gap: var(--sp-5);
+    min-height: 52px; padding: var(--sp-3) var(--sp-6);
     color: var(--text); cursor: pointer;
     transition: background var(--dur-1) var(--ease);
     position: relative;

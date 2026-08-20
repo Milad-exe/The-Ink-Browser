@@ -12,11 +12,11 @@ const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
 const { PANEL_RADIUS } = require('../features/overlay-bounds');
-const ITEM_HEIGHT = 34; // --row-h (32) + the row's 1px margins (Suggestions/styles.css)
+const ITEM_HEIGHT = 38; // --row-h (36) + the row's 1px margins (Suggestions/styles.css)
 const LIST_CHROME = 16; // body padding (8) + the card's own padding (8)
 // Fits the full capped list (≤8 rows: base + ≤4 links + ≤3 search) without
-// scrolling. 8 * 34 + 16 = 288; the caps live in renderer.js updateSuggestions.
-const MAX_HEIGHT = 296;
+// scrolling. 8 * 38 + 16 = 320; the caps live in renderer.js updateSuggestions.
+const MAX_HEIGHT = 328;
 /** Create (once) and load the overlay view for a window. Resolves when loaded. */
 async function ensureView(wd) {
     if (wd.suggestions) {

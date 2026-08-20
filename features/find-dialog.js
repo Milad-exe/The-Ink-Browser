@@ -2,7 +2,7 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { resolveAppFile } = require('../app-paths');
 const { CARD_TOP, SHELL_PAD, W_MD } = require('./overlay-bounds');
 const FIND_W = W_MD;
-const FIND_H = 60; // one row: renderer/FindDialog/styles.css .find-bar + its padding
+const FIND_H = 64; // one row: renderer/FindDialog/styles.css .find-bar + its padding
 const path = require('path');
 class FindDialogManager {
     dialogs; // parentWindow webContents id → dialog

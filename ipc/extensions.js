@@ -16,11 +16,11 @@ const PANEL_WIDTH = W_MD;
 // Mirrors renderer/ExtensionsPanel/styles.css + the shared panel anatomy: a
 // --bar-h head, a --row-h foot over its divider, two-line rows, and an empty
 // state that needs more than one row's worth of room to read as a sentence.
-const HEAD_H = 44;
-const FOOT_H = 37;
-const ITEM_H = 52;
-const EMPTY_H = 96;
-const MAX_PANEL_H = 460;
+const HEAD_H = 48;
+const FOOT_H = 41;
+const ITEM_H = 58;
+const EMPTY_H = 108;
+const MAX_PANEL_H = 500;
 function boundsFor(win, anchor, count) {
     const body = count > 0 ? count * ITEM_H + 8 : EMPTY_H;
     return panelBounds(win, {

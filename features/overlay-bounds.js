@@ -17,22 +17,22 @@
  * in renderer/styles/ui.css — change one, change all three.
  */
 const SHELL_TOP = 6;   // air above the chrome        (--shell-top)
-const BAR_H = 44;      // toolbar                     (--bar-h)
+const BAR_H = 48;      // toolbar                     (--bar-h)
 const SHELL_PAD = 8;   // gutter around the page card (--shell-pad)
 
 /** The page card's top edge: where a toolbar-anchored panel starts. */
 const CARD_TOP = SHELL_TOP + BAR_H + SHELL_PAD;
 
 /** Panel corner radius — the same step as .surface-card's --r-lg. */
-const PANEL_RADIUS = 12;
+const PANEL_RADIUS = 14;
 
 /**
  * Two widths, not six. A panel is either a list of short labels (a menu, a
  * folder) or a panel with content in it (downloads, extensions, site info,
  * the prompts).
  */
-const W_SM = 260;
-const W_MD = 320;
+const W_SM = 280;
+const W_MD = 340;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, hi));
 

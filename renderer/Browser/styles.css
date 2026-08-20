@@ -205,7 +205,7 @@ html[data-tabbar="top"] .tab-button:not(.has-favicon)::before {
    offset in tabs.js getTabBounds). */
 html[data-tabbar="side"] body {
   display: grid;
-  grid-template-columns: var(--sidebar-w, 240px) minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-w, 256px) minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 /* The utility bar spans the full width at the top (as in compact mode) and the
@@ -214,7 +214,7 @@ html[data-tabbar="side"] #utility-bar { grid-column: 1 / -1; grid-row: 1; }
 html[data-tabbar="side"] #tab-bar {
   grid-column: 1; grid-row: 2 / span 2;
   flex-direction: column; align-items: stretch;
-  width: var(--sidebar-w, 240px); height: 100%;
+  width: var(--sidebar-w, 256px); height: 100%;
   /* One inset for the column; every row inside then shares --gutter for its
      own content, so favicons, labels, folder glyphs and the foot buttons all
      sit on the same left edge. That shared edge is most of what separates a
@@ -283,13 +283,13 @@ html[data-tabbar="side"] .essentials:not(:empty) { padding-bottom: 8px; margin-b
 /* Tab rows: favicon + title + hover close, Arc-style rounded cards. */
 html[data-tabbar="side"] .tab-button {
   width: 100%; min-width: 0; max-width: none; flex-shrink: 0;
-  height: var(--row-h); padding: 0 var(--sp-3) 0 var(--gutter); gap: var(--sp-4);
+  height: var(--row-h); padding: 0 var(--sp-4) 0 var(--gutter); gap: var(--sp-5);
   border-radius: var(--r-md); color: var(--text-2);
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
               box-shadow var(--dur-1) var(--ease);
 }
 html[data-tabbar="side"] .tab-button:hover:not(.active) { color: var(--text); background: var(--hover); }
-html[data-tabbar="side"] .tab-button .tab-title { font-size: 13px; }
+html[data-tabbar="side"] .tab-button .tab-title { font-size: var(--fs-body); }
 /* Active tab: a filled pill with a 2px accent edge — the one saturated mark in
    the rail, and the fastest thing to find when scanning it. The fill carries a
    hairline and nothing else; a shadow on a row that sits IN the panel reads as
@@ -371,11 +371,11 @@ html[data-tabbar="side"] .tab-button.pinned + .tab-button:not(.pinned)::before {
    column: badge in the icon column, name on the title column. */
 .space-header { display: none; }
 html[data-tabbar="side"] .space-header {
-  display: flex; align-items: center; gap: var(--sp-4);
+  display: flex; align-items: center; gap: var(--sp-5);
   flex-shrink: 0; width: 100%;
-  height: var(--row-h); padding: 0 var(--sp-3) 0 var(--gutter);
+  height: var(--row-h); padding: 0 var(--sp-4) 0 var(--gutter);
   border: none; border-radius: var(--r-md); background: transparent;
-  font-family: var(--font); font-size: 13px; font-weight: 600;
+  font-family: var(--font); font-size: var(--fs-body); font-weight: 600;
   letter-spacing: var(--tracking); color: var(--text-2);
   cursor: pointer; text-align: left;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
@@ -406,7 +406,7 @@ html[data-tabbar="side"][data-rail="on"] .space-header { display: none; }
 /* ── Folders (tab groups) ──────────────────────────────────────────────────── */
 html[data-tabbar="side"] .folder-header {
   grid-column: 1 / -1;
-  display: flex; align-items: center; gap: var(--sp-4); height: var(--row-h);
+  display: flex; align-items: center; gap: var(--sp-5); height: var(--row-h);
   padding: 0 var(--sp-3) 0 var(--gutter); border-radius: var(--r-md); cursor: pointer;
   color: var(--text-2); position: relative;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
@@ -441,7 +441,7 @@ html[data-tabbar="side"] .folder-header.drop-target {
 /* Emoji icons render as text; the default folder glyph is an inline SVG that
    picks up the row's colour, with a darker fill behind the outline. */
 .folder-header.folder-dragging { opacity: 0.55; }
-.folder-icon { font-size: 15px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; width: var(--icon); flex: 0 0 var(--icon); }
+.folder-icon { font-size: calc(var(--icon) - 2px); line-height: 1; display: inline-flex; align-items: center; justify-content: center; width: var(--icon); flex: 0 0 var(--icon); }
 .folder-icon svg {
   width: var(--icon); height: var(--icon);
   /* The glyph's body and the light along its lid. Both derive from the theme,
@@ -454,7 +454,7 @@ html[data-tabbar="side"] .folder-header.drop-target {
   --folder-fill: color-mix(in srgb, var(--text) 18%, transparent);
   --folder-sheen: color-mix(in srgb, var(--text) 34%, transparent);
 }
-.folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); font-weight: 600; }
 .folder-rename-input {
   flex: 1; min-width: 0; height: 22px; padding: 0 6px; border-radius: 6px;
   border: 1px solid var(--accent); background: var(--page); color: var(--text);
@@ -513,7 +513,7 @@ html[data-tabbar="side"] #tab-actions.after-folders {
 html[data-tabbar="side"] #new-tab-btn {
   width: 100%; height: var(--row-h); border-radius: var(--r-md);
   display: flex; justify-content: flex-start; align-items: center;
-  padding: 0 var(--sp-3) 0 var(--gutter); gap: var(--sp-4); color: var(--text-3);
+  padding: 0 var(--sp-4) 0 var(--gutter); gap: var(--sp-5); color: var(--text-3);
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 html[data-tabbar="side"] .tab-add-glyph {
@@ -522,7 +522,7 @@ html[data-tabbar="side"] .tab-add-glyph {
 }
 html[data-tabbar="side"] .tab-add-label {
   display: block; min-width: 0;
-  font-size: 13px; font-weight: 500; letter-spacing: var(--tracking);
+  font-size: var(--fs-body); font-weight: 500; letter-spacing: var(--tracking);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 html[data-tabbar="side"] #new-tab-btn:hover { color: var(--text); background: var(--hover); }
@@ -693,7 +693,7 @@ html[data-tabbar="side"] .sidebar-foot {
 }
 .sb-ws:hover { background: var(--hover); }
 .sb-ws.active { background: var(--surface); box-shadow: var(--ring); }
-.sb-ws .profile-badge { width: 20px; height: 20px; font-size: 10px; }
+.sb-ws .profile-badge { width: 22px; height: 22px; font-size: var(--fs-micro); }
 /* Inactive spaces keep their emoji but read as muted — greyed, not dropped. */
 .sb-ws:not(.active) .profile-badge { opacity: 0.45; filter: grayscale(1); }
 .sb-ws:hover .profile-badge { opacity: 1; filter: none; }
@@ -904,14 +904,14 @@ html[data-tabbar="side"] .sidebar-foot {
 
 /* Profile switcher badge: coloured circle with the profile's initial. */
 .profile-badge {
-  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  width: var(--icon); height: var(--icon); border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   background: var(--pf-color, var(--accent)); color: #fff;
   font-family: var(--mono); font-size: var(--fs-micro); font-weight: 700; line-height: 1;
   text-transform: uppercase; pointer-events: none;
 }
 /* Emoji avatar: the glyph carries the identity, no coloured fill. */
-.profile-badge.has-emoji { background: transparent; color: inherit; font-size: 15px; text-transform: none; }
+.profile-badge.has-emoji { background: transparent; color: inherit; font-size: calc(var(--icon) - 2px); text-transform: none; }
 /* Opted out of an emoji → a small coloured dot in the profile's colour. */
 .profile-badge.is-dot { background: transparent; }
 .profile-badge.is-dot::before {
@@ -946,7 +946,7 @@ html[data-tabbar="side"] .sidebar-foot {
    over that column instead. Compact mode hides the sidebar → back to the edge
    (the 8px fallback above). */
 html[data-tabbar="side"]:not([data-compact="on"]) #utility-bar {
-  --omni-left: var(--sidebar-w, 240px);
+  --omni-left: var(--sidebar-w, 256px);
 }
 .omnibox:focus-within {
   background: var(--page);

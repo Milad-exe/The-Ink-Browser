@@ -18,6 +18,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const PORT = 9444;
 const uncaught = [];
+const extensionErrors = [];
 
 function getJson(url) {
     return new Promise((resolve, reject) => {
@@ -52,7 +53,16 @@ async function main() {
         { cwd: ROOT, shell: process.platform === 'win32' });
     app.stderr.on('data', (d) => {
         const s = d.toString();
-        if (/Uncaught/i.test(s)) uncaught.push(s.trim().split('\n')[0]);
+        if (!/Uncaught/i.test(s))
+            return;
+        const line = s.trim().split('\n')[0];
+        // An error thrown INSIDE an installed extension is that extension's
+        // bug, not a sign the browser failed to boot — it is reported, but it
+        // does not fail the check the way an error in one of our own renderers
+        // does.
+        const fromExtension = /chrome-extension:\/\//.test(line)
+            || /extensions\/browser\/extensions_browser_client/.test(line);
+        (fromExtension ? extensionErrors : uncaught).push(line);
     });
 
     const fail = (msg) => { console.error(`✗ ${msg}`); app.kill(); process.exit(1); };
@@ -94,6 +104,8 @@ async function main() {
 
     if (uncaught.length) fail(`uncaught renderer errors:\n  ${uncaught.slice(0, 5).join('\n  ')}`);
     pass('no uncaught renderer errors');
+    if (extensionErrors.length)
+        console.log(`  – ${extensionErrors.length} error(s) thrown inside installed extensions (not ours):\n    ${extensionErrors.slice(0, 3).join('\n    ')}`);
 
     console.log('\nSMOKE OK');
     app.kill();

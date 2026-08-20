@@ -37,7 +37,7 @@ const DEFAULTS = {
     // Tab strip placement: 'side' (left sidebar, default) or 'top'
     tabBarSide: 'side',
     // Width of the left tab sidebar (px), drag-resizable.
-    sidebarWidth: 240,
+    sidebarWidth: 256, // Tabs.SIDEBAR_W
     // History retention: age window in days (0 = only the entry cap applies)
     // and a hard ceiling on entries.
     historyDays: 90,
