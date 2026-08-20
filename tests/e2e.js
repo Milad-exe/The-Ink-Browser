@@ -359,6 +359,46 @@ async function omniboxNavigate(page, text) {
         await sleep(400);
     }
 
+    // ── The page card's gutters ───────────────────────────────────────────────
+    // The chrome paints the card's backdrop and main positions the native view
+    // inside it. When they disagree the difference shows as a missing gutter —
+    // compact mode had none on the left, because the rule that removes it says
+    // "the sidebar provides the left gutter" and in compact mode there is no
+    // sidebar.
+    section('Page card gutters');
+    {
+        const chrome = await getChromePage(app);
+        const gutters = async () => {
+            const card = await app.evaluate(() => global.__northstarTest.wm.getPrimaryWindow().tabs.getTabBounds());
+            const win = await app.evaluate(() => global.__northstarTest.wm.getPrimaryWindow().window.getContentBounds());
+            const css = await chrome.evaluate(() => {
+                const r = document.getElementById('content-area').getBoundingClientRect();
+                return { l: Math.round(r.left), r: Math.round(r.right) };
+            });
+            return {
+                nativeRight: win.width - (card.x + card.width),
+                cssLeft: css.l, cssRight: win.width - css.r,
+                nativeLeft: card.x, agree: css.l === card.x,
+            };
+        };
+        await check('expanded: the chrome card sits exactly where the page does', async () => {
+            const g = await gutters();
+            return g.agree ? `both at ${g.nativeLeft}` : `chrome ${g.cssLeft} vs page ${g.nativeLeft}`;
+        });
+        // Through the bridge, not the button: in compact mode the toolbar
+        // collapses, so the button that got us here is no longer clickable.
+        await chrome.evaluate(() => window.tabsUI.toggleCompact());
+        await sleep(1000);
+        await check('compact: the card has the same gutter on both sides', async () => {
+            const g = await gutters();
+            return (g.cssLeft === g.cssRight && g.agree)
+                ? `left ${g.cssLeft}, right ${g.cssRight}`
+                : `left ${g.cssLeft}, right ${g.cssRight}, page at ${g.nativeLeft}`;
+        });
+        await chrome.evaluate(() => window.tabsUI.toggleCompact());
+        await sleep(800);
+    }
+
     // ── Essentials are tabs ───────────────────────────────────────────────────
     // An Essential is not a bookmark that spawns tabs: it owns one, you can
     // browse away inside it, and only "go back to its page" returns it.

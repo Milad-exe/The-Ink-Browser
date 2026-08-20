@@ -1161,8 +1161,14 @@ browser-action-list::part(badge) {
   box-shadow: var(--ring);
   position: relative; overflow: hidden;
 }
-/* Sidebar mode: the sidebar already provides the left gutter. */
+/* Sidebar mode: the sidebar already provides the left gutter — but only while
+   it is there. In compact mode its column collapses to 0 and nothing does, so
+   the card ran flush to the window edge on the left while keeping its gutter
+   on the right. The native page view was inset correctly all along
+   (getTabBounds uses SHELL_PAD when compact), so it was the backdrop behind it
+   that was 8px wide of true. */
 html[data-tabbar="side"] #content-area { margin-left: 0; }
+html[data-tabbar="side"][data-compact="on"] #content-area { margin-left: var(--shell-pad); }
 
 /* ── Pomodoro Pill ───────────────────────── */
 .pomodoro-pill {
