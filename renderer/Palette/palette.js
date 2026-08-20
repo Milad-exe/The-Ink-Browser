@@ -54,16 +54,18 @@
             t.className = 't';
             t.textContent = r.title || r.url;
             b.appendChild(t);
+            const u = document.createElement('span');
+            u.className = 'u';
+            u.textContent = r.url;
+            b.appendChild(u);
+            // The badge goes LAST so it holds a fixed right-hand column: sitting
+            // between the title and the url, it moved with every url's length.
             if (r.badge) {
                 const g = document.createElement('span');
                 g.className = 'badge';
                 g.textContent = r.badge;
                 b.appendChild(g);
             }
-            const u = document.createElement('span');
-            u.className = 'u';
-            u.textContent = r.url;
-            b.appendChild(u);
             b.addEventListener('click', () => go(r.url));
             results.appendChild(b);
         });

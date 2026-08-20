@@ -975,39 +975,47 @@ browser-action-list::part(badge) {
 #focus-btn.active { color: var(--text); }
 
 /* ── Bookmark Bar ────────────────────────── */
+/* The strip between the toolbar and the page card. Its height is one control
+   plus the gap that separates it from the card; bookmark-bar.js MEASURES it to
+   offset the page view, so the two can never drift apart. */
 .bookmark-bar {
-  display: flex; height: 34px; width: 100%;
+  display: flex; align-items: center;
+  height: calc(var(--control-h) + var(--sp-2)); width: 100%;
   background: transparent;
-  padding: 0 10px 4px; align-items: center;
+  padding: 0 var(--sp-4) var(--sp-2);
   overflow: visible; flex-shrink: 0; position: relative;
 }
 .bookmark-bar.hidden { display: none; }
-#bookmark-bar-items { display: flex; gap: 2px; align-items: center; overflow: hidden; height: 100%; flex: 1; }
+#bookmark-bar-items { display: flex; gap: var(--sp-1); align-items: center; overflow: hidden; height: 100%; flex: 1; }
 
 .bookmark-bar-item {
-  display: flex; align-items: center; gap: 6px;
-  padding: 0 10px; height: 26px;
-  border: none; background: transparent; border-radius: 8px;
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 0 var(--sp-4); height: var(--control-h);
+  border: none; background: transparent; border-radius: var(--r-md);
   cursor: pointer; font-family: var(--font); font-size: var(--fs-small); font-weight: 500;
   color: var(--text-2); white-space: nowrap; max-width: 160px;
   overflow: hidden; text-overflow: ellipsis;
-  transition: background 0.1s, color 0.1s; flex-shrink: 0;
-  margin: 0 1px; position: relative;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+  flex-shrink: 0; position: relative;
 }
 .bookmark-bar-item:hover { background: var(--hover); color: var(--text); }
-.bookmark-bar-favicon { width: 13px; height: 13px; flex-shrink: 0; border-radius: 4px; }
+.bookmark-bar-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.bookmark-bar-favicon { width: var(--icon); height: var(--icon); flex-shrink: 0; border-radius: var(--r-xs); }
 .bookmark-bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.bookmark-bar-more { font-size: 11px; font-weight: 600; padding: 0 8px; color: var(--text-3); flex-shrink: 0; }
+.bookmark-bar-more {
+  font-size: var(--fs-micro); font-weight: 600; padding: 0 var(--sp-4);
+  color: var(--text-3); flex-shrink: 0;
+}
 .bookmark-bar-more:hover { color: var(--text); }
 
-.bookmark-bar-folder { gap: 5px; }
+.bookmark-bar-folder { gap: var(--sp-3); }
 .bookmark-folder-icon { flex-shrink: 0; display: flex; align-items: center; opacity: 0.6; }
 .bookmark-bar-item:hover .bookmark-folder-icon { opacity: 0.9; }
 
 .bookmark-bar-rename-input {
-  background: var(--page); border: 1px solid var(--accent); border-radius: 6px;
-  color: var(--text); font: inherit; font-size: 11px; outline: none;
+  background: var(--page); border: 1px solid var(--accent); border-radius: var(--r-sm);
+  color: var(--text); font: inherit; font-size: var(--fs-micro); outline: none;
   padding: 0 6px; width: 100px; min-width: 40px;
 }
 

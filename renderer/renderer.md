@@ -170,7 +170,7 @@ Creates and returns the DOM element for a single top-level bookmark bar entry: a
 - **Returns:** A `<div>` or `<button>` DOM element.
 
 #### `reportChromeHeight()`
-Computes whether the bookmark bar is visible and has items, shows or hides the bar accordingly, then calls `window.electronAPI.reportChromeHeight` with either 28 (bar visible) or 0 (bar hidden) so the main process can resize the web content area.
+Computes whether the bookmark bar is visible and has items, shows or hides the bar accordingly, then calls `window.electronAPI.reportChromeHeight` with the bar's **measured** height (0 when hidden) so the main process can offset the page view. It is measured rather than hardcoded because that number and `.bookmark-bar`'s CSS height are the same fact: when they drifted apart, the page view sat above its own card.
 - **Parameters:** none
 - **Returns:** void
 

@@ -15,7 +15,9 @@ const { PANEL_RADIUS } = require('./overlay-bounds');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
-const BAR_MAXW = 760, BAR_H = 84, MARGIN = 14; // single full-width bar
+// One full-width bar, floating over the page. The margin is the shell's own
+// gutter doubled (--sp-6), not a number of its own.
+const BAR_MAXW = 760, BAR_H = 84, MARGIN = 16;
 // Reads playback state from the page. Prefers MediaSession metadata (YouTube,
 // Spotify, SoundCloud all set it) and falls back to the document title.
 const READ_STATE_JS = `(() => {

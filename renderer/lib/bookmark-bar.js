@@ -742,7 +742,11 @@
         function reportChromeHeight() {
             const showBar = bookmarkBarVisible && hasBookmarks;
             bookmarkBar.classList.toggle('hidden', !showBar);
-            window.electronAPI.reportChromeHeight(showBar ? 30 : 0); /* must match .bookmark-bar height */
+            // Measured, not hardcoded: this number offsets the page view, so a
+            // constant that drifted from .bookmark-bar's height (30 here, 34 in
+            // CSS, 28 in the docs) left the page sitting above its own card.
+            const h = showBar ? Math.round(bookmarkBar.getBoundingClientRect().height) : 0;
+            window.electronAPI.reportChromeHeight(h);
         }
         reportChromeHeight();
         async function refreshBookmarkBar() {
