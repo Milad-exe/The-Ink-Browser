@@ -107,7 +107,7 @@ async function countCookies(site, sess) {
     }
 }
 function register(ipcMain, { wm }) {
-    const sitePermissions = require('../features/site-permissions').default;
+    const sitePermissions = require('../features/site-permissions');
     const permissionPrompt = require('../features/permission-prompt');
     // Toggle open at the given anchor rect { x, y } (address-bar coords).
     ipcMain.handle('open-site-info', async (e, anchor) => {

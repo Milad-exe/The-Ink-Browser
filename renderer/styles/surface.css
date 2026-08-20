@@ -43,7 +43,7 @@
   .surface-row {
     display: flex; align-items: center; gap: var(--sp-4);
     width: 100%; min-height: var(--row-h);
-    padding: 0 var(--sp-3); border: none; border-radius: var(--r-md);
+    padding: 0 var(--sp-4); border: none; border-radius: var(--r-md);
     background: transparent; color: var(--text);
     font-family: var(--font); font-size: var(--fs-body); font-weight: 500;
     letter-spacing: var(--tracking);
@@ -172,7 +172,7 @@
     background: color-mix(in srgb, var(--border) 70%, transparent);
   }
   .surface-label {
-    padding: var(--sp-3) var(--sp-3) var(--sp-2);
+    padding: var(--sp-3) var(--sp-4) var(--sp-2);
     font-size: var(--fs-micro); font-weight: 600; letter-spacing: 0.06em;
     text-transform: uppercase; color: var(--text-3);
   }

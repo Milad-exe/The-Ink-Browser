@@ -89,15 +89,23 @@
                 control(opts, () => window.extPanel.openOptions(ext.id));
                 row.appendChild(opts);
             }
-            // A real button with a switch role: a <div> toggle is invisible to
-            // the keyboard and announces as nothing.
-            const toggle = document.createElement('button');
-            toggle.type = 'button';
-            toggle.setAttribute('role', 'switch');
-            toggle.setAttribute('aria-checked', String(!!ext.enabled));
-            toggle.className = 'ext-toggle' + (ext.enabled ? ' on' : '');
+            // The shared switch (ui.css), so an extension's on/off looks and
+            // behaves like every other switch in the browser — and unlike the
+            // <div> it replaces, the keyboard can reach and announce it.
+            const toggle = document.createElement('label');
+            toggle.className = 'toggle';
             toggle.title = ext.enabled ? T('ext.disable', 'Disable') : T('ext.enable', 'Enable');
-            control(toggle, async () => { await window.extPanel.setEnabled(ext.id, !ext.enabled); refresh(); });
+            const box = document.createElement('input');
+            box.type = 'checkbox';
+            box.checked = !!ext.enabled;
+            box.setAttribute('aria-label', ext.name);
+            const track = document.createElement('span');
+            track.className = 'switch-track';
+            toggle.append(box, track);
+            box.addEventListener('change', async () => {
+                await window.extPanel.setEnabled(ext.id, box.checked);
+                refresh();
+            });
             row.appendChild(toggle);
             const rm = document.createElement('button');
             rm.className = 'surface-icon-btn ext-remove';

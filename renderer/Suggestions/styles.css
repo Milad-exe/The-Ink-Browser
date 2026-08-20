@@ -42,7 +42,7 @@ body {
 
 .item {
   display: flex; align-items: center; gap: var(--sp-4);
-  padding: 0 var(--sp-3); margin: 1px 0;
+  padding: 0 var(--sp-4); margin: 1px 0;
   border-radius: var(--r-md);
   /* The same row height as every list in the browser (--row-h). 40px rows
      made a 6-row dropdown taller than most of the page behind it. */

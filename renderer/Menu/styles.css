@@ -35,10 +35,13 @@ body {
    and type as every other row, so it reads as one of them rather than as a
    widget parked in the menu. */
 .zoom-row {
-  display: flex; align-items: center; justify-content: space-between;
-  height: var(--row-h); padding: 0 var(--sp-3) 0 var(--sp-5);
+  display: flex; align-items: center; gap: var(--sp-4);
+  height: var(--row-h); padding: 0 var(--sp-3) 0 var(--sp-4);
 }
-.zoom-label { font-size: var(--fs-body); font-weight: 500; color: var(--text-2); }
+/* The row has no icon, but it keeps the icon column so "Zoom" starts on the
+   same left edge as every label above and below it. */
+.zoom-row::before { content: ''; width: var(--icon); flex: 0 0 var(--icon); }
+.zoom-label { flex: 1; font-size: var(--fs-body); font-weight: 500; color: var(--text-2); }
 .zoom-controls { display: flex; align-items: center; gap: var(--sp-1); }
 #zoom-reset {
   min-width: 46px; height: var(--control-h); padding: 0 var(--sp-3);

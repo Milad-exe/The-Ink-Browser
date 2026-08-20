@@ -39,30 +39,6 @@ html, body {
 .ext-pin.is-pinned { color: var(--accent); background: var(--active-bg); }
 .ext-remove:hover { color: var(--danger); }
 
-/* The toggle matches Settings (.track): rounded, and "on" is monochrome. The
-   accent is reserved for focus, the active row and live state. */
-.ext-toggle {
-  position: relative;
-  border: none; padding: 0; appearance: none; padding: 0; border: none;
-  width: 26px; height: 14px; flex-shrink: 0;
-  border-radius: var(--r-pill);
-  background: var(--hover);
-  box-shadow: var(--ring-2);
-  cursor: pointer;
-  transition: background var(--dur-1) var(--ease);
-}
-.ext-toggle::after {
-  content: '';
-  position: absolute; top: 2px; left: 2px;
-  width: 10px; height: 10px;
-  border-radius: var(--r-pill);
-  background: var(--text-3);
-  transition: transform var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
-}
-.ext-toggle.on { background: var(--text); }
-.ext-toggle.on::after { transform: translateX(12px); background: var(--bg); }
-.ext-toggle:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-wash); }
-
 /* DevTools-panel rows: a labelled group of destinations, so they read as list
    rows with a direction, not as another kind of extension. */
 .dt-row { padding-left: var(--sp-4); }
