@@ -1763,7 +1763,19 @@
                     if (btn)
                         btn.title = `Workspace: ${cur.name}`;
                     const sh = document.getElementById('space-header');
-                    if (sh) sh.textContent = cur.name || 'Space';
+                    if (sh) {
+                        const nameEl = document.getElementById('space-name');
+                        if (nameEl)
+                            nameEl.textContent = cur.name || 'Space';
+                        const badgeEl = document.getElementById('space-badge');
+                        if (badgeEl) {
+                            badgeEl.classList.toggle('has-emoji', !!cur.emoji);
+                            badgeEl.classList.toggle('is-dot', !cur.emoji);
+                            badgeEl.textContent = cur.emoji || '';
+                            badgeEl.style.setProperty('--pf-color', cur.color || '');
+                        }
+                        sh.title = cur.name || 'Space';
+                    }
                 }
                 // Avatar row: one per workspace, active one labelled.
                 if (wsRow) {
@@ -1845,6 +1857,25 @@
                     window.profiles.menu(r.left, r.bottom + 4);
                 });
             }
+            // The space pill at the top of the rail: switch spaces, or make one.
+            // The same list the foot avatars offer, but named — which is what
+            // you want when you have more spaces than you can recognise by icon.
+            document.getElementById('space-header')?.addEventListener('click', (e) => {
+                const btn = e.currentTarget;
+                const r = btn.getBoundingClientRect();
+                const rows = [];
+                for (const p of (_spacesCache || [])) {
+                    const mark = p.id === activeWorkspace ? '  ✓' : '';
+                    rows.push([`${p.emoji ? p.emoji + '  ' : ''}${p.name}${mark}`,
+                        () => { if (p.id !== activeWorkspace) window.profiles.switch(p.id); }]);
+                }
+                if (rows.length)
+                    rows.push(['sep']);
+                rows.push(['Rename this space…', () => openProfileModal(activeWorkspace)]);
+                rows.push(['New space…', () => openCreateSpace()]);
+                btn.setAttribute('aria-expanded', 'true');
+                openCtxMenu(r.left, r.bottom + 4, rows);
+            });
             // The foot "+" opens a menu rather than creating a space outright —
             // it's the create-anything affordance in the reference.
             document.getElementById('sb-add-ws')?.addEventListener('click', (e) => {
@@ -2476,7 +2507,7 @@
                     startFolderRename(h, f.id);
                 }
             });
-            h.innerHTML = '<span class="folder-chevron">▸</span><span class="folder-icon">📁</span><span class="folder-name"></span><button class="folder-del" title="Delete folder">×</button>';
+            h.innerHTML = '<span class="folder-chevron">▸</span><span class="folder-icon">📁</span><span class="folder-name"></span><span class="folder-count" aria-hidden="true"></span><button class="folder-del" title="Delete folder">×</button>';
             h.addEventListener('click', (e) => {
                 if (h.classList.contains('renaming') || e.target.closest('.folder-del')) return;
                 if (h.dataset.suppressClick) return; // a drag just ended here
@@ -2543,6 +2574,7 @@
                 const fn = _ctxPending;
                 _ctxPending = null;
                 _closeCtxMenu = null;
+                document.getElementById('space-header')?.setAttribute('aria-expanded', 'false');
                 if (fn) fn(result);
             });
         }
@@ -2766,6 +2798,7 @@
                     setFolderIcon(header.querySelector('.folder-icon'), f);
                     if (!header.classList.contains('renaming')) header.querySelector('.folder-name').textContent = f.name || 'Folder';
                     frag.appendChild(header);
+                    let count = 0;
                     for (const btn of normal) {
                         if (folderState.assign.get(+btn.dataset.index) !== f.id) continue;
                         btn.classList.add('in-folder');
@@ -2773,6 +2806,14 @@
                         if (hidden || f.collapsed) btn.classList.add('folder-collapsed');
                         frag.appendChild(btn);
                         grouped.add(btn);
+                        count++;
+                    }
+                    // How many tabs are in there — the one thing a collapsed
+                    // folder cannot tell you by looking at it.
+                    const countEl = header.querySelector('.folder-count');
+                    if (countEl) {
+                        countEl.textContent = count ? String(count) : '';
+                        countEl.classList.toggle('hidden', !count);
                     }
                     walk(f.id, depth + 1, hidden || !!f.collapsed);
                 }

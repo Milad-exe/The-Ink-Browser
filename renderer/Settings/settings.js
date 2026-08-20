@@ -234,17 +234,45 @@
             })();
         }
         // ── Appearance: Theme ──────────────────────────────────────────────────
-        const themeSelect = document.getElementById('theme-select');
-        themeSelect.value = settings.theme || 'default';
-        // Migrate retired theme names (chalk/midnight/ember/mist/dusk/sage) → default.
-        if (![...themeSelect.options].some(o => o.value === themeSelect.value)) {
-            themeSelect.value = 'default';
-            save('theme', 'default');
+        const themePicker = document.getElementById('theme-picker');
+        if (themePicker) {
+            const options = [...themePicker.querySelectorAll('.theme-option')];
+            // Retired theme names (chalk/midnight/ember/mist/dusk/sage) fall back.
+            let current = settings.theme || 'default';
+            if (!options.some(o => o.dataset.themeValue === current)) {
+                current = 'default';
+                save('theme', current);
+            }
+            const paint = (value) => {
+                for (const o of options) {
+                    const on = o.dataset.themeValue === value;
+                    o.setAttribute('aria-checked', String(on));
+                    o.tabIndex = on ? 0 : -1;
+                }
+            };
+            paint(current);
+            const choose = async (value) => {
+                if (value === current)
+                    return;
+                current = value;
+                paint(value);
+                await save('theme', value);
+                showToast('Theme updated');
+            };
+            for (const o of options)
+                o.addEventListener('click', () => choose(o.dataset.themeValue));
+            // A radiogroup is one tab stop; arrows move within it.
+            themePicker.addEventListener('keydown', (e) => {
+                const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+                if (!step)
+                    return;
+                e.preventDefault();
+                const i = options.findIndex(o => o.getAttribute('aria-checked') === 'true');
+                const next = options[(i + step + options.length) % options.length];
+                next.focus();
+                choose(next.dataset.themeValue);
+            });
         }
-        themeSelect.addEventListener('change', async () => {
-            await save('theme', themeSelect.value);
-            showToast('Theme updated');
-        });
         // ── Appearance: Bookmark bar ───────────────────────────────────────────
         // Toolbar customization — one persisted object; every key defaults to true.
         const tbToggles = document.querySelectorAll('.tb-toggle');

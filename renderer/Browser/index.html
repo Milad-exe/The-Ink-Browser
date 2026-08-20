@@ -173,7 +173,13 @@
     <!-- Essentials: pinned favourites (sidebar mode only, per profile) -->
     <div id="essentials" class="essentials" aria-label="Essentials" data-i18n-label="chrome.essentials"></div>
     <!-- Muted current-space label above the tab list (a "Space" header) -->
-    <div id="space-header" class="space-header"></div>
+    <!-- The space you are in, and the way to switch: the reference designs all
+         put identity at the top of the rail, not in a caption. -->
+    <button id="space-header" class="space-header" aria-haspopup="menu" aria-expanded="false">
+      <span class="space-badge profile-badge is-dot" id="space-badge" aria-hidden="true"></span>
+      <span class="space-name" id="space-name">Space</span>
+      <svg class="space-chevron" viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg>
+    </button>
     <button id="tab-scroll-left" class="tab-scroll-btn" aria-label="Scroll tabs left" data-i18n-label="chrome.scrollTabsLeft">‹</button>
     <div id="tabs-container" role="tablist" aria-label="Tabs" data-i18n-label="chrome.tabs"></div>
     <button id="tab-scroll-right" class="tab-scroll-btn" aria-label="Scroll tabs right" data-i18n-label="chrome.scrollTabsRight">›</button>

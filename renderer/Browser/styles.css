@@ -213,14 +213,13 @@ html[data-tabbar="side"] body {
 html[data-tabbar="side"] #utility-bar { grid-column: 1 / -1; grid-row: 1; }
 html[data-tabbar="side"] #tab-bar {
   grid-column: 1; grid-row: 2 / span 2;
-  padding-top: var(--shell-pad);
   flex-direction: column; align-items: stretch;
   width: var(--sidebar-w, 240px); height: 100%;
   /* One inset for the column; every row inside then shares --gutter for its
      own content, so favicons, labels, folder glyphs and the foot buttons all
      sit on the same left edge. That shared edge is most of what separates a
      sidebar that looks designed from one that looks assembled. */
-  padding: 0 var(--sp-3) var(--sp-3); gap: var(--sp-1);
+  padding: var(--shell-pad) var(--sp-3) var(--sp-3); gap: var(--sp-1);
   background: transparent;
 }
 /* Right-edge drag handle to resize the sidebar (side mode only). */
@@ -304,7 +303,12 @@ html[data-tabbar="side"] .tab-button.active::after {
 }
 html[data-tabbar="side"] .tab-button.active {
   color: var(--text);
-  background: var(--surface-2, var(--surface));
+  /* The fill carries a breath of the accent at the edge the marker is on, so
+     the 2px bar reads as part of the row rather than as a sticker on it. */
+  background:
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--accent) 13%, var(--surface-2, var(--surface))) 0%,
+      var(--surface-2, var(--surface)) 44%);
   box-shadow: var(--ring);
 }
 html[data-tabbar="side"] .tab-button.active .tab-title { font-weight: 600; }
@@ -362,15 +366,41 @@ html[data-tabbar="side"] .tab-button.pinned + .tab-button:not(.pinned)::before {
   content: ''; position: absolute; left: 2px; right: 2px; top: -7px;
   height: 1px; background: var(--border-2);
 }
-/* Muted current-space label above the tab list. */
+/* The space you are in, at the top of the rail — a switcher, not a caption.
+   It sits on the same left edge as the rows below it, so the rail reads as one
+   column: badge in the icon column, name on the title column. */
 .space-header { display: none; }
 html[data-tabbar="side"] .space-header {
-  display: block; flex-shrink: 0;
-  padding: var(--sp-3) var(--gutter) var(--sp-2);
-  font-family: var(--font); font-size: var(--fs-micro); font-weight: 600;
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3);
+  display: flex; align-items: center; gap: var(--sp-4);
+  flex-shrink: 0; width: 100%;
+  height: var(--row-h); padding: 0 var(--sp-3) 0 var(--gutter);
+  border: none; border-radius: var(--r-md); background: transparent;
+  font-family: var(--font); font-size: 13px; font-weight: 600;
+  letter-spacing: var(--tracking); color: var(--text-2);
+  cursor: pointer; text-align: left;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+html[data-tabbar="side"] .space-header:hover,
+html[data-tabbar="side"] .space-header[aria-expanded="true"] {
+  background: var(--hover); color: var(--text);
+}
+html[data-tabbar="side"] .space-header:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: -2px;
+}
+.space-badge {
+  width: var(--icon); height: var(--icon); flex: 0 0 var(--icon);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; line-height: 1;
+}
+.space-name {
+  flex: 1; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* The chevron is the affordance, so it stays quiet until you look at the row. */
+.space-chevron { flex-shrink: 0; color: var(--text-3); opacity: 0; transition: opacity var(--dur-1) var(--ease); }
+html[data-tabbar="side"] .space-header:hover .space-chevron,
+html[data-tabbar="side"] .space-header:focus-visible .space-chevron,
+html[data-tabbar="side"] .space-header[aria-expanded="true"] .space-chevron { opacity: 1; }
 html[data-tabbar="side"][data-rail="on"] .space-header { display: none; }
 
 /* ── Folders (tab groups) ──────────────────────────────────────────────────── */
@@ -382,6 +412,18 @@ html[data-tabbar="side"] .folder-header {
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 html[data-tabbar="side"] .folder-header:hover { background: var(--hover); color: var(--text); }
+/* How many tabs the folder holds. Sits where the delete button appears, so it
+   steps aside on hover rather than crowding it. */
+.folder-count {
+  flex-shrink: 0; min-width: 18px; padding: 0 var(--sp-2);
+  border-radius: var(--r-sm); background: var(--hover);
+  font-size: var(--fs-micro); font-weight: 600; line-height: 18px;
+  text-align: center; color: var(--text-3);
+  transition: opacity var(--dur-1) var(--ease);
+}
+.folder-count.hidden { display: none; }
+.folder-header:hover .folder-count,
+.folder-header:focus-within .folder-count { opacity: 0; }
 html[data-tabbar="side"] .folder-header.drop-target {
   background: var(--accent-wash, color-mix(in srgb, var(--accent) 18%, transparent));
   box-shadow: inset 0 0 0 1px var(--accent);

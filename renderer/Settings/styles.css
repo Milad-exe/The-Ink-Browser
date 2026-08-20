@@ -57,9 +57,22 @@ html, body {
 .nav-item:hover { background: var(--hover); color: var(--text); }
 /* The selected section reads like the active tab in the sidebar: a filled
    surface with a top highlight, not a flat wash. */
+/* The chosen section, marked the way the browser's own sidebar marks the tab
+   you are on: a 2px accent edge and a fill that carries a breath of it. */
 .nav-item.active {
-  color: var(--text); background: var(--surface);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent), var(--ring);
+  color: var(--text);
+  background:
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--accent) 13%, var(--surface)) 0%,
+      var(--surface) 44%);
+  box-shadow: var(--ring);
+  position: relative;
+}
+.nav-item.active::after {
+  content: ''; position: absolute; left: 0; top: 50%;
+  width: 2px; height: 14px; margin-top: -7px;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  background: var(--accent); pointer-events: none;
 }
 .nav-item.active svg { opacity: 1; }
 
@@ -363,3 +376,71 @@ input, textarea, select { user-select: text; -webkit-user-select: text; }
 .version-grid .k { color: var(--text-3); font-family: var(--mono); font-size: var(--fs-micro); }
 .version-grid .v { color: var(--text-2); font-family: var(--mono); font-size: var(--fs-micro); }
 .hidden { display: none !important; }
+
+/* ── Theme picker ───────────────────────────────────────────────────────────
+   Four miniatures of the browser, each painted in its own theme's palette:
+   the rail, the page card and two lines of text. A dropdown of names told you
+   nothing about what you were choosing. The colours are literal copies of the
+   blocks in ui.css — change a theme there, change its preview here. */
+.theme-picker {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--sp-5); margin-top: var(--sp-5);
+}
+.theme-option {
+  display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-3);
+  padding: 0; border: none; background: transparent;
+  font-family: var(--font); cursor: pointer;
+}
+.theme-preview {
+  display: flex; flex-direction: column; height: 76px; overflow: hidden;
+  border-radius: var(--r-md); box-shadow: var(--ring-2);
+  transition: box-shadow var(--dur-1) var(--ease);
+}
+.theme-option:hover .theme-preview { box-shadow: inset 0 0 0 0.5px var(--border-2); }
+.theme-option[aria-checked="true"] .theme-preview {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.theme-option:focus-visible { outline: none; }
+.theme-option:focus-visible .theme-preview { box-shadow: 0 0 0 3px var(--accent-wash), 0 0 0 2px var(--accent); }
+.theme-name {
+  font-size: var(--fs-small); font-weight: 500; color: var(--text-3);
+  letter-spacing: var(--tracking); text-align: left;
+}
+.theme-option[aria-checked="true"] .theme-name { color: var(--text); font-weight: 600; }
+
+/* The miniature is this browser: a toolbar with the address field centred over
+   the page, a rail down the left, and the page card inset from both. */
+.tp-bar { height: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.tp-field { width: 46%; height: 5px; border-radius: var(--r-pill); }
+.tp-body { flex: 1; display: flex; min-height: 0; }
+.tp-rail { width: 24%; flex-shrink: 0; }
+.tp-page {
+  flex: 1; margin: 0 5px 5px 0; border-radius: var(--r-xs);
+  display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 0 6px;
+}
+.tp-line { height: 3px; border-radius: var(--r-pill); }
+.tp-line.short { width: 55%; }
+
+.theme-preview[data-preview="default"]   { background: #14161d; }
+.theme-preview[data-preview="default"] .tp-page { background: #1b1e27; }
+.theme-preview[data-preview="default"] .tp-line { background: #eceef4; opacity: 0.55; }
+.theme-preview[data-preview="default"] .tp-line.short { background: #e0894a; opacity: 1; }
+.theme-preview[data-preview="default"] .tp-field { background: #0f1116; }
+
+.theme-preview[data-preview="fathom"]    { background: #061321; }
+.theme-preview[data-preview="fathom"] .tp-page { background: #0a1a2c; }
+.theme-preview[data-preview="fathom"] .tp-line { background: #d8e2f0; opacity: 0.55; }
+.theme-preview[data-preview="fathom"] .tp-line.short { background: #e0894a; opacity: 1; }
+.theme-preview[data-preview="fathom"] .tp-field { background: #030b14; }
+
+.theme-preview[data-preview="porcelain"] { background: #e7e9ef; }
+.theme-preview[data-preview="porcelain"] .tp-page { background: #ffffff; }
+.theme-preview[data-preview="porcelain"] .tp-line { background: #1a1c26; opacity: 0.45; }
+.theme-preview[data-preview="porcelain"] .tp-line.short { background: #cf7338; opacity: 1; }
+.theme-preview[data-preview="porcelain"] .tp-field { background: #ffffff; }
+
+.theme-preview[data-preview="dune"]      { background: #f0e2c8; }
+.theme-preview[data-preview="dune"] .tp-page { background: #fdf6ea; }
+.theme-preview[data-preview="dune"] .tp-line { background: #14306b; opacity: 0.45; }
+.theme-preview[data-preview="dune"] .tp-line.short { background: #b0502c; opacity: 1; }
+.theme-preview[data-preview="dune"] .tp-field { background: #fdf6ea; }

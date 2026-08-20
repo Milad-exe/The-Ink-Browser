@@ -144,15 +144,40 @@
         </div>
 
         <div class="card">
-          <div class="card-title">Theme</div>
-          <div class="card-desc">Choose a color palette for the browser</div>
-          <div class="select-row">
-            <select id="theme-select">
-              <option value="default">Northstar — Slate</option>
-              <option value="fathom">Fathom — Deep Navy</option>
-              <option value="porcelain">Porcelain — Soft Light</option>
-              <option value="dune">Dune — Cream &amp; Navy</option>
-            </select>
+          <div class="card-title" data-i18n="settings.theme">Theme</div>
+          <div class="card-desc" data-i18n="settings.themeDesc">Choose a color palette for the browser</div>
+          <!-- Each option is a miniature of the browser painted in that theme's
+               own palette — a name and a colour swatch never told you what
+               "Dune" would actually look like. -->
+          <div class="theme-picker" id="theme-picker" role="radiogroup" aria-label="Theme" data-i18n-label="settings.theme">
+            <button class="theme-option" role="radio" data-theme-value="default" aria-checked="true">
+              <span class="theme-preview" data-preview="default" aria-hidden="true">
+                <span class="tp-bar"><span class="tp-field"></span></span>
+                <span class="tp-body"><span class="tp-rail"></span><span class="tp-page"><span class="tp-line"></span><span class="tp-line short"></span></span></span>
+              </span>
+              <span class="theme-name">Slate</span>
+            </button>
+            <button class="theme-option" role="radio" data-theme-value="fathom" aria-checked="false">
+              <span class="theme-preview" data-preview="fathom" aria-hidden="true">
+                <span class="tp-bar"><span class="tp-field"></span></span>
+                <span class="tp-body"><span class="tp-rail"></span><span class="tp-page"><span class="tp-line"></span><span class="tp-line short"></span></span></span>
+              </span>
+              <span class="theme-name">Fathom</span>
+            </button>
+            <button class="theme-option" role="radio" data-theme-value="porcelain" aria-checked="false">
+              <span class="theme-preview" data-preview="porcelain" aria-hidden="true">
+                <span class="tp-bar"><span class="tp-field"></span></span>
+                <span class="tp-body"><span class="tp-rail"></span><span class="tp-page"><span class="tp-line"></span><span class="tp-line short"></span></span></span>
+              </span>
+              <span class="theme-name">Porcelain</span>
+            </button>
+            <button class="theme-option" role="radio" data-theme-value="dune" aria-checked="false">
+              <span class="theme-preview" data-preview="dune" aria-hidden="true">
+                <span class="tp-bar"><span class="tp-field"></span></span>
+                <span class="tp-body"><span class="tp-rail"></span><span class="tp-page"><span class="tp-line"></span><span class="tp-line short"></span></span></span>
+              </span>
+              <span class="theme-name">Dune</span>
+            </button>
           </div>
         </div>
 
