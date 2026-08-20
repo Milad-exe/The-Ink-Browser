@@ -5,43 +5,53 @@
  * (the metrics block at the end of both files is identical), and put any new
  * token in BOTH or it will have no effect at runtime.
  *
- * Northstar redesign — a soft, cinematic "floating shell" language:
- * the chrome sits on a tinted shell, the page floats in a rounded card with a
- * gentle shadow, tabs are rounded pills, and one accent gradient (blue→violet
- * by default) threads through the brand mark, active states, and focus rings.
+ * ONE ACCENT, FOUR GROUNDS. The ground is what a theme is; the identity
+ * colour does not change with it. Every ground is built the same way —
+ * a deep, near-neutral shell, a page a step above it, wells a step below —
+ * and the accent is the only saturated thing on screen, which is what lets a
+ * 2px marker or a focus ring carry meaning without competing with anything.
  *
- *   default   — Northstar · slate shell, blue→violet aurora (dark)
- *   fathom    — Fathom    · abyssal navy, arctic mist (dark)
- *   porcelain — Porcelain · warm paper light, blue accent (light)
- *   dune      — Dune      · cream & silent navy, amber accent (light)
+ * The greys used to carry a 15–18% blue cast, which fought the warm accent and
+ * read muddy; they are near-neutral now, deeper at the bottom and brighter at
+ * the top, so the same shapes have more contrast to work with.
+ *
+ *   default   — Slate     · neutral graphite, near-black (dark)
+ *   fathom    — Fathom    · abyssal navy (dark)
+ *   porcelain — Porcelain · cool paper white (light)
+ *   dune      — Dune      · cream ground, navy ink (light)
+ *   private   — violet, unmistakably not one of the four
  *
  * Token groups:
  *   --shell / --page          the floating-shell surfaces (see Browser/styles)
- *   --bg/--surface/--surface-2 layered fills (bg = deepest)
+ *   --bg/--surface/--surface-2 layered fills. --bg is ALWAYS the darkest step,
+ *                             in light themes too: it is what a recessed well
+ *                             (the address field, a select) is filled with, and
+ *                             a well lighter than the shell around it reads as
+ *                             raised.
  *   --text/-2/-3              primary / secondary / tertiary ink
  *   --border/-2, --hover, --active-bg   hairlines & interaction washes
- *   --accent/--accent-2, --accent-wash  the aurora gradient + its soft halo
+ *   --accent/--accent-2, --accent-wash  the one identity colour + its halo
  *   --radius / --radius-lg / --radius-pill   the rounded-corner scale
  */
 
 :root {
-  /* Northstar (default) — deep slate shell, aurora blue→violet */
-  --shell:     #14161d;
-  --page:      #1b1e27;
-  --bg:        #1b1e27;
-  --surface:   #22262f;
-  --surface-2: #2b2f3a;
-  --text:      #eceef4;
-  --text-2:    #9498a8;
-  --text-3:    #5a5f6e;
-  --border:    rgba(255,255,255,0.08);
-  --border-2:  rgba(255,255,255,0.14);
-  --hover:     rgba(255,255,255,0.06);
-  --active-bg: rgba(255,255,255,0.10);
-  --accent:    #e0894a;
-  --accent-2:  #c8613a;
-  --accent-wash: rgba(224,137,74,0.20);
-  --danger:    #f4635e;
+  /* Slate (default) — neutral graphite, near-black */
+  --shell: #0e0f11;
+  --page: #171719;
+  --bg: #0b0c0d;
+  --surface: #1e1f22;
+  --surface-2: #282a2e;
+  --text: #f3f4f6;
+  --text-2: #a2a4ab;
+  --text-3: #6c6f76;
+  --border: rgba(255,255,255,0.09);
+  --border-2: rgba(255,255,255,0.16);
+  --hover: rgba(255,255,255,0.06);
+  --active-bg: rgba(255,255,255,0.11);
+  --accent: #ff7a45;
+  --accent-2: #e0552c;
+  --accent-wash: rgba(255,122,69,0.18);
+  --danger: #ff5f57;
   --font:      'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono:      'Space Mono', 'SF Mono', ui-monospace, monospace;
 
@@ -51,84 +61,84 @@
 }
 
 html[data-theme="fathom"] {
-  /* Fathom — abyssal navy shell, cold cyan current */
-  --shell:     #061321;
-  --page:      #0a1a2c;
-  --bg:        #0a1a2c;
-  --surface:   #10233a;
-  --surface-2: #173047;
-  --text:      #d8e2f0;
-  --text-2:    #8aa0bd;
-  --text-3:    #4f6684;
-  --border:    rgba(160,190,225,0.10);
-  --border-2:  rgba(160,190,225,0.18);
-  --hover:     rgba(160,190,225,0.07);
-  --active-bg: rgba(160,190,225,0.13);
-  --accent:    #e0894a;
-  --accent-2:  #c8613a;
-  --accent-wash: rgba(224,137,74,0.20);
-  --danger:    #f0687a;
+  /* Fathom — abyssal navy */
+  --shell: #050b14;
+  --page: #0a1420;
+  --bg: #04090f;
+  --surface: #101d2c;
+  --surface-2: #182839;
+  --text: #e2eaf4;
+  --text-2: #93a6bd;
+  --text-3: #5d7086;
+  --border: rgba(170,200,235,0.10);
+  --border-2: rgba(170,200,235,0.18);
+  --hover: rgba(170,200,235,0.07);
+  --active-bg: rgba(170,200,235,0.13);
+  --accent: #ff7a45;
+  --accent-2: #e0552c;
+  --accent-wash: rgba(255,122,69,0.18);
+  --danger: #ff6b74;
 }
 
 html[data-theme="porcelain"] {
-  /* Porcelain — warm paper light, blue→violet accent */
-  --shell:     #e7e9ef;
-  --page:      #ffffff;
-  --bg:        #ffffff;
-  --surface:   #f5f6fa;
-  --surface-2: #eceef4;
-  --text:      #1a1c26;
-  --text-2:    #6b6f7e;
-  --text-3:    #a2a6b4;
-  --border:    rgba(16,20,40,0.09);
-  --border-2:  rgba(16,20,40,0.14);
-  --hover:     rgba(16,20,40,0.05);
-  --active-bg: rgba(16,20,40,0.07);
-  --accent:    #cf7338;
-  --accent-2:  #b0502c;
-  --accent-wash: rgba(207,115,56,0.14);
-  --danger:    #f4635e;
+  /* Porcelain — cool paper white */
+  --shell: #e8e9ec;
+  --page: #ffffff;
+  --bg: #dcdee3;
+  --surface: #f7f8fa;
+  --surface-2: #eeeff2;
+  --text: #16171a;
+  --text-2: #61646b;
+  --text-3: #7c8088;
+  --border: rgba(10,12,18,0.10);
+  --border-2: rgba(10,12,18,0.16);
+  --hover: rgba(10,12,18,0.05);
+  --active-bg: rgba(10,12,18,0.08);
+  --accent: #d9531c;
+  --accent-2: #b8441d;
+  --accent-wash: rgba(217,83,28,0.14);
+  --danger: #d93a34;
 }
 
 html[data-theme="dune"] {
-  /* Dune — light cream shell, silent navy ink, sandy amber warmth */
-  --shell:     #f0e2c8;
-  --page:      #fdf6ea;
-  --bg:        #fdf6ea;
-  --surface:   #f7edd9;
-  --surface-2: #efe1c5;
-  --text:      #14306b;
-  --text-2:    #55689a;
-  --text-3:    #a99a7d;
-  --border:    rgba(20,48,107,0.12);
-  --border-2:  rgba(20,48,107,0.20);
-  --hover:     rgba(20,48,107,0.06);
-  --active-bg: rgba(20,48,107,0.10);
-  --accent:    #e0872f;
-  --accent-2:  #c25d3a;
-  --accent-wash: rgba(224,135,47,0.18);
-  --danger:    #c2492f;
+  /* Dune — cream ground, silent navy ink */
+  --shell: #efe1c6;
+  --page: #fdf7ec;
+  --bg: #e6d8b8;
+  --surface: #f8efdd;
+  --surface-2: #f0e2c8;
+  --text: #122c63;
+  --text-2: #4b5e8a;
+  --text-3: #867658;
+  --border: rgba(18,44,99,0.12);
+  --border-2: rgba(18,44,99,0.20);
+  --hover: rgba(18,44,99,0.06);
+  --active-bg: rgba(18,44,99,0.10);
+  --accent: #c0621a;
+  --accent-2: #b4501f;
+  --accent-wash: rgba(192,98,26,0.18);
+  --danger: #bf4429;
 }
 
 /* ── Private mode — lavender/violet, unmistakably distinct ── */
 html[data-private-window="true"],
 html[data-private-tab="true"] {
-  --shell:     #241a3d;
-  --page:      #2c2148;
-  --bg:        #2c2148;
-  --surface:   #362a56;
-  --surface-2: #413466;
-  --text:      #ece4ff;
-  --text-2:    #b3a2d8;
-  --text-3:    #7a6aa8;
-  --border:    rgba(180,150,240,0.14);
-  --border-2:  rgba(180,150,240,0.24);
-  --hover:     rgba(180,150,240,0.09);
-  --active-bg: rgba(180,150,240,0.15);
-  --accent:    #a78bfa;
-  --accent-2:  #7c3aed;
-  --accent-wash: rgba(167,139,250,0.22);
-  --danger:    #f0688a;
+  --shell: #170f2b;
+  --page: #1e1438;
+  --bg: #130c24;
+  --surface: #271a45;
+  --surface-2: #322357;
+  --text: #ece4ff;
+  --text-2: #b0a0d6;
+  --text-3: #786aa4;
+  --border: rgba(185,155,245,0.14);
+  --border-2: rgba(185,155,245,0.24);
+  --hover: rgba(185,155,245,0.09);
+  --active-bg: rgba(185,155,245,0.15);
+  --accent: #b18aff;
+  --accent-2: #8b5cf6;
+  --accent-wash: rgba(177,138,255,0.22);
+  --danger: #ff6b8a;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -183,7 +193,7 @@ html[data-private-tab="true"] {
        --ring        a real half-pixel hairline, drawn as a shadow so it never
                      takes part in layout the way a border does */
   --shadow-pop: 0 10px 30px rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.18);
-  --accent-ink: #17110a;   /* text/glyph colour ON an accent fill */
+  --accent-ink: #1a0d05;   /* text/glyph colour ON an accent fill */
   --ring: inset 0 0 0 0.5px var(--border);
   --ring-2: inset 0 0 0 0.5px var(--border-2);
 

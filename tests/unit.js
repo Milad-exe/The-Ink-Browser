@@ -8,6 +8,7 @@
  * why this file can run under plain node.
  */
 'use strict';
+const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 const Module = require('module');
@@ -438,6 +439,75 @@ test('a panel anchored to the address field hangs from it, not from the corner',
 test('a panel taller than the window stops at the bottom gutter', () => {
     const b = panelBounds(fakeWin(), { anchor: { left: 1274, right: 1304, top: 13, bottom: 43 }, width: 320, height: 1200 });
     assert.strictEqual(b.y + b.height, 900 - SHELL_PAD);
+});
+
+
+// ── Palette contrast ─────────────────────────────────────────────────────────
+// A re-tone is easy to do by eye and easy to get wrong: the light themes had a
+// tertiary ink and an accent that fell under 3:1 on their own shell. These read
+// the shipped tokens out of ui.css (the file pages actually link) and hold every
+// theme to a floor.
+const uiCss = fs.readFileSync(path.join(root, 'renderer/styles/ui.css'), 'utf8');
+
+function paletteOf(selector) {
+    // ui.css has several blocks per selector (`:root` carries the metrics as
+    // well as the palette) — take the one that defines --shell.
+    const re = new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^{]*\\{([\\s\\S]*?)\\n\\}', 'g');
+    for (const m of uiCss.matchAll(re)) {
+        if (!m[1].includes('--shell:'))
+            continue;
+        const out = {};
+        for (const [, k, v] of m[1].matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{6})\s*;/g))
+            out[k] = v;
+        return out;
+    }
+    throw new Error('palette not found: ' + selector);
+}
+const srgb = (c) => { const x = c / 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+function luminance(hex) {
+    const h = hex.slice(1);
+    const [r, g, b] = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+    return 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
+}
+function contrast(a, b) {
+    const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+}
+
+const THEMES = {
+    slate: ':root',
+    fathom: 'html[data-theme="fathom"]',
+    porcelain: 'html[data-theme="porcelain"]',
+    dune: 'html[data-theme="dune"]',
+    private: 'html[data-private-window="true"]',
+};
+// [ink, ground, floor] — 4.5 for anything you read, 3 for marks and captions.
+const PAIRS = [
+    ['text', 'page', 4.5], ['text', 'surface', 4.5],
+    ['text-2', 'shell', 4.5], ['text-2', 'surface', 4.5],
+    ['text-3', 'shell', 3], ['text-3', 'surface', 3],
+    ['accent', 'shell', 3], ['accent', 'page', 3],
+    ['danger', 'surface', 3],
+];
+for (const [name, selector] of Object.entries(THEMES)) {
+    test(`${name} palette clears its contrast floors`, () => {
+        const p = paletteOf(selector);
+        for (const [ink, ground, floor] of PAIRS) {
+            const r = contrast(p[ink], p[ground]);
+            assert.ok(r >= floor,
+                `--${ink} on --${ground} is ${r.toFixed(2)}:1, needs ${floor}:1`);
+        }
+    });
+}
+
+test('every theme defines the whole palette', () => {
+    const base = Object.keys(paletteOf(':root')).filter(k => !['radius', 'radius-lg', 'radius-pill'].includes(k));
+    for (const [name, selector] of Object.entries(THEMES)) {
+        if (selector === ':root') continue;
+        const p = paletteOf(selector);
+        const missing = base.filter(k => !(k in p) && !k.startsWith('shadow') && !k.startsWith('ring'));
+        assert.deepStrictEqual(missing, [], `${name} is missing: ${missing.join(', ')}`);
+    }
 });
 
 // ── Report ───────────────────────────────────────────────────────────────────

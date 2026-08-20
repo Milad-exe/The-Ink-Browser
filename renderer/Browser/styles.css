@@ -776,7 +776,7 @@ html[data-tabbar="side"] .sidebar-foot {
 .cm-overlay {
   position: fixed; inset: 0; z-index: 1300;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(8,10,20,0.42);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
 }
 .cm-overlay.hidden { display: none; }
 .ri-card {

@@ -216,7 +216,7 @@ class WindowManager {
             // translucent chrome (renderer paints the chrome with alpha).
             ...(process.platform === 'darwin'
                 ? { vibrancy: 'under-window', visualEffectState: 'active', backgroundColor: '#00000000' }
-                : { backgroundColor: '#0c0c0c' }),
+                : { backgroundColor: '#0e0f11' }), // --shell (themes.css)
             webPreferences: {
                 preload: path.join(__dirname, "../preload/preload.js"),
                 // The chrome UI loads only trusted local files, and its preload
