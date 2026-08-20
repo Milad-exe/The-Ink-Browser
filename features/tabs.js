@@ -556,7 +556,7 @@ class Tabs {
             tab.privateSession = webPrefs.session; // wiped when the tab closes
         }
         this.mainWindow.contentView.addChildView(tab);
-        tab.webContents.loadFile(resolveAppFile(makePrivate ? 'renderer/NewTab/private.html' : 'renderer/NewTab/index.html'));
+        this._loadBlank(tab);
         this.raiseFloatingViews();
         UserAgent.setupTab(tab);
         this._applyTabBackground(tab, 'newtab');
@@ -828,10 +828,24 @@ class Tabs {
     // paint would bleed the frosted material through. Internal pages (new tab,
     // settings, history, bookmarks) opt INTO that frost with a transparent view;
     // web content gets an opaque white backing (matching Chrome) so nothing bleeds.
+    /**
+     * Load "no page" into a tab.
+     *
+     * A blank tab used to load renderer/NewTab — a real document with a mark
+     * and a hint line. It is gone: opening a tab raises the palette, so the
+     * page behind it only ever flashed past on the way somewhere else, and a
+     * page that exists only to be covered is a page to maintain, translate and
+     * theme for nothing. The view is transparent (_applyTabBackground), so
+     * about:blank shows the chrome's own page card.
+     */
+    _loadBlank(tab) {
+        try { tab.webContents.loadURL('about:blank'); }
+        catch (e) { log.debug('tabs', '_loadBlank', e); }
+    }
     _applyTabBackground(tab, urlOrType) {
         const t = urlOrType || '';
         const internal = t === 'newtab' || t === 'settings' || t === 'history' || t === 'bookmarks' ||
-            (typeof t === 'string' && /\/(NewTab|Settings|History|Bookmarks)\//.test(t));
+            (typeof t === 'string' && /\/(Settings|History|Bookmarks)\//.test(t));
         try {
             tab.setBackgroundColor(internal ? '#00000000' : '#ffffff');
         }
@@ -988,6 +1002,15 @@ class Tabs {
                 }
                 catch (e) { log.debug('tabs', 'blockDangerousNav', e); }
             }
+            if (url === 'about:blank') {
+                // The blank tab. It carries the 'newtab' token so the omnibox
+                // stays empty and promptForBlankTab still recognises it.
+                this.tabUrls.set(tabIndex, 'newtab');
+                lastAddedUrl = 'newtab';
+                this.sendTabUpdate(tabIndex, tab, 'newtab');
+                this.sendNavigationUpdate(tabIndex);
+                return;
+            }
             if (!url.startsWith('file://') && !isNavigatingProgrammatically) {
                 if (lastAddedUrl !== url) {
                     this.tabUrls.set(tabIndex, url);
@@ -1111,6 +1134,15 @@ class Tabs {
             });
         });
         tab.webContents.on('did-navigate-in-page', (event, url) => {
+            if (url === 'about:blank') {
+                // The blank tab. It carries the 'newtab' token so the omnibox
+                // stays empty and promptForBlankTab still recognises it.
+                this.tabUrls.set(tabIndex, 'newtab');
+                lastAddedUrl = 'newtab';
+                this.sendTabUpdate(tabIndex, tab, 'newtab');
+                this.sendNavigationUpdate(tabIndex);
+                return;
+            }
             if (!url.startsWith('file://') && !isNavigatingProgrammatically) {
                 const currentUrl = this.tabUrls.get(tabIndex);
                 if (currentUrl !== url && lastAddedUrl !== url) {
@@ -1237,17 +1269,8 @@ class Tabs {
         tab.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
             if (!isMainFrame)
                 return;
-            if (errorCode === -3) {
-                // ERR_ABORTED — e.g. the user hit stop. If the still-current
-                // document is the new-tab page mid-fade-out, bring it back.
-                try {
-                    if ((tab.webContents.getURL() || '').includes('/NewTab/')) {
-                        tab.webContents.executeJavaScript("document.documentElement.classList.remove('leaving')", true).catch(() => { });
-                    }
-                }
-                catch (e) { log.debug('tabs', 'host', e); }
-                return;
-            }
+            if (errorCode === -3)
+                return; // ERR_ABORTED — e.g. the user hit stop.
             const params = new URLSearchParams({
                 url: validatedURL || '',
                 code: String(errorCode),
@@ -1685,7 +1708,7 @@ class Tabs {
                 }
                 else {
                     const isPrivTab = this.privateTabs.has(index);
-                    tab.webContents.loadFile(resolveAppFile(isPrivTab ? 'renderer/NewTab/private.html' : 'renderer/NewTab/index.html'));
+                    this._loadBlank(tab);
                 }
             }
             else if (tab.needsReloadForFocusMode) {
@@ -1764,12 +1787,6 @@ class Tabs {
             // Leaving the new-tab page: fade it out NOW. Chromium keeps the old
             // document painted until the new one commits, and a static clock
             // sitting there for the whole network wait reads as "stuck".
-            if (this.tabUrls.get(index) === 'newtab') {
-                try {
-                    tab.webContents.executeJavaScript("document.documentElement.classList.add('leaving')", true).catch(() => { });
-                }
-                catch (e) { log.debug('tabs', 'loadUrl', e); }
-            }
             tab.webContents.loadURL(url);
             this.tabUrls.set(index, url);
             // This tab now has somewhere to be, so the palette's question is
@@ -1971,7 +1988,6 @@ class Tabs {
             const tab = this.tabMap.get(index);
             const previousUrl = this.navigationHistory.goBack(index);
             const isPriv = this.privateTabs.has(index);
-            const newTabFile = isPriv ? 'renderer/NewTab/private.html' : 'renderer/NewTab/index.html';
             if (previousUrl && previousUrl !== 'newtab') {
                 tab.setNavigatingProgrammatically(true);
                 tab.webContents.loadURL(previousUrl);
@@ -2001,7 +2017,7 @@ class Tabs {
             }
             else if (nextUrl === 'newtab') {
                 tab.setNavigatingProgrammatically(true);
-                tab.webContents.loadFile(resolveAppFile(isPriv ? 'renderer/NewTab/private.html' : 'renderer/NewTab/index.html'));
+                this._loadBlank(tab);
                 this.tabUrls.set(index, 'newtab');
             }
             this.sendNavigationUpdate(index);
@@ -2033,7 +2049,7 @@ class Tabs {
         }
         else {
             const isPriv = this.privateTabs.has(index);
-            tab.webContents.loadFile(resolveAppFile(isPriv ? 'renderer/NewTab/private.html' : 'renderer/NewTab/index.html'));
+            this._loadBlank(tab);
             this.tabUrls.set(index, 'newtab');
         }
         this.sendTabUpdate(index, tab, this.tabUrls.get(index));

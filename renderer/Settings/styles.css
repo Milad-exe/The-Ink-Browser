@@ -64,21 +64,11 @@ html[data-vibrancy="true"], html[data-vibrancy="true"] body {
 /* The selected section reads like the active tab in the sidebar: a filled
    surface with a top highlight, not a flat wash. */
 /* The chosen section, marked the way the browser's own sidebar marks the tab
-   you are on: a 2px accent edge and a fill that carries a breath of it. */
+   you are on: a clean filled pill, no accent stub. */
 .nav-item.active {
   color: var(--text);
-  background:
-    linear-gradient(90deg,
-      color-mix(in srgb, var(--accent) 13%, var(--surface)) 0%,
-      var(--surface) 44%);
+  background: var(--surface);
   box-shadow: var(--ring);
-  position: relative;
-}
-.nav-item.active::after {
-  content: ''; position: absolute; left: 0; top: 50%;
-  width: 2px; height: 14px; margin-top: -7px;
-  border-radius: 0 var(--r-pill) var(--r-pill) 0;
-  background: var(--accent); pointer-events: none;
 }
 .nav-item.active svg { opacity: 1; }
 

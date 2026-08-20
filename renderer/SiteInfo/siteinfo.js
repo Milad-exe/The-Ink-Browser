@@ -12,8 +12,8 @@
     }
     catch (e) { window.inkLog?.debug('siteinfo', 'i18n: ' + e); }
     const api = window.siteInfoApi;
-    const LOCK = '<svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="8" rx="1.5"/><path d="M6.5 9V6.5a3.5 3.5 0 017 0V9"/></svg>';
-    const WARN = '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2L2.8 16h14.4L10 3.2z"/><path d="M10 8.2v3.2M10 13.6v.1"/></svg>';
+    const LOCK = '<svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="8" rx="1.5"/><path d="M6.5 9V6.5a3.5 3.5 0 017 0V9"/></svg>';
+    const WARN = '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.31" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2L2.8 16h14.4L10 3.2z"/><path d="M10 8.2v3.2M10 13.6v.1"/></svg>';
     const esc = (s) => String(s || '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
     function permRow(p) {
         const row = document.createElement('div');

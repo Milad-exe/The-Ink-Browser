@@ -14,17 +14,17 @@
   <div id="utility-bar">
     <div class="nav-buttons">
       <button id="back-btn" class="nav-btn" title="Back" data-i18n-title="chrome.back">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.75 19.5L7.25 12l7.5-7.5"/></svg>
       </button>
       <button id="forward-btn" class="nav-btn" title="Forward" data-i18n-title="chrome.forward">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9.25 19.5L16.75 12 9.25 4.5"/></svg>
       </button>
       <button id="reload-btn" class="nav-btn" title="Reload" data-i18n-title="chrome.reload">
-        <svg class="nav-reload" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="nav-reload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
           <path d="M21 4v4.2h-4.2"/>
         </svg>
-        <svg class="nav-stop" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="nav-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 6 6 18M6 6l12 12"/>
         </svg>
       </button>
@@ -32,7 +32,7 @@
 
       <!-- Compact mode: hide/show the sidebar -->
       <button id="compact-btn" class="icon-btn" title="Toggle compact mode" data-i18n-title="chrome.compact">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/>
           <path d="M9.5 4.5v15"/>
         </svg>
@@ -41,17 +41,17 @@
       <div class="omnibox" data-omni="search">
         <button class="omni-icon" id="omni-icon" type="button" aria-label="Site information" data-i18n-label="chrome.siteInfo">
           <!-- Search: shown while typing / on new tab -->
-          <svg class="oi oi-search" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="oi oi-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="7"/>
             <path d="M21 21l-4.3-4.3"/>
           </svg>
           <!-- Secure: HTTPS page -->
-          <svg class="oi oi-secure" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="oi oi-secure" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
             <rect x="5" y="11" width="14" height="9" rx="2"/>
             <path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>
           </svg>
           <!-- Not secure: HTTP page -->
-          <svg class="oi oi-insecure" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="oi oi-insecure" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
             <path d="M10.3 3.5 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.5a2 2 0 0 0-3.4 0z"/>
             <path d="M12 9.5v4M12 17.2h.01"/>
           </svg>
@@ -92,28 +92,28 @@
       <browser-action-list id="ext-actions"></browser-action-list>
       <!-- Extensions: lists installed extensions; links to the Chrome Web Store -->
       <button id="extensions-btn" class="icon-btn" title="Extensions" data-i18n-title="chrome.extensions">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/>
           <rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>
         </svg>
       </button>
       <!-- Reader mode: hidden until the page looks like an article -->
       <button id="reader-btn" class="icon-btn reader-btn hidden" title="Reader view" data-i18n-title="chrome.reader">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <rect x="4" y="4" width="16" height="16" rx="2.5"/>
           <path d="M8 9h8M8 12.5h8M8 16h5"/>
         </svg>
       </button>
       <!-- Picture-in-Picture: hidden until the active tab plays video -->
       <button id="pip-btn" class="icon-btn pip-btn hidden" title="Picture-in-Picture" data-i18n-title="chrome.pip">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="5" width="18" height="14" rx="2.5"/>
           <rect x="12.5" y="11.5" width="6.5" height="5" rx="1" fill="currentColor" stroke="none"/>
         </svg>
       </button>
       <!-- Downloads: hidden until the first download of the session -->
       <button id="downloads-btn" class="icon-btn downloads-btn hidden" title="Downloads" data-i18n-title="chrome.downloads">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 4v10M8 10.5l4 4 4-4"/>
           <path d="M5 19.5h14"/>
         </svg>
@@ -121,7 +121,7 @@
       </button>
       <!-- Bookmark: filled ribbon when bookmarked, outline when not -->
       <button id="bookmark-btn" class="icon-btn" title="Bookmark" data-i18n-title="chrome.bookmark">
-        <svg class="icon-svg bookmark-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="icon-svg bookmark-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4-7 4V4.5a1 1 0 0 1 1-1z"/>
         </svg>
         <svg class="icon-svg bookmark-filled" viewBox="0 0 24 24" fill="currentColor">
@@ -130,13 +130,13 @@
       </button>
       <!-- Focus: clock icon -->
       <button id="focus-btn" class="icon-btn" title="Focus mode" data-i18n-title="chrome.focusMode">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="8.5"/>
           <path d="M12 7v5l3.2 2"/>
         </svg>
       </button>
       <button id="menu-btn" class="icon-btn menu-btn" title="Menu" data-i18n-title="chrome.menu">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
           <path d="M4 7h16M4 12h16M4 17h16"/>
         </svg>
       </button>
@@ -178,7 +178,7 @@
     <button id="space-header" class="space-header" aria-haspopup="menu" aria-expanded="false">
       <span class="space-badge profile-badge is-dot" id="space-badge" aria-hidden="true"></span>
       <span class="space-name" id="space-name">Space</span>
-      <svg class="space-chevron" viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg>
+      <svg class="space-chevron" viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg>
     </button>
     <button id="tab-scroll-left" class="tab-scroll-btn" aria-label="Scroll tabs left" data-i18n-label="chrome.scrollTabsLeft">‹</button>
     <div id="tabs-container" role="tablist" aria-label="Tabs" data-i18n-label="chrome.tabs"></div>
@@ -204,12 +204,12 @@
          per workspace, active one labelled) + add + settings. -->
     <div id="sidebar-foot" class="sidebar-foot">
       <button id="sb-downloads" class="icon-btn sb-downloads hidden" title="Downloads" data-i18n-title="chrome.downloads">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/>
         </svg>
       </button>
       <button id="sb-settings" class="icon-btn sb-settings" title="Settings" data-i18n-title="chrome.settings">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
@@ -239,7 +239,7 @@
       </div>
       <div class="pomodoro-sessions" id="pomodoro-sessions"></div>
       <button id="pomodoro-close" class="surface-icon-btn pom-close" title="Close" data-i18n-title="chrome.close" aria-label="Close" data-i18n-label="chrome.close">
-        <svg viewBox="0 0 20 20" fill="none"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 20 20" fill="none"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.17" stroke-linecap="round"/></svg>
       </button>
     </div>
   </div>

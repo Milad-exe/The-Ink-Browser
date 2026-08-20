@@ -16,7 +16,7 @@ try {
     const isFile = location.protocol === 'file:';
     const isChrome = isFile && /\/Browser\/index\.html$/.test(location.pathname);
     // Chrome + internal pages paint translucently over the window vibrancy.
-    const isFrostable = isFile && /\/(Browser|NewTab|Settings|History|Bookmarks)\/(index|private)\.html$/.test(location.pathname);
+    const isFrostable = isFile && /\/(Browser|Settings|History|Bookmarks)\/index\.html$/.test(location.pathname);
     // macOS frosted-glass: flag frostable pages so their CSS goes translucent.
     if (process.platform === 'darwin' && isFrostable) {
         const mark = () => document.documentElement.setAttribute('data-vibrancy', 'true');

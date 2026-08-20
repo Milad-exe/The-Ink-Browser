@@ -18,7 +18,7 @@
             return (!v || v === key) ? fallback : v;
         };
 
-        const FOLDER_SVG = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v6.3a1.7 1.7 0 0 1-1.7 1.7H4.2a1.7 1.7 0 0 1-1.7-1.7z"/></svg>';
+        const FOLDER_SVG = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.17" stroke-linejoin="round"><path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v6.3a1.7 1.7 0 0 1-1.7 1.7H4.2a1.7 1.7 0 0 1-1.7-1.7z"/></svg>';
 
         let tree = [];
         const load = async () => {
@@ -66,7 +66,7 @@
             const remove = document.createElement('button');
             remove.className = 'row-action';
             remove.title = T('bookmarks.remove', 'Remove bookmark');
-            remove.innerHTML = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+            remove.innerHTML = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.29" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
             remove.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 try {

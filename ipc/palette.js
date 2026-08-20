@@ -73,6 +73,7 @@ function sendFrame(wd) {
             left: Math.max(0, Math.round(card.x)),
             right: Math.max(0, Math.round(win.width - (card.x + card.width))),
             top: Math.max(0, Math.round(card.y)),
+            bottom: Math.max(0, Math.round(win.height - (card.y + card.height))),
         });
     }
     catch (e) { log.debug('palette', 'sendFrame', e); }

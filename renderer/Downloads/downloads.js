@@ -17,7 +17,7 @@
         const clearBtn = document.getElementById('clear-btn');
         // Base document outline shared by the file-type icons; `inner` draws the
         // glyph that identifies the type (folded corner + type mark).
-        const fileIcon = (inner) => '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+        const fileIcon = (inner) => '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.17" stroke-linecap="round" stroke-linejoin="round">' +
             '<path d="M11 2H5.5A1.5 1.5 0 0 0 4 3.5v13A1.5 1.5 0 0 0 5.5 18h9a1.5 1.5 0 0 0 1.5-1.5V7l-5-5z"/><path d="M11 2v5h5"/>' +
             (inner || '') + '</svg>';
         const ICONS = {
@@ -54,11 +54,11 @@
             const ext = dot > -1 ? name.slice(dot + 1).toLowerCase() : '';
             return ICONS[EXT_MAP[ext]] || ICONS.file;
         }
-        const SVG_FOLDER = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4H8l2 2h6.5A1.5 1.5 0 0 1 18 7.5v7a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14.5v-9z"/></svg>';
-        const SVG_CANCEL = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg>';
-        const SVG_PAUSE = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 4v12M13 4v12"/></svg>';
+        const SVG_FOLDER = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.17" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4H8l2 2h6.5A1.5 1.5 0 0 1 18 7.5v7a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14.5v-9z"/></svg>';
+        const SVG_CANCEL = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.17" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg>';
+        const SVG_PAUSE = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.17" stroke-linecap="round"><path d="M7 4v12M13 4v12"/></svg>';
         const SVG_RESUME = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M6 4l10 6-10 6V4z"/></svg>';
-        const SVG_RETRY = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a6 6 0 1 1-1.76-4.24"/><path d="M16 2v4h-4"/></svg>';
+        const SVG_RETRY = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.17" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a6 6 0 1 1-1.76-4.24"/><path d="M16 2v4h-4"/></svg>';
         // Sizes follow the user's locale (1,5 MB vs 1.5 MB) — see
         // renderer/lib/i18n.js. Falls back to the plain format if the shared
         // module is not loaded on this page.

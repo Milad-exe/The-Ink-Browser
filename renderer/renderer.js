@@ -280,18 +280,32 @@
                 if (menuOpen)
                     window.electronAPI.windowClick({ x: e.clientX, y: e.clientY });
             });
+            // Whatever had focus before, a press in the chrome means the chrome
+            // is what you are using — take focus on the way DOWN so the click
+            // itself lands on the control rather than paying for the focus.
+            window.addEventListener('pointerdown', () => {
+                try { window.tabsUI?.focusChrome?.(); }
+                catch (e) { window.inkLog?.debug('renderer', 'focusChrome: ' + e); }
+            }, true);
             window.menu.onClosed(() => { menuOpen = false; });
         }
         /**
          * Back/forward buttons — click navigates one step; holding the button
          * (or right-clicking it) shows the tab's history list, Firefox-style.
          */
-        /** Give the keyboard back to the page after a toolbar click. */
+        /**
+         * Drop the focus ring a toolbar click leaves behind.
+         *
+         * This used to hand OS focus to the page view as well, which is what a
+         * single-process browser does — but the chrome and the page are
+         * SEPARATE WebContentsViews here, and a view that does not hold focus
+         * spends the next click getting it. That is the "first click on the
+         * sidebar does nothing" bug: reload stole focus, and the rail had to
+         * buy it back. The chrome keeps focus; clicking the page gives the page
+         * focus, which is the same gesture that would have typed into it.
+         */
         function releaseFocusToPage(btn) {
-            try {
-                btn?.blur();
-                window.tabsUI?.focusPage?.();
-            }
+            try { btn?.blur(); }
             catch (e) { window.inkLog?.debug('renderer', 'releaseFocusToPage: ' + e); }
         }
         function setupNavButton(btn, action) {
@@ -2475,10 +2489,10 @@
             '<stop offset="0" stop-color="var(--folder-sheen)"/>' +
             '<stop offset="1" stop-color="var(--folder-fill)"/></linearGradient></defs>';
         const FOLDER_GLYPH = {
-            closed: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">' + FOLDER_DEFS +
+            closed: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.17" stroke-linejoin="round">' + FOLDER_DEFS +
                 '<path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v6.3a1.7 1.7 0 0 1-1.7 1.7H4.2a1.7 1.7 0 0 1-1.7-1.7z" fill="url(#fg)"/>' +
                 '<path d="M3.6 8.4h12.8" stroke="var(--folder-sheen)" stroke-width="1" stroke-linecap="round" opacity="0.7"/></svg>',
-            open: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">' + FOLDER_DEFS +
+            open: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.17" stroke-linejoin="round">' + FOLDER_DEFS +
                 '<path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v1.2H5.6z" fill="url(#fg)"/>' +
                 '<path d="M2.5 6.6l1.3 7.9a1.7 1.7 0 0 0 1.7 1.5h10.3a1.7 1.7 0 0 0 1.7-1.5l1-5.2H5.6z" fill="url(#fg)"/>' +
                 '<path d="M5.9 10.1h11.3" stroke="var(--folder-sheen)" stroke-width="1" stroke-linecap="round" opacity="0.55"/></svg>',
@@ -2874,8 +2888,8 @@
         const INDICATOR_SVG = {
             audio: '<svg viewBox="0 0 20 20" width="11" height="11" fill="currentColor"><path d="M3.5 7.5v5H7l4 3.5v-12L7 7.5H3.5z"/><path d="M13.5 7a4 4 0 010 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
             muted: '<svg viewBox="0 0 20 20" width="11" height="11" fill="currentColor"><path d="M3.5 7.5v5H7l4 3.5v-12L7 7.5H3.5z"/><path d="M13 8l4 4M17 8l-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
-            mic: '<svg viewBox="0 0 20 20" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7.5" y="2.5" width="5" height="9" rx="2.5"/><path d="M4.5 9.5a5.5 5.5 0 0011 0M10 15v2.5"/></svg>',
-            camera: '<svg viewBox="0 0 20 20" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5.5" width="11" height="9" rx="1.5"/><path d="M13 9l5-2.5v7L13 11"/></svg>',
+            mic: '<svg viewBox="0 0 20 20" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.91" stroke-linecap="round" stroke-linejoin="round"><rect x="7.5" y="2.5" width="5" height="9" rx="2.5"/><path d="M4.5 9.5a5.5 5.5 0 0011 0M10 15v2.5"/></svg>',
+            camera: '<svg viewBox="0 0 20 20" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.91" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5.5" width="11" height="9" rx="1.5"/><path d="M13 9l5-2.5v7L13 11"/></svg>',
         };
         const INDICATOR_TITLE = {
             audio: 'Playing audio — click to mute',

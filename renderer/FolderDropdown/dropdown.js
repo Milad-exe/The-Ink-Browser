@@ -24,11 +24,11 @@
            22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"/>
 </svg>`;
     const BACK_ARROW_SVG = `<svg width="6" height="10" viewBox="0 0 6 10" fill="none"
-  stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round">
   <path d="M5 1L1 5l4 4"/>
 </svg>`;
     const CHEVRON_RIGHT_SVG = `<svg width="5" height="9" viewBox="0 0 5 9" fill="none"
-  stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round">
   <path d="M1 1l3 3.5L1 8"/>
 </svg>`;
     const DRAG_SPRING_DELAY = 500;

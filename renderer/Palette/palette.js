@@ -164,6 +164,7 @@
         root.setProperty('--frame-left', (f.left || 0) + 'px');
         root.setProperty('--frame-right', (f.right || 0) + 'px');
         root.setProperty('--frame-top', (f.top || 0) + 'px');
+        root.setProperty('--frame-bottom', (f.bottom || 0) + 'px');
     });
     window.overlayPalette.onOpen(() => {
         input.value = '';
