@@ -126,6 +126,50 @@ function installGapHandlers(ctx) {
         return id;
     };
 
+    // ── chrome.windows, when the browser has no tabs ─────────────────────────
+    // electron-chrome-extensions learns about a window only through addTab(),
+    // so a window with NO tabs does not exist as far as extensions are
+    // concerned: windows.getCurrent() answers null and getAll() answers []. The
+    // browser opens with no tabs, so a password manager asking for the current
+    // window at startup got null and its background script died on `.id`.
+    //
+    // These describe the real windows in the same shape and with the same ids
+    // the library uses (Electron's BrowserWindow.id), so the two agree once
+    // tabs do exist — the polyfill only falls back when the library is empty.
+    const windowDetails = (wd) => {
+        const win = wd?.window;
+        if (!win || win.isDestroyed())
+            return null;
+        const [left, top] = win.getPosition();
+        const [width, height] = win.getSize();
+        let state = 'normal';
+        if (win.isMinimized()) state = 'minimized';
+        else if (win.isMaximized()) state = 'maximized';
+        else if (win.isFullScreen()) state = 'fullscreen';
+        return {
+            id: win.id,
+            focused: win.isFocused(),
+            top, left, width, height,
+            incognito: !!wd.private,
+            type: 'normal',
+            state,
+            alwaysOnTop: win.isAlwaysOnTop(),
+            tabs: [],
+            sessionId: 'default',
+        };
+    };
+    const allWindowDetails = () => {
+        const out = [];
+        for (const wd of (wm.windows?.values?.() || []))
+            { const d = windowDetails(wd); if (d) out.push(d); }
+        return out;
+    };
+    handle('ext:windows.getAll', () => allWindowDetails());
+    handle('ext:windows.getCurrent', () => {
+        const wd = wm.getMostRecentlyFocusedWindow?.() || wm.getPrimaryWindow?.();
+        return windowDetails(wd) || allWindowDetails()[0] || null;
+    });
+
     // ── chrome.tabCapture ────────────────────────────────────────────────────
     handle('ext:getMediaStreamId', (_e, { targetTabId, consumerTabId } = {}) => {
         // Chrome hands back an id the CONSUMER can pass to getUserMedia with

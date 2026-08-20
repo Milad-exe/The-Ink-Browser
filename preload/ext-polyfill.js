@@ -363,6 +363,53 @@ function mainWorldScript() {
         };
     }
 
+    // ── chrome.windows, when the browser has no tabs ─────────────────────────
+    // The library builds its window list from tabs, so a window with none is
+    // invisible: getCurrent() answers null, getAll() answers []. This browser
+    // opens with no tabs, and an extension that asks for the current window at
+    // startup (a password manager does) then dies on `.id`.
+    //
+    // Wrap rather than replace: the native call still runs first and its answer
+    // wins whenever it has one, so nothing changes the moment a tab exists.
+    if (current.windows && typeof current.windows.getCurrent === 'function') {
+        const nativeWindows = current.windows;
+        const fill = async (value, channel) => {
+            const empty = value == null || (Array.isArray(value) && value.length === 0);
+            if (!empty)
+                return value;
+            try { return await api.invoke(channel, {}); }
+            catch { return value; }
+        };
+        const wrap = (name, channel) => {
+            const original = nativeWindows[name];
+            if (typeof original !== 'function')
+                return;
+            windowsShim[name] = function (...args) {
+                const cb = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+                const result = Promise.resolve(original.apply(nativeWindows, args))
+                    .then((v) => fill(v, channel))
+                    .catch(async (e) => {
+                        const filled = await fill(null, channel);
+                        if (filled == null)
+                            throw e;
+                        return filled;
+                    });
+                if (cb) { result.then(cb, () => cb(null)); return undefined; }
+                return result;
+            };
+        };
+        var windowsShim = Object.create(null);
+        for (const key of Reflect.ownKeys(nativeWindows)) {
+            const desc = Object.getOwnPropertyDescriptor(nativeWindows, key);
+            try { Object.defineProperty(windowsShim, key, desc); }
+            catch { }
+        }
+        wrap('getCurrent', 'ext:windows.getCurrent');
+        wrap('getLastFocused', 'ext:windows.getCurrent');
+        wrap('getAll', 'ext:windows.getAll');
+        add.windows = windowsShim;
+    }
+
     if (!Object.keys(add).length)
         return;
     // chrome is frozen, so rebuild it with the extra namespaces and rebind. The
