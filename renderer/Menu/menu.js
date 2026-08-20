@@ -69,5 +69,14 @@
         // somewhere to start.
         document.querySelectorAll('.menu-row').forEach(r => r.setAttribute('role', 'menuitem'));
         window.Ink?.keys?.rows(document, { selector: '.menu-row, #zoom-reset', onEscape: close, focusFirst: true });
+        // Left/Right work the zoom row from its single stop, the way a slider
+        // row behaves in a native menu.
+        document.getElementById('zoom-reset').addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')
+                return;
+            e.preventDefault();
+            e.stopPropagation();
+            setZoom(e.key === 'ArrowLeft' ? 'out' : 'in');
+        });
     });
 })();

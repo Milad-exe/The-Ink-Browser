@@ -108,6 +108,7 @@
         const root = data.kind === 'emoji' ? buildEmoji(data) : build(data.rows, 0, []);
         chain.push(root);
         place(root, data.x, data.y);
+        armKeys();
     });
 
     // Clear the chain as well as telling main to hide us, so the view never
@@ -117,6 +118,13 @@
     surface.addEventListener('mousedown', (e) => {
         if (!chain.some(m => m.contains(e.target))) dismiss();
     });
+    // A context menu you can only click is half a menu: arrows move, Enter
+    // activates, Escape closes, and typing jumps by first letter. Re-armed on
+    // every open because the rows are rebuilt each time.
+    const armKeys = () => {
+        const top = chain[chain.length - 1];
+        window.Ink?.keys?.rows(top || document, { selector: '.ctx-menu-item', onEscape: dismiss, focusFirst: true });
+    };
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') dismiss();
     });

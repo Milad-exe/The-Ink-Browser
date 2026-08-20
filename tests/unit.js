@@ -406,6 +406,40 @@ test('locale resolution falls back from a region to its language, then English',
     assert.strictEqual(i18n.resolve('sv-SE'), 'en', 'no catalogue → English, not a blank UI');
 });
 
+// ── Overlay placement ────────────────────────────────────────────────────────
+// Panels used to invent their own geometry (six widths, four gaps, two
+// hardcoded y values). These pin the one rule they all follow now.
+const { panelBounds, CARD_TOP, SHELL_PAD } = require(path.join(root, 'features/overlay-bounds'));
+const fakeWin = (width = 1440, height = 900) => ({ getContentBounds: () => ({ x: 0, y: 0, width, height }) });
+
+test('a panel from the toolbar opens in the page card\'s top-right corner', () => {
+    const b = panelBounds(fakeWin(), { anchor: { left: 1274, right: 1304, top: 13, bottom: 43 }, width: 320, height: 177 });
+    assert.strictEqual(b.y, CARD_TOP, 'level with the top of the page card');
+    assert.strictEqual(b.x + b.width, 1440 - SHELL_PAD, 'flush with the shell gutter');
+});
+
+test('toolbar panels share an edge whichever icon opened them', () => {
+    const mk = (right) => panelBounds(fakeWin(), { anchor: { left: right - 30, right, top: 13, bottom: 43 }, width: 320, height: 177 });
+    assert.strictEqual(mk(1304).x, mk(1432).x, 'the icons are one cluster, not three anchors');
+});
+
+test('a panel triggered low in the window opens upwards instead of being squashed', () => {
+    const b = panelBounds(fakeWin(), { anchor: { left: 9, right: 39, top: 862, bottom: 892 }, width: 320, height: 177 });
+    assert.strictEqual(b.height, 177, 'keeps its full height');
+    assert.ok(b.y + b.height <= 892, 'sits above the trigger');
+});
+
+test('a panel anchored to the address field hangs from it, not from the corner', () => {
+    const b = panelBounds(fakeWin(), { anchor: { left: 535, right: 557, top: 17, bottom: 39 }, align: 'left', width: 320, height: 300 });
+    assert.strictEqual(b.x, 535);
+    assert.strictEqual(b.y, CARD_TOP);
+});
+
+test('a panel taller than the window stops at the bottom gutter', () => {
+    const b = panelBounds(fakeWin(), { anchor: { left: 1274, right: 1304, top: 13, bottom: 43 }, width: 320, height: 1200 });
+    assert.strictEqual(b.y + b.height, 900 - SHELL_PAD);
+});
+
 // ── Report ───────────────────────────────────────────────────────────────────
 if (failures.length) {
     console.error(`\n${failures.length} of ${passed + failures.length} unit tests failed:\n`);

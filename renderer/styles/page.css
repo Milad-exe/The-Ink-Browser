@@ -58,7 +58,7 @@
 
   .page-search {
     display: flex; align-items: center; gap: var(--sp-4);
-    height: var(--field-h); padding: 0 var(--sp-5);
+    height: var(--field-h); padding: 0 var(--sp-6);
     margin-bottom: var(--sp-6);
     background: color-mix(in srgb, var(--bg) 70%, transparent);
     border-radius: var(--r-md); box-shadow: var(--ring);
@@ -97,7 +97,7 @@
 
   .list-row {
     display: flex; align-items: center; gap: var(--sp-4);
-    min-height: 44px; padding: var(--sp-2) var(--sp-4);
+    min-height: 44px; padding: var(--sp-2) var(--sp-6);
     color: var(--text); cursor: pointer;
     transition: background var(--dur-1) var(--ease);
     position: relative;

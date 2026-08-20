@@ -18,6 +18,12 @@
     catch (e) { window.inkLog?.debug('extpanel', 'i18n: ' + e); }
     const listEl = document.getElementById('list');
     const PIN_SVG = `<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M9.5 1.5l5 5-1.5 1.5-.75-.25L9.5 10.5l.25 2.75L8.5 14.5 5 11 2 14l-1-1 3-3-3.5-3.5 1.25-1.25 2.75.25 2.75-2.75-.25-.75L9.5 1.5z"/></svg>`;
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            window.extPanel.close();
+        }
+    });
     function render(items) {
         listEl.textContent = '';
         if (!items || items.length === 0) {
@@ -113,7 +119,6 @@
         listEl.appendChild(head);
         for (const p of panels) {
             const row = document.createElement('button');
-            row.tabIndex = -1;
             row.className = 'surface-row dt-row';
             row.title = `Open “${p.title}” from ${p.extensionName || p.extensionId}`;
             const meta = document.createElement('div');

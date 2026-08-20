@@ -13,10 +13,11 @@
  * so it draws above the tab's WebContentsView.
  */
 const log = require('./log');
+const { panelBounds, PANEL_RADIUS, W_MD } = require('./overlay-bounds');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
-const PANEL_W = 330;
+const PANEL_W = W_MD;
 let wmRef = null;
 let seq = 0;
 const pending = new Map(); // id → { resolve, wd }
@@ -86,7 +87,7 @@ async function showNext(wd) {
             },
         });
         view.setBackgroundColor('#00000000');
-        try { view.setBorderRadius(12) } catch (e) { log.debug('permission-ui', 'item', e); }
+        try { view.setBorderRadius(PANEL_RADIUS) } catch (e) { log.debug('permission-ui', 'item', e); }
         wd.permView = view;
         wd.window.contentView.addChildView(view);
         view.webContents.loadFile(resolveAppFile('renderer/PermissionPrompt/index.html'));
@@ -122,10 +123,9 @@ async function showNext(wd) {
         }
         catch (e) { log.debug('permission-ui', 'onBlur', e); }
     }
-    const winW = wd.window.getBounds().width;
-    const left = Math.max(8, Math.min(Math.round(anchor.x) - 10, winW - PANEL_W - 8));
-    const top = Math.max(2, Math.round(anchor.y) + 4);
-    view.setBounds({ x: left, y: top, width: PANEL_W, height: 150 });
+    // Hangs from the address field, like the site-info panel it sits beside.
+    wd.permAnchor = { left: Math.round(anchor.x), bottom: Math.round(anchor.y) };
+    view.setBounds(panelBounds(wd.window, { anchor: wd.permAnchor, align: 'left', width: PANEL_W, height: 150 }));
     view.setVisible(true);
     wd.permShownAt = Date.now();
     view.webContents.send('permission-data', { id: item.id, ...item.data });
@@ -173,8 +173,10 @@ function register(ipcMain, { wm }) {
         const wd = findWdByOverlay(e.sender);
         if (wd && wd.permView && !wd.permView.webContents.isDestroyed()) {
             try {
-                const b = wd.permView.getBounds();
-                wd.permView.setBounds({ ...b, height: Math.max(70, Math.min(320, Math.round(height))) });
+                wd.permView.setBounds(panelBounds(wd.window, {
+                    anchor: wd.permAnchor, align: 'left', width: PANEL_W,
+                    height: Math.max(70, Math.min(320, Math.round(height))),
+                }));
             }
             catch (e) { log.debug('permission-ui', 'permission-ui-resize', e); }
         }

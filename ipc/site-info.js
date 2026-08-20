@@ -9,7 +9,8 @@ const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView, session } = require('electron');
-const PANEL_W = 300;
+const { panelBounds, PANEL_RADIUS, W_MD } = require('../features/overlay-bounds');
+const PANEL_W = W_MD;
 function computeInfo(url, sitePermissions) {
     let origin = null, host = '', secure = false, internal = false;
     try {
@@ -144,13 +145,14 @@ function register(ipcMain, { wm }) {
             },
         });
         view.setBackgroundColor('#00000000');
-        try { view.setBorderRadius(12) } catch (e) { log.debug('site-info', 'open-site-info', e); }
+        try { view.setBorderRadius(PANEL_RADIUS) } catch (e) { log.debug('site-info', 'open-site-info', e); }
         wd.window.contentView.addChildView(view);
         view.webContents.loadFile(resolveAppFile('renderer/SiteInfo/index.html'));
-        const winW = wd.window.getBounds().width;
-        const left = Math.max(8, Math.min(Math.round((anchor && anchor.x) || 12) - 10, winW - PANEL_W - 8));
-        const top = Math.max(2, Math.round((anchor && anchor.y) || 86) + 4);
-        view.setBounds({ x: left, y: top, width: PANEL_W, height: 300 });
+        // Anchored to the lock glyph, so it hangs from the left edge of the
+        // address field rather than from the window's corner.
+        const rect = { left: Math.round(anchor?.x ?? 12), bottom: Math.round(anchor?.y ?? 50) };
+        wd.siteInfoAnchor = rect;
+        view.setBounds(panelBounds(wd.window, { anchor: rect, align: 'left', width: PANEL_W, height: 300 }));
         wd.siteInfoView = view;
         wd.siteInfoInfo = info;
         // Focus the panel so a click anywhere outside it blurs → closes it.
@@ -223,8 +225,10 @@ function register(ipcMain, { wm }) {
         const wd = wm.getWindowByWebContents(e.sender);
         if (wd && wd.siteInfoView) {
             try {
-                const b = wd.siteInfoView.getBounds();
-                wd.siteInfoView.setBounds({ ...b, height: Math.max(80, Math.min(560, Math.round(height))) });
+                wd.siteInfoView.setBounds(panelBounds(wd.window, {
+                    anchor: wd.siteInfoAnchor, align: 'left', width: PANEL_W,
+                    height: Math.max(80, Math.min(560, Math.round(height))),
+                }));
             }
             catch (e) { log.debug('site-info', 'site-info-resize', e); }
         }

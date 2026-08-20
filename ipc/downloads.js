@@ -11,7 +11,8 @@ const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView, shell, app } = require('electron');
 const downloadManager = require('../features/download-manager');
-const PANEL_WIDTH = 340;
+const { panelBounds, PANEL_RADIUS, W_MD } = require('../features/overlay-bounds');
+const PANEL_WIDTH = W_MD;
 // Mirrors renderer/Downloads/styles.css + the shared panel anatomy: a
 // --bar-h head, a --row-h foot over its divider, and rows that are two lines
 // tall. The empty state needs more than one row's worth of room to read as a
@@ -21,15 +22,13 @@ const FOOT_H = 37;
 const ITEM_H = 52;
 const EMPTY_H = 96;
 const MAX_PANEL_H = 460;
-function panelBounds(anchor, count) {
+function boundsFor(win, anchor, count) {
     const body = count > 0 ? count * ITEM_H + 8 : EMPTY_H;
-    const height = Math.min(MAX_PANEL_H, HEAD_H + FOOT_H + body);
-    return {
-        x: Math.max(0, Math.floor(anchor.right - PANEL_WIDTH)),
-        y: Math.floor(anchor.bottom + 6),
+    return panelBounds(win, {
+        anchor,
         width: PANEL_WIDTH,
-        height,
-    };
+        height: Math.min(MAX_PANEL_H, HEAD_H + FOOT_H + body),
+    });
 }
 async function ensurePanel(wd) {
     if (wd.downloadsPanel) {
@@ -45,7 +44,7 @@ async function ensurePanel(wd) {
         },
     });
     view.setBackgroundColor('#00000000');
-    try { view.setBorderRadius(12) } catch (e) { log.debug('downloads', 'if', e); }
+    try { view.setBorderRadius(PANEL_RADIUS) } catch (e) { log.debug('downloads', 'if', e); }
     view.setVisible(false);
     wd.downloadsPanel = view;
     wd.window.contentView.addChildView(view);
@@ -130,7 +129,7 @@ function register(ipcMain, { wm }) {
         try {
             const view = await ensurePanel(wd);
             const items = downloadManager.getAll();
-            view.setBounds(panelBounds(anchor, items.length));
+            view.setBounds(boundsFor(wd.window, anchor, items.length));
             view.webContents.send('downloads-data', items);
             view.setVisible(true);
             wd.downloadsPanelOpen = true;

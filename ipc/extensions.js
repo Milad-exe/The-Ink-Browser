@@ -11,19 +11,23 @@ const { resolveAppFile } = require('../app-paths');
 const extensions = require('../features/extensions');
 const WEB_STORE_URL = 'https://chromewebstore.google.com/';
 // ── Toolbar panel (puzzle icon) — same overlay pattern as the downloads panel ──
-const PANEL_WIDTH = 320;
-const HEADER_H = 38;
-const FOOTER_H = 40;
-const ITEM_H = 46;
-const MAX_PANEL_H = 430;
-function panelBounds(anchor, count) {
-    const height = Math.min(MAX_PANEL_H, HEADER_H + FOOTER_H + Math.max(1, count) * ITEM_H + 2);
-    return {
-        x: Math.max(0, Math.floor(anchor.right - PANEL_WIDTH)),
-        y: Math.floor(anchor.bottom + 6),
+const { panelBounds, PANEL_RADIUS, W_MD } = require('../features/overlay-bounds');
+const PANEL_WIDTH = W_MD;
+// Mirrors renderer/ExtensionsPanel/styles.css + the shared panel anatomy: a
+// --bar-h head, a --row-h foot over its divider, two-line rows, and an empty
+// state that needs more than one row's worth of room to read as a sentence.
+const HEAD_H = 44;
+const FOOT_H = 37;
+const ITEM_H = 52;
+const EMPTY_H = 96;
+const MAX_PANEL_H = 460;
+function boundsFor(win, anchor, count) {
+    const body = count > 0 ? count * ITEM_H + 8 : EMPTY_H;
+    return panelBounds(win, {
+        anchor,
         width: PANEL_WIDTH,
-        height,
-    };
+        height: Math.min(MAX_PANEL_H, HEAD_H + FOOT_H + body),
+    });
 }
 async function ensurePanel(wd) {
     if (wd.extensionsPanel) {
@@ -39,7 +43,7 @@ async function ensurePanel(wd) {
         },
     });
     view.setBackgroundColor('#00000000');
-    try { view.setBorderRadius(12) } catch (e) { log.debug('extensions', 'if', e); }
+    try { view.setBorderRadius(PANEL_RADIUS) } catch (e) { log.debug('extensions', 'if', e); }
     view.setVisible(false);
     wd.extensionsPanel = view;
     wd.window.contentView.addChildView(view);
@@ -710,7 +714,7 @@ function register(ipcMain, { wm }) {
             let extraRows = 0;
             try { extraRows = require('../features/devtools-ext').listPanels().length; }
             catch (e) { log.debug('extensions', 'extensions-panel-toggle', e); }
-            view.setBounds(panelBounds(anchor, items.length + extraRows));
+            view.setBounds(boundsFor(wd.window, anchor, items.length + extraRows));
             // Re-add on every open: newly created tab views would otherwise
             // sit above the panel in the contentView child order.
             try {
@@ -747,12 +751,7 @@ function register(ipcMain, { wm }) {
             return false;
         const h = Math.max(80, Math.min(MAX_PANEL_H, Math.ceil(height) + 2));
         try {
-            wd.extensionsPanel.setBounds({
-                x: Math.max(0, Math.floor(anchor.right - PANEL_WIDTH)),
-                y: Math.floor(anchor.bottom + 6),
-                width: PANEL_WIDTH,
-                height: h,
-            });
+            wd.extensionsPanel.setBounds(panelBounds(wd.window, { anchor, width: PANEL_WIDTH, height: h }));
         }
         catch (e) { log.debug('extensions', 'extensions-panel-height', e); }
         return true;

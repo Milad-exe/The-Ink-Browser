@@ -11,11 +11,12 @@ const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
-const ITEM_HEIGHT = 36; // row min-height 34 + its 1px margins (Suggestions/styles.css)
+const { PANEL_RADIUS } = require('../features/overlay-bounds');
+const ITEM_HEIGHT = 34; // --row-h (32) + the row's 1px margins (Suggestions/styles.css)
 const LIST_CHROME = 16; // body padding (8) + the card's own padding (8)
 // Fits the full capped list (≤8 rows: base + ≤4 links + ≤3 search) without
-// scrolling. 8 * 36 + 16 = 304; the caps live in renderer.js updateSuggestions.
-const MAX_HEIGHT = 312;
+// scrolling. 8 * 34 + 16 = 288; the caps live in renderer.js updateSuggestions.
+const MAX_HEIGHT = 296;
 /** Create (once) and load the overlay view for a window. Resolves when loaded. */
 async function ensureView(wd) {
     if (wd.suggestions) {
@@ -31,7 +32,7 @@ async function ensureView(wd) {
         },
     });
     view.setBackgroundColor('#00000000');
-    try { view.setBorderRadius(12) } catch (e) { log.debug('suggestions', 'if', e); }
+    try { view.setBorderRadius(PANEL_RADIUS) } catch (e) { log.debug('suggestions', 'if', e); }
     view.setVisible(false);
     wd.suggestions = view;
     wd.window.contentView.addChildView(view);

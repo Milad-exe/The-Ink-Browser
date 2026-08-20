@@ -33,7 +33,9 @@
 </svg>`;
     const DRAG_SPRING_DELAY = 500;
     const MAX_HEIGHT = 480;
-    const PANEL_WIDTH = 240;
+    // 244 + 16 = the shared small-panel width (features/overlay-bounds W_SM);
+    // the padding is the slack the shadow needs inside the view.
+    const PANEL_WIDTH = 244;
     const PANEL_PADDING = 16;
     // ─────────────────────────────────────────────────────────────────────────────
     // Tree state
@@ -324,6 +326,12 @@
         }
         container.appendChild(buildList(folder));
         updateSize();
+        // Same keyboard as every other menu in the browser: the list is one
+        // tab stop, arrows move inside it, Escape closes.
+        window.Ink?.keys?.rows(container, {
+            selector: '.item, .back-btn:not(.hidden)',
+            onEscape: () => window.folderDropdown?.close?.(),
+        });
     }
     // ─────────────────────────────────────────────────────────────────────────────
     // List

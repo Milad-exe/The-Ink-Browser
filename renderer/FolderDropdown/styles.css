@@ -20,7 +20,7 @@ body {
   border-radius: var(--r-lg);
   box-shadow: var(--ring-2), var(--shadow-pop);
   overflow: hidden;
-  width: 240px;
+  width: 244px;
 }
 
 .hidden { display: none !important; }

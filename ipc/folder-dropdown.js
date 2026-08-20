@@ -9,6 +9,7 @@
 const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
+const { panelBounds, PANEL_RADIUS, W_SM } = require('../features/overlay-bounds');
 const { WebContentsView, Menu } = require('electron');
 const { closeFolderDropdown, broadcastBookmarksChanged } = require('./utils');
 const { sanitizeUrl } = require('../features/url-security');
@@ -36,7 +37,7 @@ function register(ipcMain, { wm, screen, webContents }) {
                 },
             });
             view.setBackgroundColor('#00000000');
-            try { view.setBorderRadius(12) } catch (e) { log.debug('folder-dropdown', 'folder-dropdown-open', e); }
+            try { view.setBorderRadius(PANEL_RADIUS) } catch (e) { log.debug('folder-dropdown', 'folder-dropdown-open', e); }
             wd.window.contentView.addChildView(view);
             wd.folderDropdown = view;
             wd.folderDropdownId = folderData.id;
@@ -300,13 +301,11 @@ function initialBounds(anchorRect, folderData, win) {
     const children = folderData.children || [];
     const itemCount = children.filter(c => c.type !== 'divider').length || 1;
     const sepCount = children.filter(c => c.type === 'divider').length;
-    // Single-panel width (matches PANEL_WIDTH + PANEL_PADDING in dropdown.js)
-    const w = 240 + 16;
-    const h = Math.min(itemCount * 28 + sepCount * 7 + 16, 480);
-    const winW = win.getContentBounds().width;
-    const x = Math.max(0, Math.min(Math.floor(anchorRect.left), winW - w));
-    const y = Math.floor(anchorRect.bottom);
-    return { x, y, width: w, height: h };
+    // First-frame estimate only — the page measures itself and reports back
+    // (updateBounds). Rows are --row-h and separators are 1px inside --sp-2
+    // margins, so an estimate built from 28px rows clipped the last item.
+    const h = Math.min(itemCount * 32 + sepCount * 9 + 8, 480);
+    return panelBounds(win, { anchor: anchorRect, align: 'left', width: W_SM, height: h });
 }
 /** Recursively find a folder node by id inside the bookmark tree. */
 function findFolderDeep(items, targetId) {

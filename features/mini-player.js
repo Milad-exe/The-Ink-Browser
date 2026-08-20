@@ -11,6 +11,7 @@
  * Toggleable in Settings → General ("miniPlayerEnabled").
  */
 const log = require('./log');
+const { PANEL_RADIUS } = require('./overlay-bounds');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
@@ -102,7 +103,7 @@ function show(wd, tabIndex) {
         },
     });
     view.setBackgroundColor('#00000000');
-    try { view.setBorderRadius(12); } catch (e) { log.debug('mini-player', 'if', e); }
+    try { view.setBorderRadius(PANEL_RADIUS); } catch (e) { log.debug('mini-player', 'if', e); }
     wd.window.contentView.addChildView(view);
     view.webContents.loadFile(resolveAppFile('renderer/MiniPlayer/index.html'));
     view.setBounds(panelBounds(wd));

@@ -9,7 +9,8 @@ const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
 const { closeWindowMenu, closeFolderDropdown } = require('./utils');
-const MENU_WIDTH = 268;
+const { panelBounds, PANEL_RADIUS, W_SM } = require('../features/overlay-bounds');
+const MENU_WIDTH = W_SM;
 // Rows (12 x --row-h) + the zoom row + four separators + the card's own
 // padding. Measured from the rendered card rather than guessed: an oversized
 // menu window is invisible but still swallows clicks below the card.
@@ -29,16 +30,12 @@ function register(ipcMain, { wm }) {
             },
         });
         wd.menu.setBackgroundColor('#00000000');
-        try { wd.menu.setBorderRadius(12); } catch (e) { log.debug('menu', 'open', e); }
+        try { wd.menu.setBorderRadius(PANEL_RADIUS); } catch (e) { log.debug('menu', 'open', e); }
         wd.window.contentView.addChildView(wd.menu);
         wd.menu.webContents.loadFile(resolveAppFile('renderer/Menu/index.html'));
-        const browserWidth = wd.window.getBounds().width;
-        wd.menu.setBounds({
-            height: MENU_HEIGHT,
-            width: MENU_WIDTH,
-            x: browserWidth - 10 - MENU_WIDTH,
-            y: 90,
-        });
+        // No anchor: the menu belongs to the window, so it opens in the
+        // shell's own corner — level with the top of the page card.
+        wd.menu.setBounds(panelBounds(wd.window, { width: MENU_WIDTH, height: MENU_HEIGHT }));
         // Close the menu the moment the user clicks outside it or the window
         // loses OS focus. Use a one-shot flag so cleanup only fires once.
         const cleanups = [];

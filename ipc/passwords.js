@@ -11,7 +11,8 @@ const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
 const store = require('../features/password-store');
-const PROMPT_W = 360;
+const { panelBounds, PANEL_RADIUS, W_MD } = require('../features/overlay-bounds');
+const PROMPT_W = W_MD;
 const PROMPT_H = 150;
 function senderOrigin(sender) {
     try {
@@ -112,14 +113,14 @@ function register(ipcMain, { wm }) {
                     },
                 });
                 view.setBackgroundColor('#00000000');
-                try { view.setBorderRadius(12) } catch (e) { log.debug('passwords', 'showPrompt', e); }
+                try { view.setBorderRadius(PANEL_RADIUS) } catch (e) { log.debug('passwords', 'showPrompt', e); }
                 wd.passwordPrompt = view;
                 wd.window.contentView.addChildView(view);
                 view.webContents.loadFile(resolveAppFile('renderer/PasswordPrompt/index.html'));
                 await new Promise(res => view.webContents.once('did-finish-load', () => res()));
             }
             const b = wd.window.getContentBounds();
-            wd.passwordPrompt.setBounds({ x: Math.max(0, b.width - PROMPT_W - 12), y: 52, width: PROMPT_W, height: PROMPT_H });
+            wd.passwordPrompt.setBounds(panelBounds(wd.window, { width: PROMPT_W, height: PROMPT_H }));
             try {
                 wd.window.contentView.removeChildView(wd.passwordPrompt);
                 wd.window.contentView.addChildView(wd.passwordPrompt);

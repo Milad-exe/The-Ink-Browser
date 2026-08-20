@@ -23,7 +23,9 @@ html, body {
 
 /* ── Sidebar ── */
 .sidebar {
-  width: 208px; min-width: 168px; max-width: 232px;
+  /* The same width as the browser's own sidebar, so the app keeps one grid
+     whether you are looking at a page or at the chrome. */
+  width: 240px; min-width: 200px; max-width: 260px;
   flex-shrink: 0;
   /* Recessed rather than raised — it is navigation, not content. */
   background: color-mix(in srgb, var(--bg) 55%, transparent);
@@ -70,7 +72,8 @@ html, body {
   flex: 1; min-width: 0; overflow-y: auto;
   padding: var(--sp-8) var(--sp-7) calc(var(--sp-8) * 2);
 }
-.section { max-width: 720px; margin: 0 auto; }
+/* The same reading column as History and Bookmarks (page.css). */
+.section { max-width: 780px; margin: 0 auto; }
 
 .section { display: none; }
 .section.active { display: block; }
@@ -207,7 +210,7 @@ input[type="number"]:focus { border-color: var(--text-3); }
    see the SHARED CONTROLS block in renderer/styles/ui.css. */
 .ext-add-buttons { display: flex; gap: var(--sp-4); flex-shrink: 0; }
 
-.ext-id-row { display: flex; gap: var(--sp-4); margin-top: 14px; }
+.ext-id-row { display: flex; gap: var(--sp-4); margin-top: var(--sp-5); }
 .ext-id-input {
   flex: 1; padding: 9px 12px; background: var(--bg);
   border: 1px solid var(--border-2); color: var(--text); border-radius: var(--r-md);
@@ -301,10 +304,11 @@ input, textarea, select { user-select: text; -webkit-user-select: text; }
 }
 
 /* ── Search engines, data import/export, diagnostics ───────────────────────── */
-.engine-list { margin-top: 14px; display: flex; flex-direction: column; gap: var(--sp-3); }
+.engine-list { margin-top: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-3); }
 .engine-row {
   display: flex; align-items: center; gap: var(--sp-4);
-  padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md);
+  min-height: var(--row-h); padding: var(--sp-3) var(--sp-4);
+  border: none; box-shadow: var(--ring); border-radius: var(--r-md);
   background: var(--surface);
 }
 .engine-row .name { font-size: var(--fs-small); font-weight: 600; color: var(--text); }
@@ -323,17 +327,20 @@ input, textarea, select { user-select: text; -webkit-user-select: text; }
 .engine-add { display: flex; gap: var(--sp-4); margin-top: 12px; flex-wrap: wrap; }
 .text-input {
   flex: 1 1 120px; min-width: 0;
-  padding: 7px 10px; border-radius: var(--r-md);
-  border: 1px solid var(--border); background: var(--page); color: var(--text);
+  height: var(--field-h); padding: 0 var(--sp-4); border-radius: var(--r-md);
+  border: none; box-shadow: var(--ring-2); background: var(--page); color: var(--text);
   font-family: var(--font); font-size: var(--fs-small); outline: none;
+  transition: box-shadow var(--dur-1) var(--ease);
 }
-.text-input:focus { border-color: var(--accent); }
+.text-input:focus {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 0 3px var(--accent-wash);
+}
 .text-input.kw { flex: 0 0 92px; font-family: var(--mono); }
 .text-input.url { flex: 2 1 220px; font-family: var(--mono); font-size: var(--fs-small); }
-.engine-hint { margin-top: 10px; margin-bottom: 0; }
+.engine-hint { margin-top: var(--sp-4); margin-bottom: 0; }
 .engine-hint code {
   font-family: var(--mono); font-size: var(--fs-micro);
-  background: var(--surface); padding: 1px 4px; border-radius: 3px;
+  background: var(--surface); padding: 1px 4px; border-radius: var(--r-xs);
 }
 
 .btn-row { display: flex; gap: var(--sp-4); flex-wrap: wrap; }

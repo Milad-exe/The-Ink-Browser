@@ -11,7 +11,8 @@ const { WebContentsView, Menu } = require('electron');
 const { broadcastBookmarksChanged } = require('./utils');
 const { sanitizeUrl } = require('../features/url-security');
 // Bookmark-prompt popup dimensions
-const PROMPT_W = 320;
+const { panelBounds, PANEL_RADIUS, W_MD } = require('../features/overlay-bounds');
+const PROMPT_W = W_MD;
 const PROMPT_H = 260;
 function register(ipcMain, { wm, webContents }) {
     const broadcast = () => broadcastBookmarksChanged(webContents);
@@ -133,12 +134,13 @@ function register(ipcMain, { wm, webContents }) {
                     },
                 });
                 wd.bookmarkPrompt.setBackgroundColor('#00000000');
-                try { wd.bookmarkPrompt.setBorderRadius(12); } catch (e) { log.debug('bookmarks', 'bookmark-prompt-open', e); }
+                try { wd.bookmarkPrompt.setBorderRadius(PANEL_RADIUS); } catch (e) { log.debug('bookmarks', 'bookmark-prompt-open', e); }
                 wd.window.contentView.addChildView(wd.bookmarkPrompt);
             }
-            const x = Math.max(0, Math.floor(bounds.right) - PROMPT_W);
-            const y = Math.max(0, Math.floor(bounds.bottom) + 8);
-            wd.bookmarkPrompt.setBounds({ x, y, width: PROMPT_W, height: PROMPT_H });
+            wd.bookmarkPrompt.setBounds(panelBounds(wd.window, {
+                anchor: { right: Math.floor(bounds.right), bottom: Math.floor(bounds.bottom) },
+                width: PROMPT_W, height: PROMPT_H,
+            }));
             wd.bookmarkPrompt.webContents.loadFile(resolveAppFile('renderer/BookmarkPrompt/index.html'));
             await new Promise(res => wd.bookmarkPrompt.webContents.once('did-finish-load', () => res()));
             wd.bookmarkPrompt.webContents.focus();

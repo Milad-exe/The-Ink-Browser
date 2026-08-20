@@ -1,5 +1,8 @@
 const { BrowserWindow, ipcMain } = require('electron');
 const { resolveAppFile } = require('../app-paths');
+const { CARD_TOP, SHELL_PAD, W_MD } = require('./overlay-bounds');
+const FIND_W = W_MD;
+const FIND_H = 60; // one row: renderer/FindDialog/styles.css .find-bar + its padding
 const path = require('path');
 class FindDialogManager {
     dialogs; // parentWindow webContents id → dialog
@@ -104,8 +107,8 @@ class FindDialog {
             return;
         }
         this.findWindow = new BrowserWindow({
-            width: 320,
-            height: 60,
+            width: FIND_W,
+            height: FIND_H,
             frame: false,
             alwaysOnTop: true,
             resizable: false,
@@ -119,10 +122,12 @@ class FindDialog {
         });
         this.findWindow.loadFile(resolveAppFile('renderer/FindDialog/index.html'));
         if (!this.isDestroyed && this.parentWindow && !this.parentWindow.isDestroyed()) {
+            // Sits in the parent's own gutter, level with the top of the page
+            // card — the same corner every other panel opens in.
             const parentBounds = this.parentWindow.getBounds();
-            const x = parentBounds.x + parentBounds.width - 300;
-            const y = parentBounds.y + 60;
-            this.findWindow.setPosition(x, y);
+            const x = parentBounds.x + parentBounds.width - SHELL_PAD - FIND_W;
+            const y = parentBounds.y + CARD_TOP;
+            this.findWindow.setPosition(Math.round(x), Math.round(y));
         }
         this.findWindow.on('closed', () => {
             this.findWindow = null;
