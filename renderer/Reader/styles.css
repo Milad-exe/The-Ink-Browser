@@ -58,10 +58,14 @@ html[data-rd-face="serif"] body { font-family: Georgia, "Iowan Old Style", "Time
   transition: filter var(--dur-1) var(--ease);
 }
 .rd-tool:hover { filter: brightness(0.96); }
+/* Selection is the app's accent, not the reading theme's link colour: a blue
+   ring on white read as an unstyled OS default, and it was the only place in
+   the browser where "chosen" meant something other than the accent. */
 .rd-seg.active {
-  border-color: var(--rd-link);
-  box-shadow: inset 0 0 0 1px var(--rd-link);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--rd-tool-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
 }
+.rd-tool:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-wash); }
 #rd-close { margin-right: auto; font-size: 14px; }
 .rd-swatch { width: 24px; }
 .rd-swatch.light { background: #fff; }
