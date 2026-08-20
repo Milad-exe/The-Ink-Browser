@@ -238,6 +238,11 @@ exposeInternal('essentials', {
     add: (url, title, profile) => ipcRenderer.invoke('essentials:add', url, title, profile),
     remove: (url, profile) => ipcRenderer.invoke('essentials:remove', url, profile),
     setIcon: (url, profile, icon) => ipcRenderer.invoke('essentials:icon', url, profile, icon),
+    // An Essential is a tab: open (or return to) the one it owns.
+    open: (url, profile) => ipcRenderer.invoke('essentials:open', url, profile),
+    goHome: (url, profile) => ipcRenderer.invoke('essentials:goHome', url, profile),
+    setHome: (url, profile, home) => ipcRenderer.invoke('essentials:setHome', url, profile, home),
+    onTabs: (cb) => ipcRenderer.on('essential-tabs', (_e, live) => cb(live)),
     onChanged: (cb) => ipcRenderer.on('essentials-changed', () => cb()),
 });
 // Glance — floating page preview over the current tab.

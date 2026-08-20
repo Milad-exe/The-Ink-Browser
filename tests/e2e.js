@@ -320,6 +320,68 @@ async function omniboxNavigate(page, text) {
         });
     }
 
+    // ── Essentials are tabs ───────────────────────────────────────────────────
+    // An Essential is not a bookmark that spawns tabs: it owns one, you can
+    // browse away inside it, and only "go back to its page" returns it.
+    section('Essentials');
+    {
+        const chrome = await getChromePage(app);
+        const st = () => app.evaluate(() => {
+            const t = global.__northstarTest.wm.getPrimaryWindow().tabs;
+            return {
+                tabs: t.tabMap.size,
+                activeUrl: String(t.tabUrls.get(t.activeTabIndex) || ''),
+                bound: [...(t.essentialTabs || new Map()).keys()],
+            };
+        });
+        const KEY = 'https://example.com/deep/page';
+        await chrome.evaluate((u) => window.essentials.add(u, 'Example', null), KEY);
+        await sleep(800);
+
+        let before = await st();
+        await chrome.click('.essential-tile');
+        await sleep(3000);
+        const opened = await st();
+        await check('clicking an Essential opens exactly one tab, bound to it', async () =>
+            opened.tabs === before.tabs + 1 && opened.bound.length === 1
+                ? `${before.tabs} -> ${opened.tabs}` : `tabs ${before.tabs}->${opened.tabs}, bound ${opened.bound.length}`);
+
+        await app.evaluate((el) => {
+            const t = global.__northstarTest.wm.getPrimaryWindow().tabs;
+            t.loadUrl(t.activeTabIndex, 'https://www.wikipedia.org');
+        });
+        await sleep(3000);
+        await chrome.click('.essential-tile');
+        await sleep(1500);
+        const again = await st();
+        await check('clicking it again returns to its tab instead of opening another', async () =>
+            again.tabs === opened.tabs && /wikipedia/.test(again.activeUrl)
+                ? `still ${again.tabs} tab, on ${again.activeUrl}` : `tabs ${again.tabs}, url ${again.activeUrl}`);
+
+        await chrome.evaluate((u) => window.essentials.goHome(u, null), KEY);
+        await sleep(2500);
+        const home = await st();
+        await check('"go back to its page" returns its tab home', async () =>
+            home.activeUrl.includes('example.com/deep/page') && home.tabs === opened.tabs
+                ? home.activeUrl : `url ${home.activeUrl}, tabs ${home.tabs}`);
+
+        await chrome.evaluate((u) => window.essentials.setHome(u, null, 'https://example.com/'), KEY);
+        await sleep(700);
+        await check('the page it goes back to is editable', async () => {
+            const list = await chrome.evaluate(() => window.essentials.list());
+            return list[0]?.home === 'https://example.com/' ? list[0].home : JSON.stringify(list[0]);
+        });
+
+        await app.evaluate(() => {
+            const t = global.__northstarTest.wm.getPrimaryWindow().tabs;
+            t.removeTab(t.activeTabIndex);
+        });
+        await sleep(900);
+        await check('closing its tab unbinds it', async () => (await st()).bound.length === 0);
+        await chrome.evaluate((u) => window.essentials.remove(u, null), KEY);
+        await sleep(500);
+    }
+
     // ── Page context menu ─────────────────────────────────────────────────────
     // Built in main from the click's params, so it can be built and INVOKED
     // here without a real right-click.

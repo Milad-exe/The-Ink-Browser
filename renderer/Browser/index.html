@@ -247,6 +247,18 @@
   <!-- One-time hint the first time a tab runs in an isolated session -->
 
   <!-- Rename this window's profile -->
+  <!-- One-field prompt, reused by anything that needs a line of text
+       (an Essential's page, …). -->
+  <div id="text-prompt" class="cm-overlay hidden">
+    <div class="ri-card" role="dialog" aria-labelledby="tp-title">
+      <div class="ri-title" id="tp-title">Edit</div>
+      <input id="tp-input" class="ri-input" spellcheck="false">
+      <div class="ri-actions">
+        <button id="tp-cancel" class="btn btn-ghost ri-btn" data-i18n="chrome.cancel">Cancel</button>
+        <button id="tp-save" class="btn btn-primary ri-btn" data-i18n="chrome.save">Save</button>
+      </div>
+    </div>
+  </div>
   <div id="profile-rename-modal" class="cm-overlay hidden">
     <div class="ri-card" role="dialog" aria-label="Edit profile" data-i18n-label="chrome.editProfile">
       <div class="ri-title">Edit profile</div>

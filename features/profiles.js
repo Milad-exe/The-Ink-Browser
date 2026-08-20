@@ -225,7 +225,9 @@ function _essentials() {
 // The id argument is kept so existing per-window callers still work; Essentials
 // no longer vary by space.
 function essentials(_id) {
-    return _essentials().map(e => ({ ...e }));
+    // `home` is what "go back to its page" uses; unset means the Essential's
+    // own url, so old entries keep working without a migration.
+    return _essentials().map(e => ({ ...e, home: e.home || e.url }));
 }
 function addEssential(_id, e) {
     if (!e || !e.url)
@@ -236,6 +238,26 @@ function addEssential(_id, e) {
     if (list.length >= ESSENTIALS_MAX)
         return false;
     list.push({ url: e.url, title: e.title || e.url, profile: e.profile || null });
+    save();
+    return true;
+}
+/**
+ * The page an Essential goes back to.
+ *
+ * An Essential IS a tab: you click it, you land in its tab, and you can browse
+ * away inside it. `home` is where "go back to its page" returns you, and it is
+ * editable — an Essential added from a deep link can be pointed at the site's
+ * front page instead, or vice versa. It defaults to the url the Essential was
+ * created from, which stays its identity key.
+ */
+function setEssentialHome(_id, url, profile, home) {
+    const e = _essentials().find(x => x.url === url && (x.profile || null) === (profile || null));
+    if (!e)
+        return false;
+    const next = String(home || '').trim();
+    if (next && !/^https?:\/\//i.test(next))
+        return false;
+    e.home = next || null;   // null → falls back to the Essential's own url
     save();
     return true;
 }
@@ -259,4 +281,4 @@ function removeEssential(_id, url, profile = null) {
     return true;
 }
 
-module.exports = { list, meta, create, remove, reorder, rename, update, sessionFor, essentials, addEssential, removeEssential, setEssentialIcon, COLORS, EMOJIS };
+module.exports = { list, meta, create, remove, reorder, rename, update, sessionFor, essentials, addEssential, removeEssential, setEssentialIcon, setEssentialHome, COLORS, EMOJIS };

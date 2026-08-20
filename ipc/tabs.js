@@ -458,6 +458,43 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (ok) broadcastEssentials();
         return ok;
     });
+    // An Essential IS a tab: open it, or return to the one it already owns.
+    ipcMain.handle('essentials:open', (_e, url, profile) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (!wd?.tabs || !/^https?:/i.test(url || ''))
+            return null;
+        const item = profiles.essentials(wm.profileOf(_e.sender))
+            .find(x => x.url === url && (x.profile || null) === (profile || null));
+        const home = (item && item.home) || url;
+        return wd.tabs.openEssential(`${url}|${profile || ''}`, home, profile || null);
+    });
+    // Take its tab back to its page (creating the tab if it has none).
+    ipcMain.handle('essentials:goHome', (_e, url, profile) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (!wd?.tabs)
+            return false;
+        const item = profiles.essentials(wm.profileOf(_e.sender))
+            .find(x => x.url === url && (x.profile || null) === (profile || null));
+        const home = (item && item.home) || url;
+        const idx = wd.tabs.openEssential(`${url}|${profile || ''}`, home, profile || null);
+        if (typeof idx !== 'number')
+            return false;
+        wd.tabs.loadUrl(idx, home);
+        return true;
+    });
+    // Which page it goes back to. Passing nothing uses the page its tab is on.
+    ipcMain.handle('essentials:setHome', (_e, url, profile, home) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        let next = home;
+        if (!next && wd?.tabs) {
+            const bound = wd.tabs.essentialTabs?.get(`${url}|${profile || ''}`);
+            if (bound != null)
+                next = wd.tabs.tabUrls.get(bound);
+        }
+        const ok = profiles.setEssentialHome(wm.profileOf(_e.sender), url, profile || null, next);
+        if (ok) broadcastEssentials();
+        return ok;
+    });
     ipcMain.handle('essentials:icon', (_e, url, profile, icon) => {
         const ok = profiles.setEssentialIcon(wm.profileOf(_e.sender), url, profile || null, icon);
         if (ok) broadcastEssentials();

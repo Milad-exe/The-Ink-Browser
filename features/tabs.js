@@ -829,6 +829,56 @@ class Tabs {
      * theme for nothing. The view is transparent (_applyTabBackground), so
      * about:blank shows the chrome's own page card.
      */
+    /**
+     * Open (or return to) the tab that belongs to an Essential.
+     *
+     * An Essential is not a bookmark that spawns tabs — it IS a tab. Clicking
+     * it lands you in its tab, wherever you had browsed to inside it; only
+     * "go back to its page" returns it to `home`. The binding is per window
+     * and is dropped when the tab closes.
+     *
+     * @param {string} key   `${url}|${profile ?? ''}` — the Essential's identity
+     * @param {string} home  the page to open if it has no tab yet
+     * @param {string|null} container  container/profile id, when it is bound to one
+     * @returns {number|null} the tab index it landed on
+     */
+    openEssential(key, home, container = null) {
+        if (!this.essentialTabs)
+            this.essentialTabs = new Map();
+        const bound = this.essentialTabs.get(key);
+        if (bound != null && this.tabMap.has(bound)) {
+            this.showTab(bound);
+            return bound;
+        }
+        const idx = container
+            ? this.openInContainer(container, home)
+            : this.createTab(home, true, false);
+        if (typeof idx === 'number') {
+            this.essentialTabs.set(key, idx);
+            this.sendEssentialTabs();
+        }
+        return typeof idx === 'number' ? idx : null;
+    }
+    /** Send the chrome the set of Essentials that currently have a tab. */
+    sendEssentialTabs() {
+        try {
+            const live = [];
+            for (const [key, idx] of (this.essentialTabs || new Map()))
+                if (this.tabMap.has(idx))
+                    live.push({ key, index: idx, active: idx === this.activeTabIndex });
+            this.mainWindow.webContents.send('essential-tabs', live);
+        }
+        catch (e) { log.debug('tabs', 'sendEssentialTabs', e); }
+    }
+    /** Drop bindings whose tab is gone (called from removeTab). */
+    _forgetEssentialTab(index) {
+        if (!this.essentialTabs)
+            return;
+        for (const [key, idx] of this.essentialTabs)
+            if (idx === index)
+                this.essentialTabs.delete(key);
+        this.sendEssentialTabs();
+    }
     _loadBlank(tab) {
         try { tab.webContents.loadURL('about:blank'); }
         catch (e) { log.debug('tabs', '_loadBlank', e); }
@@ -1620,6 +1670,8 @@ class Tabs {
     showTab(index) {
         // A glance is transient — dismiss it on any tab switch.
         this.closeGlance();
+        // The Essentials grid highlights whichever tile owns the tab you are on.
+        setImmediate(() => this.sendEssentialTabs());
         // Switching to a tab outside the split pair dissolves the split.
         if (this.splitPair && !this.splitPair.includes(index))
             this._clearSplit();
@@ -1854,6 +1906,7 @@ class Tabs {
     }
     removeTab(index) {
         if (this.tabMap.has(index)) {
+            this._forgetEssentialTab(index);
             const wasActive = this.activeTabIndex === index;
             const nextActive = wasActive ? this._neighborInWorkspace(index) : null;
             const tab = this.tabMap.get(index);

@@ -149,6 +149,43 @@
         });
         // ── Shared state ──────────────────────────────────────────────────────────
         let menuOpen = false;
+        /**
+         * Ask for one line of text. Used by anything that edits a single value
+         * (an Essential's page, …) so those actions do not each grow their own
+         * dialog. Resolves through `onSave` only when the user commits.
+         */
+        function promptForText(title, value, onSave) {
+            const modal = document.getElementById('text-prompt');
+            const input = document.getElementById('tp-input');
+            const titleEl = document.getElementById('tp-title');
+            if (!modal || !input)
+                return;
+            titleEl.textContent = title;
+            input.value = value || '';
+            modal.classList.remove('hidden');
+            // The page is a native view painted OVER the chrome, so it has to
+            // stand aside while a modal is up (same as the profile modal).
+            try { window.focusMode.overlayOpen(); }
+            catch (e) { window.inkLog?.debug('renderer', 'promptForText: ' + e); }
+            input.focus();
+            input.select();
+            const close = () => {
+                modal.classList.add('hidden');
+                try { window.focusMode.overlayClose(); }
+                catch (e) { window.inkLog?.debug('renderer', 'promptForText: ' + e); }
+                document.getElementById('tp-save').removeEventListener('click', save);
+                document.getElementById('tp-cancel').removeEventListener('click', close);
+                input.removeEventListener('keydown', onKey);
+            };
+            const save = () => { const v = input.value.trim(); close(); if (v) onSave(v); };
+            const onKey = (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); save(); }
+                if (e.key === 'Escape') { e.preventDefault(); close(); }
+            };
+            document.getElementById('tp-save').addEventListener('click', save);
+            document.getElementById('tp-cancel').addEventListener('click', close);
+            input.addEventListener('keydown', onKey);
+        }
         // Assigned by initProfiles(); declared HERE, above the init sequence,
         // because spaceContextMenu() — shared by the space pill and the foot
         // avatars — is defined at module level and calls them, and a binding
@@ -1528,6 +1565,7 @@
                 for (const it of items) {
                     const tile = document.createElement('button');
                     tile.className = 'essential-tile';
+                    tile.dataset.key = `${it.url}|${it.profile || ''}`;
                     tile.title = it.title || it.url;
                     let letter = '•';
                     try { letter = new URL(it.url).hostname.replace(/^www\./, '').charAt(0).toUpperCase(); }
@@ -1558,45 +1596,58 @@
                     tile.appendChild(rm);
                     // Click: focus an already-open tab of this site, else open one
                     // (profile-bound essentials reopen in their profile).
+                    // An Essential IS a tab. Clicking it lands you in its tab —
+                    // wherever you had browsed to inside it — and opens that tab
+                    // only if it does not have one yet. It used to hunt for any
+                    // tab on the same ORIGIN and otherwise spawn a new tab, so
+                    // an Essential you had browsed away from opened a second
+                    // copy of itself.
                     tile.addEventListener('click', () => {
-                        if (it.profile) {
-                            window.tab.openInContainer(it.profile, it.url);
-                            return;
-                        }
-                        let origin = null;
-                        try { origin = new URL(it.url).origin; }
-                        catch (e) { window.inkLog?.debug('renderer', 'render: ' + e); }
-                        if (origin) {
-                            for (const [idx, u] of tabUrls) {
-                                try {
-                                    if (new URL(u).origin === origin) {
-                                        window.tab.switch(idx);
-                                        return;
-                                    }
-                                }
-                                catch (e) { window.inkLog?.debug('renderer', 'render: ' + e); }
-                            }
-                        }
-                        window.browserBookmarks.openInNewTab(it.url, true);
+                        window.essentials.open(it.url, it.profile || null);
                     });
                     // Essentials get their own menu — "Remove from Essentials"
                     // rather than the tab strip's unpin.
                     tile.addEventListener('contextmenu', (ev) => {
                         ev.preventDefault(); ev.stopPropagation();
+                        let homeHost = it.home || it.url;
+                        try { homeHost = new URL(it.home || it.url).hostname.replace(/^www\./, ''); }
+                        catch (e) { window.inkLog?.debug('renderer', 'essential menu: ' + e); }
                         openCtxMenu(ev.clientX, ev.clientY, [
-                            ['Open in New Tab', () => window.browserBookmarks.openInNewTab(it.url, true)],
+                            [`Go back to ${homeHost}`, () => window.essentials.goHome(it.url, it.profile || null)],
+                            ['Use this page as its page', () => window.essentials.setHome(it.url, it.profile || null, null)],
+                            ['Set its page…', () => {
+                                const current = it.home || it.url;
+                                promptForText('Page to go back to', current, (v) => {
+                                    if (v && v !== current)
+                                        window.essentials.setHome(it.url, it.profile || null, v);
+                                });
+                            }],
                             ['sep'],
+                            ['Open in a new tab', () => window.browserBookmarks.openInNewTab(it.url, true)],
                             ['Change icon…', () => openEmojiPicker(ev.clientX, ev.clientY,
                                 (emo) => window.essentials.setIcon(it.url, it.profile || null, emo), true)],
                             ['Bookmark…', () => window.browserBookmarks.add(it.url, it.title || '')],
                             ['sep'],
-                            ['Remove from Essentials', () => window.essentials.remove(it.url, it.profile || null), 'danger'],
+                            ['Remove from essentials', () => window.essentials.remove(it.url, it.profile || null), 'danger'],
                         ]);
                     });
                     grid.appendChild(tile);
                 }
             };
             render();
+            // Main says which Essentials currently own a tab, and which one you
+            // are looking at — the tile is the tab, so it shows its own state.
+            try {
+                window.essentials.onTabs?.((live) => {
+                    const byKey = new Map((live || []).map(x => [x.key, x]));
+                    for (const tile of grid.querySelectorAll('.essential-tile')) {
+                        const state = byKey.get(tile.dataset.key || '');
+                        tile.classList.toggle('has-tab', !!state);
+                        tile.classList.toggle('is-active', !!state?.active);
+                    }
+                });
+            }
+            catch (e) { window.inkLog?.debug('renderer', 'essential tabs: ' + e); }
             try { window.essentials.onChanged(render); }
             catch (e) { window.inkLog?.debug('renderer', 'render: ' + e); }
         }
