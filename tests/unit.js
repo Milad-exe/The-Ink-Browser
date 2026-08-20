@@ -442,6 +442,32 @@ test('a panel taller than the window stops at the bottom gutter', () => {
 });
 
 
+// ── Sidebar clamp ────────────────────────────────────────────────────────────
+// The drag in the chrome and the main process (which takes over once the
+// pointer is over the page view) MUST agree, or the sidebar keeps shrinking on
+// screen after the page has stopped moving.
+test('the sidebar clamp stops at its minimum however far you drag', () => {
+    assert.strictEqual(chromeUtil.clampSidebarWidth(40, 1440), 178);
+    assert.strictEqual(chromeUtil.clampSidebarWidth(-500, 1440), 178);
+    assert.strictEqual(chromeUtil.clampSidebarWidth(0, 1440), 178);
+});
+
+test('…and at its maximum', () => {
+    assert.strictEqual(chromeUtil.clampSidebarWidth(5000, 1440), 426);
+});
+
+test('the limits scale with the window but keep absolute floors', () => {
+    const wide = chromeUtil.sidebarLimits(2560);
+    assert.ok(wide.min > 178 && wide.max > 426, 'a wide window gets a wider band');
+    const tiny = chromeUtil.sidebarLimits(600);
+    assert.strictEqual(tiny.min, 178, 'never narrower than usable');
+    assert.strictEqual(tiny.max, 320, 'never wider than the floor on a small window');
+});
+
+test('a width inside the band is left alone', () => {
+    assert.strictEqual(chromeUtil.clampSidebarWidth(256, 1440), 256);
+});
+
 // ── Palette contrast ─────────────────────────────────────────────────────────
 // A re-tone is easy to do by eye and easy to get wrong: the light themes had a
 // tertiary ink and an accent that fell under 3:1 on their own shell. These read

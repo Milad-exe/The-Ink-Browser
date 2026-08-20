@@ -320,6 +320,45 @@ async function omniboxNavigate(page, text) {
         });
     }
 
+    // ── Sidebar resize clamp ──────────────────────────────────────────────────
+    // The chrome draws the sidebar; main positions the page view. If their
+    // clamps disagree the sidebar keeps shrinking on screen after the page has
+    // stopped moving, which is what a drag past the minimum used to look like.
+    section('Sidebar resize');
+    {
+        const chrome = await getChromePage(app);
+        const widths = async () => ({
+            css: await chrome.evaluate(() => Math.round(document.getElementById('tab-bar').getBoundingClientRect().width)),
+            card: (await app.evaluate(() => global.__northstarTest.wm.getPrimaryWindow().tabs.getTabBounds())).x,
+        });
+        const dragTo = async (xs) => {
+            await chrome.evaluate(async (list) => {
+                window.tabsUI.startSidebarResize();
+                for (const x of list) {
+                    const w = Ink.util.clampSidebarWidth(x, window.innerWidth);
+                    document.documentElement.style.setProperty('--sidebar-w', w + 'px');
+                    window.tabsUI.resizeSidebar(w);
+                    await new Promise(r => setTimeout(r, 60));
+                }
+            }, xs);
+            await sleep(500);
+            return widths();
+        };
+        const narrow = await dragTo([220, 120, 40, 4]);
+        await check('dragging past the minimum stops the sidebar AND the page together', async () =>
+            narrow.css === narrow.card && narrow.css >= 170
+                ? `both ${narrow.css}` : `chrome ${narrow.css}, page ${narrow.card}`);
+        const wide = await dragTo([600, 1200, 2000]);
+        await check('dragging past the maximum stops them together too', async () =>
+            wide.css === wide.card && wide.css > narrow.css
+                ? `both ${wide.css}` : `chrome ${wide.css}, page ${wide.card}`);
+        await chrome.evaluate(() => {
+            document.documentElement.style.setProperty('--sidebar-w', '256px');
+            window.tabsUI.commitSidebarWidth(256);
+        });
+        await sleep(400);
+    }
+
     // ── Essentials are tabs ───────────────────────────────────────────────────
     // An Essential is not a bookmark that spawns tabs: it owns one, you can
     // browse away inside it, and only "go back to its page" returns it.

@@ -1495,11 +1495,12 @@
         }
         // Drag the right edge of the sidebar to resize it (side mode). Live-resizes
         // the page view; persists (globally) on release.
-        // Snap a raw width to either the icon rail (56) or the expanded band
-        // (180–460); the 56–180 gap never sticks. Mirrors clampW in ipc/tabs.js.
+        // ONE clamp, shared with main (renderer/lib/util.js). This used to snap
+        // to a 56px rail below 132 while main refused to go under its minimum,
+        // so dragging narrow kept shrinking the sidebar on screen after the
+        // page had already stopped moving.
         function snapSidebar(px) {
-            px = Math.round(px);
-            return px < 132 ? 56 : Math.max(180, Math.min(460, px));
+            return Ink.util.clampSidebarWidth(px, window.innerWidth);
         }
         function applySidebarWidth(w) {
             document.documentElement.style.setProperty('--sidebar-w', w + 'px');

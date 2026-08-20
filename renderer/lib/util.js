@@ -156,8 +156,41 @@
         return String(engine.url).replace(/%s/g, encodeURIComponent(query));
     }
 
+    /**
+     * How wide the sidebar is allowed to be, for a window of `winW`.
+     *
+     * The limits scale with the window (measured off the reference: ~10.5% at
+     * its narrowest, ~29.6% at its widest) with absolute floors so it stays
+     * usable on a small screen.
+     */
+    function sidebarLimits(winW) {
+        const w = Number(winW) || 0;
+        if (!w)
+            return { min: 180, max: 460 };
+        return {
+            min: Math.max(178, Math.round(w * 0.105)),
+            max: Math.max(320, Math.round(w * 0.296)),
+        };
+    }
+
+    /**
+     * The width the sidebar should actually take for a pointer at `px`.
+     *
+     * ONE rule, used by the drag in the chrome AND by the main process when the
+     * pointer crosses over the page view mid-drag. They used to disagree — the
+     * chrome collapsed to a 56px rail below 132 while main refused to go under
+     * its minimum — so dragging narrow kept shrinking the sidebar visually past
+     * the point where the page stopped moving.
+     */
+    function clampSidebarWidth(px, winW) {
+        const { min, max } = sidebarLimits(winW);
+        const w = Math.round(Number(px) || min);
+        return Math.max(min, Math.min(max, w));
+    }
+
     return {
         debounce, looksLikeUrl, normalizeUrl, linkScore, isLowValueMatch,
         cleanliness, urlDisplayParts, keywordEngine, searchUrl,
+        sidebarLimits, clampSidebarWidth,
     };
 });

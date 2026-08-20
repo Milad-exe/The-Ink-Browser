@@ -242,21 +242,16 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     // very narrow window.
     // No icon-rail collapse: dragging narrow stops at the minimum with labels
     // intact, rather than snapping to an icons-only strip.
-    const MIN_FRAC = 0.105, MAX_FRAC = 0.296;
-    const limitsFor = (wd) => {
-        let winW = 0;
-        try { winW = wd?.window?.getContentBounds?.().width || 0; } catch (e) { log.debug('tabs', 'limitsFor', e); }
-        if (!winW) return { min: 180, max: 460 };
-        return {
-            min: Math.max(178, Math.round(winW * MIN_FRAC)),
-            max: Math.max(320, Math.round(winW * MAX_FRAC)),
-        };
+    // The clamp itself lives in renderer/lib/util.js, so the drag in the chrome
+    // and this side (which takes over once the pointer is over the page view)
+    // cannot drift apart — they did, and the sidebar kept shrinking on screen
+    // after the page had stopped moving.
+    const { clampSidebarWidth } = require('../renderer/lib/util');
+    const winWidthOf = (wd) => {
+        try { return wd?.window?.getContentBounds?.().width || 0; }
+        catch (e) { log.debug('tabs', 'winWidthOf', e); return 0; }
     };
-    const clampW = (w, wd) => {
-        w = Math.round(Number(w) || 232);
-        const { min, max } = limitsFor(wd);
-        return Math.max(min, Math.min(max, w));
-    };
+    const clampW = (w, wd) => clampSidebarWidth(w, winWidthOf(wd));
     function applyWidthLive(wd, width) {
         const t = wd.tabs;
         if (width === t.sidebarWidth) return;
