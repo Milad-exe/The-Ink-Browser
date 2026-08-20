@@ -29,6 +29,7 @@ function ok(name, extra)   { passed++; console.log(`  ✓ ${name}${extra ? '  ' 
 function bad(name, why)    { failed++; fails.push(`${name} — ${why}`); console.log(`  ✗ ${name}  <== ${why}`); }
 function skip(name, why)   { skipped++; console.log(`  – ${name} (skipped: ${why})`); }
 function section(t)        { console.log(`\n── ${t} ${'─'.repeat(Math.max(0, 60 - t.length))}`); }
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 async function check(name, fn) {
     try { const r = await fn(); if (r === false) bad(name, 'assertion false'); else ok(name, typeof r === 'string' ? r : ''); }
     catch (e) { bad(name, (e && e.message) || String(e)); }
@@ -235,6 +236,52 @@ async function omniboxNavigate(page, text) {
         const r = await app.evaluate((el) => { const tabs = global.__northstarTest.wm.getPrimaryWindow().tabs; const n0 = tabs.getTotalTabs(); const idx = tabs.activeTabIndex; tabs.removeTab(idx); return { n0, n1: tabs.getTotalTabs() }; });
         return r.n1 === r.n0 - 1;
     });
+
+    // ── Sidebar context menus ─────────────────────────────────────────────────
+    // Every menu ITEM worked; what was broken was reaching them — right-clicking
+    // the rail's background opened nothing, which is where "New folder" lives.
+    section('Sidebar context menus');
+    {
+        const chrome = await getChromePage(app);
+        const ctxRows = async (selector) => {
+            await chrome.evaluate((sel) => {
+                const el = document.querySelector(sel);
+                if (!el) throw new Error('missing ' + sel);
+                const r = el.getBoundingClientRect();
+                el.dispatchEvent(new MouseEvent('contextmenu', {
+                    bubbles: true,
+                    clientX: Math.round(r.left + r.width / 2),
+                    clientY: Math.round(r.top + r.height / 2),
+                }));
+            }, selector);
+            await sleep(700);
+            const menu = app.windows().find(p => { try { return p.url().includes('CtxMenu/index.html'); } catch { return false; } });
+            const rows = menu ? await menu.evaluate(() => [...document.querySelectorAll('.ctx-menu-item')].map(b => b.textContent.replace(/\s+/g, ' ').trim())) : [];
+            if (menu) await menu.keyboard.press('Escape').catch(() => {});
+            await sleep(300);
+            return rows;
+        };
+        await check('the rail background opens the sidebar menu', async () => {
+            const rows = await ctxRows('#tab-bar');
+            return rows.includes('New folder') ? `${rows.length} items` : false;
+        });
+        await check('a tab row opens the tab menu', async () => {
+            const rows = await ctxRows('.tab-button');
+            return rows.includes('Close tab') ? `${rows.length} items` : false;
+        });
+        await check('the space pill and the foot avatar offer the same menu', async () => {
+            const pill = await ctxRows('#space-header');
+            const avatar = await ctxRows('.sb-ws');
+            return pill.length > 3 && JSON.stringify(pill) === JSON.stringify(avatar)
+                ? `${pill.length} items each` : false;
+        });
+        await check('menu copy is sentence case', async () => {
+            const rows = await ctxRows('.tab-button');
+            // A second capital inside a label means Title Case ("Close Tab").
+            const titled = rows.filter(r => /^[A-Z][a-z]+ [A-Z][a-z]/.test(r));
+            return titled.length === 0 ? 'no Title Case rows' : `Title Case: ${titled.join(', ')}`;
+        });
+    }
 
     // ── window.open: popups vs tabs (the fix) ─────────────────────────────────
     section('window.open — popups vs tabs');

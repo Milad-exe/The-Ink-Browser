@@ -1327,33 +1327,43 @@
             tabsContainer.addEventListener('scroll', updateScrollShadows);
             // Right-click the empty part of the tab list → a custom menu.
             const emptyAreaMenu = (e) => {
-                if (e.target.closest('.tab-button') || e.target.closest('.folder-header')) return;
+                // Anything with its own menu handles itself.
+                if (e.target.closest('.tab-button') || e.target.closest('.folder-header')
+                    || e.target.closest('.sidebar-foot') || e.target.closest('#space-header')
+                    || e.target.closest('.essential-tile'))
+                    return;
                 e.preventDefault(); e.stopPropagation();
                 // Grouped as in the reference design doc. Only actions with a real
                 // implementation are listed — no placeholder rows.
                 openCtxMenu(e.clientX, e.clientY, [
-                    ['Compact Mode', [
+                    ['Compact mode', [
                         ['Toggle compact mode', () => window.tabsUI.toggleCompact()],
                     ]],
                     [T('chrome.newTab', 'New tab'), () => window.palette.open()],
-                    ['New Folder', newFolderInline],
+                    ['New folder', newFolderInline],
                     ['sep'],
-                    ['Select All Tabs', () => selectAllTabs()],
-                    ['Reload Selected Tab', () => window.tab.reload(activeTabIndex)],
-                    ['Bookmark Selected Tab…', () => {
+                    ['Select all tabs', () => selectAllTabs()],
+                    ['Reload selected tab', () => window.tab.reload(activeTabIndex)],
+                    ['Bookmark selected tab…', () => {
                         const btn = tabs.get(activeTabIndex);
                         const title = btn?.querySelector('.tab-title')?.textContent || '';
                         if (currentTabUrl) window.browserBookmarks.add(currentTabUrl, title);
                     }],
-                    ['Reopen Closed Tab', () => window.tabsUI.reopenClosed()],
+                    ['Reopen closed tab', () => window.tabsUI.reopenClosed()],
                     ['sep'],
-                    ['Edit Theme…', () => window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance')],
+                    ['Edit theme…', () => window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance')],
                 ]);
             };
             tabsContainer.addEventListener('contextmenu', emptyAreaMenu);
             // The spacer fills the rest of the column in side mode, so a
             // right-click below the last tab lands there, not on the list.
             document.getElementById('tab-drag-spacer')?.addEventListener('contextmenu', emptyAreaMenu);
+            // …and the rail itself, so the whole background answers. Only the
+            // list and the spacer did, which left the column's own padding, the
+            // gap under the space pill and the strip beside the rows silently
+            // dead — and "New folder" lives in this menu, so it read as if the
+            // browser had no way to make one.
+            tabBar?.addEventListener('contextmenu', emptyAreaMenu);
             window.addEventListener('resize', () => setTimeout(() => { updateTabWidths(tabs.size); updateScrollShadows(); }, 100));
             setTimeout(() => { if (tabs.size > 0) {
                 updateTabWidths(tabs.size);
@@ -1546,7 +1556,7 @@
                         openCtxMenu(ev.clientX, ev.clientY, [
                             ['Open in New Tab', () => window.browserBookmarks.openInNewTab(it.url, true)],
                             ['sep'],
-                            ['Change Icon…', () => openEmojiPicker(ev.clientX, ev.clientY,
+                            ['Change icon…', () => openEmojiPicker(ev.clientX, ev.clientY,
                                 (emo) => window.essentials.setIcon(it.url, it.profile || null, emo), true)],
                             ['Bookmark…', () => window.browserBookmarks.add(it.url, it.title || '')],
                             ['sep'],
@@ -1713,7 +1723,7 @@
                     ];
                     if (named.length) rows.push(['sep']);
                     for (const c of named) rows.push([c.name, () => setContainer(c.id, c.name)]);
-                    rows.push(['sep'], ['New Container…', async () => {
+                    rows.push(['sep'], ['New container…', async () => {
                         const nm = (nameEl.value.trim() || 'Container');
                         const c = await window.containers.createNamed(nm);
                         if (c?.id) setContainer(c.id, c.name);
@@ -1798,36 +1808,7 @@
                         b.addEventListener('dblclick', (e) => { e.preventDefault(); openProfileModal(p.id); });
                         b.addEventListener('contextmenu', (e) => {
                             e.preventDefault();
-                            const rows = [];
-                            if (p.id !== activeWorkspace) rows.push(['Switch to this Space', () => window.profiles.switch(p.id)], ['sep']);
-                            rows.push(
-                                ['Change Name…', () => openProfileModal(p.id)],
-                                ['Change Icon…', () => openProfileModal(p.id)],
-                                ['Edit Theme…', () => window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance')],
-                                ['Unload Space', () => window.tab.unloadWorkspace(p.id)],
-                                ['Set Profile', [
-                                    ['Own (isolated)', () => window.profiles.update(p.id, { container: null })],
-                                    ['Default (shared)', () => window.profiles.update(p.id, { container: 'default' })],
-                                    ['sep'],
-                                    ...(_containersCache || []).map(c => [c.name, () => window.profiles.update(p.id, { container: c.id })]),
-                                    ...(_containersCache.length ? [['sep'], ['Manage containers',
-                                        _containersCache.map(c => [c.name, [
-                                            [`Delete “${c.name}”`, async () => {
-                                                await window.containers.remove(c.id);
-                                                _containersCache = (await window.containers.listNamed()) || [];
-                                            }, 'danger'],
-                                        ]]),
-                                    ]] : []),
-                                ]],
-                                ['sep'],
-                                ['Create Space', () => openCreateSpace()],
-                                ...(_spacesCache.length > 1 && String(p.id) !== '1' ? [['sep'], ['Delete Space', [
-                                    // Wipes the space's logins and closes its tabs,
-                                    // so it asks rather than acting on one click.
-                                    [`Delete “${p.name}” and its data`, () => window.profiles.remove(p.id), 'danger'],
-                                ]]] : []),
-                            );
-                            openCtxMenu(e.clientX, e.clientY, rows);
+                            spaceContextMenu(e.clientX, e.clientY, p.id);
                         });
                         wsRow.appendChild(b);
                     }
@@ -1876,13 +1857,21 @@
                 btn.setAttribute('aria-expanded', 'true');
                 openCtxMenu(r.left, r.bottom + 4, rows);
             });
+            // Right-click it and you get what you get on the space's avatar in
+            // the foot — the pill is the space, so both surfaces of it answer
+            // the same way.
+            document.getElementById('space-header')?.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                spaceContextMenu(e.clientX, e.clientY, activeWorkspace);
+            });
             // The foot "+" opens a menu rather than creating a space outright —
             // it's the create-anything affordance in the reference.
             document.getElementById('sb-add-ws')?.addEventListener('click', (e) => {
                 const r = e.currentTarget.getBoundingClientRect();
                 openCtxMenu(r.left, r.top - 8, [
-                    ['Create Space', () => openCreateSpace()],
-                    ['Create Folder', () => newFolderInline()],
+                    ['New space…', () => openCreateSpace()],
+                    ['New folder', () => newFolderInline()],
                     ['sep'],
                     [T('chrome.newTab', 'New tab'), () => window.palette.open()],
                 ]);
@@ -2081,29 +2070,29 @@
                     const moves = folderState.folders
                         .filter(f => f.id !== curFolder)
                         .map(f => [f.name || 'Folder', () => window.folders.assign(idx, f.id)]);
-                    if (curFolder) moves.push(['sep'], ['Remove from Folder', () => window.folders.assign(idx, null)]);
-                    if (moves.length) rows.push(['Move to Folder', moves]);
+                    if (curFolder) moves.push(['sep'], ['Remove from folder', () => window.folders.assign(idx, null)]);
+                    if (moves.length) rows.push(['Move to folder', moves]);
                 }
                 rows.push(
                     ['sep'],
-                    ['Change Label…', () => startTabRename(btn, idx)],
-                    ['Change Icon…', () => openEmojiPicker(e.clientX, e.clientY,
+                    ['Change label…', () => startTabRename(btn, idx)],
+                    ['Change icon…', () => openEmojiPicker(e.clientX, e.clientY,
                         (emo) => window.tab.setIcon(idx, emo), true)],
-                    ['Reset Label', () => window.tab.setLabel(idx, '')],
-                    ['Reset Icon', () => window.tab.setIcon(idx, '')],
-                    ['Reload Tab', () => window.tab.reload(idx)],
-                    ['Mute Tab', () => window.tab.toggleMute(idx)],
+                    ['Reset label', () => window.tab.setLabel(idx, '')],
+                    ['Reset icon', () => window.tab.setIcon(idx, '')],
+                    ['Reload tab', () => window.tab.reload(idx)],
+                    ['Mute tab', () => window.tab.toggleMute(idx)],
                     ['sep'],
-                    [isPinned ? 'Unpin Tab' : 'Pin Tab', () => window.tab.pin(idx)],
-                    ['Unload Tab', () => window.tab.unload(idx)],
+                    [isPinned ? 'Unpin tab' : 'Pin tab', () => window.tab.pin(idx)],
+                    ['Unload tab', () => window.tab.unload(idx)],
                     ...(isPinned ? [
-                        ['Edit Pinned URL…', async () => {
+                        ['Edit pinned URL…', async () => {
                             const cur = await window.tab.getHome(idx);
                             startInlineEdit(btn, cur, (v) => window.tab.setHome(idx, v));
                         }],
-                        ['Reset Pinned Tab', () => window.tab.resetPinned(idx)],
+                        ['Reset pinned tab', () => window.tab.resetPinned(idx)],
                     ] : []),
-                    ['Duplicate Tab', async () => {
+                    ['Duplicate tab', async () => {
                         const url = await window.tab.getTabUrl(idx);
                         const ni = await window.tab.add();
                         if (typeof ni !== 'number') return;
@@ -2117,20 +2106,20 @@
                     ['sep'],
                     // Pinned tabs are workspace-scoped; promoting one to an
                     // Essential makes it global, so the pin is dropped with it.
-                    [isPinned ? 'Move to Essentials' : 'Add to Essentials', async () => {
+                    [isPinned ? 'Move to essentials' : 'Add to essentials', async () => {
                         const url = await window.tab.getTabUrl(idx);
                         const title = btn.querySelector('.tab-title')?.textContent || '';
                         if (!/^https?:/i.test(url || '')) return;
                         const ok = await window.essentials.add(url, title, null);
                         if (ok && isPinned) window.tab.pin(idx);
                     }],
-                    ['Open in New Container Tab', (_containersCache || []).map(c => [
+                    ['Open in new container tab', (_containersCache || []).map(c => [
                         c.name, async () => {
                             const url = await window.tab.getTabUrl(idx);
                             if (/^https?:/i.test(url || '')) window.tab.openInContainer(c.id, url);
                         },
                     ])],
-                    ['Move Tab', [
+                    ['Move tab', [
                         ['Move to Top', () => {
                             const first = [...tabsContainer.querySelectorAll('.tab-button:not(.pinned):not(.in-folder)')][0];
                             if (first && first !== btn) tabsContainer.insertBefore(btn, first);
@@ -2142,10 +2131,10 @@
                         }],
                     ]],
                     ...(splitPair && splitPair.includes(idx)
-                        ? [['Close Split View', () => window.tabsUI.closeSplit()]]
-                        : (idx !== activeTabIndex ? [['Split View With Active Tab', () => window.tabsUI.split(idx)]] : [])),
+                        ? [['Close split view', () => window.tabsUI.closeSplit()]]
+                        : (idx !== activeTabIndex ? [['Split with the active tab', () => window.tabsUI.split(idx)]] : [])),
                     ['sep'],
-                    ['Close Duplicate Tabs', async () => {
+                    ['Close duplicate tabs', async () => {
                         const all = [...document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden)')];
                         const seen = new Set();
                         for (const b of all) {
@@ -2155,26 +2144,26 @@
                             else seen.add(u);
                         }
                     }],
-                    ['Close Multiple Tabs', [
-                        ['Close Other Tabs', () => {
+                    ['Close multiple tabs', [
+                        ['Close other tabs', () => {
                             for (const b of [...document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden):not(.pinned)')])
                                 if (+b.dataset.index !== idx) window.tab.remove(+b.dataset.index);
                         }],
-                        ['Close Tabs Below', () => {
+                        ['Close tabs below', () => {
                             const all = [...document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden):not(.pinned)')];
                             const at = all.findIndex(b => +b.dataset.index === idx);
                             if (at >= 0) for (const b of all.slice(at + 1)) window.tab.remove(+b.dataset.index);
                         }],
                     ]],
-                    ['Bookmark Tab…', async () => {
+                    ['Bookmark tab…', async () => {
                         const url = await window.tab.getTabUrl(idx);
                         const title = btn.querySelector('.tab-title')?.textContent || '';
                         if (/^https?:/i.test(url || '')) window.browserBookmarks.add(url, title);
                     }],
                     ['sep'],
-                    ['Select All Tabs', () => selectAllTabs()],
+                    ['Select all tabs', () => selectAllTabs()],
                     ['sep'],
-                    [selectionFor(idx).length > 1 ? `Close ${selectionFor(idx).length} Tabs` : 'Close Tab',
+                    [selectionFor(idx).length > 1 ? `Close ${selectionFor(idx).length} tabs` : 'Close tab',
                         () => { for (const i of selectionFor(idx)) window.tab.remove(i); clearSelection(); }, 'danger'],
                 );
                 openCtxMenu(e.clientX, e.clientY, rows);
@@ -2654,30 +2643,72 @@
             try { window.ctxMenu.open({ kind: 'emoji', x, y, emojis: emojiSet(), allowNone: !!allowNone }); }
             catch (e) { window.inkLog?.debug('renderer', 'openEmojiPicker: ' + e); }
         }
+        /**
+         * Everything you can do to a space. Used by BOTH the pill at the top of
+         * the rail and the avatar in the foot — they are two views of the same
+         * thing, so a right-click on either has to offer the same actions.
+         */
+        function spaceContextMenu(x, y, id) {
+            const p = (_spacesCache || []).find(s => String(s.id) === String(id));
+            if (!p)
+                return;
+            const rows = [];
+            if (p.id !== activeWorkspace)
+                rows.push(['Switch to this space', () => window.profiles.switch(p.id)], ['sep']);
+            rows.push(
+                ['Change name…', () => openProfileModal(p.id)],
+                ['Change icon…', () => openProfileModal(p.id)],
+                ['Edit theme…', () => window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance')],
+                ['Unload space', () => window.tab.unloadWorkspace(p.id)],
+                ['Set profile', [
+                    ['Own (isolated)', () => window.profiles.update(p.id, { container: null })],
+                    ['Default (shared)', () => window.profiles.update(p.id, { container: 'default' })],
+                    ['sep'],
+                    ...(_containersCache || []).map(c => [c.name, () => window.profiles.update(p.id, { container: c.id })]),
+                    ...(_containersCache.length ? [['sep'], ['Manage containers',
+                        _containersCache.map(c => [c.name, [
+                            [`Delete “${c.name}”`, async () => {
+                                await window.containers.remove(c.id);
+                                _containersCache = (await window.containers.listNamed()) || [];
+                            }, 'danger'],
+                        ]]),
+                    ]] : []),
+                ]],
+                ['sep'],
+                ['New folder', () => newFolderInline()],
+                ['New space…', () => openCreateSpace()],
+                ...(_spacesCache.length > 1 && String(p.id) !== '1' ? [['sep'], ['Delete space', [
+                    // Wipes the space's logins and closes its tabs, so it asks
+                    // rather than acting on one click.
+                    [`Delete “${p.name}” and its data`, () => window.profiles.remove(p.id), 'danger'],
+                ]]] : []),
+            );
+            openCtxMenu(x, y, rows);
+        }
         function showFolderMenu(x, y, id) {
             // Spaces other than the current one; the folder and its tabs move together.
             const spaceRows = (_spacesCache || [])
                 .filter(p => String(p.id) !== String(activeWorkspace))
                 .map(p => [`${p.emoji ? p.emoji + '  ' : ''}${p.name}`, () => window.folders.move(id, p.id)]);
             openCtxMenu(x, y, [
-                ['Rename Folder…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }],
-                ['Change Icon…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); const r = h ? h.getBoundingClientRect() : { right: x, top: y }; openEmojiPicker(r.right + 4, r.top, (e) => window.folders.icon(id, e)); }],
+                ['Rename folder…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }],
+                ['Change icon…', () => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); const r = h ? h.getBoundingClientRect() : { right: x, top: y }; openEmojiPicker(r.right + 4, r.top, (e) => window.folders.icon(id, e)); }],
                 ['sep'],
-                ['New Subfolder…', async () => {
+                ['New subfolder…', async () => {
                     const sub = await window.folders.create('New Folder', id);
                     if (sub) setTimeout(() => {
                         const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(sub)}"]`);
                         if (h) startFolderRename(h, sub);
                     }, 160);
                 }],
-                ['Unload All Tabs', () => {
+                ['Unload all tabs', () => {
                     for (const [i, fid] of folderState.assign.entries())
                         if (fid === id) window.tab.unload(i);
                 }],
                 ['sep'],
-                ...(spaceRows.length ? [['Change Space', spaceRows], ['sep']] : []),
-                ['Unpack Folder', () => window.folders.remove(id)],
-                ['Delete Folder', () => {
+                ...(spaceRows.length ? [['Change space', spaceRows], ['sep']] : []),
+                ['Unpack folder', () => window.folders.remove(id)],
+                ['Delete folder', () => {
                     const members = [...folderState.assign.entries()].filter(([, fid]) => fid === id).map(([i]) => i);
                     for (const i of members) { try { window.tab.remove(i); } catch (e) { window.inkLog?.debug('renderer', 'spaceRows: ' + e); } }
                     window.folders.remove(id);
