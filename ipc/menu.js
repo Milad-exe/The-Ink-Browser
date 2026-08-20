@@ -64,6 +64,14 @@ function register(ipcMain, { wm }) {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd)
             return;
+        // The page was clicked, so the page is what the keyboard should be
+        // aimed at — otherwise the chrome keeps focus and the NEXT press in
+        // the page pays for the handover.
+        try {
+            if (!_e.sender.isDestroyed())
+                _e.sender.focus();
+        }
+        catch (e) { log.debug('menu', 'content-view-click focus', e); }
         if (wd.menu)
             closeWindowMenu(wd);
         if (wd.bookmarkPrompt) {

@@ -283,9 +283,18 @@
             // Whatever had focus before, a press in the chrome means the chrome
             // is what you are using — take focus on the way DOWN so the click
             // itself lands on the control rather than paying for the focus.
-            window.addEventListener('pointerdown', () => {
+            window.addEventListener('pointerdown', (e) => {
                 try { window.tabsUI?.focusChrome?.(); }
-                catch (e) { window.inkLog?.debug('renderer', 'focusChrome: ' + e); }
+                catch (err) { window.inkLog?.debug('renderer', 'focusChrome: ' + err); }
+                // A press outside the address field gives it up AT ONCE. The
+                // field used to hold on for 400ms while the suggestions faded,
+                // which made that first press read as "nothing happened".
+                if (document.activeElement !== searchBar)
+                    return;
+                if (e.target.closest?.('.omnibox'))
+                    return;
+                hideSuggestions();
+                searchBar.blur();
             }, true);
             window.menu.onClosed(() => { menuOpen = false; });
         }

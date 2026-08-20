@@ -459,15 +459,11 @@ class WindowManager {
                     const focusIdx = (savedActive != null && inWs.includes(savedActive)) ? savedActive : inWs[0];
                     if (typeof focusIdx === 'number')
                         tabs.showTab(focusIdx);
-                    else
-                        tabs.createTab();
                 }
                 catch (e) {
                     // A failed restore used to be silent, so a session that came
                     // back empty looked like the state file was simply missing.
                     log.error('window-manager', 'session restore failed', e);
-                    if (tabs.getTotalTabs() === 0)
-                        tabs.createTab();
                 }
                 this.restored = true;
                 // The rest of last session's windows, once this one is up.
@@ -479,9 +475,10 @@ class WindowManager {
                 const idx = tabs.createTab(null, true, !!options?.private);
                 tabs.loadUrl(idx, options.url);
             }
-            else {
-                tabs.createTab();
-            }
+            // …and nothing else. A fresh window opens with NO tabs: an empty
+            // rail and the page card in the theme's own colour. It used to
+            // create a blank tab, which then raised the palette, so the browser
+            // greeted you with a dialog you had not asked for.
             // Whether or not there was anything to restore, the restore slot is
             // now spent: a window opened LATER in the session must start empty,
             // not re-run the restore and clone another window's tabs.

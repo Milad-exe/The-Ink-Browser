@@ -136,6 +136,17 @@
         clearTimeout(timer);
         timer = setTimeout(refresh, 90);
     });
+    // Escape closes it wherever focus happens to be — the field, a row, or
+    // nothing at all. It used to be handled only on the input, so a palette
+    // that opened without the caret in it could not be dismissed from the
+    // keyboard.
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape')
+            return;
+        e.preventDefault();
+        e.stopPropagation();
+        window.overlayPalette.dismiss();
+    }, true);
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { e.preventDefault(); window.overlayPalette.dismiss(); return; }
         if (e.key === 'Enter') {

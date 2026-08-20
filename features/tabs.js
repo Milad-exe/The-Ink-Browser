@@ -198,7 +198,9 @@ class Tabs {
             this._sleepScan();
         }
         catch (e) { log.debug('tabs', 'constructor', e); } }, 60_000);
-        this.activeTabIndex = 0;
+        // -1 until a tab exists: a window opens with none, and pointing at
+        // tab 0 while the map is empty makes every lookup a silent miss.
+        this.activeTabIndex = -1;
         this.nextTabIndex = 0;
         this.allowClose = false;
         this.closePreventionActive = false;
@@ -1604,9 +1606,9 @@ class Tabs {
      *
      * In the TOP STRIP the window *is* the tab strip, so it goes with the last
      * tab — what Chrome and Safari do. In SIDEBAR mode the window is a
-     * workspace that happens to hold tabs, so it stays and raises the palette,
-     * the way Arc and Zen behave: closing your last tab should not throw away
-     * the window, its size, its space or its session.
+     * workspace that happens to hold tabs, so it stays: closing your last tab
+     * should not throw away the window, its size, its space or its session.
+     * It stays EMPTY — no blank tab, and no palette until you ask for one.
      *
      * Deferred and re-checked on the next tick either way: rapid tab operations
      * (double-close races) pass through a transient empty state, and acting on
@@ -1623,12 +1625,6 @@ class Tabs {
             }
             this.activeTabIndex = -1;
             try { this.mainWindow.webContents.send('tab-switched', { index: -1 }); }
-            catch (e) { log.debug('tabs', '_onEmptied', e); }
-            try {
-                const wd = this.getWindowData();
-                if (wd)
-                    require('../ipc/palette').openFor(wd);
-            }
             catch (e) { log.debug('tabs', '_onEmptied', e); }
         });
     }
