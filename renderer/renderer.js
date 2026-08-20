@@ -2466,12 +2466,22 @@
         //    tabs indented beneath it; collapsed folders hide their members. ────────
         // Folder glyph (open / closed), matching the reference. A user-set emoji
         // via Change Icon still wins over it.
+        // A folder with a body and a lid, lit from the top-left: the gradient
+        // and the highlight along the lid are what make a 17px glyph read as a
+        // volume rather than as an outline. `--folder-fill` / `--folder-sheen`
+        // come from the stylesheet, so it follows the theme.
+        const FOLDER_DEFS =
+            '<defs><linearGradient id="fg" x1="0" y1="0" x2="0" y2="1">' +
+            '<stop offset="0" stop-color="var(--folder-sheen)"/>' +
+            '<stop offset="1" stop-color="var(--folder-fill)"/></linearGradient></defs>';
         const FOLDER_GLYPH = {
-            closed: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">' +
-                '<path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v6.3a1.7 1.7 0 0 1-1.7 1.7H4.2a1.7 1.7 0 0 1-1.7-1.7z" fill="var(--folder-fill)"/></svg>',
-            open: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">' +
-                '<path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v1.2H5.6z" fill="var(--folder-fill)"/>' +
-                '<path d="M2.5 6.6l1.3 7.9a1.7 1.7 0 0 0 1.7 1.5h10.3a1.7 1.7 0 0 0 1.7-1.5l1-5.2H5.6z" fill="var(--folder-fill)"/></svg>',
+            closed: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">' + FOLDER_DEFS +
+                '<path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v6.3a1.7 1.7 0 0 1-1.7 1.7H4.2a1.7 1.7 0 0 1-1.7-1.7z" fill="url(#fg)"/>' +
+                '<path d="M3.6 8.4h12.8" stroke="var(--folder-sheen)" stroke-width="1" stroke-linecap="round" opacity="0.7"/></svg>',
+            open: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">' + FOLDER_DEFS +
+                '<path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v1.2H5.6z" fill="url(#fg)"/>' +
+                '<path d="M2.5 6.6l1.3 7.9a1.7 1.7 0 0 0 1.7 1.5h10.3a1.7 1.7 0 0 0 1.7-1.5l1-5.2H5.6z" fill="url(#fg)"/>' +
+                '<path d="M5.9 10.1h11.3" stroke="var(--folder-sheen)" stroke-width="1" stroke-linecap="round" opacity="0.55"/></svg>',
         };
         function setFolderIcon(el, f) {
             if (f.icon) { el.innerHTML = ''; el.textContent = f.icon; return; }

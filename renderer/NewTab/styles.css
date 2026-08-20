@@ -41,6 +41,13 @@ html, body {
   color: var(--text-2);
 }
 
+/* macOS: a blank tab is the one page with nothing to read, so it takes the
+   window's material most freely — the card reads as glass rather than as a
+   grey rectangle waiting for content. */
+html[data-vibrancy="true"], html[data-vibrancy="true"] body {
+  background: color-mix(in srgb, var(--page) 62%, transparent);
+}
+
 @keyframes rest-in { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) {
   .mark, .hint { animation: none; }

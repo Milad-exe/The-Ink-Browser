@@ -406,10 +406,19 @@ html[data-tabbar="side"][data-rail="on"] .space-header { display: none; }
 /* ── Folders (tab groups) ──────────────────────────────────────────────────── */
 html[data-tabbar="side"] .folder-header {
   grid-column: 1 / -1;
-  display: flex; align-items: center; gap: var(--sp-3); height: var(--row-h);
-  padding: 0 var(--sp-3) 0 var(--sp-3); border-radius: var(--r-md); cursor: pointer;
+  display: flex; align-items: center; gap: var(--sp-4); height: var(--row-h);
+  padding: 0 var(--sp-3) 0 var(--gutter); border-radius: var(--r-md); cursor: pointer;
   color: var(--text-2); position: relative;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+/* The disclosure hangs in the column's own padding rather than taking a slot
+   in the row — taking one pushed the glyph and the name off the rail's grid. */
+.folder-chevron {
+  position: absolute; left: 2px; top: 50%; transform: translateY(-50%);
+  width: 10px; text-align: center;
+}
+html[data-tabbar="side"] .folder-header:not(.collapsed) .folder-chevron {
+  transform: translateY(-50%) rotate(90deg);
 }
 html[data-tabbar="side"] .folder-header:hover { background: var(--hover); color: var(--text); }
 /* How many tabs the folder holds. Sits where the delete button appears, so it
@@ -428,13 +437,23 @@ html[data-tabbar="side"] .folder-header.drop-target {
   background: var(--accent-wash, color-mix(in srgb, var(--accent) 18%, transparent));
   box-shadow: inset 0 0 0 1px var(--accent);
 }
-.folder-chevron { font-size: 10px; width: 12px; text-align: center; color: var(--text-3); transition: transform 0.12s; }
-.folder-header:not(.collapsed) .folder-chevron { transform: rotate(90deg); }
+.folder-chevron { font-size: 10px; color: var(--text-3); transition: transform var(--dur-1) var(--ease); }
 /* Emoji icons render as text; the default folder glyph is an inline SVG that
    picks up the row's colour, with a darker fill behind the outline. */
 .folder-header.folder-dragging { opacity: 0.55; }
-.folder-icon { font-size: 15px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; width: 17px; flex-shrink: 0; }
-.folder-icon svg { width: 17px; height: 17px; --folder-fill: color-mix(in srgb, var(--shell) 70%, transparent); }
+.folder-icon { font-size: 15px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; width: var(--icon); flex: 0 0 var(--icon); }
+.folder-icon svg {
+  width: var(--icon); height: var(--icon);
+  /* The glyph's body and the light along its lid. Both derive from the theme,
+     so a folder in Porcelain is a pale volume rather than a dark one. */
+  --folder-fill: color-mix(in srgb, var(--text) 12%, transparent);
+  --folder-sheen: color-mix(in srgb, var(--text) 26%, transparent);
+}
+.folder-header:hover .folder-icon svg,
+.folder-header.active .folder-icon svg {
+  --folder-fill: color-mix(in srgb, var(--text) 18%, transparent);
+  --folder-sheen: color-mix(in srgb, var(--text) 34%, transparent);
+}
 .folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
 .folder-rename-input {
   flex: 1; min-width: 0; height: 22px; padding: 0 6px; border-radius: 6px;
@@ -528,12 +547,22 @@ html[data-tabbar="side"] .essentials {
 html[data-tabbar="side"] .essentials:empty { display: none; }
 .essential-tile {
   position: relative; height: 54px; border: none; cursor: pointer;
-  border-radius: var(--r-lg); background: var(--surface);
+  border-radius: var(--r-lg);
+  /* Lit from the top like the panels: a tile is a small piece of the same
+     glass, not a flat swatch. */
+  background: linear-gradient(180deg,
+    color-mix(in srgb, #fff 4%, var(--surface)) 0%,
+    var(--surface) 62%);
   display: flex; align-items: center; justify-content: center;
-  box-shadow: var(--ring);
+  box-shadow: inset 0 0.5px 0 color-mix(in srgb, #fff 7%, transparent), var(--ring);
   transition: background var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
 }
-.essential-tile:hover { background: var(--hover); box-shadow: var(--ring-2); }
+.essential-tile:hover {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, #fff 7%, var(--surface)) 0%,
+    color-mix(in srgb, #fff 2%, var(--surface)) 62%);
+  box-shadow: inset 0 0.5px 0 color-mix(in srgb, #fff 10%, transparent), var(--ring-2);
+}
 .essential-tile img { width: 20px; height: 20px; border-radius: 6px; pointer-events: none; }
 .essential-tile .ess-fallback {
   width: 20px; height: 20px; border-radius: 6px; background: var(--accent-wash);
@@ -1245,8 +1274,16 @@ body:hover ::-webkit-scrollbar-thumb {
 
 @layer components {
 /* Nested folders and their members indent by depth. */
-html[data-tabbar="side"] .folder-header { padding-left: calc(6px + var(--depth, 0) * 13px); }
-html[data-tabbar="side"] .tab-button.in-folder { margin-left: calc(var(--depth, 1) * 13px); width: auto; }
+/* A folder is a row like any other: glyph in the rail's icon column, name on
+   its title column. Depth indents by exactly one icon column per level, and a
+   folder's tabs sit one column further in, so their favicons land under the
+   folder's NAME rather than under its glyph. */
+html[data-tabbar="side"] .folder-header {
+  padding-left: calc(var(--gutter) + var(--depth, 0) * var(--icon));
+}
+html[data-tabbar="side"] .tab-button.in-folder {
+  margin-left: calc(var(--depth, 1) * var(--icon)); width: auto;
+}
 }
 
 @layer components {

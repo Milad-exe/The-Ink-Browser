@@ -26,6 +26,14 @@
     margin: 0;
     min-height: 100vh;
     background: var(--page);
+  }
+  /* macOS: the view behind an internal page is already transparent
+     (Tabs._applyTabBackground) and the window carries `vibrancy:
+     'under-window'`, so the ground can be the window's own material instead of
+     a flat fill. Only the GROUND goes translucent — cards and rows keep their
+     opaque surfaces, so nothing you have to read sits on moving wallpaper. */
+  html[data-vibrancy="true"] .page {
+    background: color-mix(in srgb, var(--page) 78%, transparent);
     color: var(--text);
     font-family: var(--font);
     font-size: var(--fs-body);

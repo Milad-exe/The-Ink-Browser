@@ -17,6 +17,12 @@ html, body {
   letter-spacing: var(--tracking);
   -webkit-font-smoothing: antialiased;
 }
+/* macOS: the ground becomes the window's own material (see page.css). Cards,
+   rows and the nav keep their opaque surfaces so nothing readable sits on
+   moving wallpaper. */
+html[data-vibrancy="true"], html[data-vibrancy="true"] body {
+  background: color-mix(in srgb, var(--page) 78%, transparent);
+}
 
 /* ── Layout ── */
 .layout { display: flex; height: 100%; min-height: 0; overflow: hidden; }
