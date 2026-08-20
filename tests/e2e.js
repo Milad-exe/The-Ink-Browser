@@ -283,6 +283,80 @@ async function omniboxNavigate(page, text) {
         });
     }
 
+    // ── Page context menu ─────────────────────────────────────────────────────
+    // Built in main from the click's params, so it can be built and INVOKED
+    // here without a real right-click.
+    section('Page context menu');
+    {
+        const template = (params) => app.evaluate((_el, p) => {
+            const wd = global.__northstarTest.wm.getPrimaryWindow();
+            let idx = wd.tabs.activeTabIndex;
+            for (const [i] of wd.tabs.tabMap) {
+                if (/^https?:/i.test(String(wd.tabs.tabUrls.get(i) || ''))) { idx = i; break; }
+            }
+            const Ctor = global.__northstarTest.tabContextMenu;
+            const menu = new Ctor(wd.tabs.tabMap.get(idx), p, wd.tabs);
+            global.__ctxTemplate = menu.getTemplate();
+            return global.__ctxTemplate.map(r => r.label || (r.type === 'separator' ? '—' : '?'));
+        }, params);
+        const invoke = (label) => app.evaluate((_el, l) => {
+            const row = (global.__ctxTemplate || []).find(r => (r.label || '').startsWith(l));
+            if (!row || !row.click) return false;
+            row.click();
+            return true;
+        }, label);
+        const BASE = {
+            editFlags: { canCopy: true, canUndo: false, canRedo: false, canCut: false, canPaste: false },
+            selectionText: '', isEditable: false, mediaType: 'none',
+        };
+
+        await check('a link offers the whole link menu', async () => {
+            const rows = await template({ ...BASE, linkURL: 'https://example.org/a', linkText: 'A' });
+            const want = ['Open link in new tab', 'Open link in new window', 'Open link in new private window',
+                'Open link beside this page', 'Copy link address', 'Copy clean link', 'Bookmark link'];
+            const missing = want.filter(w => !rows.includes(w));
+            return missing.length === 0 ? `${rows.length} items` : `missing: ${missing.join(', ')}`;
+        });
+
+        await check('"Search …" names the configured engine, not always Google', async () => {
+            await app.evaluate(() => global.__northstarTest.wm.getPrimaryWindow().tabs.persistence.set('searchEngine', 'duckduckgo'));
+            const rows = await template({ ...BASE, selectionText: 'electron' });
+            const hit = rows.find(r => r.startsWith('Search '));
+            await app.evaluate(() => global.__northstarTest.wm.getPrimaryWindow().tabs.persistence.set('searchEngine', 'google'));
+            return /DuckDuckGo/.test(hit || '') ? hit : `said: ${hit}`;
+        });
+
+        await check('"Open link in new window" opens OUR window, not the default browser', async () => {
+            const before = await app.evaluate((el) => el.BrowserWindow.getAllWindows().length);
+            await template({ ...BASE, linkURL: 'https://example.org/a', linkText: 'A' });
+            await invoke('Open link in new window');
+            await sleep(2500);
+            const after = await app.evaluate((el) => el.BrowserWindow.getAllWindows().length);
+            return after === before + 1 ? `windows ${before}->${after}` : `windows ${before}->${after}`;
+        });
+
+        await check('"Open link beside this page" makes a split', async () => {
+            await template({ ...BASE, linkURL: 'https://example.com/split', linkText: 'S' });
+            await invoke('Open link beside this page');
+            await sleep(2500);
+            return await app.evaluate(() => !!global.__northstarTest.wm.getPrimaryWindow().tabs.splitPair);
+        });
+
+        await check('"Bookmark link" stores it', async () => {
+            const wm = () => app.evaluate(async (el) => {
+                const w = global.__northstarTest.wm;
+                const list = await w.bookmarksFor('1').getAll();
+                return Array.isArray(list) ? list.length : 0;
+            });
+            const before = await wm();
+            await template({ ...BASE, linkURL: 'https://example.net/bookmark-me', linkText: 'Mark' });
+            await invoke('Bookmark link');
+            await sleep(1200);
+            const after = await wm();
+            return after === before + 1 ? `${before} -> ${after}` : `${before} -> ${after}`;
+        });
+    }
+
     // ── window.open: popups vs tabs (the fix) ─────────────────────────────────
     section('window.open — popups vs tabs');
     await app.evaluate(m_navMeasure, { url: 'https://example.com', timeoutMs: 20000, fresh: true });

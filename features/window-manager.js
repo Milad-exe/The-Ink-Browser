@@ -473,6 +473,12 @@ class WindowManager {
                 // The rest of last session's windows, once this one is up.
                 this._restoreRemainingWindows();
             }
+            else if (options?.url) {
+                // Opened FOR a link ("open in new window"): the window starts on
+                // that page rather than on a blank tab with the palette up.
+                const idx = tabs.createTab(null, true, !!options?.private);
+                tabs.loadUrl(idx, options.url);
+            }
             else {
                 tabs.createTab();
             }

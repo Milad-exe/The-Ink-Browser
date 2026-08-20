@@ -122,6 +122,8 @@ class Northstar {
                 i18n: require('./features/i18n'),
                 userData: require('./features/user-data'),
                 history: require('./features/history'),
+                searchEngines: require('./features/search-engines'),
+                tabContextMenu: require('./features/tab-context-menu'),
                 log,
             };
         }

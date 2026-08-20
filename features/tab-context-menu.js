@@ -44,6 +44,28 @@ class TabContextMenu {
         catch (e) { log.debug('tab-context-menu', 'openInNewTab', e); }
         this.tabManager.createLazyTab(safe, title, false, false, true, true);
     }
+    /** Open a link in a NEW Northstar window (optionally a private one). */
+    openInWindow(url, makePrivate) {
+        const safe = sanitizeUrl(url);
+        const wm = this.tabManager.windowManager;
+        if (!wm) {
+            log.warn('tab-context-menu', 'no window manager; cannot open a window');
+            return;
+        }
+        wm.createWindow(1000, 700, { url: safe, private: !!makePrivate });
+    }
+    /** The default search engine, or Google if the setting has not loaded. */
+    defaultEngine() {
+        try {
+            const engines = require('./search-engines');
+            const id = this.tabManager.persistence?.get('searchEngine') || 'google';
+            return engines.byId(id) || engines.byId('google');
+        }
+        catch (e) {
+            log.debug('tab-context-menu', 'defaultEngine', e);
+            return { id: 'google', name: 'Google', url: 'https://www.google.com/search?q=%s' };
+        }
+    }
     addPageItems(params) {
         const wc = this.tab.webContents;
         const currentUrl = wc.getURL ? wc.getURL() : '';
@@ -70,18 +92,18 @@ class TabContextMenu {
         if (isRealPage) {
             this.sep();
             this.contextTemplate.push({
-                label: 'Save Page As…',
+                label: 'Save page as…',
                 click: () => downloadManager.saveAs(wc, currentUrl),
             }, {
                 label: 'Print…',
                 click: () => wc.print(),
             }, {
-                label: 'View Page Source',
+                label: 'View page source',
                 click: () => this.openInNewTab(`view-source:${currentUrl}`),
             });
             this.sep();
             this.contextTemplate.push({
-                label: 'Copy Page URL',
+                label: 'Copy page URL',
                 click: () => clipboard.writeText(currentUrl),
             });
         }
@@ -95,7 +117,7 @@ class TabContextMenu {
             return;
         this.sep();
         this.contextTemplate.push({
-            label: 'Inspect Element',
+            label: 'Inspect element',
             click: () => this.tab.webContents.inspectElement(params.x, params.y),
         });
     }
@@ -108,13 +130,19 @@ class TabContextMenu {
         const truncated = params.selectionText.length > 40
             ? params.selectionText.slice(0, 40) + '…'
             : params.selectionText;
+        // The engine the address bar would use — the menu used to say Google
+        // and go to Google even when the default was something else.
+        const engine = this.defaultEngine();
         this.contextTemplate.push({
             label: 'Copy',
             role: 'copy',
             enabled: params.editFlags.canCopy,
         }, {
-            label: `Search Google for "${truncated}"`,
-            click: () => this.openInNewTab(`https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`),
+            label: `Search ${engine.name} for “${truncated}”`,
+            click: () => {
+                const { buildUrl } = require('./search-engines');
+                this.openInNewTab(buildUrl(engine, params.selectionText));
+            },
         });
     }
     addSpellcheckItems(params) {
@@ -133,7 +161,7 @@ class TabContextMenu {
         }
         this.contextTemplate.push({ type: 'separator' });
         this.contextTemplate.push({
-            label: 'Add to Dictionary',
+            label: 'Add to dictionary',
             click: () => { try {
                 sess.addWordToSpellCheckerDictionary(params.misspelledWord);
             }
@@ -144,37 +172,72 @@ class TabContextMenu {
         if (!params.isEditable)
             return;
         this.sep();
-        this.contextTemplate.push({ label: 'Undo', role: 'undo', enabled: params.editFlags.canUndo }, { label: 'Redo', role: 'redo', enabled: params.editFlags.canRedo }, { type: 'separator' }, { label: 'Cut', role: 'cut', enabled: params.editFlags.canCut }, { label: 'Copy', role: 'copy', enabled: params.editFlags.canCopy }, { label: 'Paste', role: 'paste', enabled: params.editFlags.canPaste }, { label: 'Select All', role: 'selectAll' });
+        this.contextTemplate.push({ label: 'Undo', role: 'undo', enabled: params.editFlags.canUndo }, { label: 'Redo', role: 'redo', enabled: params.editFlags.canRedo }, { type: 'separator' }, { label: 'Cut', role: 'cut', enabled: params.editFlags.canCut }, { label: 'Copy', role: 'copy', enabled: params.editFlags.canCopy }, { label: 'Paste', role: 'paste', enabled: params.editFlags.canPaste }, { label: 'Select all', role: 'selectAll' });
     }
     addLinkItems(params) {
         if (!params.linkURL)
             return;
         this.contextTemplate.push({
-            label: 'Open Link in New Tab',
+            label: 'Open link in new tab',
             click: () => this.openInNewTab(params.linkURL),
         }, {
             // Glance: a floating preview of the link over the current page (Esc to
             // close, ⌘/Ctrl+Enter to open it as a full tab).
-            label: 'Glance at Link',
+            label: 'Glance at link',
             click: () => this.tabManager.openGlance(sanitizeUrl(params.linkURL)),
         }, {
-            label: 'Open Link in New Window',
-            click: () => { if (isSafeExternal(params.linkURL))
-                shell.openExternal(params.linkURL); },
+            // Split the link beside the page you are on — the browser has split
+            // view, and a link is the most common thing you want beside a page.
+            label: 'Open link beside this page',
+            click: () => {
+                const url = sanitizeUrl(params.linkURL);
+                let title = url;
+                try { title = new URL(url).hostname; }
+                catch (e) { log.debug('tab-context-menu', 'split link', e); }
+                // eager: a pane in a split has to be loaded, not lazy.
+                this.tabManager.createLazyTab(url, title, false, false, true, true);
+                const idx = this.tabManager.nextTabIndex - 1;
+                this.tabManager.splitWithActive(idx);
+            },
         }, {
-            label: 'Copy Link Address',
+            // A NORTHSTAR window. This used to call shell.openExternal, which
+            // handed the link to whatever your default browser is — the one
+            // place in the app that quietly sent you somewhere else.
+            label: 'Open link in new window',
+            click: () => this.openInWindow(params.linkURL, false),
+        }, {
+            label: 'Open link in new private window',
+            click: () => this.openInWindow(params.linkURL, true),
+        }, {
+            label: 'Copy link address',
             click: () => clipboard.writeText(params.linkURL),
         }, {
             // Same tracking-param list the privacy engine strips on navigation,
             // so a copied link matches what the browser would have requested.
-            label: 'Copy Clean Link',
+            label: 'Copy clean link',
             click: () => {
                 const { stripTrackingParams } = require('./privacy');
                 clipboard.writeText(stripTrackingParams(params.linkURL) || params.linkURL);
             },
         }, {
-            label: 'Save Link As…',
+            label: 'Save link as…',
             click: () => downloadManager.saveAs(this.tab.webContents, params.linkURL),
+        }, {
+            label: 'Bookmark link',
+            click: async () => {
+                try {
+                    // Bookmarks are per-space, so it has to be THIS window's
+                    // store — the same one the star and the bar write to.
+                    const wm = this.tabManager.windowManager;
+                    const store = wm?.bookmarksFor(this.tabManager.profileId || '1');
+                    if (!store)
+                        return;
+                    const url = sanitizeUrl(params.linkURL);
+                    await store.add(url, params.linkText || url, String(this.tabManager.profileId || '1'));
+                    this.tabManager.mainWindow.webContents.send('bookmarks-changed');
+                }
+                catch (e) { log.warn('tab-context-menu', 'bookmark link failed', e); }
+            },
         });
     }
     addImageItems(params) {
@@ -182,16 +245,19 @@ class TabContextMenu {
             return;
         this.sep();
         this.contextTemplate.push({
-            label: 'Save Image As…',
+            label: 'Save image as…',
             click: () => downloadManager.saveAs(this.tab.webContents, params.srcURL),
         }, {
-            label: 'Copy Image Address',
+            label: 'Copy image address',
             click: () => clipboard.writeText(params.srcURL),
         }, {
-            label: 'Open Image in New Tab',
+            label: 'Open image in new tab',
             click: () => this.openInNewTab(params.srcURL),
         }, {
-            label: 'Search Google for Image',
+            // Named for what it actually uses: reverse image search by URL is
+            // a Lens endpoint, and the other built-in engines have no
+            // equivalent, so labelling it with the default engine would lie.
+            label: 'Search image with Google Lens',
             click: () => this.openInNewTab(`https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`),
         });
     }
@@ -202,7 +268,7 @@ class TabContextMenu {
         this.sep();
         if (params.mediaType === 'video') {
             this.contextTemplate.push({
-                label: 'Picture-in-Picture',
+                label: 'Picture in picture',
                 click: () => {
                     const src = JSON.stringify(params.srcURL || '');
                     // userGesture=true so the PiP request counts as user-activated.
@@ -220,13 +286,13 @@ class TabContextMenu {
             });
         }
         this.contextTemplate.push({
-            label: `Open ${label} in New Tab`,
+            label: `Open ${label} in new tab`,
             click: () => this.openInNewTab(params.srcURL),
         }, {
-            label: `Save ${label} As…`,
+            label: `Save ${label} as…`,
             click: () => downloadManager.saveAs(this.tab.webContents, params.srcURL),
         }, {
-            label: 'Copy Media Address',
+            label: 'Copy media address',
             click: () => clipboard.writeText(params.srcURL),
         });
     }
