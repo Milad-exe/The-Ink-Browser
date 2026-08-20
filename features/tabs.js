@@ -631,17 +631,6 @@ class Tabs {
         });
         if (shouldActivate) {
             this.showTab(tabIndex);
-            // A blank tab raises the palette rather than parking the user on a
-            // page. showTab() gave OS focus to the tab's view, so this has to
-            // run after it — and again once the (near-empty) page has loaded,
-            // since its own load can re-grab focus.
-            const promptFor = () => {
-                if (this.activeTabIndex !== tabIndex || this.mainWindow.isDestroyed())
-                    return;
-                this.promptForBlankTab();
-            };
-            setImmediate(promptFor);
-            tab.webContents.once('did-finish-load', () => setTimeout(promptFor, 0));
         }
         else {
             const activeTab = this.tabMap.get(previousActiveTabIndex);
@@ -1006,7 +995,7 @@ class Tabs {
             }
             if (url === 'about:blank') {
                 // The blank tab. It carries the 'newtab' token so the omnibox
-                // stays empty and promptForBlankTab still recognises it.
+                // stays empty and the tab still reads as blank.
                 this.tabUrls.set(tabIndex, 'newtab');
                 lastAddedUrl = 'newtab';
                 this.sendTabUpdate(tabIndex, tab, 'newtab');
@@ -1138,7 +1127,7 @@ class Tabs {
         tab.webContents.on('did-navigate-in-page', (event, url) => {
             if (url === 'about:blank') {
                 // The blank tab. It carries the 'newtab' token so the omnibox
-                // stays empty and promptForBlankTab still recognises it.
+                // stays empty and the tab still reads as blank.
                 this.tabUrls.set(tabIndex, 'newtab');
                 lastAddedUrl = 'newtab';
                 this.sendTabUpdate(tabIndex, tab, 'newtab');
@@ -1628,21 +1617,6 @@ class Tabs {
             catch (e) { log.debug('tabs', '_onEmptied', e); }
         });
     }
-    promptForBlankTab() {
-        const index = this.activeTabIndex;
-        if ((this.tabUrls.get(index) || '') !== 'newtab')
-            return;
-        const now = Date.now();
-        if (this._lastPrompt && this._lastPrompt.index === index && now - this._lastPrompt.at < 600)
-            return;
-        this._lastPrompt = { index, at: now };
-        try {
-            const wd = this.getWindowData();
-            if (wd)
-                require('../ipc/palette').openFor(wd);
-        }
-        catch (e) { log.debug('tabs', 'promptForBlankTab', e); }
-    }
     showTab(index) {
         // A glance is transient — dismiss it on any tab switch.
         this.closeGlance();
@@ -1751,14 +1725,11 @@ class Tabs {
         // Split view: after showing the active half full, lay both halves out.
         if (this.splitPair && this.splitPair.includes(index))
             this._layoutSplit();
-        // Landing on a blank tab — by switching to it, by closing the last real
-        // one, or on a fresh window — asks where to go instead of showing a page.
-        // Landing on a real page dismisses the question.
+        // The palette is raised ONLY when the user asks for a new tab (⌘T, the
+        // +, the menu). Landing on a blank tab used to raise it too, which
+        // meant switching tabs could put a dialog in front of you.
         const blank = (this.tabUrls.get(index) || '') === 'newtab';
-        if (blank && !this.privateTabs.has(index)) {
-            setTimeout(() => this.promptForBlankTab(), 60);
-        }
-        else {
+        if (!blank) {
             try {
                 const wd = this.getWindowData();
                 if (wd?.paletteOpen)

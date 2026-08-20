@@ -149,6 +149,13 @@
         });
         // ── Shared state ──────────────────────────────────────────────────────────
         let menuOpen = false;
+        // Assigned by initProfiles(); declared HERE, above the init sequence,
+        // because spaceContextMenu() — shared by the space pill and the foot
+        // avatars — is defined at module level and calls them, and a binding
+        // declared further down the file is in the temporal dead zone when
+        // init runs (see CLAUDE.md, invariant 2).
+        let openProfileModal = () => {};
+        let openCreateSpace = () => {};
         // ── DOM references ─────────────────────────────────────────────────────────
         const tabBar = document.getElementById('tab-bar');
         const tabsContainer = document.getElementById('tabs-container');
@@ -1688,8 +1695,8 @@
                     window.profiles.reorder([...row.querySelectorAll('.sb-ws')].map(b => b.dataset.space));
                 });
             }
-            let openProfileModal = () => {}; // assigned when the modal wires up below
-            let openCreateSpace = () => {}; // assigned by initCreateSpace below
+            // (openProfileModal / openCreateSpace are declared at module scope —
+            // spaceContextMenu() needs them and lives outside this function.)
             // Create a Space: an in-sidebar form (reference) rather than a modal.
             // The space is created only on submit, so cancelling leaves nothing behind.
             function initCreateSpace() {

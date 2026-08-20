@@ -275,6 +275,43 @@ async function omniboxNavigate(page, text) {
             return pill.length > 3 && JSON.stringify(pill) === JSON.stringify(avatar)
                 ? `${pill.length} items each` : false;
         });
+        // The space menu is shared by the pill and the foot avatar; its actions
+        // live in initProfiles(), which is a different scope from the menu. When
+        // they drifted apart, every row that used them silently threw.
+        await check('the space menu\'s rows actually do something', async () => {
+            const invoke = async (label) => {
+                await chrome.evaluate(() => {
+                    const el = document.getElementById('space-header');
+                    const r = el.getBoundingClientRect();
+                    el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: Math.round(r.left + 20), clientY: Math.round(r.bottom) }));
+                });
+                await sleep(700);
+                const menu = app.windows().find(p => { try { return p.url().includes('CtxMenu/index.html'); } catch { return false; } });
+                if (!menu) return false;
+                const ok = await menu.evaluate((l) => {
+                    const b = [...document.querySelectorAll('.ctx-menu-item')].find(x => x.textContent.replace(/\s+/g, ' ').trim() === l);
+                    if (!b) return false; b.click(); return true;
+                }, label);
+                await sleep(900);
+                return ok;
+            };
+            await invoke('Change name…');
+            const modal = await chrome.evaluate(() => {
+                const el = document.getElementById('profile-rename-modal');
+                return !!el && !el.classList.contains('hidden');
+            });
+            await chrome.keyboard.press('Escape');
+            await sleep(400);
+            await invoke('New space…');
+            const creator = await chrome.evaluate(() => {
+                const el = document.querySelector('.space-create');
+                return !!el && getComputedStyle(el).display !== 'none' && !el.classList.contains('hidden');
+            });
+            await chrome.keyboard.press('Escape');
+            await sleep(300);
+            return modal && creator ? 'rename + create both open' : `rename:${modal} create:${creator}`;
+        });
+
         await check('menu copy is sentence case', async () => {
             const rows = await ctxRows('.tab-button');
             // A second capital inside a label means Title Case ("Close Tab").
