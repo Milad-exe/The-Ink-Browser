@@ -1576,6 +1576,39 @@ class Tabs {
      * on the same tab within a beat, so dismissing it does not immediately
      * summon it again when focus returns.
      */
+    /**
+     * The last tab in the window just closed.
+     *
+     * In the TOP STRIP the window *is* the tab strip, so it goes with the last
+     * tab — what Chrome and Safari do. In SIDEBAR mode the window is a
+     * workspace that happens to hold tabs, so it stays and raises the palette,
+     * the way Arc and Zen behave: closing your last tab should not throw away
+     * the window, its size, its space or its session.
+     *
+     * Deferred and re-checked on the next tick either way: rapid tab operations
+     * (double-close races) pass through a transient empty state, and acting on
+     * that closed the window spuriously.
+     */
+    _onEmptied() {
+        setImmediate(() => {
+            if (this.mainWindow.isDestroyed() || this.tabMap.size !== 0)
+                return;
+            if ((this.persistence?.get('tabBarSide') ?? 'side') === 'top') {
+                this.allowClose = true;
+                this.mainWindow.close();
+                return;
+            }
+            this.activeTabIndex = -1;
+            try { this.mainWindow.webContents.send('tab-switched', { index: -1 }); }
+            catch (e) { log.debug('tabs', '_onEmptied', e); }
+            try {
+                const wd = this.getWindowData();
+                if (wd)
+                    require('../ipc/palette').openFor(wd);
+            }
+            catch (e) { log.debug('tabs', '_onEmptied', e); }
+        });
+    }
     promptForBlankTab() {
         const index = this.activeTabIndex;
         if ((this.tabUrls.get(index) || '') !== 'newtab')
@@ -1877,18 +1910,8 @@ class Tabs {
                     catch (e) { log.debug('tabs', 'removeTab', e); }
                 }
             }
-            if (this.tabMap.size === 0) {
-                // Defer + re-check on the next tick: guards against a transient
-                // empty state during rapid tab operations (double-close races)
-                // closing the whole window spuriously. If a tab exists again by
-                // then the window stays; imperceptible on a genuine last close.
-                setImmediate(() => {
-                    if (!this.mainWindow.isDestroyed() && this.tabMap.size === 0) {
-                        this.allowClose = true;
-                        this.mainWindow.close();
-                    }
-                });
-            }
+            if (this.tabMap.size === 0)
+                this._onEmptied();
             this.saveStateDebounced();
         }
     }
@@ -1923,18 +1946,8 @@ class Tabs {
                 index: index,
                 totalTabs: this.tabMap.size
             });
-            if (this.tabMap.size === 0) {
-                // Defer + re-check on the next tick: guards against a transient
-                // empty state during rapid tab operations (double-close races)
-                // closing the whole window spuriously. If a tab exists again by
-                // then the window stays; imperceptible on a genuine last close.
-                setImmediate(() => {
-                    if (!this.mainWindow.isDestroyed() && this.tabMap.size === 0) {
-                        this.allowClose = true;
-                        this.mainWindow.close();
-                    }
-                });
-            }
+            if (this.tabMap.size === 0)
+                this._onEmptied();
             else {
                 if (wasActive) {
                     const target = (nextActive !== null && this.tabMap.has(nextActive))

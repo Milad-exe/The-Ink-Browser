@@ -40,10 +40,42 @@ function hidePalette(wd) {
         wd.paletteOpen = false;
         // The overlay took keyboard focus when it opened; hand it back or the
         // window is left with nothing focused and the next accelerator beeps.
-        try { wd.window.webContents.focus(); }
+        // On a blank tab there is no page to type into, so the address bar
+        // takes the caret — dismissing the palette should leave you somewhere
+        // you can start typing, not nowhere.
+        try {
+            wd.window.webContents.focus();
+            const t = wd.tabs;
+            const blank = t && !/^https?:/i.test(String(t.tabUrls.get(t.activeTabIndex) || ''));
+            if (blank)
+                wd.window.webContents.send('focus-address-bar');
+        }
         catch (e) { log.debug('palette', 'hidePalette', e); }
     }
     catch (e) { log.debug('palette', 'hidePalette', e); }
+}
+
+/**
+ * Tell the palette where the page card is, so it can centre on the page rather
+ * than on the window. Sent on open and whenever the window is resized while it
+ * is up (the sidebar resizer changes the card's left edge too).
+ */
+function sendFrame(wd) {
+    try {
+        const view = wd?.palette;
+        if (!view || view.webContents.isDestroyed())
+            return;
+        const card = wd.tabs?.getTabBounds?.();
+        const win = wd.window.getContentBounds();
+        if (!card)
+            return;
+        view.webContents.send('palette:frame', {
+            left: Math.max(0, Math.round(card.x)),
+            right: Math.max(0, Math.round(win.width - (card.x + card.width))),
+            top: Math.max(0, Math.round(card.y)),
+        });
+    }
+    catch (e) { log.debug('palette', 'sendFrame', e); }
 }
 
 // Raise the palette for a window. Every user-facing "new tab" goes through
@@ -61,7 +93,12 @@ async function openFor(wd) {
         catch (e) { log.debug('palette', 'openFor', e); }
         view.setVisible(true);
         wd.paletteOpen = true;
+        sendFrame(wd);
         view.webContents.send('palette:data', {});
+        if (!wd._paletteResizeHooked) {
+            wd._paletteResizeHooked = true;
+            wd.window.on('resize', () => { if (wd.paletteOpen) sendFrame(wd); });
+        }
         try { view.webContents.focus(); }
         catch (e) { log.debug('palette', 'openFor', e); }
         return true;

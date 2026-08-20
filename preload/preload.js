@@ -319,6 +319,7 @@ exposeInternal('tabsUI', {
     onTabBarSide: (handler) => ipcRenderer.on('tabbar-side-changed', (_e, v) => handler(v)),
     onCompact: (handler) => ipcRenderer.on('sidebar-compact-changed', (_e, v) => handler(v)),
     focusChrome: () => ipcRenderer.send('chrome:focus'),
+    focusPage: () => ipcRenderer.send('page:focus'),
     menuOpened: () => ipcRenderer.send('chrome-menu-open'),
     menuClosed: () => ipcRenderer.send('chrome-menu-close'),
     onCloseMenus: (handler) => ipcRenderer.on('close-chrome-menus', () => handler()),

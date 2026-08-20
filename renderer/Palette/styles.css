@@ -15,15 +15,24 @@ html, body {
 #surface {
   position: fixed; inset: 0;
   display: flex; justify-content: center; align-items: flex-start;
-  /* Sits just under the toolbar, in line with the address bar it stands in
-     for — a centred box floating at 18vh read as unrelated to the browser. */
-  padding-top: calc(var(--bar-h) + var(--sp-6));
+  /* The palette covers the window, but it belongs to the PAGE: main sends the
+     page card's rect (--frame-*) and the card centres inside it, so it lands
+     over the page rather than 116px to the left of it next to a sidebar.
+     Vertically it sits just inside the top of the card, in line with the
+     address bar it stands in for — a box floating at 18vh read as unrelated
+     to the browser. */
+  padding-left: var(--frame-left, 0px);
+  padding-right: var(--frame-right, 0px);
+  padding-top: calc(var(--frame-top, 58px) + var(--sp-6));
 }
 /* The scrim fades in under the card rather than snapping on with it. */
 #surface { background: color-mix(in srgb, #05070d 38%, transparent); }
 
 #card {
-  width: min(600px, 72vw);
+  /* The same width as the address bar it stands in for (--omni-max in the
+     chrome), so it opens exactly where that field is rather than at some
+     other size in roughly the same place. */
+  width: min(620px, 72vw);
   background: color-mix(in srgb, var(--surface) 96%, transparent);
   border-radius: var(--r-xl);
   box-shadow: var(--ring-2), var(--shadow-pop);

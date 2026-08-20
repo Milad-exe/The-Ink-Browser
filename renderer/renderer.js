@@ -273,6 +273,7 @@
                     window.tab.stop(activeTabIndex);
                 else
                     window.tab.reload(activeTabIndex);
+                releaseFocusToPage(reloadBtn);
             });
             addBtn.addEventListener('click', () => window.palette.open());
             window.addEventListener('click', (e) => {
@@ -285,6 +286,14 @@
          * Back/forward buttons — click navigates one step; holding the button
          * (or right-clicking it) shows the tab's history list, Firefox-style.
          */
+        /** Give the keyboard back to the page after a toolbar click. */
+        function releaseFocusToPage(btn) {
+            try {
+                btn?.blur();
+                window.tabsUI?.focusPage?.();
+            }
+            catch (e) { window.inkLog?.debug('renderer', 'releaseFocusToPage: ' + e); }
+        }
         function setupNavButton(btn, action) {
             let pressTimer = null;
             let menuShown = false;
@@ -307,6 +316,10 @@
                     return;
                 } // long-press already handled
                 action();
+                // Clicking a toolbar button focuses it. Every browser hands the
+                // keyboard back to the page afterwards; without this, the next
+                // keystroke went to the chrome and did nothing.
+                releaseFocusToPage(btn);
             });
             btn.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
@@ -3070,8 +3083,9 @@
         // Focus mode + Pomodoro timer
         // ─────────────────────────────────────────────────────────────────────────
         function initFocusModeAndPomodoro() {
-            document.getElementById('compact-btn')?.addEventListener('click', () => {
-                try { window.tabsUI.toggleCompact(); } catch (e) { window.inkLog?.debug('renderer', 'initFocusModeAndPomodoro: ' + e); }
+            document.getElementById('compact-btn')?.addEventListener('click', (e) => {
+                try { window.tabsUI.toggleCompact(); } catch (err) { window.inkLog?.debug('renderer', 'initFocusModeAndPomodoro: ' + err); }
+                releaseFocusToPage(e.currentTarget);
             });
             const focusBtn = document.getElementById('focus-btn');
             const utilityBar = document.getElementById('utility-bar');
@@ -3442,7 +3456,10 @@
             const readerBtn = document.getElementById('reader-btn');
             const pipBtn = document.getElementById('pip-btn');
             if (readerBtn && window.reader) {
-                readerBtn.addEventListener('click', () => window.reader.toggle(activeTabIndex));
+                readerBtn.addEventListener('click', (e) => {
+                    window.reader.toggle(activeTabIndex);
+                    releaseFocusToPage(e.currentTarget);
+                });
                 // Main pushes { index, active, available } as pages load / tabs switch.
                 window.reader.onState((d) => {
                     if (!d || d.index !== activeTabIndex)

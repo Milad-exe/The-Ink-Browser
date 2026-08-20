@@ -155,6 +155,16 @@
         if (!document.getElementById('card').contains(e.target)) window.overlayPalette.dismiss();
     });
 
+    // Main sends the page card's rect: the palette belongs to the page, so it
+    // centres on the page area rather than on the window.
+    window.overlayPalette.onFrame?.((f) => {
+        if (!f)
+            return;
+        const root = document.documentElement.style;
+        root.setProperty('--frame-left', (f.left || 0) + 'px');
+        root.setProperty('--frame-right', (f.right || 0) + 'px');
+        root.setProperty('--frame-top', (f.top || 0) + 'px');
+    });
     window.overlayPalette.onOpen(() => {
         input.value = '';
         rows = [];

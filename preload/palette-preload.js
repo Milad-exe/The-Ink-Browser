@@ -14,6 +14,10 @@ catch { }
 // rather than pulling in the whole shared preload.
 contextBridge.exposeInMainWorld('overlayPalette', {
     onOpen: (cb) => ipcRenderer.on('palette:data', (_e, d) => cb(d)),
+    // The palette covers the whole window, but it belongs to the PAGE — main
+    // sends the page card's rect so the card can centre on it rather than on
+    // the window (which put it 116px left of centre beside a sidebar).
+    onFrame: (cb) => ipcRenderer.on('palette:frame', (_e, d) => cb(d)),
     done: () => ipcRenderer.send('palette:done'),
     dismiss: () => ipcRenderer.send('palette:dismiss'),
 });

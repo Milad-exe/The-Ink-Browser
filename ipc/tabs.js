@@ -320,6 +320,18 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         try { wm.getWindowByWebContents(_e.sender)?.window?.webContents?.focus(); }
         catch (e) { log.debug('tabs', 'chrome:focus', e); }
     });
+    // …and the inverse. Clicking a toolbar button leaves focus on that button,
+    // so after Reload the keyboard was aimed at the chrome rather than at the
+    // page — the next keystroke went nowhere. Every browser hands focus back.
+    ipcMain.on('page:focus', (_e) => {
+        try {
+            const t = wm.getWindowByWebContents(_e.sender)?.tabs;
+            const wc = t && t.tabMap.get(t.activeTabIndex)?.webContents;
+            if (wc && !wc.isDestroyed())
+                wc.focus();
+        }
+        catch (e) { log.debug('tabs', 'page:focus', e); }
+    });
     ipcMain.on('chrome-menu-open', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         const t = wd?.tabs;
