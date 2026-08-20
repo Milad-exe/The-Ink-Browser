@@ -44,16 +44,27 @@
     }
 
     /** Localise a DOM subtree in place. */
+    /**
+     * Localise markup in place. A key the catalogue does not have is LEFT
+     * ALONE: the English in the file is the fallback, and overwriting it with
+     * the key painted "menu.newWindow" into the menu on any page whose
+     * catalogue had not arrived.
+     */
     function apply(scope) {
         const roots = scope || document;
+        const has = (key) => key && Object.prototype.hasOwnProperty.call(strings, key);
         for (const el of roots.querySelectorAll('[data-i18n]'))
-            el.textContent = t(el.dataset.i18n);
+            if (has(el.dataset.i18n))
+                el.textContent = t(el.dataset.i18n);
         for (const el of roots.querySelectorAll('[data-i18n-title]'))
-            el.title = t(el.dataset.i18nTitle);
+            if (has(el.dataset.i18nTitle))
+                el.title = t(el.dataset.i18nTitle);
         for (const el of roots.querySelectorAll('[data-i18n-label]'))
-            el.setAttribute('aria-label', t(el.dataset.i18nLabel));
+            if (has(el.dataset.i18nLabel))
+                el.setAttribute('aria-label', t(el.dataset.i18nLabel));
         for (const el of roots.querySelectorAll('[data-i18n-placeholder]'))
-            el.placeholder = t(el.dataset.i18nPlaceholder);
+            if (has(el.dataset.i18nPlaceholder))
+                el.placeholder = t(el.dataset.i18nPlaceholder);
     }
 
     // ── Formatters ───────────────────────────────────────────────────────────

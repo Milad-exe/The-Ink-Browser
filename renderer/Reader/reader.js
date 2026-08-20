@@ -62,7 +62,7 @@
                 document.getElementById('rd-error').classList.remove('hidden');
                 return;
             }
-            document.title = article.title || 'Reader View';
+            document.title = article.title || 'Reader view';
             document.getElementById('rd-title').textContent = article.title || '';
             document.getElementById('rd-site').textContent = article.siteName || '';
             document.getElementById('rd-byline').textContent = article.byline || '';

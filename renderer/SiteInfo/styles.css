@@ -13,18 +13,15 @@ body {
   font-size: var(--fs-body); -webkit-font-smoothing: antialiased;
 }
 
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
 
-/* ── Connection header ── */
+
+/* ── Connection header ──────────────────────────────────────────────────────
+   The one place the panel raises its voice: the site's name and whether the
+   connection is private, on the same gutter as everything below it. */
 .conn {
-  display: flex; align-items: center; gap: 11px;
-  padding: 14px 14px 13px;
-  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-5) var(--sp-5) var(--sp-4);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 .conn-icon { display: flex; flex-shrink: 0; color: var(--text-2); }
 .conn.secure   .conn-icon { color: var(--text); }
@@ -32,68 +29,53 @@ body {
 .conn-title { font-size: var(--fs-body); font-weight: 600; color: var(--text); letter-spacing: var(--tracking); }
 .host { font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); margin-top: 2px; word-break: break-all; }
 
-/* ── Protections shield ── */
+/* ── Protections ────────────────────────────────────────────────────────────
+   A setting, so it reads as one: label and explanation on the left, the shared
+   switch on the right (see SHARED CONTROLS in ui.css). */
 .shield {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
-.shield-title { font-size: var(--fs-body); font-weight: 600; color: var(--text); }
-.shield-desc  { font-size: var(--fs-micro); color: var(--text-3); margin-top: 2px; }
+.shield-text { min-width: 0; }
+.shield-title { font-size: var(--fs-body); font-weight: 500; color: var(--text); }
+.shield-desc  { font-size: var(--fs-small); color: var(--text-3); margin-top: 2px; }
 
-.toggle { position: relative; display: inline-block; flex-shrink: 0; }
-.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
-.track {
-  display: block; width: 34px; height: 20px; border-radius: var(--radius);
-  background: var(--border-2); cursor: pointer; transition: background var(--dur-1) var(--ease);
-}
-.track::after {
-  content: ''; position: absolute; top: 3px; left: 3px;
-  width: 14px; height: 14px; border-radius: var(--radius);
-  background: var(--text-2); transition: transform var(--dur-1) var(--ease), background 0.15s;
-}
-.toggle input:checked + .track { background: var(--accent); box-shadow: none; }
-.toggle input:checked + .track::after { transform: translateX(14px); background: #fff; }
-
-/* ── Permissions ── */
-.section { padding: 11px 14px 4px; }
-.section-title {
-  font-family: var(--mono);
-  font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--text-3); margin-bottom: 9px;
-}
+/* ── Permissions ────────────────────────────────────────────────────────── */
+.section { padding: var(--sp-4) var(--sp-5) var(--sp-3); }
+.section .surface-label { padding: 0 0 var(--sp-3); }
 .perm {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; margin-bottom: 9px;
+  gap: var(--sp-5); min-height: var(--row-h);
 }
 .perm-label { font-size: var(--fs-body); color: var(--text); }
-.perm-empty { font-size: var(--fs-small); color: var(--text-3); margin-bottom: 9px; }
+.perm-empty { font-size: var(--fs-small); color: var(--text-3); padding-bottom: var(--sp-4); }
 
+/* Allow / Block reads as one control with a chosen side, not as two buttons. */
 .seg {
-  display: flex; flex-shrink: 0;
-  border: 1px solid var(--border-2); border-radius: var(--radius); overflow: hidden;
+  display: flex; flex-shrink: 0; gap: 2px; padding: 2px;
+  border-radius: var(--r-md); box-shadow: var(--ring-2);
 }
 .seg button {
-  border: none; background: transparent; color: var(--text-2);
-  font-family: inherit; font-size: var(--fs-micro); font-weight: 500;
-  padding: 4px 11px; cursor: pointer;
-  transition: background var(--dur-1) var(--ease), color 0.1s;
+  border: none; border-radius: var(--r-sm); background: transparent; color: var(--text-3);
+  font-family: inherit; font-size: var(--fs-micro); font-weight: 600;
+  letter-spacing: var(--tracking);
+  height: 22px; padding: 0 var(--sp-4); cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-.seg button + button { border-left: 1px solid var(--border-2); }
 .seg button.on { background: var(--active-bg); color: var(--text); }
-.seg button:hover:not(.on) { background: var(--hover); color: var(--text); }
-
-/* ── Clear data ── */
-.clear {
-  display: block; width: calc(100% - 24px); margin: 4px 12px 12px;
-  padding: 8px; border-radius: var(--radius);
-  border: 1px solid var(--border-2); background: transparent;
-  color: color-mix(in srgb, var(--danger) 72%, var(--text));
-  font-family: inherit; font-size: var(--fs-small); cursor: pointer;
-  transition: background var(--dur-1) var(--ease);
+.seg button:hover:not(.on) { background: var(--hover); color: var(--text-2); }
+.seg button:focus-visible {
+  outline: none; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
 }
-.clear:hover:not(:disabled) { background: var(--hover); }
-.clear:disabled { opacity: 0.6; cursor: default; }
+
+/* ── Clear data ──────────────────────────────────────────────────────────
+   The panel's one destructive action, in the foot where every panel keeps its
+   action. It carries the danger colour only on hover: at rest it should not
+   be the loudest thing in a panel you opened to read. */
+.clear { color: var(--text-2); }
+.clear:hover:not(:disabled) { color: var(--danger); background: var(--hover); }
+.clear:disabled { opacity: 0.55; cursor: default; }
 
 /* Chrome UI text is interface, not copy — never selectable. Inputs stay editable. */
 body { user-select: none; -webkit-user-select: none; }

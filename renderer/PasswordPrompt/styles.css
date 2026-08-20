@@ -1,38 +1,24 @@
-/* Wrapped in @layer components: ui.css declares the layer order
- * (theme < base < components < utilities), so Tailwind utility classes in
- * the page markup can always override these component rules. */
+/* "Save password?" — a card, a credential, two answers. Card, buttons and the
+ * icon button come from surface.css and the SHARED CONTROLS block in ui.css. */
 @layer components {
 
 *, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: transparent; font-family: var(--font); -webkit-font-smoothing: antialiased; }
-
-#card {
-  margin: 4px; padding: 14px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+html, body {
+  margin: 0; padding: 0; background: transparent;
+  font-family: var(--font); -webkit-font-smoothing: antialiased;
+  user-select: none; -webkit-user-select: none;
 }
-#head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-#title { font-size: var(--fs-body); font-weight: 600; color: var(--text); }
-#close {
-  background: none; border: none; color: var(--text-3); cursor: pointer;
-  font-size: var(--fs-body); width: 22px; height: 22px; border-radius: var(--radius);
-}
-#close:hover { background: var(--hover); color: var(--text); }
+input, textarea { user-select: text; -webkit-user-select: text; }
 
-#cred { margin-bottom: 14px; }
+#card { margin: var(--sp-2); padding: var(--sp-5); }
+
+#head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); margin-bottom: var(--sp-4); }
+#title { font-size: var(--fs-body); font-weight: 600; color: var(--text); letter-spacing: var(--tracking); }
+
+#cred { margin-bottom: var(--sp-5); }
 #site { font-size: var(--fs-body); color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#user { font-size: var(--fs-small); color: var(--text-3); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#user { font-size: var(--fs-small); color: var(--text-3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-#actions { display: flex; justify-content: flex-end; gap: 8px; }
-button.btn-primary, button.btn-ghost {
-  font-family: var(--font); font-size: var(--fs-small); font-weight: 500;
-  padding: 7px 16px; border-radius: var(--radius); cursor: pointer;
-  letter-spacing: 0.03em;
-}
-.btn-primary { background: var(--text); color: var(--surface); border: 1px solid var(--text); }
-.btn-primary:hover { opacity: 0.9; }
-.btn-ghost { background: transparent; color: var(--text-2); border: 1px solid var(--border-2); }
-.btn-ghost:hover { background: var(--hover); color: var(--text); }
+#actions { display: flex; justify-content: flex-end; gap: var(--sp-4); }
 
 }

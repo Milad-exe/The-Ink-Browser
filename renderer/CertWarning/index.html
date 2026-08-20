@@ -37,18 +37,10 @@
     .title { font-size: clamp(21px, 2.6vw, 27px); font-weight: 700; letter-spacing: -0.02em; }
     .host { font-family: var(--mono); font-size: 13px; color: var(--danger); margin-top: 8px; user-select: text; }
     .detail { font-size: 14px; color: var(--text-2); margin-top: 14px; max-width: 480px; line-height: 1.5; }
-    .code { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); margin-top: 10px; letter-spacing: 0.04em; }
+    .code { font-family: var(--mono); font-size: var(--fs-small); color: var(--text-3); margin-top: 10px; letter-spacing: 0.04em; }
 
     .actions { display: flex; gap: 10px; margin-top: 26px; flex-wrap: wrap; justify-content: center; }
-    button {
-      cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 600;
-      padding: 9px 20px; border-radius: var(--radius);
-      transition: filter 0.15s, background 0.15s, border-color 0.15s, color 0.15s;
-    }
-    .btn-primary { border: 1px solid transparent; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
-    .btn-primary:hover { filter: brightness(1.06); }
-    .btn-ghost { border: 1px solid var(--border-2); background: transparent; color: var(--text-2); }
-    .btn-ghost:hover { border-color: var(--text-3); background: var(--hover); color: var(--text); }
+    /* Buttons are shared — see SHARED CONTROLS in renderer/styles/ui.css. */
 
     /* The way through is deliberately plain text, not a button: proceeding is
        the rare, informed case, not the obvious next step. */
@@ -57,26 +49,26 @@
       text-align: left;
     }
     .adv-toggle {
-      background: none; border: none; color: var(--text-3); font-size: 12.5px;
+      background: none; border: none; color: var(--text-3); font-size: var(--fs-body);
       padding: 4px 0; font-weight: 500;
     }
     .adv-toggle:hover { color: var(--text-2); }
     .adv-body { display: none; margin-top: 12px; }
     .advanced.open .adv-body { display: block; }
     .cert {
-      border: 1px solid var(--border); border-radius: var(--radius);
+      border: 1px solid var(--border); border-radius: var(--r-md);
       background: var(--surface); padding: 12px 14px;
-      font-family: var(--mono); font-size: 11.5px; color: var(--text-2);
+      font-family: var(--mono); font-size: var(--fs-small); color: var(--text-2);
       user-select: text; -webkit-user-select: text;
     }
     .cert div { display: flex; gap: 10px; padding: 2px 0; word-break: break-all; }
     .cert span:first-child { color: var(--text-3); min-width: 92px; flex-shrink: 0; }
     .proceed {
       margin-top: 12px; background: none; border: none; padding: 4px 0;
-      color: var(--danger); font-size: 12.5px; font-weight: 600; text-align: left;
+      color: var(--danger); font-size: var(--fs-body); font-weight: 600; text-align: left;
     }
     .proceed:hover { filter: brightness(1.15); }
-    .proceed-note { color: var(--text-3); font-size: 11.5px; margin-top: 4px; line-height: 1.5; }
+    .proceed-note { color: var(--text-3); font-size: var(--fs-small); margin-top: 4px; line-height: 1.5; }
   </style>
 </head>
 <body>
@@ -93,8 +85,8 @@
     <div class="code" id="code"></div>
 
     <div class="actions">
-      <button class="btn-primary" id="btn-back" data-i18n="cert.backToSafety">Back to safety</button>
-      <button class="btn-ghost" id="btn-retry" data-i18n="cert.tryAgain">Try again</button>
+      <button class="btn btn-primary" id="btn-back" data-i18n="cert.backToSafety">Back to safety</button>
+      <button class="btn btn-ghost" id="btn-retry" data-i18n="cert.tryAgain">Try again</button>
     </div>
 
     <div class="advanced" id="advanced">

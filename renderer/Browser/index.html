@@ -6,10 +6,144 @@
   <meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none';" />
   <title>Northstar</title>
   <link rel="stylesheet" href="../styles/ui.css">
+  <link rel="stylesheet" href="../styles/surface.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <!-- Tab Bar (top strip — sits beside the native window controls) -->
+  <div id="utility-bar">
+    <div class="nav-buttons">
+      <button id="back-btn" class="nav-btn" title="Back" data-i18n-title="chrome.back">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button id="forward-btn" class="nav-btn" title="Forward" data-i18n-title="chrome.forward">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+      <button id="reload-btn" class="nav-btn" title="Reload" data-i18n-title="chrome.reload">
+        <svg class="nav-reload" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+          <path d="M21 4v4.2h-4.2"/>
+        </svg>
+        <svg class="nav-stop" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+      <!-- Compact mode: hide/show the sidebar -->
+      <button id="compact-btn" class="icon-btn" title="Toggle compact mode" data-i18n-title="chrome.compact">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/>
+          <path d="M9.5 4.5v15"/>
+        </svg>
+      </button>
+    <div class="omnibox-wrapper">
+      <div class="omnibox" data-omni="search">
+        <button class="omni-icon" id="omni-icon" type="button" aria-label="Site information" data-i18n-label="chrome.siteInfo">
+          <!-- Search: shown while typing / on new tab -->
+          <svg class="oi oi-search" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"/>
+            <path d="M21 21l-4.3-4.3"/>
+          </svg>
+          <!-- Secure: HTTPS page -->
+          <svg class="oi oi-secure" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="11" width="14" height="9" rx="2"/>
+            <path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>
+          </svg>
+          <!-- Not secure: HTTP page -->
+          <svg class="oi oi-insecure" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.3 3.5 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.5a2 2 0 0 0-3.4 0z"/>
+            <path d="M12 9.5v4M12 17.2h.01"/>
+          </svg>
+        </button>
+        <div class="omni-input">
+          <input id="searchBar" type="text" placeholder="Search or enter URL"
+                 data-i18n-placeholder="chrome.omnibox"
+                 aria-label="Address and search" data-i18n-label="chrome.addressBar"
+                 role="combobox" aria-expanded="false" aria-autocomplete="list"
+                 autocomplete="off" spellcheck="false">
+          <!-- Inline completion, shown as dim text AFTER the caret. The typed
+               half is transparent so the suggestion lines up with the input's
+               own glyphs; Tab (or clicking the row) accepts it. -->
+          <div id="omni-ghost" aria-hidden="true"><span class="typed"></span><span class="rest"></span></div>
+          <!-- Firefox-style resting URL: host bright, scheme/path dimmed.
+               Painted over the (text-transparent) input while it's unfocused. -->
+          <div id="url-display" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inline pomodoro pill — hidden until focus mode/timer is active -->
+    <div id="pomodoro-pill" class="pomodoro-pill hidden" title="Click to manage timer" data-i18n-title="chrome.timer">
+      <svg class="pill-ring" viewBox="0 0 28 28" width="28" height="28">
+        <circle class="pill-ring-bg"   cx="14" cy="14" r="11"/>
+        <circle class="pill-ring-fill" id="pill-ring-fill" cx="14" cy="14" r="11"/>
+      </svg>
+      <span class="pill-phase-dot" id="pill-phase-dot"></span>
+      <span class="pill-time" id="pill-time">25:00</span>
+    </div>
+
+    <div class="trailing-icons">
+      <!-- Profile switcher: coloured initial of this window's profile -->
+      <button id="profile-btn" class="icon-btn" title="Profiles" data-i18n-title="chrome.profiles">
+        <span id="profile-badge" class="profile-badge">P</span>
+      </button>
+      <!-- Extension browser-action buttons (electron-chrome-extensions) -->
+      <browser-action-list id="ext-actions"></browser-action-list>
+      <!-- Extensions: lists installed extensions; links to the Chrome Web Store -->
+      <button id="extensions-btn" class="icon-btn" title="Extensions" data-i18n-title="chrome.extensions">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/>
+          <rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>
+        </svg>
+      </button>
+      <!-- Reader mode: hidden until the page looks like an article -->
+      <button id="reader-btn" class="icon-btn reader-btn hidden" title="Reader view" data-i18n-title="chrome.reader">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="4" width="16" height="16" rx="2.5"/>
+          <path d="M8 9h8M8 12.5h8M8 16h5"/>
+        </svg>
+      </button>
+      <!-- Picture-in-Picture: hidden until the active tab plays video -->
+      <button id="pip-btn" class="icon-btn pip-btn hidden" title="Picture-in-Picture" data-i18n-title="chrome.pip">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="5" width="18" height="14" rx="2.5"/>
+          <rect x="12.5" y="11.5" width="6.5" height="5" rx="1" fill="currentColor" stroke="none"/>
+        </svg>
+      </button>
+      <!-- Downloads: hidden until the first download of the session -->
+      <button id="downloads-btn" class="icon-btn downloads-btn hidden" title="Downloads" data-i18n-title="chrome.downloads">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 4v10M8 10.5l4 4 4-4"/>
+          <path d="M5 19.5h14"/>
+        </svg>
+        <span class="downloads-dot"></span>
+      </button>
+      <!-- Bookmark: filled ribbon when bookmarked, outline when not -->
+      <button id="bookmark-btn" class="icon-btn" title="Bookmark" data-i18n-title="chrome.bookmark">
+        <svg class="icon-svg bookmark-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4-7 4V4.5a1 1 0 0 1 1-1z"/>
+        </svg>
+        <svg class="icon-svg bookmark-filled" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4-7 4V4.5a1 1 0 0 1 1-1z"/>
+        </svg>
+      </button>
+      <!-- Focus: clock icon -->
+      <button id="focus-btn" class="icon-btn" title="Focus mode" data-i18n-title="chrome.focusMode">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="8.5"/>
+          <path d="M12 7v5l3.2 2"/>
+        </svg>
+      </button>
+      <button id="menu-btn" class="icon-btn menu-btn" title="Menu" data-i18n-title="chrome.menu">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <path d="M4 7h16M4 12h16M4 17h16"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Bookmark Bar -->
   <div id="tab-bar">
     <!-- Drag handle on the sidebar's right edge (side mode) to resize it -->
     <div id="sidebar-resizer" class="sidebar-resizer" title="Drag to resize" data-i18n-title="chrome.resizeSidebar"></div>
@@ -17,12 +151,12 @@
     <div id="window-controls" class="window-controls"></div>
     <!-- Create-a-Space form. Lives in the sidebar (chrome, outside the page
          bounds) so unlike the modals it needs no page-view collapse. -->
-    <div id="space-create" class="space-create hidden" role="dialog" aria-label="Create a Space" data-i18n-label="chrome.createSpace">
-      <div class="sc-title">Create a Space</div>
+    <div id="space-create" class="space-create hidden" role="dialog" aria-label="Create a space" data-i18n-label="chrome.createSpace">
+      <div class="sc-title" data-i18n="chrome.createSpace">Create a space</div>
       <div class="sc-sub">Spaces keep their own tabs, essentials and history.</div>
       <div class="sc-namerow">
         <button type="button" id="sc-emoji" class="sc-emoji" aria-label="Choose icon" title="Choose icon" data-i18n-label="chrome.chooseIcon" data-i18n-title="chrome.chooseIcon"></button>
-        <input id="sc-name" class="sc-input" maxlength="24" placeholder="Space Name" data-i18n-placeholder="chrome.spaceName">
+        <input id="sc-name" class="sc-input" maxlength="24" placeholder="Space name" data-i18n-placeholder="chrome.spaceName">
       </div>
       <div id="sc-emoji-picker" class="emoji-picker hidden" role="listbox" aria-label="Icon"></div>
       <!-- Which cookie jar this space's tabs use: its own, the shared Default,
@@ -32,8 +166,8 @@
       </button>
       <button class="sc-row" id="sc-theme">Edit Theme…</button>
       <div class="sc-actions">
-        <button id="sc-create" class="sc-btn sc-btn-primary">Create Space</button>
-        <button id="sc-cancel" class="sc-btn">Cancel</button>
+        <button id="sc-create" class="btn btn-primary sc-btn">Create space</button>
+        <button id="sc-cancel" class="btn btn-ghost sc-btn">Cancel</button>
       </div>
     </div>
     <!-- Essentials: pinned favourites (sidebar mode only, per profile) -->
@@ -41,7 +175,7 @@
     <!-- Muted current-space label above the tab list (a "Space" header) -->
     <div id="space-header" class="space-header"></div>
     <button id="tab-scroll-left" class="tab-scroll-btn" aria-label="Scroll tabs left" data-i18n-label="chrome.scrollTabsLeft">‹</button>
-    <div id="tabs-container"></div>
+    <div id="tabs-container" role="tablist" aria-label="Tabs" data-i18n-label="chrome.tabs"></div>
     <button id="tab-scroll-right" class="tab-scroll-btn" aria-label="Scroll tabs right" data-i18n-label="chrome.scrollTabsRight">›</button>
     <div id="tab-actions">
       <button id="new-tab-btn" class="tab-add" aria-label="New tab" data-i18n-label="chrome.newTab"><span class="tab-add-glyph" aria-hidden="true">+</span><span class="tab-add-label" data-i18n="chrome.newTab">New tab</span></button>
@@ -80,135 +214,6 @@
   </div>
 
   <!-- Navigation / address bar -->
-  <div id="utility-bar">
-    <div class="nav-buttons">
-      <button id="back-btn" class="nav-btn" title="Back" data-i18n-title="chrome.back">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </button>
-      <button id="forward-btn" class="nav-btn" title="Forward" data-i18n-title="chrome.forward">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
-      <button id="reload-btn" class="nav-btn" title="Reload" data-i18n-title="chrome.reload">
-        <svg class="nav-reload" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
-          <path d="M21 4v4.2h-4.2"/>
-        </svg>
-        <svg class="nav-stop" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 6 6 18M6 6l12 12"/>
-        </svg>
-      </button>
-    </div>
-
-      <!-- Compact mode: hide/show the sidebar -->
-      <button id="compact-btn" class="icon-btn" title="Toggle Compact Mode" data-i18n-title="chrome.compact">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/>
-          <path d="M9.5 4.5v15"/>
-        </svg>
-      </button>
-    <div class="omnibox-wrapper">
-      <div class="omnibox" data-omni="search">
-        <span class="omni-icon" id="omni-icon">
-          <!-- Search: shown while typing / on new tab -->
-          <svg class="oi oi-search" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="7"/>
-            <path d="M21 21l-4.3-4.3"/>
-          </svg>
-          <!-- Secure: HTTPS page -->
-          <svg class="oi oi-secure" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="5" y="11" width="14" height="9" rx="2"/>
-            <path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>
-          </svg>
-          <!-- Not secure: HTTP page -->
-          <svg class="oi oi-insecure" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10.3 3.5 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.5a2 2 0 0 0-3.4 0z"/>
-            <path d="M12 9.5v4M12 17.2h.01"/>
-          </svg>
-        </span>
-        <div class="omni-input">
-          <input id="searchBar" placeholder="Search or enter URL" data-i18n-placeholder="chrome.omnibox" type="text">
-          <!-- Inline completion, shown as dim text AFTER the caret. The typed
-               half is transparent so the suggestion lines up with the input's
-               own glyphs; Tab (or clicking the row) accepts it. -->
-          <div id="omni-ghost" aria-hidden="true"><span class="typed"></span><span class="rest"></span></div>
-          <!-- Firefox-style resting URL: host bright, scheme/path dimmed.
-               Painted over the (text-transparent) input while it's unfocused. -->
-          <div id="url-display" aria-hidden="true"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Inline pomodoro pill — hidden until focus mode/timer is active -->
-    <div id="pomodoro-pill" class="pomodoro-pill hidden" title="Click to manage timer" data-i18n-title="chrome.timer">
-      <svg class="pill-ring" viewBox="0 0 28 28" width="28" height="28">
-        <circle class="pill-ring-bg"   cx="14" cy="14" r="11"/>
-        <circle class="pill-ring-fill" id="pill-ring-fill" cx="14" cy="14" r="11"/>
-      </svg>
-      <span class="pill-phase-dot" id="pill-phase-dot"></span>
-      <span class="pill-time" id="pill-time">25:00</span>
-    </div>
-
-    <div class="trailing-icons">
-      <!-- Profile switcher: coloured initial of this window's profile -->
-      <button id="profile-btn" class="icon-btn" title="Profiles" data-i18n-title="chrome.profiles">
-        <span id="profile-badge" class="profile-badge">P</span>
-      </button>
-      <!-- Extension browser-action buttons (electron-chrome-extensions) -->
-      <browser-action-list id="ext-actions"></browser-action-list>
-      <!-- Extensions: lists installed extensions; links to the Chrome Web Store -->
-      <button id="extensions-btn" class="icon-btn" title="Extensions" data-i18n-title="chrome.extensions">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/>
-          <rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>
-        </svg>
-      </button>
-      <!-- Reader mode: hidden until the page looks like an article -->
-      <button id="reader-btn" class="icon-btn reader-btn hidden" title="Reader View" data-i18n-title="chrome.reader">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="4" y="4" width="16" height="16" rx="2.5"/>
-          <path d="M8 9h8M8 12.5h8M8 16h5"/>
-        </svg>
-      </button>
-      <!-- Picture-in-Picture: hidden until the active tab plays video -->
-      <button id="pip-btn" class="icon-btn pip-btn hidden" title="Picture-in-Picture" data-i18n-title="chrome.pip">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="5" width="18" height="14" rx="2.5"/>
-          <rect x="12.5" y="11.5" width="6.5" height="5" rx="1" fill="currentColor" stroke="none"/>
-        </svg>
-      </button>
-      <!-- Downloads: hidden until the first download of the session -->
-      <button id="downloads-btn" class="icon-btn downloads-btn hidden" title="Downloads" data-i18n-title="chrome.downloads">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 4v10M8 10.5l4 4 4-4"/>
-          <path d="M5 19.5h14"/>
-        </svg>
-        <span class="downloads-dot"></span>
-      </button>
-      <!-- Bookmark: filled ribbon when bookmarked, outline when not -->
-      <button id="bookmark-btn" class="icon-btn" title="Bookmark" data-i18n-title="chrome.bookmark">
-        <svg class="icon-svg bookmark-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4-7 4V4.5a1 1 0 0 1 1-1z"/>
-        </svg>
-        <svg class="icon-svg bookmark-filled" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4-7 4V4.5a1 1 0 0 1 1-1z"/>
-        </svg>
-      </button>
-      <!-- Focus: clock icon -->
-      <button id="focus-btn" class="icon-btn" title="Focus Mode" data-i18n-title="chrome.focusMode">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="8.5"/>
-          <path d="M12 7v5l3.2 2"/>
-        </svg>
-      </button>
-      <button id="menu-btn" class="icon-btn menu-btn" title="Menu" data-i18n-title="chrome.menu">
-        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
-          <path d="M4 7h16M4 12h16M4 17h16"/>
-        </svg>
-      </button>
-    </div>
-  </div>
-
-  <!-- Bookmark Bar -->
   <div id="bookmark-bar" class="bookmark-bar hidden">
     <div id="bookmark-bar-items"></div>
   </div>
@@ -222,12 +227,14 @@
       <div class="pomodoro-phase" id="pomodoro-phase">Focus</div>
       <div class="pomodoro-time" id="pomodoro-time">25:00</div>
       <div class="pomodoro-controls">
-        <button id="pomodoro-start" class="pom-btn pom-btn-primary">Start</button>
-        <button id="pomodoro-skip"  class="pom-btn">Skip</button>
-        <button id="pomodoro-reset" class="pom-btn">Reset</button>
+        <button id="pomodoro-start" class="btn btn-primary pom-btn">Start</button>
+        <button id="pomodoro-skip" class="btn btn-ghost pom-btn">Skip</button>
+        <button id="pomodoro-reset" class="btn btn-ghost pom-btn">Reset</button>
       </div>
       <div class="pomodoro-sessions" id="pomodoro-sessions"></div>
-      <button id="pomodoro-close" class="pom-close" title="Close" data-i18n-title="chrome.close">✕</button>
+      <button id="pomodoro-close" class="surface-icon-btn pom-close" title="Close" data-i18n-title="chrome.close" aria-label="Close" data-i18n-label="chrome.close">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
     </div>
   </div>
 
@@ -244,8 +251,8 @@
       <div id="prf-emoji-picker" class="emoji-picker hidden" role="listbox" aria-label="Emoji"></div>
       <div class="prf-hint">Choose the dot to keep the avatar minimal.</div>
       <div class="ri-actions">
-        <button id="prf-cancel" class="ri-btn">Cancel</button>
-        <button id="prf-save" class="ri-btn ri-btn-primary">Save</button>
+        <button id="prf-cancel" class="btn btn-ghost ri-btn">Cancel</button>
+        <button id="prf-save" class="btn btn-primary ri-btn">Save</button>
       </div>
     </div>
   </div>
@@ -255,6 +262,7 @@
        window.Ink, which renderer.js wires up. Order matters — these must run
        before renderer.js. -->
   <script src="../lib/i18n.js"></script>
+  <script src="../lib/keys.js"></script>
   <script src="../lib/util.js"></script>
   <script src="../lib/bookmark-bar.js"></script>
   <script src="../renderer.js"></script>

@@ -24,6 +24,9 @@ html, body {
   letter-spacing: var(--tracking); cursor: pointer; white-space: nowrap;
 }
 .ctx-menu-item:hover { background: var(--hover); }
+.ctx-menu-item:focus-visible {
+  outline: none; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
+}
 .ctx-menu-item.danger { color: var(--danger); }
 .ctx-menu-item.has-sub { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .ctx-sub-arrow { color: var(--text-3); font-size: 14px; line-height: 1; flex-shrink: 0; }
@@ -32,19 +35,27 @@ html, body {
 /* Emoji picker variant */
 .emoji-pop { min-width: 250px; }
 .emoji-search {
-  width: 100%; height: 28px; margin-bottom: 6px; padding: 0 9px;
-  border: 1px solid var(--border); border-radius: var(--r-md);
-  background: var(--page); color: var(--text);
+  width: 100%; height: var(--field-h); margin-bottom: var(--sp-3); padding: 0 var(--sp-4);
+  border: none; border-radius: var(--r-md);
+  background: var(--page); box-shadow: var(--ring-2);
+  color: var(--text);
   font-family: var(--font); font-size: var(--fs-body); outline: none;
   user-select: text; -webkit-user-select: text;
 }
-.emoji-search:focus { border-color: var(--accent); }
+.emoji-search:focus {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+              0 0 0 3px var(--accent-wash);
+}
 .emoji-pop-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; max-height: 200px; overflow-y: auto; }
 .emoji-opt {
-  width: 28px; height: 28px; padding: 0; border: none; border-radius: 7px;
+  width: var(--control-h); height: var(--control-h); padding: 0; border: none;
+  border-radius: var(--r-md);
   background: transparent; cursor: pointer; font-size: 16px; line-height: 1;
 }
 .emoji-opt:hover { background: var(--hover); }
+.emoji-opt:focus-visible {
+  outline: none; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
+}
 .emoji-none {
   position: relative;
 }

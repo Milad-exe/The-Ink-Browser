@@ -38,10 +38,10 @@
     #handle .pill,
     #handle .pad {
         display: flex; align-items: center; justify-content: center;
-        border: 1px solid var(--border-2);
-        border-radius: var(--radius-pill, 999px);
+        border: none;
+        border-radius: var(--r-pill);
         background: var(--surface);
-        box-shadow: var(--shadow-pop);
+        box-shadow: var(--ring-2), var(--shadow-pop);
         transition: opacity 0.12s, transform 0.12s;
     }
     #handle .pill {

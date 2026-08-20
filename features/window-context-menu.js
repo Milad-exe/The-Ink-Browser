@@ -1,4 +1,5 @@
 const log = require('./log');
+const i18n = require('./i18n');
 class WindowContextMenu {
     window; // BrowserWindow the menu belongs to
     windowManager;
@@ -72,7 +73,7 @@ class WindowContextMenu {
         })();
         this.sep();
         this.contextTemplate.push({
-            label: 'New Tab',
+            label: i18n.t('chrome.newTab'),
             click: () => { try { require('../ipc/palette').openFor(windowData); } catch { windowData.tabs.createTab(); } },
         }, { type: 'separator' }, {
             label: 'Reload Tab',
@@ -176,7 +177,7 @@ class WindowContextMenu {
             return;
         this.sep();
         this.contextTemplate.push({
-            label: 'New Tab',
+            label: i18n.t('chrome.newTab'),
             click: () => { try { require('../ipc/palette').openFor(windowData); } catch { windowData.tabs.createTab(); } },
         });
         const closed = windowData.tabs.closedTabHistory;

@@ -1,36 +1,20 @@
+/* The side panel's cap: the shared panel head (renderer/styles/surface.css)
+ * sitting directly on top of the extension's own page view, so it rounds only
+ * its top corners — the native view below carries the bottom ones
+ * (features/side-panel.js setBorderRadius). */
 @layer components {
-    /* The header is a thin cap sitting directly on top of the extension's own
-       page view, so it rounds only its top corners — the native view below
-       carries the bottom ones (features/side-panel.js setBorderRadius).
-
-       These are written out rather than composed from utilities because
-       renderer/styles/ui.css is a COMPILED Tailwind subset with no build step
-       in this repo: a class that was not already used somewhere does not exist,
-       and silently does nothing. */
-    #bar {
-        -webkit-app-region: no-drag;
-        border-radius: var(--radius);
-        border: 1px solid var(--border-2);
-        background: var(--surface);
-        padding-left: 12px;
-        padding-right: 12px;
-    }
-
-    #title {
-        min-width: 0;
-    }
-
-    #close-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 20px;
-        height: 20px;
-        flex-shrink: 0;
-        border-radius: var(--radius);
-    }
-
-    #close-btn:hover {
-        background: var(--hover);
-    }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: transparent; font-family: var(--font); color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    user-select: none; -webkit-user-select: none;
+  }
+  #bar {
+    height: 100vh;
+    -webkit-app-region: no-drag;
+    background: var(--surface);
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    box-shadow: var(--ring-2);
+  }
 }

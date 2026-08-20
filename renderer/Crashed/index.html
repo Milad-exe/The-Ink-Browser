@@ -29,17 +29,10 @@
     .glyph { color: var(--text-3); margin-bottom: 18px; }
     .title { font-size: clamp(20px, 2.6vw, 26px); font-weight: 700; letter-spacing: -0.02em; }
     .detail { font-size: 14px; color: var(--text-2); margin-top: 10px; max-width: 440px; line-height: 1.5; }
-    .url { font-family: var(--mono); font-size: 12.5px; color: var(--text-3); margin-top: 10px; max-width: 560px; word-break: break-all; user-select: text; }
+    .url { font-family: var(--mono); font-size: var(--fs-body); color: var(--text-3); margin-top: 10px; max-width: 560px; word-break: break-all; user-select: text; }
     .reason { font-family: var(--mono); font-size: 11px; color: var(--text-3); margin-top: 8px; letter-spacing: 0.04em; }
     .actions { display: flex; gap: 10px; margin-top: 26px; }
-    button {
-      cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 600;
-      padding: 9px 20px; border-radius: var(--radius); transition: filter 0.15s, background 0.15s, border-color 0.15s;
-    }
-    .btn-primary { border: 1px solid transparent; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
-    .btn-primary:hover { filter: brightness(1.06); }
-    .btn-ghost { border: 1px solid var(--border-2); background: transparent; color: var(--text); }
-    .btn-ghost:hover { border-color: var(--text-3); background: var(--hover); }
+    /* Buttons are shared — see SHARED CONTROLS in renderer/styles/ui.css. */
   </style>
 </head>
 <body>
@@ -55,8 +48,8 @@
     <p class="url" id="url"></p>
     <p class="reason" id="reason"></p>
     <div class="actions">
-      <button class="btn-ghost" id="btn-back" data-i18n="crash.back">Go Back</button>
-      <button class="btn-primary" id="btn-reload" data-i18n="crash.reload">Reload Page</button>
+      <button class="btn btn-ghost" id="btn-back" data-i18n="crash.back">Go back</button>
+      <button class="btn btn-primary" id="btn-reload" data-i18n="crash.reload">Reload page</button>
     </div>
   </main>
   <script>

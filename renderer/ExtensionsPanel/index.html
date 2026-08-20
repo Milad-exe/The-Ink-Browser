@@ -8,21 +8,22 @@
   <link rel="stylesheet" href="../styles/surface.css">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="m-0 select-none overflow-hidden bg-transparent font-sans text-primary">
-  <div id="panel" class="flex h-screen flex-col overflow-hidden rounded-lg border border-strong bg-surface">
-    <div class="flex items-center justify-between border-b border-subtle px-3.5 py-2.5">
-      <span class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-secondary">Extensions</span>
-      <button id="close-btn" tabindex="-1" class="cursor-pointer border-0 bg-transparent p-0 text-[13px] leading-none text-tertiary hover:text-primary" title="Close">✕</button>
+<body>
+  <div id="panel" class="surface-card">
+    <div class="surface-head">
+      <span class="surface-title" data-i18n="chrome.extensions">Extensions</span>
+      <button id="close-btn" class="surface-icon-btn" title="Close" data-i18n-title="chrome.close" aria-label="Close" data-i18n-label="chrome.close">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
     </div>
 
-    <div id="list" class="min-h-0 flex-1 overflow-y-auto"></div>
+    <div id="list" class="surface-body surface-scroll"></div>
 
-    <!-- Footer: the way to get more extensions -->
-    <a id="store-link" href="#"
-       class="block border-t border-subtle px-3.5 py-2.5 text-[12px] font-medium text-accent no-underline hover:bg-hover">
-      Browse the Chrome Web Store ↗
-    </a>
+    <!-- The way to get more extensions -->
+    <a id="store-link" class="surface-foot" href="#" data-i18n="ext.store">Find extensions</a>
   </div>
+  <script src="../lib/i18n.js"></script>
+  <script src="../lib/keys.js"></script>
   <script src="panel.js"></script>
 </body>
 </html>

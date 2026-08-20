@@ -10,15 +10,16 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="panel">
-    <div id="header">
-      <span id="title">Downloads</span>
-      <button id="clear-btn" title="Clear finished downloads">Clear</button>
+  <div id="panel" class="surface-card">
+    <div class="surface-head">
+      <span class="surface-title" data-i18n="chrome.downloads">Downloads</span>
+      <button id="clear-btn" title="Clear finished downloads" data-i18n-title="downloads.clearTitle" data-i18n="downloads.clear">Clear</button>
     </div>
-    <div id="list" role="list" aria-label="Downloads"></div>
-    <button id="show-all">Show all downloads</button>
+    <div id="list" class="surface-body surface-scroll" role="list" aria-label="Downloads" data-i18n-label="chrome.downloads"></div>
+    <button id="show-all" class="surface-foot" data-i18n="downloads.showAll">Open downloads folder</button>
   </div>
   <script src="../lib/i18n.js"></script>
+  <script src="../lib/keys.js"></script>
   <script src="downloads.js"></script>
 </body>
 </html>

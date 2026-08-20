@@ -1,8 +1,7 @@
-/* Wrapped in @layer components: ui.css declares the layer order
- * (theme < base < components < utilities), so Tailwind utility classes in
- * the page markup can always override these component rules. */
+/* Find in page. One row — field, count, prev/next, close — because that is
+ * what every browser's find bar looks like and it is the shape people already
+ * know. The card and the icon buttons are shared (surface.css). */
 @layer components {
-
 
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -11,66 +10,42 @@ body {
   font-family: var(--font);
   background: transparent; overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  user-select: none; -webkit-user-select: none;
 }
+input, textarea { user-select: text; -webkit-user-select: text; }
 
-.find-container {
-  display: flex; justify-content: center;
-  align-items: center; height: 100vh; padding: 8px;
-}
+.find-container { display: flex; align-items: center; height: 100vh; padding: var(--sp-4); }
 
 .find-bar {
-  display: flex; flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius); padding: 10px;
-  width: 100%; max-width: 264px; gap: 8px;
+  display: flex; align-items: center; gap: var(--sp-2);
+  width: 100%; height: 44px; padding: 0 var(--sp-2) 0 var(--sp-5);
 }
 
 #find-input {
-  width: 100%; border: 1px solid var(--border-2); outline: none;
-  font-size: var(--fs-body); font-family: inherit; padding: 8px 11px;
-  background: var(--bg); color: var(--text);
-  border-radius: var(--radius); transition: border-color var(--dur-1) var(--ease), box-shadow 0.14s;
+  flex: 1; min-width: 0; height: 100%;
+  border: none; outline: none; background: transparent;
+  font-family: inherit; font-size: var(--fs-body); letter-spacing: var(--tracking);
+  color: var(--text);
 }
 #find-input::placeholder { color: var(--text-3); }
-#find-input:focus { border-color: color-mix(in srgb, var(--accent) 50%, var(--border-2)); }
 
-.find-controls {
-  display: flex; align-items: center; justify-content: space-between; gap: 6px;
-}
-
-.find-nav { display: flex; gap: 2px; }
-
-.find-btn {
-  background: transparent; border: 1px solid var(--border-2);
-  color: var(--text-2); cursor: pointer; padding: 5px 8px; border-radius: var(--radius);
-  font-size: var(--fs-micro); font-family: inherit;
-  display: flex; align-items: center; justify-content: center;
-  min-width: 26px; height: 26px; transition: color var(--dur-1) var(--ease), background 0.1s, border-color 0.1s;
-}
-.find-btn:hover { color: var(--text); background: var(--active-bg); border-color: var(--border-2); }
-.find-btn:active { background: var(--hover); }
-.find-btn:disabled { opacity: 0.28; cursor: not-allowed; }
-.find-btn:disabled:hover { color: var(--text-2); background: transparent; }
-
-.close-btn {
-  color: var(--text-3); font-size: var(--fs-body); background: transparent; border: none;
-  cursor: pointer; padding: 4px 6px; border-radius: var(--radius); transition: color var(--dur-1) var(--ease), background 0.1s;
-  font-family: inherit;
-}
-.close-btn:hover { color: var(--text); background: var(--active-bg); }
-
+/* The count only appears once there is something to count, so an empty field
+   is not sitting next to "0 of 0". */
 .match-counter {
-  font-size: var(--fs-micro); color: var(--text-2); margin: 0 4px; min-width: 46px;
-  text-align: center; font-weight: 500;
-  font-family: var(--mono, 'Menlo', monospace); letter-spacing: 0.04em;
+  flex-shrink: 0;
+  font-family: var(--mono); font-size: var(--fs-micro); font-weight: 500;
+  letter-spacing: 0.02em; color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
+.match-counter:empty { display: none; }
+.match-counter.none { color: var(--text-3); }
 
+.find-nav { display: flex; gap: 0; flex-shrink: 0; }
+.find-btn:disabled { opacity: 0.3; cursor: default; }
+.find-btn:disabled:hover { background: transparent; color: var(--text-3); }
+
+/* Matches on the page itself. */
 .find-highlight { background: rgba(245,196,50,0.35); color: inherit; }
 .find-highlight.current { background: #f5c842; color: #000; }
-
-/* Chrome UI text is interface, not copy — never selectable. Inputs stay editable. */
-body { user-select: none; -webkit-user-select: none; }
-input, textarea { user-select: text; -webkit-user-select: text; }
 
 }

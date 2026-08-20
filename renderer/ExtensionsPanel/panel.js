@@ -7,42 +7,57 @@
 // their pinned toolbar icon — the row itself never activates, so aiming for a
 // control can't accidentally open a popup. The footer links to the Web Store.
 (() => {
+    const T = (key, fallback) => {
+        try { const v = window.Ink?.i18n?.t(key); return (v && v !== key) ? v : fallback; }
+        catch (e) { return fallback; }
+    };
+    try {
+        window.Ink.i18n.init(window.inkI18n?.getSync() || (window.northstarSettings?.getSync() || {}).i18n || {});
+        window.Ink.i18n.apply(document);
+    }
+    catch (e) { window.inkLog?.debug('extpanel', 'i18n: ' + e); }
     const listEl = document.getElementById('list');
     const PIN_SVG = `<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M9.5 1.5l5 5-1.5 1.5-.75-.25L9.5 10.5l.25 2.75L8.5 14.5 5 11 2 14l-1-1 3-3-3.5-3.5 1.25-1.25 2.75.25 2.75-2.75-.25-.75L9.5 1.5z"/></svg>`;
     function render(items) {
         listEl.textContent = '';
         if (!items || items.length === 0) {
             const empty = document.createElement('div');
-            empty.className = 'px-3.5 py-5 text-center text-[12px] italic text-tertiary';
-            empty.textContent = 'No extensions installed';
+            empty.className = 'surface-empty';
+            const t = document.createElement('div');
+            t.className = 'empty-title';
+            t.textContent = T('ext.empty', 'No extensions yet');
+            const h = document.createElement('div');
+            h.className = 'empty-hint';
+            h.textContent = T('ext.emptyHint', 'Installed extensions are managed here.');
+            empty.append(t, h);
             listEl.appendChild(empty);
             return;
         }
         for (const ext of items) {
             const row = document.createElement('div');
-            row.className = 'flex items-center gap-2.5 border-b border-subtle px-3.5 py-2.5';
+            row.className = 'surface-row ext-row';
             row.title = ext.description || ext.name;
             const icon = document.createElement('div');
-            icon.className = 'h-5 w-5 flex-shrink-0';
+            icon.className = 'ext-icon';
             if (ext.icon) {
                 const img = document.createElement('img');
                 img.src = ext.icon;
-                img.className = 'h-5 w-5';
+                img.className = 'ext-icon-img';
                 if (!ext.enabled)
                     img.style.filter = 'grayscale(1) opacity(0.5)';
                 icon.appendChild(img);
             }
             else {
-                icon.classList.add('border', 'border-strong', 'bg-surface-2');
+                icon.classList.add('ext-icon-blank');
             }
             row.appendChild(icon);
             const meta = document.createElement('div');
-            meta.className = 'min-w-0 flex-1';
+            meta.className = 'ext-meta';
             const name = document.createElement('div');
-            name.className = 'truncate text-[12.5px] font-medium' + (ext.enabled ? '' : ' text-tertiary');
+            name.className = 'ext-name' + (ext.enabled ? '' : ' is-off');
             name.textContent = ext.name;
             const ver = document.createElement('div');
-            ver.className = 'font-mono text-[10px] text-tertiary';
+            ver.className = 'ext-sub';
             ver.textContent = 'v' + (ext.version || '?')
                 + (ext.enabled ? '' : ' · off')
                 + (ext.pinned ? '' : ' · unpinned');
@@ -55,33 +70,33 @@
             };
             // Pin / unpin — a real 26px button so it's an easy, unambiguous target.
             const pin = document.createElement('button');
-            pin.tabIndex = -1;
-            pin.className = 'ext-pin flex h-[26px] w-[26px] flex-shrink-0 cursor-pointer items-center justify-center border-0 hover:bg-hover'
-                + (ext.pinned ? ' pinned text-accent' : ' text-tertiary');
-            pin.style.background = ext.pinned ? 'var(--active-bg)' : 'transparent';
-            pin.title = ext.pinned ? 'Pinned to toolbar — click to unpin' : 'Pin to toolbar';
+            pin.className = 'surface-icon-btn ext-pin' + (ext.pinned ? ' is-pinned' : '');
+            pin.title = ext.pinned ? T('ext.unpin', 'Pinned to the toolbar — click to unpin') : T('ext.pin', 'Pin to the toolbar');
             pin.innerHTML = PIN_SVG;
             control(pin, () => window.extPanel.setPinned(ext.id, !ext.pinned));
             row.appendChild(pin);
             if (ext.optionsUrl && ext.enabled) {
                 const opts = document.createElement('button');
-                opts.tabIndex = -1;
-                opts.className = 'flex h-[26px] w-[22px] flex-shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent text-[13px] text-tertiary hover:text-primary';
-                opts.title = 'Extension options';
-                opts.textContent = '⚙';
+                opts.className = 'surface-icon-btn';
+                opts.title = T('ext.options', 'Extension options');
+                opts.innerHTML = '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.4"/><path d="M10 3v1.6M10 15.4V17M3 10h1.6M15.4 10H17M5 5l1.1 1.1M13.9 13.9L15 15M5 15l1.1-1.1M13.9 6.1L15 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
                 control(opts, () => window.extPanel.openOptions(ext.id));
                 row.appendChild(opts);
             }
-            const toggle = document.createElement('div');
-            toggle.className = 'ext-toggle flex-shrink-0' + (ext.enabled ? ' on' : '');
-            toggle.title = ext.enabled ? 'Disable' : 'Enable';
+            // A real button with a switch role: a <div> toggle is invisible to
+            // the keyboard and announces as nothing.
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.setAttribute('role', 'switch');
+            toggle.setAttribute('aria-checked', String(!!ext.enabled));
+            toggle.className = 'ext-toggle' + (ext.enabled ? ' on' : '');
+            toggle.title = ext.enabled ? T('ext.disable', 'Disable') : T('ext.enable', 'Enable');
             control(toggle, async () => { await window.extPanel.setEnabled(ext.id, !ext.enabled); refresh(); });
             row.appendChild(toggle);
             const rm = document.createElement('button');
-            rm.tabIndex = -1;
-            rm.className = 'flex h-[26px] w-[22px] flex-shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent text-[13px] leading-none text-tertiary hover:text-danger';
-            rm.title = 'Remove extension';
-            rm.textContent = '✕';
+            rm.className = 'surface-icon-btn ext-remove';
+            rm.title = T('ext.remove', 'Remove extension');
+            rm.innerHTML = '<svg viewBox="0 0 20 20" fill="none"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
             control(rm, async () => { await window.extPanel.remove(ext.id); refresh(); });
             row.appendChild(rm);
             listEl.appendChild(row);
@@ -93,27 +108,27 @@
         if (!panels || !panels.length)
             return;
         const head = document.createElement('div');
-        head.className = 'dt-section font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-secondary';
-        head.textContent = 'DevTools panels';
+        head.className = 'surface-label';
+        head.textContent = T('ext.devtoolsPanels', 'DevTools panels');
         listEl.appendChild(head);
         for (const p of panels) {
             const row = document.createElement('button');
             row.tabIndex = -1;
-            row.className = 'dt-row';
+            row.className = 'surface-row dt-row';
             row.title = `Open “${p.title}” from ${p.extensionName || p.extensionId}`;
             const meta = document.createElement('div');
-            meta.className = 'min-w-0 flex-1';
+            meta.className = 'ext-meta';
             const name = document.createElement('div');
-            name.className = 'truncate text-[12.5px] font-medium';
+            name.className = 'ext-name';
             name.textContent = p.title;
             const sub = document.createElement('div');
-            sub.className = 'truncate font-mono text-[10px] text-tertiary';
+            sub.className = 'ext-sub';
             sub.textContent = p.extensionName || p.extensionId;
             meta.appendChild(name);
             meta.appendChild(sub);
             row.appendChild(meta);
             const arrow = document.createElement('span');
-            arrow.className = 'flex-shrink-0 text-[12px] text-tertiary';
+            arrow.className = 'ext-arrow';
             arrow.textContent = '→';
             row.appendChild(arrow);
             row.addEventListener('click', () => {
@@ -165,6 +180,9 @@
         window.extPanel.openStore();
         window.extPanel.close();
     });
+    // Rows here are not activatable — the controls inside them are — so Tab
+    // walks the controls and only Escape is wired at the panel level.
+    window.Ink?.keys?.rows(document, { selector: '.dt-row, #store-link', typeahead: false });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape')
         window.extPanel.close(); });
     refresh();

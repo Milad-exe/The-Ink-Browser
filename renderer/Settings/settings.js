@@ -407,7 +407,7 @@
                     }
                 });
                 const del = document.createElement('button');
-                del.className = 'btn-danger btn-sm';
+                del.className = 'btn btn-danger btn-sm';
                 del.textContent = 'Remove';
                 del.addEventListener('click', async () => {
                     if (!confirm(`Remove the saved password for ${host}?`))
@@ -488,13 +488,13 @@
                 const toggle = document.createElement('label');
                 toggle.className = 'toggle';
                 toggle.title = ext.enabled ? 'Disable' : 'Enable';
-                toggle.innerHTML = `<input type="checkbox" ${ext.enabled ? 'checked' : ''}><span class="track"></span>`;
+                toggle.innerHTML = `<input type="checkbox" ${ext.enabled ? 'checked' : ''}><span class="switch-track"></span>`;
                 toggle.querySelector('input').addEventListener('change', (e) => {
                     window.northstarExtensions.setEnabled(ext.id, e.target.checked);
                 });
                 controls.appendChild(toggle);
                 const removeBtn = document.createElement('button');
-                removeBtn.className = 'btn-danger btn-sm';
+                removeBtn.className = 'btn btn-danger btn-sm';
                 removeBtn.textContent = 'Remove';
                 removeBtn.addEventListener('click', async () => {
                     if (!confirm(`Remove "${ext.name}"?`))

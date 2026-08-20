@@ -1,6 +1,7 @@
 const { WebContentsView, Menu, dialog } = require('electron');
 const { resolveAppFile } = require('../app-paths');
 const log = require('./log');
+const i18n = require('./i18n');
 const zoom = require('./zoom');
 const preloadForPage = require('./tabs/preload-for-page');
 const path = require('path');
@@ -401,8 +402,8 @@ class Tabs {
             this.tabContainers.set(tabIndex, container);
         this.tabProfiles.set(tabIndex, workspace);
         tab.lazyLoaded = false;
-        let tempTitle = title || url || 'New Tab';
-        if ((!title || title === 'New Tab' || title === '') && url && url.startsWith('http')) {
+        let tempTitle = title || url || i18n.t('tab.untitled');
+        if ((!title || title === i18n.t('tab.untitled') || title === 'New Tab' || title === '') && url && url.startsWith('http')) {
             try {
                 tempTitle = new URL(url).hostname;
             }
@@ -470,7 +471,7 @@ class Tabs {
             }
             const urlType = this.tabUrls.get(index) || '';
             if (urlType === 'newtab' || (typeof urlType === 'string' && urlType.startsWith('file://'))) {
-                return 'New Tab';
+                return i18n.t('tab.untitled');
             }
             if (urlType === 'history') {
                 return 'History';
@@ -481,10 +482,10 @@ class Tabs {
             if (fallbackTitle)
                 return fallbackTitle;
             const t = tab && tab.webContents ? tab.webContents.getTitle() : '';
-            return t || 'New Tab';
+            return t || i18n.t('tab.untitled');
         }
         catch {
-            return 'New Tab';
+            return i18n.t('tab.untitled');
         }
     }
     updateWindowTitle(index, explicitTitle) {
@@ -616,7 +617,7 @@ class Tabs {
         this.setupTabListeners(tabIndex, tab);
         this.mainWindow.webContents.send('tab-created', {
             index: tabIndex,
-            title: 'New Tab',
+            title: i18n.t('tab.untitled'),
             totalTabs: this.tabMap.size,
             afterIndex: insertAfterIndex === -1 ? -1 : (afterPos !== -1 ? insertAfterIndex : null),
             active: shouldActivate,
@@ -654,7 +655,7 @@ class Tabs {
             try { tab.webContents.audioMuted = true; } catch (e) { log.debug('tabs', 'focusOmnibox', e); }
         }
         this.saveStateDebounced();
-        this.sendTabUpdate(tabIndex, tab, '', 'New Tab');
+        this.sendTabUpdate(tabIndex, tab, '', i18n.t('tab.untitled'));
         tab.webContents.on('did-finish-load', () => {
             const windowData = this.getWindowData();
             if (windowData) {
@@ -1007,7 +1008,7 @@ class Tabs {
                 const base = token.split('/')[0];
                 this.tabUrls.set(tabIndex, token);
                 lastAddedUrl = token;
-                let title = 'New Tab';
+                let title = i18n.t('tab.untitled');
                 if (base === 'settings')
                     title = 'Settings';
                 else if (base === 'bookmarks')
@@ -1427,7 +1428,7 @@ class Tabs {
             else if (url && url.includes('/History/index.html'))
                 displayTitle = 'History';
             else
-                displayTitle = 'New Tab';
+                displayTitle = i18n.t('tab.untitled');
         }
         else if (isInternalToken) {
             displayUrl = url; // 'settings' / 'settings/appearance' / 'history' / 'bookmarks'
@@ -2255,7 +2256,7 @@ class Tabs {
         const keepHistory = this.persistence?.get('restoreTabHistory') !== false;
         const tabs = selected.map((idx) => {
             const url = this.tabUrls.get(idx) || 'newtab';
-            let title = this.computeDisplayTitleFor(idx) || 'New Tab';
+            let title = this.computeDisplayTitleFor(idx) || i18n.t('tab.untitled');
             // Back/forward and scroll position, so a restored tab is the tab you
             // left rather than a fresh load of the same address. Capped: a very
             // long history is not worth an unbounded state file.

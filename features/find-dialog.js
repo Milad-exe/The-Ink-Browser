@@ -104,8 +104,8 @@ class FindDialog {
             return;
         }
         this.findWindow = new BrowserWindow({
-            width: 270,
-            height: 110,
+            width: 320,
+            height: 60,
             frame: false,
             alwaysOnTop: true,
             resizable: false,

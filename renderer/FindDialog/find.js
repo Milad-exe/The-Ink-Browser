@@ -3,6 +3,15 @@
 // top-level names out of the shared global scope.
 (() => {
     document.addEventListener('DOMContentLoaded', () => {
+        const T = (key, fallback) => {
+            try { const v = window.Ink?.i18n?.t(key); return (v && v !== key) ? v : fallback; }
+            catch (e) { return fallback; }
+        };
+        try {
+            window.Ink.i18n.init(window.inkI18n?.getSync() || {});
+            window.Ink.i18n.apply(document);
+        }
+        catch (e) { window.inkLog?.debug('find', 'i18n: ' + e); }
         const findInput = document.getElementById('find-input');
         const prevBtn = document.getElementById('prev-btn');
         const nextBtn = document.getElementById('next-btn');
@@ -77,12 +86,15 @@
             currentMatchIndex = current;
             totalMatches = total;
             if (total === 0) {
-                matchCounter.textContent = 'No matches';
+                matchCounter.textContent = T('find.none', 'No matches');
+                matchCounter.classList.add('none');
                 prevBtn.disabled = true;
                 nextBtn.disabled = true;
             }
             else {
-                matchCounter.textContent = `${current} of ${total}`;
+                matchCounter.textContent = T('find.count', '{current} of {total}')
+                    .replace('{current}', current).replace('{total}', total);
+                matchCounter.classList.remove('none');
                 prevBtn.disabled = false;
                 nextBtn.disabled = false;
             }

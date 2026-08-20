@@ -1,4 +1,14 @@
 const { contextBridge, ipcRenderer } = require('electron');
+// The catalogue, so this panel's labels follow the language setting. Inlined
+// rather than required from a shared module: overlay preloads are SANDBOXED
+// (only the chrome window sets sandbox:false), and a sandboxed preload can
+// require 'electron' and nothing else.
+try {
+    contextBridge.exposeInMainWorld('inkI18n', {
+        getSync: () => { try { return ipcRenderer.sendSync('i18n-sync') || {}; } catch { return {}; } },
+    });
+}
+catch { }
 // Bridge for the context-menu overlay view. A pick is reported as either a path
 // of row indices (regular menus) or { emoji } (the picker) — main forwards it to
 // the chrome, which owns the actual handlers.

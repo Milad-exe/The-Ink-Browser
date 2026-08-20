@@ -14,6 +14,20 @@
      * DOMContentLoaded listener.
      */
     // ── Module-level utilities ────────────────────────────────────────────────────
+    /**
+     * Translate, with the English already in the source as the fallback.
+     * `Ink.i18n.t` returns the KEY for an unknown string, which would paint
+     * "chrome.newTab" into a menu — this returns the fallback instead. Declared
+     * up here because the init sequence runs near the top of the file (a const
+     * declared below it would be in its TDZ when the chrome first paints).
+     */
+    const T = (key, fallback) => {
+        try {
+            const v = window.Ink?.i18n?.t(key);
+            return (v && v !== key) ? v : fallback;
+        }
+        catch (e) { return fallback; }
+    };
     /** Sanitize an HTML string using DOMPurify when available. */
     const sanitizeHtml = (typeof DOMPurify !== 'undefined')
         ? (html) => DOMPurify.sanitize(html, { FORCE_BODY: false })
@@ -1308,7 +1322,7 @@
                     ['Compact Mode', [
                         ['Toggle compact mode', () => window.tabsUI.toggleCompact()],
                     ]],
-                    ['New Tab', () => window.palette.open()],
+                    [T('chrome.newTab', 'New tab'), () => window.palette.open()],
                     ['New Folder', newFolderInline],
                     ['sep'],
                     ['Select All Tabs', () => selectAllTabs()],
@@ -1485,7 +1499,6 @@
                     }
                     const rm = document.createElement('button');
                     rm.className = 'ess-remove';
-                    rm.tabIndex = -1;
                     rm.textContent = '×';
                     rm.title = 'Remove from Essentials';
                     rm.addEventListener('click', (e) => { e.stopPropagation(); window.essentials.remove(it.url, it.profile || null); });
@@ -1827,7 +1840,7 @@
                     ['Create Space', () => openCreateSpace()],
                     ['Create Folder', () => newFolderInline()],
                     ['sep'],
-                    ['New Tab', () => window.palette.open()],
+                    [T('chrome.newTab', 'New tab'), () => window.palette.open()],
                 ]);
             });
             document.getElementById('sb-settings')?.addEventListener('click', () => {
@@ -1877,6 +1890,14 @@
                     b.addEventListener('click', () => { setEmojiField(e); picker.classList.add('hidden'); });
                     picker.appendChild(b);
                 }
+                // One tab stop for the whole grid; arrows move within it, so a
+                // keyboard can pick an icon instead of the grid being a
+                // mouse-only feature.
+                window.Ink?.keys?.rows(picker, {
+                    selector: '.emoji-opt',
+                    typeahead: false,
+                    onEscape: () => picker.classList.add('hidden'),
+                });
             }
             emojiBtn?.addEventListener('click', (e) => { e.stopPropagation(); picker?.classList.toggle('hidden'); });
             const close = () => {
@@ -1937,13 +1958,18 @@
             if (String(workspace) !== activeWorkspace)
                 btn.classList.add('ws-hidden');
             btn.draggable = false; // pointer-tracked drag below, not HTML5 DnD
-            // Keyboard-reachable: a div needs the role and the tab stop spelled
-            // out, or the whole strip is invisible to keyboard and screen-reader
-            // users. Enter/Space switch to the tab (see the keydown below).
-            btn.tabIndex = 0;
+            // The strip is ONE tab stop, not one per tab: Tab reaches the tab
+            // list, then the arrows move within it (the toolbar pattern every
+            // browser and every OS uses — twenty open tabs should not mean
+            // twenty presses to reach the address bar). The active tab carries
+            // the stop; setActiveTab keeps that in sync.
+            btn.tabIndex = -1;
             btn.setAttribute('role', 'tab');
             btn.setAttribute('aria-label', title || `Tab ${index + 1}`);
+            btn.setAttribute('aria-selected', 'false');
             btn.addEventListener('keydown', (e) => {
+                const NEXT = sideTabs() ? 'ArrowDown' : 'ArrowRight';
+                const PREV = sideTabs() ? 'ArrowUp' : 'ArrowLeft';
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     window.tab.switch(parseInt(btn.dataset.index));
@@ -1951,6 +1977,10 @@
                 else if (e.key === 'Delete' || e.key === 'Backspace') {
                     e.preventDefault();
                     window.tab.remove(parseInt(btn.dataset.index));
+                }
+                else if (e.key === NEXT || e.key === PREV || e.key === 'Home' || e.key === 'End') {
+                    e.preventDefault();
+                    moveTabFocus(btn, e.key === NEXT ? 1 : e.key === PREV ? -1 : e.key);
                 }
             });
             if (isPrivate)
@@ -2002,7 +2032,7 @@
                 const curFolder = folderState.assign.get(idx) || null;
                 // Grouped as in the reference design doc; folder targets collapse
                 // into one submenu instead of a row per folder.
-                const rows = [['New Tab', () => window.palette.open()]];
+                const rows = [[T('chrome.newTab', 'New tab'), () => window.palette.open()]];
                 if (!isPinned) {
                     const moves = folderState.folders
                         .filter(f => f.id !== curFolder)
@@ -2358,12 +2388,46 @@
                 btn.classList.toggle('in-split', !!(splitPair && splitPair.includes(idx)));
         }
         function setActiveTab(index) {
-            tabs.forEach(tab => tab.classList.remove('active'));
+            tabs.forEach(tab => {
+                tab.classList.remove('active');
+                tab.tabIndex = -1;
+                tab.setAttribute('aria-selected', 'false');
+            });
             const active = tabs.get(index);
-            if (active)
+            if (active) {
                 active.classList.add('active');
+                // The active tab is the strip's tab stop (roving tabindex).
+                active.tabIndex = 0;
+                active.setAttribute('aria-selected', 'true');
+            }
             activeTabIndex = index;
             applySplitMarks();
+        }
+        /**
+         * Move keyboard focus within the tab strip. `step` is +1/-1, or the
+         * literal 'Home'/'End'. Focus moves without switching tabs — Enter
+         * commits — which is how a tablist is expected to behave.
+         */
+        function moveTabFocus(from, step) {
+            const visible = [...document.querySelectorAll('.tab-button')]
+                .filter(el => el.offsetParent !== null);
+            if (!visible.length)
+                return;
+            let next;
+            if (step === 'Home')
+                next = visible[0];
+            else if (step === 'End')
+                next = visible[visible.length - 1];
+            else {
+                const i = visible.indexOf(from);
+                next = visible[(i + step + visible.length) % visible.length];
+            }
+            if (!next)
+                return;
+            for (const el of visible)
+                el.tabIndex = -1;
+            next.tabIndex = 0;
+            next.focus();
         }
         // ── Folders (tab groups): render a header per folder and slot its member
         //    tabs indented beneath it; collapsed folders hide their members. ────────
@@ -2399,7 +2463,7 @@
                     startFolderRename(h, f.id);
                 }
             });
-            h.innerHTML = '<span class="folder-chevron">▸</span><span class="folder-icon">📁</span><span class="folder-name"></span><button class="folder-del" tabindex="-1" title="Delete folder">×</button>';
+            h.innerHTML = '<span class="folder-chevron">▸</span><span class="folder-icon">📁</span><span class="folder-name"></span><button class="folder-del" title="Delete folder">×</button>';
             h.addEventListener('click', (e) => {
                 if (h.classList.contains('renaming') || e.target.closest('.folder-del')) return;
                 if (h.dataset.suppressClick) return; // a drag just ended here
@@ -3385,14 +3449,14 @@
                         return;
                     readerBtn.classList.toggle('hidden', !(d.available || d.active));
                     readerBtn.classList.toggle('active', !!d.active);
-                    readerBtn.title = d.active ? 'Exit Reader View' : 'Reader View';
+                    readerBtn.title = d.active ? T('chrome.readerExit', 'Exit reader view') : T('chrome.reader', 'Reader view');
                 });
                 window.reader.onFailed((d) => {
                     if (!d || d.index !== activeTabIndex)
                         return;
                     // quiet feedback that extraction failed — no motion
                     readerBtn.title = 'No article found on this page';
-                    setTimeout(() => { readerBtn.title = 'Reader View'; }, 1600);
+                    setTimeout(() => { readerBtn.title = T('chrome.reader', 'Reader view'); }, 1600);
                 });
             }
             if (pipBtn && window.pip) {

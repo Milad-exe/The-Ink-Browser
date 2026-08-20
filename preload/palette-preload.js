@@ -1,4 +1,14 @@
 const { contextBridge, ipcRenderer } = require('electron');
+// The catalogue, so this panel's labels follow the language setting. Inlined
+// rather than required from a shared module: overlay preloads are SANDBOXED
+// (only the chrome window sets sandbox:false), and a sandboxed preload can
+// require 'electron' and nothing else.
+try {
+    contextBridge.exposeInMainWorld('inkI18n', {
+        getSync: () => { try { return ipcRenderer.sendSync('i18n-sync') || {}; } catch { return {}; } },
+    });
+}
+catch { }
 // The palette needs both its overlay lifecycle and a few internal bridges, and a
 // view gets exactly one preload — so the handful it uses are re-exposed here
 // rather than pulling in the whole shared preload.

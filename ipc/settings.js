@@ -42,6 +42,12 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
     ipcMain.on('settings-get-sync', (_e) => {
         _e.returnValue = withEngines(wm.persistence.getAll());
     });
+    // Just the catalogue, for overlay panels (preload/i18n-bridge.js). They
+    // paint before an async round trip could land, and they have no reason to
+    // see the rest of the settings.
+    ipcMain.on('i18n-sync', (_e) => {
+        _e.returnValue = { locale: i18n.currentLocale(), catalogue: i18n.catalogue() };
+    });
     // ── Language ──────────────────────────────────────────────────────────────
     ipcMain.handle('i18n:locales', () => i18n.locales());
     ipcMain.handle('i18n:set', (_e, id) => {

@@ -8,21 +8,25 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="card" id="card">
+  <div class="card surface-card" id="card">
     <div class="conn" id="conn"></div>
     <div class="shield" id="shield">
-      <div>
-        <div class="shield-title">Protections</div>
-        <div class="shield-desc" id="shield-desc">Blocking ads &amp; trackers on this site</div>
+      <div class="shield-text">
+        <div class="shield-title" data-i18n="site.protections">Protections</div>
+        <div class="shield-desc" id="shield-desc" data-i18n="site.protectionsOn">Blocking ads and trackers on this site</div>
       </div>
-      <label class="toggle"><input type="checkbox" id="shield-toggle"><span class="track"></span></label>
+      <label class="toggle">
+        <input type="checkbox" id="shield-toggle" aria-label="Block ads and trackers" data-i18n-label="site.protectionsToggle">
+        <span class="switch-track"></span>
+      </label>
     </div>
     <div class="section">
-      <div class="section-title">Permissions</div>
+      <div class="surface-label" data-i18n="site.permissions">Permissions</div>
       <div id="perms" class="perms"></div>
     </div>
-    <button class="clear" id="clear">Clear cookies and site data</button>
+    <button class="clear surface-foot" id="clear" data-i18n="site.clear">Clear cookies and site data</button>
   </div>
+  <script src="../lib/i18n.js"></script>
   <script src="siteinfo.js"></script>
 </body>
 </html>

@@ -12,11 +12,18 @@ const { resolveAppFile } = require('../app-paths');
 const { WebContentsView, shell, app } = require('electron');
 const downloadManager = require('../features/download-manager');
 const PANEL_WIDTH = 340;
-const HEADER_H = 40;
-const ITEM_H = 58;
-const MAX_PANEL_H = 420;
+// Mirrors renderer/Downloads/styles.css + the shared panel anatomy: a
+// --bar-h head, a --row-h foot over its divider, and rows that are two lines
+// tall. The empty state needs more than one row's worth of room to read as a
+// sentence rather than as a clipped label.
+const HEAD_H = 44;
+const FOOT_H = 37;
+const ITEM_H = 52;
+const EMPTY_H = 96;
+const MAX_PANEL_H = 460;
 function panelBounds(anchor, count) {
-    const height = Math.min(MAX_PANEL_H, HEADER_H + Math.max(1, count) * ITEM_H);
+    const body = count > 0 ? count * ITEM_H + 8 : EMPTY_H;
+    const height = Math.min(MAX_PANEL_H, HEAD_H + FOOT_H + body);
     return {
         x: Math.max(0, Math.floor(anchor.right - PANEL_WIDTH)),
         y: Math.floor(anchor.bottom + 6),

@@ -11,18 +11,26 @@
 </head>
 <body>
     <div class="find-container">
-        <div class="find-bar">
-            <input type="text" id="find-input" placeholder="Find in page..." autofocus>
-            <div class="find-controls">
-                <div class="find-nav">
-                    <button id="prev-btn" class="find-btn" title="Previous">▲</button>
-                    <button id="next-btn" class="find-btn" title="Next">▼</button>
-                </div>
-                <span id="match-counter" class="match-counter">0 of 0</span>
-                <button id="close-btn" class="find-btn close-btn" title="Close">✕</button>
+        <!-- One row, the way every browser draws it: the field, then how many
+             matches, then the two ways to move through them, then done. -->
+        <div class="find-bar surface-card">
+            <input type="text" id="find-input" placeholder="Find in page" autofocus
+                   aria-label="Find in page" data-i18n-placeholder="menu.find" data-i18n-label="menu.find">
+            <span id="match-counter" class="match-counter"></span>
+            <div class="find-nav">
+                <button id="prev-btn" class="surface-icon-btn find-btn" title="Previous match" aria-label="Previous match" data-i18n-title="find.prev" data-i18n-label="find.prev">
+                    <svg viewBox="0 0 20 20" fill="none"><path d="M5.5 12L10 7.5l4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button id="next-btn" class="surface-icon-btn find-btn" title="Next match" aria-label="Next match" data-i18n-title="find.next" data-i18n-label="find.next">
+                    <svg viewBox="0 0 20 20" fill="none"><path d="M5.5 8l4.5 4.5L14.5 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
             </div>
+            <button id="close-btn" class="surface-icon-btn" title="Close" aria-label="Close" data-i18n-title="chrome.close" data-i18n-label="chrome.close">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
         </div>
     </div>
+    <script src="../lib/i18n.js"></script>
     <script src="find.js"></script>
 </body>
 </html>

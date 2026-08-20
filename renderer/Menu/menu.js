@@ -3,6 +3,11 @@
 // top-level names out of the shared global scope.
 (() => {
     document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            window.Ink.i18n.init(window.inkI18n?.getSync() || (window.northstarSettings?.getSync() || {}).i18n || {});
+            window.Ink.i18n.apply(document);
+        }
+        catch (e) { window.inkLog?.debug('menu', 'i18n: ' + e); }
         const api = window.electronAPI;
         const mac = api.platform === 'darwin';
         const MOD = mac ? '⌘' : 'Ctrl ';
@@ -59,5 +64,10 @@
         document.getElementById('zoom-in').addEventListener('click', () => setZoom('in'));
         document.getElementById('zoom-reset').addEventListener('click', () => setZoom('reset'));
         setZoom('get'); // reflect the active tab's current zoom
+        // A menu you can only click is half a menu: arrows move, Enter runs,
+        // Escape closes, and the first row is focused so the keyboard has
+        // somewhere to start.
+        document.querySelectorAll('.menu-row').forEach(r => r.setAttribute('role', 'menuitem'));
+        window.Ink?.keys?.rows(document, { selector: '.menu-row, #zoom-reset', onEscape: close, focusFirst: true });
     });
 })();

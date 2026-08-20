@@ -9,14 +9,14 @@
         const fieldLabel = document.querySelector('.field label');
         // ── New folder mode ──────────────────────────────────────────────────────
         if (mode === 'new-folder') {
-            heading.textContent = 'New Folder';
+            heading.textContent = 'New folder';
             if (fieldLabel)
                 fieldLabel.textContent = 'Name';
             titleInput.value = '';
             titleInput.placeholder = 'Folder name';
             actions.innerHTML = `
-      <button id="btn-cancel">Cancel</button>
-      <button class="primary" id="btn-create">Create</button>
+      <button class="btn btn-ghost" id="btn-cancel">Cancel</button>
+      <button class="btn btn-primary" id="btn-create">Create</button>
     `;
             document.getElementById('btn-cancel').addEventListener('click', () => window.electronAPI.closePrompt());
             document.getElementById('btn-create').addEventListener('click', () => {
@@ -36,13 +36,13 @@
         }
         // ── Folder rename mode ───────────────────────────────────────────────────
         if (mode === 'folder-rename') {
-            heading.textContent = 'Rename Folder';
+            heading.textContent = 'Rename folder';
             if (fieldLabel)
                 fieldLabel.textContent = 'Name';
             titleInput.value = title || '';
             actions.innerHTML = `
-      <button id="btn-cancel">Cancel</button>
-      <button class="primary" id="btn-save">Save</button>
+      <button class="btn btn-ghost" id="btn-cancel">Cancel</button>
+      <button class="btn btn-primary" id="btn-save">Save</button>
     `;
             document.getElementById('btn-cancel').addEventListener('click', () => window.electronAPI.closePrompt());
             document.getElementById('btn-save').addEventListener('click', () => {
@@ -63,13 +63,13 @@
         }
         // ── Bookmark add / edit mode ─────────────────────────────────────────────
         titleInput.value = title || '';
-        heading.textContent = hasObj ? 'Edit Bookmark' : 'Add Bookmark';
+        heading.textContent = hasObj ? 'Edit bookmark' : 'Add bookmark';
         if (fieldLabel)
             fieldLabel.textContent = 'Title';
         if (hasObj) {
             actions.innerHTML = `
-      <button class="remove" id="btn-remove">Remove</button>
-      <button class="primary" id="btn-done">Done</button>
+      <button class="btn btn-danger" id="btn-remove">Remove</button>
+      <button class="btn btn-primary" id="btn-done">Done</button>
     `;
             document.getElementById('btn-remove').addEventListener('click', () => {
                 if (id)
@@ -91,8 +91,8 @@
         }
         else {
             actions.innerHTML = `
-      <button id="btn-cancel">Cancel</button>
-      <button class="primary" id="btn-save">Save</button>
+      <button class="btn btn-ghost" id="btn-cancel">Cancel</button>
+      <button class="btn btn-primary" id="btn-save">Save</button>
     `;
             document.getElementById('btn-cancel').addEventListener('click', () => window.electronAPI.closePrompt());
             document.getElementById('btn-save').addEventListener('click', () => {

@@ -10,7 +10,10 @@ const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
 const { closeWindowMenu, closeFolderDropdown } = require('./utils');
 const MENU_WIDTH = 268;
-const MENU_HEIGHT = 566; // must cover every row in renderer/Menu/index.html
+// Rows (12 x --row-h) + the zoom row + four separators + the card's own
+// padding. Measured from the rendered card rather than guessed: an oversized
+// menu window is invisible but still swallows clicks below the card.
+const MENU_HEIGHT = 468;
 // (12 rows + zoom + separators; adding a row without raising this clips the menu)
 function register(ipcMain, { wm }) {
     // ── Open ─────────────────────────────────────────────────────────────────

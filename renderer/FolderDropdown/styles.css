@@ -17,8 +17,8 @@ body {
 
 #container {
   background: var(--surface);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius);
+  border-radius: var(--r-lg);
+  box-shadow: var(--ring-2), var(--shadow-pop);
   overflow: hidden;
   width: 240px;
 }
@@ -28,9 +28,9 @@ body {
 /* ── Navigation header ───────────────────────── */
 
 .back-btn {
-  display: flex; align-items: center; gap: 8px;
-  width: 100%; height: 32px; padding: 0 12px;
-  border: none; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: var(--sp-4);
+  width: 100%; height: var(--row-h); padding: 0 var(--sp-5);
+  border: none; border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   background: transparent;
   font-family: var(--font); font-size: var(--fs-body); font-weight: 500;
   color: var(--text-2); cursor: pointer;
@@ -64,14 +64,12 @@ body {
 
 /* ── Items list ──────────────────────────────── */
 
-.items-list {
-  padding: 4px;
-}
+.items-list { padding: var(--sp-2); }
 
 .item {
-  display: flex; align-items: center; gap: 9px;
-  width: 100%; height: 32px; padding: 0 10px;
-  border-radius: var(--radius);
+  display: flex; align-items: center; gap: var(--sp-4);
+  width: 100%; height: var(--row-h); padding: 0 var(--sp-4);
+  border-radius: var(--r-md);
   background: transparent; border: none;
   font-family: var(--font); font-size: var(--fs-body);
   color: var(--text-2); cursor: pointer;
@@ -80,11 +78,14 @@ body {
   -webkit-app-region: no-drag;
   position: relative;
 }
-.item:hover  { background: var(--active-bg); color: var(--text); }
+.item:hover  { background: var(--hover); color: var(--text); }
+.item:focus-visible, .back-btn:focus-visible {
+  outline: none; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
+}
 .item:active { background: var(--hover); }
 
 .item img {
-  width: 14px; height: 14px; flex-shrink: 0; border-radius: var(--radius);
+  width: var(--icon); height: var(--icon); flex-shrink: 0; border-radius: var(--r-xs);
   opacity: 0.65; pointer-events: none;
   transition: opacity 0.08s;
 }
@@ -113,14 +114,17 @@ body {
 /* ── Separator ───────────────────────────────── */
 
 .sep {
-  height: 1px; background: var(--border); margin: 3px 0;
+  height: 1px; margin: var(--sp-2) 0;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
 }
 
 /* ── Empty state ─────────────────────────────── */
 
+/* Empty states are sentences, not asides — nothing else in the browser is
+   italic, and a folder with nothing in it should say so plainly. */
 .empty {
-  padding: 10px 12px;
-  color: var(--text-3); font-size: var(--fs-micro); font-style: italic;
+  padding: var(--sp-4) var(--sp-5);
+  color: var(--text-3); font-size: var(--fs-small);
 }
 
 /* ── Inline rename ───────────────────────────── */
@@ -128,19 +132,26 @@ body {
 .inline-rename-input {
   flex: 1; min-width: 0;
   background: var(--bg);
-  border: 1px solid var(--accent, #5e81f4);
-  border-radius: var(--radius); color: var(--text);
+  border: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: var(--r-sm); color: var(--text);
   font: inherit; font-size: var(--fs-body);
-  outline: none; padding: 0 5px;
-  height: 20px; line-height: 20px;
+  outline: none; padding: 0 var(--sp-3);
+  height: 22px; line-height: 22px;
 }
 
 /* ── Scrollbar ───────────────────────────────── */
 
-::-webkit-scrollbar { width: 4px; }
+/* Present when you need it, invisible when you don't — the same scrollbar the
+   other panels use (.surface-scroll). */
+::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-2); }
-::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+::-webkit-scrollbar-thumb {
+  background: transparent; border-radius: var(--r-pill);
+  border: 2px solid transparent; background-clip: padding-box;
+}
+#container:hover ::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text) 18%, transparent); background-clip: padding-box;
+}
 
 /* ── Drag states ─────────────────────────────── */
 

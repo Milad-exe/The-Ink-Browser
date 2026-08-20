@@ -4,6 +4,15 @@
 (() => {
     (function () {
         'use strict';
+        const T = (key, fallback) => {
+            try { const v = window.Ink?.i18n?.t(key); return (v && v !== key) ? v : fallback; }
+            catch (e) { return fallback; }
+        };
+        try {
+            window.Ink.i18n.init(window.inkI18n?.getSync() || (window.northstarSettings?.getSync() || {}).i18n || {});
+            window.Ink.i18n.apply(document);
+        }
+        catch (e) { window.inkLog?.debug('downloads', 'i18n: ' + e); }
         const listEl = document.getElementById('list');
         const clearBtn = document.getElementById('clear-btn');
         // Base document outline shared by the file-type icons; `inner` draws the
@@ -82,7 +91,7 @@
         }
         function makeBtn(title, svg, onClick) {
             const b = document.createElement('button');
-            b.className = 'dl-btn';
+            b.className = 'surface-icon-btn dl-btn';
             b.title = title;
             b.innerHTML = svg;
             b.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
@@ -92,14 +101,20 @@
             listEl.innerHTML = '';
             if (!items.length) {
                 const empty = document.createElement('div');
-                empty.className = 'empty';
-                empty.textContent = 'No downloads for this session.';
+                empty.className = 'surface-empty';
+                const t = document.createElement('div');
+                t.className = 'empty-title';
+                t.textContent = T('downloads.empty', 'No downloads yet');
+                const h = document.createElement('div');
+                h.className = 'empty-hint';
+                h.textContent = T('downloads.emptyHint', 'Files you download appear here.');
+                empty.append(t, h);
                 listEl.appendChild(empty);
                 return;
             }
             items.forEach((item) => {
                 const row = document.createElement('div');
-                row.className = 'dl-item' + (item.state === 'completed' ? ' completed' : '');
+                row.className = 'surface-row dl-item' + (item.state === 'completed' ? ' completed' : '');
                 row.setAttribute('role', 'listitem');
                 row.title = item.url || '';
                 const icon = document.createElement('span');
@@ -130,13 +145,13 @@
                 actions.className = 'dl-actions';
                 if (item.state === 'progressing') {
                     actions.appendChild(item.paused
-                        ? makeBtn('Resume', SVG_RESUME, () => window.overlayDownloads.action('resume', item.id))
-                        : makeBtn('Pause', SVG_PAUSE, () => window.overlayDownloads.action('pause', item.id)));
-                    actions.appendChild(makeBtn('Cancel', SVG_CANCEL, () => window.overlayDownloads.action('cancel', item.id)));
+                        ? makeBtn(T('downloads.resume', 'Resume'), SVG_RESUME, () => window.overlayDownloads.action('resume', item.id))
+                        : makeBtn(T('downloads.pause', 'Pause'), SVG_PAUSE, () => window.overlayDownloads.action('pause', item.id)));
+                    actions.appendChild(makeBtn(T('downloads.cancel', 'Cancel'), SVG_CANCEL, () => window.overlayDownloads.action('cancel', item.id)));
                 }
                 else {
-                    actions.appendChild(makeBtn('Show in folder', SVG_FOLDER, () => window.overlayDownloads.action('show-in-folder', item.id)));
-                    actions.appendChild(makeBtn('Remove from list', SVG_CANCEL, () => window.overlayDownloads.action('remove', item.id)));
+                    actions.appendChild(makeBtn(T('downloads.showInFolder', 'Show in folder'), SVG_FOLDER, () => window.overlayDownloads.action('show-in-folder', item.id)));
+                    actions.appendChild(makeBtn(T('downloads.removeFromList', 'Remove from list'), SVG_CANCEL, () => window.overlayDownloads.action('remove', item.id)));
                 }
                 row.appendChild(actions);
                 if (item.state === 'completed') {
@@ -148,6 +163,7 @@
         clearBtn.addEventListener('click', () => window.overlayDownloads.action('clear-finished'));
         document.getElementById('show-all')
             ?.addEventListener('click', () => window.overlayDownloads.action('show-all'));
+        window.Ink?.keys?.rows(document, { selector: '.dl-item, #show-all', typeahead: false });
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape')
                 window.overlayDownloads.close();

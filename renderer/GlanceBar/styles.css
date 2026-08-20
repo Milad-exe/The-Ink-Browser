@@ -11,8 +11,8 @@
            compiled Tailwind subset, and justify-end / gap-1 were never used
            elsewhere so they do not exist — the buttons silently sat left. */
         justify-content: flex-end;
-        gap: 4px;
-        padding-right: 2px;
+        gap: var(--sp-2);
+        padding-right: var(--sp-1);
     }
 
     #bar button {
@@ -23,13 +23,13 @@
         height: 30px;
         flex-shrink: 0;
         padding: 0;
-        border: 1px solid var(--border-2);
-        border-radius: var(--radius);
+        border: none;
+        border-radius: var(--r-md);
         background: var(--surface);
         color: var(--text-2);
         cursor: pointer;
-        transition: background var(--dur-1) var(--ease), color 0.12s;
-        box-shadow: var(--shadow-pop);
+        transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+        box-shadow: var(--ring-2), var(--shadow-pop);
     }
 
     #bar button:hover {

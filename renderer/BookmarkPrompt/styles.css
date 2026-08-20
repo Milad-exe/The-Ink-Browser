@@ -1,79 +1,45 @@
-/* Wrapped in @layer components: ui.css declares the layer order
- * (theme < base < components < utilities), so Tailwind utility classes in
- * the page markup can always override these component rules. */
+/* Add / edit a bookmark, and the folder prompts that share this view. The
+ * card and the buttons are shared (surface.css, and SHARED CONTROLS in
+ * ui.css); this is the form between them. */
 @layer components {
-
 
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
-  margin: 0; padding: 4px;
-  font-family: var(--font);
-  background: transparent;
+  margin: 0; padding: var(--sp-2);
+  font-family: var(--font); background: transparent;
   font-size: var(--fs-body); color: var(--text);
   -webkit-font-smoothing: antialiased;
+  user-select: none; -webkit-user-select: none;
 }
+input, textarea { user-select: text; -webkit-user-select: text; }
 
-.container {
-  display: flex; flex-direction: column; gap: 12px;
-  padding: 15px;
-  background: var(--surface);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius);
-}
+.container { display: flex; flex-direction: column; gap: var(--sp-5); padding: var(--sp-5); }
 
+/* The heading names the prompt at the same size and weight a panel head does,
+   rather than as a mono micro-label above a form. */
 h3 {
   margin: 0;
-  font-size: var(--fs-micro); font-weight: 600;
-  letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--text-3);
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.field { display: flex; flex-direction: column; gap: 5px; }
-
-.field label {
-  font-size: 10.5px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--text-3);
-}
-
-.field input {
-  padding: 8px 10px;
-  font-family: var(--font); font-size: var(--fs-body);
-  border: 1px solid var(--border-2);
-  background: var(--bg);
+  font-size: var(--fs-body); font-weight: 600; letter-spacing: var(--tracking);
   color: var(--text);
-  border-radius: var(--radius); outline: none;
-  transition: border-color var(--dur-1) var(--ease), box-shadow 0.14s;
 }
-.field input:focus { border-color: var(--text-3); }
 
-.actions { display: flex; gap: 6px; }
-
-button {
-  flex: 1; padding: 8px 10px;
-  background: transparent;
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius);
-  font-family: var(--font); font-size: var(--fs-small); font-weight: 500;
-  color: var(--text-2); cursor: pointer;
-  transition: background var(--dur-1) var(--ease), color 0.1s;
+.field { display: flex; flex-direction: column; gap: var(--sp-3); }
+.field label { font-size: var(--fs-small); font-weight: 500; color: var(--text-3); }
+.field input {
+  height: var(--field-h); padding: 0 var(--sp-4);
+  font-family: var(--font); font-size: var(--fs-body);
+  border: none; border-radius: var(--r-md);
+  background: var(--bg); box-shadow: var(--ring-2);
+  color: var(--text); outline: none;
+  transition: box-shadow var(--dur-2) var(--ease);
 }
-button:hover { background: var(--active-bg); color: var(--text); }
-button:active { background: var(--hover); }
-
-button.primary {
-  background: var(--text); color: var(--bg);
-  border-color: var(--text);
+.field input:focus {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+              0 0 0 3px var(--accent-wash);
 }
-button.primary:hover { opacity: 0.88; }
 
-button.remove {
-  background: transparent; color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
-}
-button.remove:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.actions { display: flex; gap: var(--sp-4); }
+.actions .btn { flex: 1; }
 
 }

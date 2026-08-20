@@ -12,6 +12,16 @@
  *
  * Pages link it AFTER ui.css and BEFORE their own stylesheet, so anything
  * genuinely specific to a panel still overrides it.
+ *
+ * Every panel has the same anatomy, and only fills in the parts it needs:
+ *
+ *   .surface-card
+ *     .surface-head    title, and at most one action (usually close)
+ *     .surface-body    the scrolling middle; rows live here
+ *     .surface-foot    one full-width action, divided from the body
+ *
+ * A panel that is only a list of rows needs none of the three — .surface-pad
+ * around the rows is the whole panel.
  */
 @layer components {
 
@@ -80,6 +90,81 @@
     user-select: text; -webkit-user-select: text;
   }
   .surface-field input::placeholder { color: var(--text-3); }
+
+  /* ── Anatomy ────────────────────────────────────────────────────────────── */
+  /* The head names the panel. It is a label, not a title bar: sentence case at
+     body size, the same weight as an active row, with the panel's one action
+     (close, clear) hard right. Uppercase mono headers made small panels read
+     like system dialogs. */
+  .surface-head {
+    display: flex; align-items: center; gap: var(--sp-4);
+    height: var(--bar-h); flex-shrink: 0;
+    padding: 0 var(--sp-3) 0 var(--sp-5);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  }
+  .surface-title {
+    flex: 1; min-width: 0;
+    font-size: var(--fs-body); font-weight: 600; letter-spacing: var(--tracking);
+    color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .surface-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-2); }
+  /* One action, full width, reading as part of the panel rather than as a
+     button dropped into it. */
+  .surface-foot {
+    display: flex; align-items: center; gap: var(--sp-4);
+    width: 100%; height: var(--row-h); flex-shrink: 0;
+    margin-top: var(--sp-2); padding: 0 var(--sp-5);
+    border: none; border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    background: transparent; color: var(--text-2);
+    font-family: var(--font); font-size: var(--fs-body); font-weight: 500;
+    letter-spacing: var(--tracking);
+    text-align: left; cursor: pointer;
+    transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+  }
+  .surface-foot:hover { background: var(--hover); color: var(--text); }
+  .surface-foot svg { width: var(--icon); height: var(--icon); flex-shrink: 0; opacity: 0.8; }
+
+  /* ── Controls ───────────────────────────────────────────────────────────── */
+  /* Icon buttons are 30px whatever the glyph inside them is: a 13px ✕ with a
+     13px hit area is a target you have to aim at. */
+  .surface-icon-btn {
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: var(--control-h); height: var(--control-h); padding: 0;
+    border: none; border-radius: var(--r-md);
+    background: transparent; color: var(--text-3); cursor: pointer;
+    transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+  }
+  .surface-icon-btn:hover { background: var(--hover); color: var(--text); }
+  .surface-icon-btn svg { width: var(--icon); height: var(--icon); }
+
+  /* A shortcut hint sits at the end of a row and never competes with its
+     label — mono, muted, and it lifts with the row rather than on its own. */
+  .surface-kbd {
+    flex-shrink: 0; margin-left: auto;
+    font-family: var(--mono); font-size: var(--fs-micro); letter-spacing: 0.02em;
+    color: var(--text-3);
+  }
+  .surface-row:hover .surface-kbd { color: var(--text-2); }
+
+  /* An empty panel says what will be here, then what to do about it. */
+  .surface-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: var(--sp-2); padding: var(--sp-7) var(--sp-5); text-align: center;
+  }
+  .surface-empty .empty-title { font-size: var(--fs-body); font-weight: 500; color: var(--text-2); }
+  .surface-empty .empty-hint { font-size: var(--fs-small); color: var(--text-3); }
+
+  /* ── Focus ──────────────────────────────────────────────────────────────── */
+  /* One focus treatment for every surface: an inset accent ring, so a row at
+     the edge of a panel is never clipped the way an outer outline would be.
+     Chrome's default outline is removed only where this replaces it. */
+  .surface-row:focus-visible,
+  .surface-icon-btn:focus-visible,
+  .surface-foot:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
 
   /* ── Structure ──────────────────────────────────────────────────────────── */
   .surface-sep {
