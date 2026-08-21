@@ -113,11 +113,8 @@ function register(ipcMain, { wm, webContents }) {
     });
     ipcMain.handle('open-bookmarks-tab', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        if (wd?.tabs) {
-            const active = wd.tabs.activeTabIndex;
-            const onNewTab = wd.tabs.tabUrls.get(active) === 'newtab';
-            wd.tabs.openInternalPage('bookmarks', null, onNewTab);
-        }
+        if (wd?.tabs)
+            wd.tabs.openInternalPage('bookmarks');
     });
     // ── Bookmark-prompt overlay ───────────────────────────────────────────────
     ipcMain.handle('bookmark-prompt-open', async (_e, bounds, url, title, hasObj, id, mode) => {

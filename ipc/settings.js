@@ -211,11 +211,8 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
     // section is optional ('passwords', 'extensions', …) — omitted opens the root.
     ipcMain.handle('open-settings-tab', (_e, section) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        if (wd?.tabs) {
-            const active = wd.tabs.activeTabIndex;
-            const onNewTab = wd.tabs.tabUrls.get(active) === 'newtab';
-            wd.tabs.openInternalPage('settings', section || null, onNewTab);
-        }
+        if (wd?.tabs)
+            wd.tabs.openInternalPage('settings', section || null);
     });
     ipcMain.handle('google-login', async (_e, clientId, clientSecret) => {
         try {

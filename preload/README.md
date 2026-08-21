@@ -123,9 +123,9 @@ Preload script for the app menu overlay window. Exposes APIs to the menu UI via 
 | `windowClick(pos)` | Notifies the main process of a click position | `pos` — object with screen coordinates | void |
 | `addTab()` | Opens a new browser tab | — | Promise |
 | `newWindow()` | Opens a new browser window | — | Promise |
-| `openHistoryTab()` | Navigates to the history built-in tab | — | Promise |
-| `openBookmarksTab()` | Navigates to the bookmarks built-in tab | — | Promise |
-| `openSettingsTab()` | Navigates to the settings built-in tab | — | Promise |
+| `openHistoryTab()` | Opens history in a new tab | — | Promise |
+| `openBookmarksTab()` | Opens bookmarks in a new tab | — | Promise |
+| `openSettingsTab(section?)` | Opens settings in a new tab | `section` | Promise |
 | `closeMenu()` | Closes the menu overlay | — | Promise |
 | `toggleBookmarkBar()` | Toggles the bookmark bar visibility | — | void |
 | `getSettings()` | Returns the current application settings object | — | Promise |
@@ -353,8 +353,9 @@ Preload script for the settings page. Exposes a focused set of IPC-backed APIs f
 | `set(key, val)` | Persists a single setting | `key` — string; `val` — any | Promise |
 | `clearHistory()` | Deletes all browsing history | — | Promise |
 | `toggleBookmarkBar()` | Toggles the bookmark bar visibility | — | void |
-| `openHistoryTab()` | Opens the history built-in tab | — | Promise |
-| `openBookmarksTab()` | Opens the bookmarks built-in tab | — | Promise |
+| `openHistoryTab()` | Opens history in a new tab | — | Promise |
+| `openBookmarksTab()` | Opens bookmarks in a new tab | — | Promise |
+| `openSettingsTab(section?)` | Opens settings in a new tab | `section` | Promise |
 
 ---
 

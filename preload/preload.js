@@ -437,6 +437,10 @@ exposeInternal("electronAPI", {
     onFocusAddressBar: (callback) => ipcRenderer.on('focus-address-bar', () => callback()),
     openHistoryTab: () => ipcRenderer.invoke('open-history-tab'),
     openBookmarksTab: () => ipcRenderer.invoke('open-bookmarks-tab'),
+    // section is optional ('appearance', 'privacy', …). Use this rather than
+    // loadUrl('northstar://settings') — that is the typed-url path and
+    // replaces the tab you are on.
+    openSettingsTab: (section) => ipcRenderer.invoke('open-settings-tab', section),
     navigateActiveTab: (url) => ipcRenderer.invoke('navigate-active-tab', url),
     activeTabGoBack: () => ipcRenderer.invoke('active-tab-go-back'),
     onToggleBookmarkBar: (handler) => ipcRenderer.on('toggle-bookmark-bar', () => handler()),

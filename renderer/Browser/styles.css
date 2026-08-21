@@ -579,7 +579,10 @@ html[data-tabbar="side"][data-compact="on"] body { grid-template-columns: 0 minm
 html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
 /* The utility bar now runs the full width in side mode, so on macOS the native
    traffic lights sit over its left end in every mode — always reserve them. */
-html[data-platform="darwin"][data-tabbar="side"] #utility-bar { padding-left: 84px; }
+/* macOS owns the top-left corner, so the cluster cannot sit on the rail's
+   content edge there: 14 (traffic-light x, window-manager.js) + 52 (the three
+   lights) + 18 clears them. Windows/Linux keep the rail edge. */
+html[data-platform="darwin"][data-tabbar="side"] .lead-cluster { padding-left: 84px; }
 
 /* Icon rail: drag the divider narrow to collapse tab rows to favicons only
    (Arc). Labels, close buttons and the "New Tab" caption fall away; every
@@ -846,22 +849,46 @@ html[data-tabbar="side"] .sidebar-foot {
 
 /* ── Utility Bar (toolbar) ───────────────── */
 #utility-bar {
-  /* Height MUST match Tabs.UTILITY_BAR_H (features/tabs.js) — the page view is
-     positioned beneath this bar from there. 44px leaves 6px above and below a
-     32px field; at 40px the field filled the bar edge to edge, which is what
-     made the chrome feel cramped next to Safari or Arc. */
+  /* Height MUST match Tabs.UTILITY_BAR_H (features/tabs.js) AND BAR_H
+     (features/overlay-bounds.js) — the page view is positioned beneath this
+     bar from the first, and every panel hangs off the second. 40px around a
+     32px control leaves 4px above and below.
+
+     THE BAR SITS ON THE SAME VERTICAL GUIDES AS THE WINDOW BELOW IT, and it
+     does that structurally rather than by centring anything:
+       .lead-cluster is exactly the sidebar's width, so the field that follows
+         it begins on the PAGE CARD's left edge;
+       the right padding is SHELL_PAD, so the trailing icons end on the card's
+         right edge;
+       the cluster's own inset is the rail's content edge, so back/forward sit
+         on the same left edge as every favicon, label and foot button.
+     The field used to be positioned out of flow and centred in the leftover
+     space with a clamped width, which put its left edge at whatever the
+     window width happened to make it — aligned with nothing. */
   display: flex; height: var(--bar-h); width: 100%;
   background: transparent;
-  align-items: center; padding: 0 var(--sp-4); gap: var(--sp-3);
-  /* position:relative also anchors the out-of-flow omnibox (see below). */
+  align-items: center; padding: 0 var(--sp-4) 0 0; gap: 0;
   position: relative; z-index: 20; flex-shrink: 0;
   -webkit-app-region: drag;
+}
+
+/* Everything left of the field. --omni-left is the sidebar width in side mode
+   (set below) and unset in compact/top mode, where the cluster is free to be
+   its own width. */
+.lead-cluster {
+  display: flex; align-items: center; gap: var(--sp-3);
+  box-sizing: border-box; flex-shrink: 0;
+  width: var(--omni-left, auto);
+  /* The rail insets its rows by --sp-3 (the column) + --gutter (the row); the
+     nav buttons sit on that same edge. */
+  padding-left: calc(var(--sp-3) + var(--gutter));
 }
 #utility-bar button,
 #utility-bar input,
 #utility-bar .omnibox,
 #utility-bar .pomodoro-pill,
 #utility-bar .trailing-icons,
+#utility-bar .lead-cluster,
 #utility-bar .nav-buttons { -webkit-app-region: no-drag; }
 
 /* Toolbar icons float directly on the shell (Arc-style, flat) — no boxed rail
@@ -911,21 +938,17 @@ html[data-tabbar="side"] .sidebar-foot {
 }
 
 /* ── Address bar (omnibox) ───────────────── */
-/* The wrapper stays in the flex flow purely as the spacer that keeps the
-   trailing icons on the right; the field itself is positioned out of flow so it
-   can centre over the PAGE CARD rather than over the toolbar's leftovers (in
-   sidebar mode the card starts after the sidebar — see --omni-left).
-   Width shrinks with the window so the field never reaches under the icon
-   groups: 400px ≈ the two groups plus breathing room. */
-.omnibox-wrapper { flex: 1; min-width: 0; }
+/* The wrapper is the column between the lead cluster and the trailing icons,
+   so it already starts on the page card's left edge; its right padding is the
+   field's only separation from the icons. */
+.omnibox-wrapper { flex: 1; min-width: 0; padding-right: var(--sp-4); }
 .omnibox {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  left: var(--omni-left, var(--sp-4)); right: var(--sp-4); margin: 0 auto;
-  /* The field is the thing you use most, so it takes as much of the bar as the
-     controls at either end can spare — 860px on a wide window, and it keeps
-     shrinking gracefully below that. */
-  width: clamp(220px, calc(100% - 340px - var(--omni-left, 8px)), 860px);
-  display: flex; align-items: center; height: var(--field-h);
+  /* In flow, and left-aligned in its column: the field is the thing you use
+     most, so it takes as much of the bar as the controls at either end can
+     spare — up to 860px on a wide window, growing to the right from the card's
+     edge rather than drifting away from it. */
+  width: 100%; max-width: 860px;
+  display: flex; align-items: center; height: var(--control-h);
   /* The field is a recessed well, not a raised card: it belongs to the shell,
      and focus is carried by the accent ring rather than by lifting it. */
   background: color-mix(in srgb, var(--bg) 85%, transparent);
@@ -934,9 +957,9 @@ html[data-tabbar="side"] .sidebar-foot {
   transition: background var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
 }
 .omnibox:hover:not(:focus-within) { background: var(--bg); }
-/* Sidebar mode: the page card starts after the sidebar, so the field centres
-   over that column instead. Compact mode hides the sidebar → back to the edge
-   (the 8px fallback above). */
+/* Sidebar mode: the page card starts after the sidebar, so the lead cluster is
+   exactly that wide and the field begins where the card does. Compact mode
+   hides the sidebar → the cluster falls back to its own width. */
 html[data-tabbar="side"]:not([data-compact="on"]) #utility-bar {
   --omni-left: var(--sidebar-w, 256px);
 }
@@ -1173,7 +1196,10 @@ html[data-tabbar="side"][data-compact="on"] #content-area { margin-left: var(--s
 /* ── Pomodoro Pill ───────────────────────── */
 .pomodoro-pill {
   display: flex; align-items: center; gap: 6px;
-  height: 34px; padding: 0 12px 0 9px;
+  /* The bar has no gap of its own (its columns do the spacing), so the pill
+     carries its own separation from the trailing icons. 32px matches every
+     other control in the bar — it was 34 and sat 1px proud of them. */
+  height: var(--control-h); padding: 0 12px 0 9px; margin-right: var(--sp-3);
   border-radius: var(--r-md);
   background: var(--surface); border: 1px solid var(--border);
   cursor: pointer; flex-shrink: 0;

@@ -1418,7 +1418,7 @@
                     }],
                     ['Reopen closed tab', () => window.tabsUI.reopenClosed()],
                     ['sep'],
-                    ['Edit theme…', () => window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance')],
+                    ['Edit theme…', () => window.electronAPI.openSettingsTab('appearance')],
                 ]);
             };
             tabsContainer.addEventListener('contextmenu', emptyAreaMenu);
@@ -1784,7 +1784,7 @@
                     openEmojiPicker(r.left, r.bottom + 4, setEmoji);
                 });
                 document.getElementById('sc-theme')?.addEventListener('click', () => {
-                    window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance');
+                    window.electronAPI.openSettingsTab('appearance');
                     close();
                 });
                 // null = this space keeps its own jar; 'default' = shared session;
@@ -1959,7 +1959,7 @@
                 ]);
             });
             document.getElementById('sb-settings')?.addEventListener('click', () => {
-                window.tab.loadUrl(activeTabIndex, 'northstar://settings');
+                window.electronAPI.openSettingsTab();
             });
             // Downloads live in the foot too — revealed once the session
             // has any downloads, opening the shared downloads panel.
@@ -2750,7 +2750,7 @@
             rows.push(
                 ['Change name…', () => openProfileModal(p.id)],
                 ['Change icon…', () => openProfileModal(p.id)],
-                ['Edit theme…', () => window.tab.loadUrl(activeTabIndex, 'northstar://settings/appearance')],
+                ['Edit theme…', () => window.electronAPI.openSettingsTab('appearance')],
                 ['Unload space', () => window.tab.unloadWorkspace(p.id)],
                 ['Set profile', [
                     ['Own (isolated)', () => window.profiles.update(p.id, { container: null })],

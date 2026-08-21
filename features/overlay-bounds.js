@@ -17,7 +17,7 @@
  * in renderer/styles/ui.css — change one, change all three.
  */
 const SHELL_TOP = 6;   // air above the chrome        (--shell-top)
-const BAR_H = 48;      // toolbar                     (--bar-h)
+const BAR_H = 40;      // toolbar                     (--bar-h)
 const SHELL_PAD = 8;   // gutter around the page card (--shell-pad)
 
 /** The page card's top edge: where a toolbar-anchored panel starts. */

@@ -739,10 +739,15 @@ class Tabs {
         catch (e) { log.debug('tabs', 'openCaptivePortalSignIn', e); }
     }
     // Open an internal page (settings/history/bookmarks) via the northstar://
-    // scheme. replaceActive replaces the current tab in place (used when a
-    // northstar:// url is typed, or when the current tab is the new-tab page) —
-    // internal pages can't just navigate an existing tab because Settings needs
-    // its own privileged preload, chosen at tab creation.
+    // scheme. Internal pages can't just navigate an existing tab because
+    // Settings needs its own privileged preload, chosen at tab creation.
+    //
+    // replaceActive is for ONE caller: a northstar:// url typed into the
+    // omnibox, which is a navigation of the current tab and must behave like
+    // one. Opening these from the menu, the keyboard or another page always
+    // adds a tab — they are destinations. It used to also replace whenever the
+    // active tab's url token was 'newtab', which createTab() stores for any
+    // tab opened without a url, so a fresh tab was silently consumed.
     openInternalPage(type, section = null, replaceActive = false) {
         const page = INTERNAL_PAGES[type];
         if (!page)
@@ -910,7 +915,7 @@ class Tabs {
     // Split-view geometry lives in features/tabs/split.js with its methods.
     static MAX_RESTORED_HISTORY = 25; // back/forward entries kept per tab in the session file
     // Glance geometry lives in features/tabs/glance.js with its methods.
-    static UTILITY_BAR_H = 48;
+    static UTILITY_BAR_H = 40;
     static TAB_BAR_H = 44;
     // The page card is inset from the shell by SHELL_PAD on every side — top
     // included. (Browser/styles.css mirrors this with margin on #content-area;
