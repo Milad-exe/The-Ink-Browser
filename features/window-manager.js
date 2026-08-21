@@ -11,6 +11,7 @@ const zoom = require('./zoom');
 const searchEngines = require('./search-engines');
 const i18n = require('./i18n');
 const log = require('./log');
+const appIcon = require('./app-icon');
 class WindowManager {
     windows; // windowId → { id, window, tabs, shortcuts, menu, … overlays }
     nextWindowId;
@@ -226,6 +227,10 @@ class WindowManager {
                 contextIsolation: true,
             }
         });
+        // The `icon:` above is the default-theme mark; a window opened while a
+        // different theme is selected needs the matching one. No-op on macOS,
+        // where the icon belongs to the app rather than the window.
+        appIcon.applyToWindow(window, this.persistence.get('theme'));
         // ── Gesture / hardware navigation ────────────────────────────────────
         // Neither of these existed, so two habits that work in every other
         // browser silently did nothing here: the macOS swipe gesture, and the

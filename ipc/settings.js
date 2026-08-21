@@ -12,6 +12,7 @@ const searchEngines = require('../features/search-engines');
 const i18n = require('../features/i18n');
 const History = require('../features/history');
 const zoom = require('../features/zoom');
+const appIcon = require('../features/app-icon');
 // Privacy / tracking-protection settings routed through the privacy orchestrator.
 const PRIVACY_KEYS = [
     'adBlockEnabled', 'blockThirdPartyCookies', 'httpsUpgrade',
@@ -103,6 +104,8 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
         wm.persistence.set(key, value);
         if (key === 'theme') {
             nativeTheme.themeSource = (value === 'porcelain' || value === 'dune') ? 'light' : 'dark';
+            // The dock/taskbar icon is the mark on the theme's ground.
+            appIcon.apply(value, wm);
             webContents.getAllWebContents().forEach(wc => {
                 try {
                     wc.send('theme-changed', value);

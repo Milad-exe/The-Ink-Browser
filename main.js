@@ -80,6 +80,7 @@ const permissionPrompt = require('./features/permission-prompt');
 const permissionUI = require('./features/permission-ui');
 const privateSessions = require('./features/private-session');
 const downloadManager = require('./features/download-manager');
+const appIcon = require('./features/app-icon');
 const extensionManager = require('./features/extensions');
 // IPC feature modules
 const tabsIpc = require('./ipc/tabs');
@@ -186,10 +187,15 @@ class Northstar {
             }
             const savedTheme = this.windowManager.persistence.get('theme');
             nativeTheme.themeSource = (savedTheme === 'porcelain' || savedTheme === 'dune') ? 'light' : 'dark';
-            // No dock.setIcon: the bundle icon (icon.icns) is already the Northstar
-            // mark. Overriding it at runtime with a full-bleed PNG made the dock
-            // icon render edge-to-edge — larger than the padded bundle rendering —
-            // so it visibly "expanded" the moment the app finished launching.
+            // The icon follows the theme (features/app-icon.js). The bundle icon
+            // is built from the default theme, so only a non-default theme needs
+            // an override — which keeps the common case off dock.setIcon
+            // entirely. The per-theme PNGs carry the macOS safe-area margin: a
+            // full-bleed PNG renders edge-to-edge there, larger than the bundle
+            // icon, and the dock icon visibly "expanded" as the app finished
+            // launching.
+            if (savedTheme && savedTheme !== 'default')
+                appIcon.apply(savedTheme, this.windowManager);
             // macOS delivers standard keyboard shortcuts through the application
             // menu's key-equivalents. With no menu (setApplicationMenu(null)) it
             // silently drops some — notably Cmd+1-9 tab switching and Cmd+C/V/X/A
