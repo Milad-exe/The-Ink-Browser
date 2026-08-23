@@ -13,6 +13,9 @@ const i18n = require('../features/i18n');
 const History = require('../features/history');
 const zoom = require('../features/zoom');
 const appIcon = require('../features/app-icon');
+const themes = require('../features/themes');
+const themeRuntime = require('../features/theme-runtime');
+const themeDerive = require('../features/theme-derive');
 // Privacy / tracking-protection settings routed through the privacy orchestrator.
 const PRIVACY_KEYS = [
     'adBlockEnabled', 'blockThirdPartyCookies', 'httpsUpgrade',
@@ -103,15 +106,11 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
     ipcMain.handle('settings-set', (_e, key, value) => {
         wm.persistence.set(key, value);
         if (key === 'theme') {
-            nativeTheme.themeSource = (value === 'porcelain' || value === 'dune') ? 'light' : 'dark';
-            // The dock/taskbar icon is the mark on the theme's ground.
-            appIcon.apply(value, wm);
-            webContents.getAllWebContents().forEach(wc => {
-                try {
-                    wc.send('theme-changed', value);
-                }
-                catch (e) { log.debug('settings', 'settings-set', e); }
-            });
+            // One call does the lot: nativeTheme, the dock icon, the
+            // theme-changed broadcast, and — for derived and user themes — the
+            // token CSS every surface needs, since those have no block in the
+            // stylesheets to switch to.
+            themeRuntime.apply(value, wm);
         }
         if (key === 'utilityBar') {
             // Chrome windows re-apply toolbar visibility live.
@@ -214,6 +213,86 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
         if (wd?.tabs)
             wd.tabs.openInternalPage('settings', section || null);
     });
+    /* `webContents` is a parameter of register(), so this lives here rather
+       than at module scope — where it was, and where every save threw a
+       ReferenceError *after* persisting, so the theme was stored and the UI
+       was told the save had failed. */
+    const broadcastThemes = () => {
+        webContents.getAllWebContents().forEach(wc => {
+            try { wc.send('themes-changed'); }
+            catch (e) { log.debug('settings', 'broadcastThemes', e); }
+        });
+    };
+
+    /* ── User themes ──────────────────────────────────────────────────────
+       A theme is stored as its SEED (mode + ground + accent + optional ink),
+       never as a token set: derived tokens are cheap to recompute and a stored
+       token set would freeze today's ramp into every theme anyone ever saved. */
+    ipcMain.handle('themes-list', () => {
+        return { themes: themes.all(), current: wm.persistence.get('theme') };
+    });
+    // Preview without saving — the editor needs the real palette to paint a
+    // swatch, and the contrast numbers to say why a pick is being refused.
+    ipcMain.handle('theme-preview', (_e, seed) => {
+        const check = themeDerive.validate(seed || {});
+        if (!check.ok)
+            return { ok: false, errors: check.errors, contrast: check.contrast || null };
+        const { tokens, mode, icon } = themeDerive.derive(seed);
+        return { ok: true, tokens, mode, icon, contrast: check.contrast };
+    });
+    /* Paint a seed on this window's surfaces without saving it. This is what a
+       drag uses: no stylesheet swap, no disk write, no repaint of other
+       windows — just the palette on screen while you move the dot. */
+    ipcMain.handle('theme-live', (_e, seed) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (!wd)
+            return false;
+        if (!seed) {
+            themeRuntime.clearPreview(wm, wd);
+            return true;
+        }
+        const check = themeDerive.validate(seed);
+        if (!check.ok)
+            return false;
+        themeRuntime.previewLive(wm, wd, themeDerive.derive(seed).tokens);
+        return true;
+    });
+
+    ipcMain.handle('theme-save', (_e, input) => {
+        const list = [...(wm.persistence.get('customThemes') || [])];
+        const existing = input?.id ? list.find(t => t.id === input.id) : null;
+        const prepared = themes.prepareCustom(input, existing?.id || null);
+        if (!prepared.ok)
+            return { ok: false, errors: prepared.errors };
+        if (existing) {
+            list[list.indexOf(existing)] = prepared.theme;
+        }
+        else {
+            list.push(prepared.theme);
+        }
+        wm.persistence.set('customThemes', list);
+        /* Repaint unconditionally. The old check — "is this the global theme?" —
+           missed every window whose SPACE wears this theme, so live editing
+           showed nothing unless you happened to be editing the global one. */
+        try { themeRuntime.clearPreview(wm, wm.getWindowByWebContents(_e.sender)); }
+        catch (e) { log.debug('settings', 'clearPreview', e); }
+        themeRuntime.repaintAll(wm);
+        broadcastThemes();
+        return { ok: true, theme: prepared.theme, contrast: prepared.contrast };
+    });
+    ipcMain.handle('theme-delete', (_e, id) => {
+        const list = (wm.persistence.get('customThemes') || []).filter(t => t.id !== id);
+        wm.persistence.set('customThemes', list);
+        // Deleting the theme in use would otherwise leave every window wearing
+        // a palette that no longer exists.
+        if (wm.persistence.get('theme') === id) {
+            wm.persistence.set('theme', 'default');
+            themeRuntime.apply('default', wm);
+        }
+        broadcastThemes();
+        return { ok: true };
+    });
+
     ipcMain.handle('google-login', async (_e, clientId, clientSecret) => {
         try {
             const data = await loginWithGoogle(clientId, clientSecret);
@@ -295,5 +374,6 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
         return wd ? wd.window.isMaximized() : false;
     });
 }
+
 
 module.exports = { register };

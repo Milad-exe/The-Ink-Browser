@@ -1,0 +1,90 @@
+/* The page-actions panel. The card, rows and labels are shared
+   (renderer/styles/surface.css); this is the layout around them. */
+@layer components {
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body { height: 100%; }
+  body {
+    /* No padding: the card fills the view. It used to inset by 12px to give a
+       drop shadow room, but panels have no drop shadow now — that inset was a
+       transparent border eating clicks. */
+    margin: 0; padding: 0;
+    background: transparent; overflow: hidden;
+    font-family: var(--font); color: var(--text);
+    font-size: var(--fs-body); -webkit-font-smoothing: antialiased;
+    user-select: none; -webkit-user-select: none;
+  }
+
+  #panel { display: flex; flex-direction: column; padding: var(--sp-3); gap: 2px; }
+
+  /* The four page verbs, as one row of equal squares. Equal because none of
+     them is the primary one — which is the case is a question about the page,
+     not about the panel. */
+  .pa-actions { display: flex; gap: var(--sp-2); }
+  .pa-btn {
+    flex: 1; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border: none; border-radius: var(--r-md); cursor: pointer;
+    background: var(--bg); color: var(--text-2); box-shadow: var(--ring);
+    transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+  }
+  .pa-btn svg { width: var(--icon); height: var(--icon); }
+  .pa-btn:hover { background: var(--hover); color: var(--text); }
+  .pa-btn:focus-visible { outline: none; box-shadow: var(--ring), 0 0 0 3px var(--accent-wash); }
+  /* Not applicable to this page — dimmed and inert rather than removed, so the
+     row does not change width as you browse. That silent reflow is exactly what
+     made the toolbar restless. */
+  .pa-btn[disabled] { opacity: 0.35; cursor: default; background: transparent; box-shadow: none; }
+  .pa-btn.on { background: var(--active-bg); color: var(--text); }
+
+  .bm-filled { display: none; }
+  .pa-btn.on .bm-outline { display: none; }
+  .pa-btn.on .bm-filled { display: block; }
+
+  .pa-sep { height: 1px; margin: var(--sp-3) var(--sp-2); background: var(--border); }
+
+  /* Rows. `.surface-label` in surface.css is a SECTION CAPTION — uppercase,
+     small, no icon column — so borrowing it rendered these as three headings
+     with nothing under them. A row is its own thing. */
+  .pa-row {
+    display: flex; align-items: center; gap: var(--sp-4);
+    width: 100%; height: var(--row-h); padding: 0 var(--sp-3);
+    border: none; background: none; cursor: pointer;
+    border-radius: var(--r-md); font: inherit; text-align: left;
+    color: var(--text-2);
+  }
+  .pa-row:hover { background: var(--hover); color: var(--text); }
+  .pa-row:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-wash); }
+  .pa-row-icon { display: flex; flex-shrink: 0; }
+  .pa-row-icon svg { width: var(--icon); height: var(--icon); }
+  .pa-label { font-size: var(--fs-body); }
+  .pa-row.on { color: var(--text); }
+  .pa-row.on .pa-row-icon { color: var(--accent); }
+
+  /* Security. A state, so it is quieter than a row and carries its own colour. */
+  .pa-security {
+    display: flex; align-items: center; gap: var(--sp-3);
+    width: 100%; min-height: var(--row-h); padding: 0 var(--sp-3);
+    border: none; background: none; cursor: pointer;
+    border-radius: var(--r-md); font: inherit; text-align: left;
+    color: var(--text-2);
+  }
+  .pa-security:hover { background: var(--hover); }
+  .pa-security:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-wash); }
+  /* Secure is NOT the accent. The accent is the identity colour — it marks the
+     selected row and live state — and painting "this connection is fine" in it
+     made a routine truth look like an alert, in exactly the red the danger
+     state uses. Secure is quiet; only the insecure case gets a colour. */
+  .pa-sec-icon {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    background: var(--danger);
+  }
+  .pa-security.secure .pa-sec-icon { background: var(--text-3); }
+  .pa-security:not(.secure) .pa-sec-text { color: var(--danger); }
+  .pa-sec-text { font-size: var(--fs-small); }
+  .pa-sec-host {
+    margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3);
+  }
+}

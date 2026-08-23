@@ -104,6 +104,16 @@ class WindowManager {
             wd.tabs.applyWorkspace();
         }
         catch (e) { log.debug('window-manager', 'switchWorkspace', e); }
+        /* A space carries its own theme, and this switch repoints the window's
+           space in place — so the window now resolves to a different theme
+           without anything having moved. Nothing else triggers that repaint,
+           which is why a space's colours used to arrive only on the next
+           unrelated theme change. */
+        // Essential tiles show whether THIS space has a tab for them.
+        try { wd.tabs.sendEssentialTabs(); }
+        catch (e) { log.debug('window-manager', 'switchWorkspace essentials', e); }
+        try { require('./theme-runtime').repaintAll(this); }
+        catch (e) { log.debug('window-manager', 'switchWorkspace theme', e); }
         try {
             wd.window.webContents.send('workspace-switched', id);
             // These views are per-workspace — re-emit their change events so the
@@ -548,6 +558,10 @@ class WindowManager {
             if (windowData.ctxMenu?.webContents === webContents)
                 return windowData;
             if (windowData.palette?.webContents === webContents)
+                return windowData;
+            if (windowData.themePanel?.webContents === webContents)
+                return windowData;
+            if (windowData.pageActions?.webContents === webContents)
                 return windowData;
             if (windowData.extensionsPanel?.webContents === webContents)
                 return windowData;

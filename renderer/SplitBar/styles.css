@@ -41,7 +41,10 @@
         border: none;
         border-radius: var(--r-pill);
         background: var(--surface);
-        box-shadow: var(--ring-2), var(--shadow-pop);
+        /* Ring only — see .surface-card in renderer/styles/surface.css. These
+           views are barely bigger than the pill itself, so the shadow was never
+           anything but a band at the view's edge. */
+        box-shadow: var(--ring-2);
         transition: opacity 0.12s, transform 0.12s;
     }
     #handle .pill {

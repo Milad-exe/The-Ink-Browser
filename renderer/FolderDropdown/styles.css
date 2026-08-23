@@ -18,7 +18,8 @@ body {
 #container {
   background: var(--surface);
   border-radius: var(--r-lg);
-  box-shadow: var(--ring-2), var(--shadow-pop);
+  /* Ring only — see .surface-card in renderer/styles/surface.css. */
+  box-shadow: var(--ring-2);
   overflow: hidden;
   width: 244px;
 }

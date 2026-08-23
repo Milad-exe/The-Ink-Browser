@@ -8,7 +8,22 @@
 /* Rows scroll inside the card (not the body) so its edges stay put. */
 html, body { height: 100%; }
 body {
-  margin: 0; padding: 4px 0;
+  /* The card needs room INSIDE the view for its own shadow: a WebContentsView
+     clips at its bounds, so anything the shadow needs that is not padded for
+     ends as a hard band. These numbers are the shadow's measured reach (see
+     #list below) and they are also PAD_X / PAD_BOTTOM in ipc/suggestions.js,
+     which grows the view by exactly this much — so the card still lands on the
+     rect the address bar asked for.
+
+     Top padding is ZERO on purpose. The dropdown hangs 4px under the address
+     field and there is nowhere above it to put a gutter: growing the view
+     upwards would lay a transparent, click-eating strip over the field itself.
+     Instead the view's top edge IS the card's top edge, so the upward half of
+     the shadow falls outside the view and is never painted — there is no cut
+     because there is nothing to cut. Padding 4px here (as this file used to)
+     bought no shadow room at all and pushed the card 4px below the y the
+     address bar asked for, doubling the gap under the field. */
+  margin: 0; padding: 0 20px 26px;
   background: transparent;
   overflow: hidden;
 }
@@ -17,18 +32,33 @@ body {
   display: flex;
   flex-direction: column;
   padding: var(--sp-2);
-  /* Fill the body's content box (body already insets 4px top/bottom). The view
-     is sized to fit exactly (count*ITEM_HEIGHT + chrome in ipc/suggestions.js);
-     subtracting extra here clipped the last row's bottom padding, worst with a
-     single row. */
+  /* Fill the body's content box (body insets the shadow gutter). The view is
+     sized to fit exactly (count*ITEM_HEIGHT + LIST_CHROME in
+     ipc/suggestions.js); subtracting extra here clipped the last row's bottom
+     padding, worst with a single row. */
   max-height: 100%;
   overflow-y: auto;
   background: var(--surface);
-  /* Same card as every other floating surface (styles/surface.css): ring, not
-     border, and the shared shadow — this used to be a flat bordered box while
-     the palette next to it had a 24px shadow. */
   border-radius: var(--r-lg);
-  box-shadow: var(--ring-2), var(--shadow-pop);
+  /* The same card as every other floating surface (styles/surface.css) — ring
+     and half-pixel top highlight — plus the one drop shadow left anywhere in
+     the chrome. Panels gave theirs up because a WebContentsView clips at its
+     bounds; the dropdown keeps one because it is the surface that sits over the
+     page while you are reading it, and because it is anchored to a control that
+     gives it somewhere to cast.
+
+     It is NOT --shadow-pop. That token is 0 10px 30px, and measured in the app
+     it still paints 34px out to the sides and 46px below before it reaches
+     zero — containing THAT would mean wrapping the dropdown in a 40px halo of
+     dead, click-eating view. This shadow is sized to a gutter that is honest:
+     0 6px 16px fades out 20px sideways and 26px down, which is exactly the
+     body's padding above and PAD_X / PAD_BOTTOM in ipc/suggestions.js. Those
+     three move together or the shadow gets cut into a band again. */
+  box-shadow:
+    inset 0 0.5px 0 color-mix(in srgb, #fff 8%, transparent),
+    var(--ring-2),
+    0 6px 16px rgba(0, 0, 0, 0.28),
+    0 1px 4px rgba(0, 0, 0, 0.16);
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
 }

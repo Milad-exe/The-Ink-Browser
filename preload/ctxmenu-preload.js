@@ -14,6 +14,9 @@ catch { }
 // the chrome, which owns the actual handlers.
 contextBridge.exposeInMainWorld('overlayMenu', {
     onOpen: (cb) => ipcRenderer.on('ctxmenu:data', (_e, data) => cb(data)),
+    // What should be showing right now — for the first open of a session, where
+    // the push can beat the listener.
+    ready: () => ipcRenderer.invoke('ctxmenu:ready'),
     pick: (result) => ipcRenderer.send('ctxmenu:pick', result),
     dismiss: () => ipcRenderer.send('ctxmenu:dismiss'),
 });

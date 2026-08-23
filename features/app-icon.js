@@ -1,47 +1,41 @@
 /**
- * The dock/taskbar icon follows the selected theme.
+ * The dock/taskbar icon.
  *
- * Four themes, four grounds, and the icon is the mark on the theme's own
- * ground — so a browser running Dune does not sit in the dock as a black tile.
- * icons/themes/*.png are checked into the tree — one per theme, rasterised
- * from renderer/assets/logo.svg back when a generator existed. This only
- * decides which of them is on screen; see that SVG for how to rebuild them.
+ * ONE mark, ONE palette, everywhere. It used to follow the theme — a rendered
+ * PNG per ground, cached by colour — which was a nice mechanism and the wrong
+ * idea: an app icon is how the app is recognised in a dock, a switcher and a
+ * search result, and an icon that changes with a preference is one the user
+ * cannot learn. It also meant the icon differed from the one in the About page
+ * and from the window icon, because those read a file while the dock read a
+ * render.
  *
- * The bundle icon (icon.icns / icon.ico) cannot change at runtime, so it is
- * built from `default` — a window running the default theme therefore needs no
- * override at all, which also means the common case never touches the dock.
- *
- * macOS has one icon for the whole app, so this follows the app-wide setting.
- * Windows and Linux set it per window, and every window shares that setting
- * too, so they are handed the same image.
+ * So the palette is fixed here, the binaries beside renderer/assets/logo.svg
+ * are built from it (`npm run icons`), and this module only hands the right
+ * file to the right platform API.
  */
 const { app, nativeImage } = require('electron');
-const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const log = require('./log');
 
-const THEMES = ['default', 'fathom', 'porcelain', 'dune'];
-const cache = new Map();
+/* The mark's colours. Change them here, then run `npm run icons` — nothing
+   reads them at runtime, they are the source for the build. */
+const FIELD = '#2d6ad6';
+const MARK = '#ffffff';
 
-function imageFor(theme) {
-    const name = THEMES.includes(theme) ? theme : 'default';
-    if (!cache.has(name)) {
-        const img = nativeImage.createFromPath(resolveAppFile(path.join('icons/themes', `${name}.png`)));
-        cache.set(name, img.isEmpty() ? null : img);
+let cached = null;
+
+/** The one icon, loaded once. */
+function icon() {
+    if (cached === null) {
+        const img = nativeImage.createFromPath(resolveAppFile('logo.png'));
+        cached = img.isEmpty() ? false : img;
     }
-    return cache.get(name);
+    return cached || null;
 }
 
-/**
- * Point the dock (macOS) or every window (Windows/Linux) at `theme`'s icon.
- * `wm` is only needed off macOS; pass it whenever you have one.
- */
-function apply(theme, wm) {
-    const img = imageFor(theme);
-    if (!img) {
-        log.warn('app-icon', `no icon for theme ${theme}`);
+function setEverywhere(img, wm) {
+    if (!img)
         return;
-    }
     try {
         if (process.platform === 'darwin') {
             app.dock?.setIcon(img);
@@ -57,15 +51,31 @@ function apply(theme, wm) {
     }
 }
 
-/** A window created after a theme change starts on the bundle icon. */
-function applyToWindow(win, theme) {
+/**
+ * Point the dock (macOS) or every window (Windows/Linux) at the icon.
+ * `theme` is accepted and ignored — callers still pass it, and keeping the
+ * signature means the theme plumbing did not have to learn that the icon
+ * stopped caring.
+ */
+function apply(_theme, wm) {
+    const img = icon();
+    if (!img) {
+        log.warn('app-icon', 'logo.png missing or unreadable');
+        return false;
+    }
+    setEverywhere(img, wm);
+    return true;
+}
+
+/** A window created later starts on the bundle icon; give it ours. */
+function applyToWindow(win) {
     if (process.platform === 'darwin')
         return;
-    const img = imageFor(theme);
+    const img = icon();
     if (!img)
         return;
     try { win.setIcon(img); }
     catch (e) { log.debug('app-icon', 'applyToWindow', e); }
 }
 
-module.exports = { apply, applyToWindow, THEMES };
+module.exports = { apply, applyToWindow, FIELD, MARK };

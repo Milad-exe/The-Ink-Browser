@@ -3,9 +3,10 @@
  * Profiles — Chrome-style separate browsing selves.
  *
  * A profile is WHO you are: its own cookies/logins, its own history, its own
- * bookmarks + Essentials, its own containers. Settings, theme, and extensions
- * stay shared across profiles (per-profile extensions is heavy and rarely
- * wanted). Each window belongs to one profile; the toolbar switcher opens (or
+ * bookmarks + Essentials, its own containers, and its own THEME — a window
+ * belongs to one profile, so it wears that profile's colours (null follows the
+ * global setting). Settings and extensions stay shared across profiles
+ * (per-profile extensions is heavy and rarely wanted). Each window belongs to one profile; the toolbar switcher opens (or
  * focuses) a window per profile.
  *
  * Layering: a profile (features/containers.js) is WHICH ACCOUNT on one site,
@@ -64,7 +65,10 @@ function save() {
 
 function _find(id) { return load().list.find(p => p.id === String(id)) || null; }
 
-const _pub = (p) => ({ id: p.id, name: p.name, color: p.color, emoji: p.emoji || null, container: p.container || null });
+/* `theme` is the space's own theme id, or null to follow the global setting.
+   A window belongs to one space, so this is what that window wears — see
+   features/theme-runtime.js. */
+const _pub = (p) => ({ id: p.id, name: p.name, color: p.color, emoji: p.emoji || null, container: p.container || null, theme: p.theme || null });
 function list() { return load().list.map(_pub); }
 function meta(id) { const p = _find(id); return p ? _pub(p) : null; }
 
@@ -96,6 +100,9 @@ function update(id, patch) {
     // for the shared session, or null to keep the space's own jar. Changing it
     // repoints where logins live, so it only takes effect on the next session
     // lookup (callers re-open/switch the space).
+    // theme: a theme id this space wears, or null to follow the global setting.
+    if (patch && 'theme' in patch)
+        p.theme = patch.theme ? String(patch.theme) : null;
     if (patch && 'container' in patch) {
         const v = patch.container;
         p.container = (v === null || v === undefined || v === '') ? null : String(v);

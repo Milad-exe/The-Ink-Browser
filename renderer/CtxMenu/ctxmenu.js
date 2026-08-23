@@ -11,14 +11,29 @@
 
     const clear = () => { chain.forEach(m => m.remove()); chain = []; };
 
-    const place = (menu, x, y, parentRect) => {
-        surface.appendChild(menu);
+    const clampInto = (menu, x, y, parentRect) => {
         const w = menu.offsetWidth, h = menu.offsetHeight;
         let left = x;
         // Submenus flip to the parent's left edge when they'd leave the window.
         if (parentRect && left + w > window.innerWidth - 6) left = parentRect.left - w + 2;
-        menu.style.left = Math.max(6, Math.min(left, window.innerWidth - w - 6)) + 'px';
-        menu.style.top = Math.max(6, Math.min(y, window.innerHeight - h - 6)) + 'px';
+        const vw = window.innerWidth, vh = window.innerHeight;
+        // A degenerate viewport must not clamp, or every bound collapses to the
+        // margin and the menu lands in the corner instead of under the cursor.
+        menu.style.left = (vw > w ? Math.max(6, Math.min(left, vw - w - 6)) : Math.max(6, left)) + 'px';
+        menu.style.top = (vh > h ? Math.max(6, Math.min(y, vh - h - 6)) : Math.max(6, y)) + 'px';
+    };
+
+    const place = (menu, x, y, parentRect) => {
+        surface.appendChild(menu);
+        clampInto(menu, x, y, parentRect);
+        /* The first menu of a session is measured before the web font has
+           loaded, so it is shorter than it will be — and a clamp computed from
+           that height let it hang off the bottom of the window with its last
+           row cut off. Re-run once layout has settled. */
+        const again = () => { if (menu.isConnected) clampInto(menu, x, y, parentRect); };
+        requestAnimationFrame(again);
+        try { document.fonts?.ready.then(again); }
+        catch (e) { /* re-clamp is best effort; the first pass already placed it */ }
     };
 
     const closeFrom = (depth) => { while (chain.length > depth) chain.pop().remove(); };
@@ -103,13 +118,33 @@
         return menu;
     };
 
-    window.overlayMenu.onOpen((data) => {
+    let shownAt = 0;   // when the current menu went up, for the blur guard
+    let shownSeq = 0;  // which open it was, so push and pull don't both build it
+
+    const open = (data) => {
+        if (!data)
+            return;
+        // The push and the pull below can both deliver the FIRST menu. Building
+        // it twice is not just wasted work: the rebuild moves keyboard focus
+        // back to the first row under a user who has already pressed Down.
+        if (data.seq && data.seq === shownSeq)
+            return;
+        shownSeq = data.seq || 0;
         clear();
         const root = data.kind === 'emoji' ? buildEmoji(data) : build(data.rows, 0, []);
         chain.push(root);
         place(root, data.x, data.y);
+        shownAt = Date.now();
         armKeys();
-    });
+    };
+
+    window.overlayMenu.onOpen(open);
+    /* …and ask what is already pending. This view is created BY the first
+       right-click, so that click's data can be sent before this script is
+       listening — which is why the first right-click of a session opened an
+       empty menu and the second one worked. */
+    try { window.overlayMenu.ready?.().then(open); }
+    catch (e) { /* the push above is the normal path */ }
 
     // Clear the chain as well as telling main to hide us, so the view never
     // holds a stale menu that could flash on the next open.
@@ -128,6 +163,17 @@
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') dismiss();
     });
-    // The window losing focus should not leave a menu stranded on screen.
-    window.addEventListener('blur', dismiss);
+    /* The window losing focus should not leave a menu stranded on screen, but
+       two kinds of blur are not the user leaving, and acting on either told main
+       to hide the menu that had since taken this one's place — which is why
+       every other right-click drew nothing. One: opening focuses this view, and
+       raising it churns focus for a frame. Two: main hands focus back to the
+       chrome when it hides us, so every dismissal echoes back here. A click on
+       the surface is different — that one always dismisses, or a full-window
+       overlay would be left eating clicks. */
+    window.addEventListener('blur', () => {
+        if (!chain.length || Date.now() - shownAt < 250)
+            return;
+        dismiss();
+    });
 })();

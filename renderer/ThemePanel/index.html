@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none';" />
+  <title>Theme</title>
+  <link rel="stylesheet" href="../styles/ui.css">
+  <link rel="stylesheet" href="../styles/surface.css">
+  <link rel="stylesheet" href="../styles/theme-editor.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Same instrument as the Appearance section, in a panel. The markup is
+       duplicated here rather than templated because it is markup, not logic —
+       renderer/lib/theme-editor.js drives both copies and is the single place
+       any behaviour lives. -->
+  <div class="surface-card" id="panel">
+    <div class="surface-head">
+      <span class="surface-title" id="tp-title">Theme</span>
+      <!-- Only shown when the panel is editing a SPACE: clears its own theme so
+           it follows the global setting again. -->
+      <button class="btn btn-ghost btn-sm" id="tp-reset" type="button" hidden>Reset</button>
+      <button class="surface-icon-btn" id="tp-close" type="button" title="Close" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="tp-picker">
+      <div class="theme-picker" id="theme-picker" role="radiogroup" aria-label="Theme"></div>
+    </div>
+    <div class="tp-scroll">
+      <div class="theme-editor" id="theme-editor" hidden>
+        <div class="te-stage">
+          <div class="te-modes" id="te-mode-seg" role="radiogroup" aria-label="Mode">
+            <button type="button" data-m="dark" class="on" role="radio" aria-checked="true" title="Dark" aria-label="Dark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5z"/></svg>
+            </button>
+            <button type="button" data-m="light" role="radio" aria-checked="false" tabindex="-1" title="Light" aria-label="Light">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></svg>
+            </button>
+          </div>
+
+          <div class="te-wheel" id="te-wheel" role="application"
+               aria-label="Colour field — drag a dot to change its hue and saturation">
+            <canvas id="te-wheel-canvas" width="440" height="440" aria-hidden="true"></canvas>
+            <div class="te-dots" id="te-dots"></div>
+          </div>
+
+          <div class="te-bar">
+            <div class="te-roles" id="te-roles"></div>
+            <div class="te-tools">
+              <button type="button" id="te-add" title="Add a colour" aria-label="Add a colour">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+              <button type="button" id="te-remove" title="Remove the last colour" aria-label="Remove the last colour">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 12h14"/></svg>
+              </button>
+              <button type="button" id="te-scatter" title="Space the colours evenly around the wheel" aria-label="Space the colours evenly around the wheel">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="15" r="2.4"/><circle cx="16" cy="16.5" r="1.8"/><circle cx="13" cy="8" r="2.1"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="te-controls">
+          <label class="te-ctl">
+            <span class="te-ctl-name">Shade</span>
+            <span class="te-ctl-track" id="te-shade-track">
+              <input id="te-shade" type="range" min="0" max="100" value="50" aria-label="Shade">
+            </span>
+            <span class="te-ctl-val" id="te-shade-val">50</span>
+          </label>
+          <label class="te-ctl">
+            <span class="te-ctl-name">Intensity</span>
+            <span class="te-ctl-track" id="te-intensity-track">
+              <input id="te-intensity" type="range" min="0" max="100" value="70" aria-label="Intensity">
+            </span>
+            <span class="te-ctl-val" id="te-intensity-val">70</span>
+          </label>
+          <label class="te-ctl">
+            <span class="te-ctl-name">Grain</span>
+            <span class="te-ctl-track te-wave">
+              <svg class="te-wave-art" viewBox="0 0 240 24" aria-hidden="true" preserveAspectRatio="none">
+                <path d="M0 12 L240 12"/>
+              </svg>
+              <input id="te-grain" type="range" min="0" max="100" value="0" aria-label="Grain">
+            </span>
+            <span class="te-ctl-val" id="te-grain-val">0</span>
+          </label>
+        </div>
+
+        <p class="te-warn" id="te-warn" role="status" hidden></p>
+
+      </div>
+    </div>
+    <!-- The foot sits OUTSIDE the scroller here, unlike the Settings page where
+         it is the end of a section you scrolled to anyway. A popup is shorter
+         than the instrument inside it, so at the end of the scroll "Done" — and
+         the only way to delete the theme you are looking at — was below the
+         fold on a window of ordinary height. -->
+    <div class="te-foot tp-foot">
+      <button class="btn btn-danger btn-sm" id="te-delete" type="button" hidden>Delete</button>
+      <button class="btn btn-ghost btn-sm" id="te-cancel" type="button">Done</button>
+    </div>
+  </div>
+  <script src="../lib/theme-editor.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>

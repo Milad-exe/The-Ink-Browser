@@ -224,6 +224,13 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     ipcMain.handle('profiles:update', (_e, id, patch) => {
         const p = profiles.update(id, patch);
         broadcastProfiles();
+        // A space's theme is worn by every window in that space, so changing it
+        // has to re-resolve the surfaces — nothing moved, but what they resolve
+        // to did.
+        if (patch && 'theme' in patch) {
+            try { require('../features/theme-runtime').repaintAll(wm); }
+            catch (e) { log.debug('tabs', 'profiles:update theme', e); }
+        }
         return p;
     });
     // ── Sidebar resize ────────────────────────────────────────────────────────
@@ -444,13 +451,23 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         }
         catch (e) { log.debug('tabs', 'broadcastEssentials', e); }
     };
+    // The Essential's identity — the url it was made from, plus its container.
+    const essentialKey = (url, profile) => `${url}|${profile || ''}`;
     ipcMain.handle('essentials:list', (_e) => profiles.essentials(wm.profileOf(_e.sender)));
     ipcMain.handle('essentials:add', (_e, url, title, profile) => {
         if (!/^https?:/i.test(url || '')) return false;
         let label = title;
         if (!label) { try { label = new URL(url).hostname.replace(/^www\./, ''); } catch { label = url; } }
         const ok = profiles.addEssential(wm.profileOf(_e.sender), { url, title: label, profile: profile || null });
-        if (ok) broadcastEssentials();
+        if (ok) {
+            // The tab it was made from BECOMES the tile's tab, the way dragging
+            // a tab up into Arc's Favourites does. Otherwise you were left with
+            // the tab you promoted still in the strip and a tile that opened a
+            // second copy of it on the first click.
+            try { wm.getWindowByWebContents(_e.sender)?.tabs?.adoptEssentialTab(essentialKey(url, profile), url); }
+            catch (e) { log.debug('tabs', 'essentials:add adopt', e); }
+            broadcastEssentials();
+        }
         return ok;
     });
     // An Essential IS a tab: open it, or return to the one it already owns.
@@ -461,7 +478,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const item = profiles.essentials(wm.profileOf(_e.sender))
             .find(x => x.url === url && (x.profile || null) === (profile || null));
         const home = (item && item.home) || url;
-        return wd.tabs.openEssential(`${url}|${profile || ''}`, home, profile || null);
+        return wd.tabs.openEssential(essentialKey(url, profile), home, profile || null);
     });
     // Take its tab back to its page (creating the tab if it has none).
     ipcMain.handle('essentials:goHome', (_e, url, profile) => {
@@ -471,18 +488,16 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const item = profiles.essentials(wm.profileOf(_e.sender))
             .find(x => x.url === url && (x.profile || null) === (profile || null));
         const home = (item && item.home) || url;
-        const idx = wd.tabs.openEssential(`${url}|${profile || ''}`, home, profile || null);
-        if (typeof idx !== 'number')
-            return false;
-        wd.tabs.loadUrl(idx, home);
-        return true;
+        return wd.tabs.goHomeEssential(essentialKey(url, profile), home, profile || null);
     });
     // Which page it goes back to. Passing nothing uses the page its tab is on.
     ipcMain.handle('essentials:setHome', (_e, url, profile, home) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         let next = home;
         if (!next && wd?.tabs) {
-            const bound = wd.tabs.essentialTabs?.get(`${url}|${profile || ''}`);
+            // Bindings are keyed by space, so reading the map directly here found
+            // nothing and "use this page as its page" quietly did nothing.
+            const bound = wd.tabs.essentialTabIndex(essentialKey(url, profile));
             if (bound != null)
                 next = wd.tabs.tabUrls.get(bound);
         }
@@ -497,6 +512,15 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     });
     ipcMain.handle('essentials:remove', (_e, url, profile) => {
         const ok = profiles.removeEssential(wm.profileOf(_e.sender), url, profile || null);
+        // Its tab stays open — removing an Essential is not closing a tab — but
+        // it has to go back to being an ordinary row, since the strip hides the
+        // row of any tab a tile owns and there is no tile left to reach it by.
+        if (ok) {
+            for (const w of wm.windows.values()) {
+                try { w.tabs?.unbindEssential(essentialKey(url, profile)); }
+                catch (e) { log.debug('tabs', 'essentials:remove unbind', e); }
+            }
+        }
         broadcastEssentials();
         return ok;
     });

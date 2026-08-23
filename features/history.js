@@ -160,15 +160,47 @@ class History {
         if (isSearchResultUrl(url))
             return;
         const p = profile || null;
+        // A visit is recorded the moment navigation commits, and at that point
+        // webContents.getTitle() has not seen the document's <title> yet — it
+        // returns Chromium's placeholder, which is the URL with the scheme
+        // stripped. Storing that gave every history row a title like
+        // "youtube.com/shorts/6wLZkAWtTvQ", so the address bar and the palette
+        // showed the URL twice and never the page. Store nothing instead and
+        // let updateTitle() fill it in when the real one arrives.
         const history = await this.load();
         // Dedup by URL *and profile* — the same page under two profiles (e.g. Gmail
         // as Work vs Personal) is treated as two distinct entries, not one.
         const i = history.findIndex(e => e.url === url && (e.profile || null) === p);
+        const prev = i !== -1 ? history[i] : null;
         if (i !== -1)
             history.splice(i, 1);
-        history.unshift({ url, title, timestamp: new Date().toISOString(), ...(p ? { profile: p, profileName: profileName || null } : {}) });
+        const clean = isPlaceholderTitle(title, url) ? '' : String(title).trim();
+        // Re-visiting must not lose the title already learned: the new visit
+        // arrives with a placeholder while the old entry holds the real thing,
+        // and the old entry is about to be spliced away.
+        const kept = (!clean && prev && prev.title) ? prev.title : clean;
+        history.unshift({ url, title: kept, timestamp: new Date().toISOString(), ...(p ? { profile: p, profileName: profileName || null } : {}) });
         this._prune(history);
         this._scheduleWrite();
+    }
+    /**
+     * Fill in the title once the page actually has one.
+     *
+     * Called from the tab's page-title-updated handler. Only ever upgrades: a
+     * placeholder never overwrites a real title, so a page that re-titles
+     * itself to its own URL mid-session cannot undo what we already knew.
+     */
+    async updateTitle(url, title, profile = null) {
+        if (!url || isPlaceholderTitle(title, url))
+            return false;
+        const p = profile || null;
+        const history = await this.load();
+        const entry = history.find(e => e.url === url && (e.profile || null) === p);
+        if (!entry || entry.title === String(title).trim())
+            return false;
+        entry.title = String(title).trim();
+        this._scheduleWrite();
+        return true;
     }
     async removeFromHistory(url, timestamp) {
         try {
@@ -211,6 +243,33 @@ class History {
     }
 }
 // ── Helpers ──────────────────────────────────────────────────────────────────
+/**
+ * Is `title` Chromium's stand-in rather than the page's own?
+ *
+ * Before a document's <title> is parsed, getTitle() returns the URL with the
+ * scheme (and sometimes the www) removed. It looks like a title, it is not
+ * one, and stored as one it is indistinguishable from a page that really is
+ * called "example.com/path".
+ */
+function isPlaceholderTitle(title, url) {
+    const t = String(title || '').trim().replace(/\/$/, '');
+    if (!t)
+        return true;
+    if (t === String(url || '').trim())
+        return true;
+    try {
+        const u = new URL(url);
+        const host = u.hostname;
+        const bare = (host + u.pathname + u.search).replace(/\/$/, '');
+        for (const c of [bare, bare.replace(/^www\./, ''), host, host.replace(/^www\./, '')]) {
+            if (t === c)
+                return true;
+        }
+    }
+    catch { /* unparseable url — the equality check above is all we have */ }
+    return false;
+}
+
 function isSearchResultUrl(rawUrl) {
     if (!rawUrl)
         return false;
@@ -234,3 +293,4 @@ function isSearchResultUrl(rawUrl) {
 
 History.setRetention = setRetention;
 module.exports = History;
+module.exports.isPlaceholderTitle = isPlaceholderTitle;

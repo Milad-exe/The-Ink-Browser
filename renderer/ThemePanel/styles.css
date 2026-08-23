@@ -1,0 +1,63 @@
+/* The theme popup. Everything the instrument needs is in
+   styles/theme-editor.css; this is only the panel it sits in. */
+@layer components {
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body { height: 100%; }
+  body {
+    /* The card is inset so its own shadow renders INSIDE the view. A
+       WebContentsView clips at its bounds, so a card flush to the edge has its
+       shadow sliced off; ipc/theme-panel.js grows the view by the same amount
+       (features/overlay-bounds.js SHADOW_PAD) so the card still lands where the
+       anchor asked for it. */
+    /* No padding: the card fills the view. It used to inset by 12px to give a
+       drop shadow room; panels have no drop shadow now, so that inset was a
+       transparent border eating clicks. */
+    margin: 0; padding: 0;
+    background: transparent; overflow: hidden;
+    font-family: var(--font); color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #panel { display: flex; flex-direction: column; height: 100%; }
+  /* The picker and editor scroll together — the panel is shorter than the
+     Settings column and the editor is the taller half. */
+  /* The swatch row stays put; only the editor beneath it scrolls. Letting the
+     whole column scroll pushed the picker off the top the moment the editor
+     opened, which is the one control you need to get back to. */
+  .tp-picker { flex: none; padding: 0 var(--sp-5); }
+  /* The foot is sticky INSIDE this container, so content scrolls under it —
+     the bottom padding is the room the last control needs to clear it rather
+     than ending up permanently half-covered. */
+  .tp-scroll {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--sp-5) var(--sp-5);
+    /* No visible track. The panel is one instrument; a scrollbar down its edge
+       reads as a list that ran out of room. */
+    scrollbar-width: none;
+  }
+  .tp-scroll::-webkit-scrollbar { width: 0; height: 0; }
+  /* A panel is shorter than the Settings column, so the instrument packs
+     tighter here: less air around the swatches and a smaller field. The rule
+     between the two belongs to the editor (styles/theme-editor.css) and lands
+     exactly on the seam between the part that stays put and the part that
+     scrolls, which is what it should be marking. */
+  .theme-row { margin-top: 0; }
+  .theme-picker { padding: var(--sp-2) 3px; }
+  .theme-current { min-height: 24px; }
+  .theme-editor { margin-top: var(--sp-4); gap: var(--sp-4); }
+  .te-wheel { width: 132px; height: 132px; }
+  .te-stage { gap: var(--sp-2); }
+  /* The panel's own foot: a real bottom bar, not the tail of the scroll. */
+  .tp-foot {
+    flex: none; padding: var(--sp-4) var(--sp-5);
+    border-top: 1px solid var(--border);
+  }
+
+  /* The foot is the last thing in the scroll, not a sticky bar. Sticky put it
+     at the container's bottom edge while the sliders kept rendering underneath
+     it — a button floating over live controls. On a normal window the whole
+     instrument fits and the foot is simply at the end of it; on a short one you
+     scroll to it, which is what a scroll container is for. */
+  body { user-select: none; -webkit-user-select: none; }
+}

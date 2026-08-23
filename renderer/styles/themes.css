@@ -65,66 +65,6 @@
   --radius-pill: 999px;
 }
 
-html[data-theme="fathom"] {
-  /* Fathom — abyssal navy */
-  --shell: #050b14;
-  --page: #0a1420;
-  --bg: #04090f;
-  --surface: #101d2c;
-  --surface-2: #182839;
-  --text: #e2eaf4;
-  --text-2: #93a6bd;
-  --text-3: #5d7086;
-  --border: rgba(170,200,235,0.10);
-  --border-2: rgba(170,200,235,0.18);
-  --hover: rgba(170,200,235,0.07);
-  --active-bg: rgba(170,200,235,0.13);
-  --accent: #e5484d;
-  --accent-2: #c3363c;
-  --accent-wash: rgba(229,72,77,0.18);
-  --danger: #ff8478;
-}
-
-html[data-theme="porcelain"] {
-  /* Porcelain — cool paper white */
-  --shell: #e8e9ec;
-  --page: #ffffff;
-  --bg: #dcdee3;
-  --surface: #f7f8fa;
-  --surface-2: #eeeff2;
-  --text: #16171a;
-  --text-2: #61646b;
-  --text-3: #7c8088;
-  --border: rgba(10,12,18,0.10);
-  --border-2: rgba(10,12,18,0.16);
-  --hover: rgba(10,12,18,0.05);
-  --active-bg: rgba(10,12,18,0.08);
-  --accent: #e5484d;
-  --accent-2: #c3363c;
-  --accent-wash: rgba(229,72,77,0.18);
-  --danger: #c9271c;
-}
-
-html[data-theme="dune"] {
-  /* Dune — cream ground, silent navy ink */
-  --shell: #efe1c6;
-  --page: #fdf7ec;
-  --bg: #e6d8b8;
-  --surface: #f8efdd;
-  --surface-2: #f0e2c8;
-  --text: #122c63;
-  --text-2: #4b5e8a;
-  --text-3: #867658;
-  --border: rgba(18,44,99,0.12);
-  --border-2: rgba(18,44,99,0.20);
-  --hover: rgba(18,44,99,0.06);
-  --active-bg: rgba(18,44,99,0.10);
-  --accent: #e5484d;
-  --accent-2: #c3363c;
-  --accent-wash: rgba(229,72,77,0.18);
-  --danger: #b53a1c;
-}
-
 /* ── Private mode — lavender/violet, unmistakably distinct ── */
 html[data-private-window="true"],
 html[data-private-tab="true"] {
@@ -209,12 +149,10 @@ html[data-private-tab="true"] {
 
 }
 
-/* Light themes need less shadow: the same alpha that reads as depth on a dark
-   shell reads as dirt on a pale one. */
-html[data-theme="porcelain"], html[data-theme="dune"] {
-  --shadow-pop: 0 10px 30px rgba(30,35,60,0.14), 0 2px 6px rgba(30,35,60,0.08);
-}
-
+/* Light themes need less shadow — the same alpha that reads as depth on a dark
+   shell reads as dirt on a pale one. That used to be a rule naming the two
+   light themes that shipped; it lives in features/theme-derive.js now, so every
+   light theme gets it, including ones the user makes. */
 /* ═══════════════════════════════════════════════════════════════════════════
    SHARED CONTROLS
 

@@ -164,6 +164,28 @@ select:focus { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%,
 
 /* The switch is shared with the overlays — see SHARED CONTROLS in ui.css. */
 
+/* Narrow windows. Settings lives inside the page card — the window minus the
+   sidebar — so on a small window that column gets genuinely tight and a row of
+   controls sized for a desktop overflowed it. The theme editor collapses on
+   its own rules (styles/theme-editor.css); these are the page's. */
+@media (max-width: 560px) {
+  .content { padding: var(--sp-6) var(--sp-5) var(--sp-8); }
+  .card { padding: var(--sp-5) var(--sp-5); }
+  .toggle-row { gap: var(--sp-4); }
+  .toggle-row > div:first-child { max-width: none; }
+  .duration-grid { grid-template-columns: 1fr 1fr; gap: var(--sp-5); }
+}
+/* Very narrow: the nav becomes a strip of icons rather than eating half the
+   column. The labels are bare text nodes, not elements, so there is nothing to
+   hide — zeroing the font size collapses them and the icon is sized in its own
+   rule. */
+@media (max-width: 460px) {
+  .sidebar { width: 56px; min-width: 56px; }
+  .sidebar-header { display: none; }
+  .nav-item { justify-content: center; padding: 0; font-size: 0; gap: 0; }
+  .nav-list { padding: var(--sp-5) var(--sp-2); }
+}
+
 /* ── Focus duration grid ── */
 .duration-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -373,70 +395,8 @@ input, textarea, select { user-select: text; -webkit-user-select: text; }
 .version-grid .v { color: var(--text-2); font-family: var(--mono); font-size: var(--fs-micro); }
 .hidden { display: none !important; }
 
-/* ── Theme picker ───────────────────────────────────────────────────────────
-   Four miniatures of the browser, each painted in its own theme's palette:
-   the rail, the page card and two lines of text. A dropdown of names told you
-   nothing about what you were choosing. The colours are literal copies of the
-   blocks in ui.css — change a theme there, change its preview here. */
-.theme-picker {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: var(--sp-5); margin-top: var(--sp-5);
-}
-.theme-option {
-  display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-3);
-  padding: 0; border: none; background: transparent;
-  font-family: var(--font); cursor: pointer;
-}
-.theme-preview {
-  display: flex; flex-direction: column; height: 76px; overflow: hidden;
-  border-radius: var(--r-md); box-shadow: var(--ring-2);
-  transition: box-shadow var(--dur-1) var(--ease);
-}
-.theme-option:hover .theme-preview { box-shadow: inset 0 0 0 0.5px var(--border-2); }
-.theme-option[aria-checked="true"] .theme-preview {
-  box-shadow: 0 0 0 2px var(--accent);
-}
-.theme-option:focus-visible { outline: none; }
-.theme-option:focus-visible .theme-preview { box-shadow: 0 0 0 3px var(--accent-wash), 0 0 0 2px var(--accent); }
-.theme-name {
-  font-size: var(--fs-small); font-weight: 500; color: var(--text-3);
-  letter-spacing: var(--tracking); text-align: left;
-}
-.theme-option[aria-checked="true"] .theme-name { color: var(--text); font-weight: 600; }
-
-/* The miniature is this browser: a toolbar with the address field centred over
-   the page, a rail down the left, and the page card inset from both. */
-.tp-bar { height: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.tp-field { width: 46%; height: 5px; border-radius: var(--r-pill); }
-.tp-body { flex: 1; display: flex; min-height: 0; }
-.tp-rail { width: 24%; flex-shrink: 0; }
-.tp-page {
-  flex: 1; margin: 0 5px 5px 0; border-radius: var(--r-xs);
-  display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 0 6px;
-}
-.tp-line { height: 3px; border-radius: var(--r-pill); }
-.tp-line.short { width: 55%; }
-
-.theme-preview[data-preview="default"]   { background: #0a0a0b; }
-.theme-preview[data-preview="default"] .tp-page { background: #121213; }
-.theme-preview[data-preview="default"] .tp-line { background: #fafafa; opacity: 0.55; }
-.theme-preview[data-preview="default"] .tp-line.short { background: #e5484d; opacity: 1; }
-.theme-preview[data-preview="default"] .tp-field { background: #050506; }
-
-.theme-preview[data-preview="fathom"]    { background: #050b14; }
-.theme-preview[data-preview="fathom"] .tp-page { background: #0a1420; }
-.theme-preview[data-preview="fathom"] .tp-line { background: #e2eaf4; opacity: 0.55; }
-.theme-preview[data-preview="fathom"] .tp-line.short { background: #e5484d; opacity: 1; }
-.theme-preview[data-preview="fathom"] .tp-field { background: #04090f; }
-
-.theme-preview[data-preview="porcelain"] { background: #e8e9ec; }
-.theme-preview[data-preview="porcelain"] .tp-page { background: #ffffff; }
-.theme-preview[data-preview="porcelain"] .tp-line { background: #16171a; opacity: 0.45; }
-.theme-preview[data-preview="porcelain"] .tp-line.short { background: #e5484d; opacity: 1; }
-.theme-preview[data-preview="porcelain"] .tp-field { background: #ffffff; }
-
-.theme-preview[data-preview="dune"]      { background: #efe1c6; }
-.theme-preview[data-preview="dune"] .tp-page { background: #fdf7ec; }
-.theme-preview[data-preview="dune"] .tp-line { background: #122c63; opacity: 0.45; }
-.theme-preview[data-preview="dune"] .tp-line.short { background: #e5484d; opacity: 1; }
-.theme-preview[data-preview="dune"] .tp-field { background: #fdf7ec; }
+/* The theme picker's edit affordance used to be a second button INSIDE each
+   swatch, and it was styled from here as well as from
+   styles/theme-editor.css. It is gone: a <button> nested in a
+   <button role="radio"> is invalid markup no keyboard could reach, so editing
+   moved to the named caption under the row, where it is a control of its own. */

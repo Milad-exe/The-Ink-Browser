@@ -25,38 +25,19 @@
   mark path instead. Width, height and the gap all scale together (this is the
   base pair at ×1.20) — scaling only the width gives you a squint.
 
-  COLOUR COMES FROM THE THEME. The two custom properties below are the whole
-  palette, and the values here are Slate (the default). features/app-icon.js
-  swaps which of icons/themes/<theme>.png the dock shows when the setting
-  changes.
+  COLOUR IS FIXED. The two custom properties below are the whole palette and
+  they do not change at runtime: an app icon is how the app is recognised in a
+  dock, a switcher and a search result, and one that follows a preference is
+  one nobody can learn. features/app-icon.js carries the same two values as
+  FIELD/MARK for the record; this file is what the binaries are rendered from.
 
-  THE BINARIES ARE CHECKED IN AND ARE NOT GENERATED FROM THIS FILE ANY MORE.
-  The rasteriser (scripts/build-icons.js) has been removed, so editing the
-  geometry below changes nothing a user sees until icons/themes/*.png,
-  logo.png, logo-win.png and icons/icon.{png,ico,icns} are rebuilt by hand.
-  Everything that generator knew is recorded here so it can be redone:
-
-    ground / ink per theme, read off renderer/styles/themes.css —
-      default   #0a0a0b / #fafafa   (--shell / --text)
-      fathom    #0a1420 / #e2eaf4   (--page  / --text)
-      porcelain #e8e9ec / #16171a   (--shell / --text)
-      dune      #efe1c6 / #122c63   (--shell / --text)
-
-    the runtime PNGs are the art at 824 inside a transparent 1024 — the macOS
-    icon safe area. A full-bleed PNG handed to dock.setIcon renders edge to
-    edge, visibly LARGER than the bundle icon, which is what used to make the
-    dock icon "expand" as the app finished launching. logo-win.png is 940 in
-    1024 instead: Windows renders it smaller in the taskbar cell and does not
-    mask it. The bundle icon is full-bleed and always built from `default`,
-    because a .icns cannot change at runtime.
-
-    render at 2048 and downsample — edges stay sharp. .ico needs 16/24/32/48/
-    64/128/256 baked in; letting Windows scale a 1024 down to 16 turns it to
-    mush.
+  There is no rasteriser in the tree, so editing the geometry below changes
+  nothing a user sees until logo.png, logo-win.png and icons/icon.{png,ico,icns}
+  are rebuilt by hand.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <style>
-    :root { --icon-field: #0a0a0b; --icon-mark: #fafafa; }
+    :root { --icon-field: #2d6ad6; --icon-mark: #ffffff; }
     .field { fill: var(--icon-field); }
     .mark  { fill: var(--icon-mark); }
     .eye   { fill: var(--icon-field); }

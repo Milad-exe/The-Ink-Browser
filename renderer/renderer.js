@@ -235,6 +235,7 @@
         initAddressBar();
         initBookmarkBar();
         initFocusModeAndPomodoro();
+        initPageActions();
         initMenu();
         initDownloads();
         initExtensions();
@@ -628,7 +629,13 @@
         let currentQuery = ''; // the user's typed text, for match highlighting
         let barEdited = false; // uncommitted typed text in the bar (survives blur)
         function getSuggestionsBounds() {
-            const r = searchBar.getBoundingClientRect();
+            /* Measure the FIELD, not the <input> inside it. The input starts
+               after the lock/search glyph and stops short of the right padding,
+               so anchoring to it hung the dropdown ~39px in from the field's
+               left edge and 51px narrower — a panel that lined up with the text
+               rather than with the control it belongs to. */
+            const field = searchBar.closest('.omnibox') || searchBar;
+            const r = field.getBoundingClientRect();
             return { left: r.left, top: r.bottom + 4, width: r.width };
         }
         function positionSuggestions() {
@@ -1044,6 +1051,104 @@
             }
             catch { /* keep base rendered */ }
         }, 120);
+        /* The theme editor opens as a popup over the chrome, not as a trip to
+           Settings: you are choosing a colour for the thing you are looking
+           at, and the answer should appear next to it. Same instrument
+           either way (renderer/lib/theme-editor.js). */
+        /* Where the last context menu was opened. Row handlers are invoked with
+           no arguments, so an action that needs to know where the user clicked
+           — the theme panel hangs off that point — has nowhere else to read it
+           from. Declared HERE, above its reader: a `let` further down the file
+           is in the temporal dead zone while the init sequence runs (CLAUDE.md
+           invariant 2). */
+        let lastCtxPoint = null;
+
+        function openThemePanel(spaceId = null) {
+            /* Beside the rail, level with the click. The panel is about the
+               space you just right-clicked, so it opens next to it rather than
+               in the corner the toolbar's panels share. */
+            let anchor = null;
+            try {
+                const rail = document.getElementById('tab-bar')?.getBoundingClientRect();
+                const y = lastCtxPoint?.y;
+                if (rail && Number.isFinite(y)) {
+                    const edge = Math.round(rail.right);
+                    anchor = { left: edge, right: edge, top: y, bottom: y };
+                }
+                else if (rail) {
+                    const mid = Math.round(rail.top + 40);
+                    anchor = { left: Math.round(rail.right), right: Math.round(rail.right), top: mid, bottom: mid };
+                }
+            }
+            catch (e) { window.inkLog?.debug('renderer', 'openThemePanel: ' + e); }
+            try { window.themePanel?.toggle(anchor, spaceId ? String(spaceId) : null); }
+            catch (e) { window.inkLog?.debug('renderer', 'openThemePanel: ' + e); }
+        }
+
+        /* ── Page actions ──────────────────────────────────────────────────
+           One button in the bar, a panel behind it. The panel holds no state and
+           reimplements nothing: it reports which action was pressed and the
+           chrome presses the button that already does it. The state it renders
+           is read off those same buttons, so "is this bookmarked?" has exactly
+           one answer and it is the one the toolbar already had. */
+        function pageActionsState() {
+            const shown = (id) => {
+                const b = document.getElementById(id);
+                return !!b && !b.classList.contains('hidden');
+            };
+            const available = [];
+            if (shown('reader-btn')) available.push('reader');
+            if (shown('pip-btn')) available.push('pip');
+            if (shown('downloads-btn')) available.push('downloads');
+            const url = String(tabUrls.get(activeTabIndex) || '');
+            const internal = !!northstarDisplay(url) || !/^https?:/i.test(url);
+            let host = '';
+            try { host = url && /^https?:/i.test(url) ? new URL(url).hostname.replace(/^www\./, '') : ''; }
+            catch (e) { window.inkLog?.debug('renderer', 'pageActionsState: ' + e); }
+            return {
+                available,
+                bookmarked: !!document.getElementById('bookmark-btn')?.classList.contains('active'),
+                focus: !!document.getElementById('focus-btn')?.classList.contains('active'),
+                secure: /^https:/i.test(url),
+                internal,
+                host,
+            };
+        }
+
+        function initPageActions() {
+            const btn = document.getElementById('page-actions-btn');
+            btn?.addEventListener('click', (e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                try {
+                    window.pageActions?.toggle(
+                        { left: r.left, right: r.right, top: r.top, bottom: r.bottom },
+                        pageActionsState());
+                }
+                catch (err) { window.inkLog?.debug('renderer', 'pageActions: ' + err); }
+            });
+            // The panel presses the button that already owns the behaviour.
+            try {
+                window.pageActions?.onAction((action) => {
+                    const target = {
+                        reader: 'reader-btn', pip: 'pip-btn', downloads: 'downloads-btn',
+                        bookmark: 'bookmark-btn', focus: 'focus-btn', extensions: 'extensions-btn',
+                    }[action];
+                    if (target) {
+                        document.getElementById(target)?.click();
+                        return;
+                    }
+                    if (action === 'site-info') {
+                        document.getElementById('omni-icon')?.click();
+                        return;
+                    }
+                    // `copy-link` never reaches here — ipc/page-actions.js does it in
+                    // the main process, where the clipboard does not depend on which
+                    // renderer happens to be focused.
+                });
+            }
+            catch (e) { window.inkLog?.debug('renderer', 'pageActions wiring: ' + e); }
+        }
+
         // ── URL loading ───────────────────────────────────────────────────────────
         // Turn omnibox / dropped input into a loadable URL: pass through real
         // URLs, http-ify bare domains, and send anything else to the search engine.
@@ -1174,7 +1279,7 @@
             // ── IPC events from main process ──────────────────────────────────────
             window.tab.onTabCreated((_e, data) => {
                 tabPrivate.set(data.index, !!data.private);
-                createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private, !!data.container, data.workspace || '1');
+                createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private, !!data.container, data.workspace || '1', !!data.essential);
                 // Count only the active workspace's tabs (others live hidden).
                 updateChromeTabs(document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden)').length);
                 setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
@@ -1418,7 +1523,12 @@
                     }],
                     ['Reopen closed tab', () => window.tabsUI.reopenClosed()],
                     ['sep'],
-                    ['Edit theme…', () => window.electronAPI.openSettingsTab('appearance')],
+                    /* The sidebar you right-clicked belongs to a space, so this
+                       edits THAT space's theme — same as the space menu. Passing
+                       nothing meant this one entry quietly edited the global
+                       setting instead, which is indistinguishable from per-space
+                       theming being broken. */
+                    ['Edit theme…', () => openThemePanel(activeWorkspace)],
                 ]);
             };
             tabsContainer.addEventListener('contextmenu', emptyAreaMenu);
@@ -1646,6 +1756,15 @@
                         tile.classList.toggle('has-tab', !!state);
                         tile.classList.toggle('is-active', !!state?.active);
                     }
+                    /* An Essential IS its tile — it does not also get a row in
+                       the strip below. Two entries for one thing meant the strip
+                       filled with the pages you had pinned precisely so they
+                       would stop taking up room in it, and closing the row left
+                       a tile claiming a tab that was gone. The view is a real
+                       tab in every other respect; the tile is how you reach it. */
+                    const owned = new Set((live || []).map(x => x.index));
+                    for (const [index, btn] of tabs)
+                        btn.classList.toggle('is-essential', owned.has(index));
                 });
             }
             catch (e) { window.inkLog?.debug('renderer', 'essential tabs: ' + e); }
@@ -1700,16 +1819,25 @@
                 const row = document.getElementById('sb-workspaces');
                 if (!row) return;
                 let pressTimer = null;
+                const armDrag = (on) => {
+                    for (const b of row.querySelectorAll('.sb-ws'))
+                        b.draggable = on;
+                };
                 row.addEventListener('pointerdown', () => {
                     clearTimeout(pressTimer);
-                    pressTimer = setTimeout(() => row.classList.add('reordering'), 450);
+                    pressTimer = setTimeout(() => {
+                        row.classList.add('reordering');
+                        armDrag(true);
+                    }, 450);
                 });
                 for (const ev of ['pointerup', 'pointerleave', 'pointercancel'])
                     row.addEventListener(ev, () => clearTimeout(pressTimer));
                 // Click-away leaves the reorder grid.
                 document.addEventListener('pointerdown', (e) => {
-                    if (row.classList.contains('reordering') && !row.contains(e.target))
+                    if (row.classList.contains('reordering') && !row.contains(e.target)) {
                         row.classList.remove('reordering');
+                        armDrag(false);
+                    }
                 }, true);
                 let wheelLock = 0;
                 row.addEventListener('wheel', (e) => {
@@ -1783,9 +1911,21 @@
                     const r = emojiEl.getBoundingClientRect();
                     openEmojiPicker(r.left, r.bottom + 4, setEmoji);
                 });
-                document.getElementById('sc-theme')?.addEventListener('click', () => {
-                    window.electronAPI.openSettingsTab('appearance');
-                    close();
+                /* Theming a space you are creating happens HERE, not on a trip
+                   to Settings — the whole point of a space's theme is that you
+                   pick it while you are deciding what the space is. The panel
+                   is scoped to the space being edited; while CREATING one there
+                   is no id yet, so it edits the global theme and the new space
+                   inherits it. */
+                document.getElementById('sc-theme')?.addEventListener('click', (e) => {
+                    /* ONE rule: the theme panel always edits a space. There is no
+                       id for the space being created yet, so this edits the one
+                       you are in — the alternative was editing the global
+                       setting from a per-space UI, which is the inconsistency
+                       that made per-space theming look broken everywhere else. */
+                    const r = e.currentTarget.getBoundingClientRect();
+                    lastCtxPoint = { x: r.right, y: r.top };
+                    openThemePanel(activeWorkspace);
                 });
                 // null = this space keeps its own jar; 'default' = shared session;
                 // otherwise a named container id shared with other spaces.
@@ -1876,7 +2016,14 @@
                         const b = document.createElement('button');
                         b.className = 'sb-ws' + (p.id === activeWorkspace ? ' active' : '');
                         b.dataset.space = p.id;
-                        b.draggable = true;
+                        /* NOT draggable by default. It was unconditionally
+                           draggable, so any click that moved a pixel started an
+                           HTML5 drag — ghost image and all — on a control whose
+                           job is to switch spaces. Dragging is armed only while
+                           the long-press reorder grid is open (see
+                           initSpaceRowGestures), which is the only time it means
+                           anything. */
+                        b.draggable = false;
                         b.title = p.name; // native hover label (survives foot overflow-scroll)
                         // Every space keeps its emoji; inactive ones are greyed
                         // out (CSS) rather than reduced to a dot.
@@ -2063,11 +2210,14 @@
         // ── Tab DOM helpers ───────────────────────────────────────────────────────
         // Isolation is invisible except a small dot on tabs running in their own
         // isolated (per-tenant) session — see .tab-button[data-container] in CSS.
-        function createTabButton(index, title, afterIndex = null, shouldActivate = true, isPrivate = false, isolated = false, workspace = '1') {
+        function createTabButton(index, title, afterIndex = null, shouldActivate = true, isPrivate = false, isolated = false, workspace = '1', essential = false) {
             if (tabs.has(index))
                 return;
             const btn = document.createElement('div');
-            btn.className = 'tab-button';
+            /* An Essential's row is hidden from the FIRST frame. The binding
+               that marks it arrives a message later, so applying it there meant
+               a "New tab" row appeared and vanished on every tile click. */
+            btn.className = 'tab-button' + (essential ? ' is-essential' : '');
             btn.dataset.index = index;
             btn.dataset.ws = String(workspace);
             if (String(workspace) !== activeWorkspace)
@@ -2672,6 +2822,7 @@
             return /^[a-z]+:/i.test(url) ? url : null;
         }
         function openCtxMenu(x, y, rows) {
+            lastCtxPoint = { x, y };
             const serialize = (rs) => rs.map((r) => {
                 if (r[0] === 'sep') return { sep: true };
                 const sub = Array.isArray(r[1]) ? r[1] : null;
@@ -2750,7 +2901,7 @@
             rows.push(
                 ['Change name…', () => openProfileModal(p.id)],
                 ['Change icon…', () => openProfileModal(p.id)],
-                ['Edit theme…', () => window.electronAPI.openSettingsTab('appearance')],
+                ['Edit theme…', () => openThemePanel(p.id)],
                 ['Unload space', () => window.tab.unloadWorkspace(p.id)],
                 ['Set profile', [
                     ['Own (isolated)', () => window.profiles.update(p.id, { container: null })],

@@ -81,8 +81,22 @@ function panelBounds(win, { anchor = null, width, height, align = 'right' }) {
             h = height;
         }
     }
+    /* Still short? SLIDE up rather than shrink. A tall panel triggered from the
+       middle of the sidebar fits neither below the click nor entirely above it
+       on a small window — the default window is 800x600 — and the old code gave
+       up and squashed it, which on the theme panel meant every control scrolled
+       out of view. Sliding keeps the panel whole and merely stops it tracking
+       the click exactly, which is the right thing to give up. */
+    if (h < height) {
+        const slid = Math.max(CARD_TOP, b.height - SHELL_PAD - height);
+        if (b.height - SHELL_PAD - slid >= height) {
+            y = slid;
+            h = height;
+        }
+    }
 
-    return { x: clamp(x, SHELL_PAD, maxX), y, width, height: Math.max(80, h) };
+    const rect = { x: clamp(x, SHELL_PAD, maxX), y, width, height: Math.max(80, h) };
+    return rect;
 }
 
 module.exports = { panelBounds, CARD_TOP, SHELL_TOP, SHELL_PAD, BAR_H, PANEL_RADIUS, W_SM, W_MD };

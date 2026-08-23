@@ -29,7 +29,10 @@
         color: var(--text-2);
         cursor: pointer;
         transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-        box-shadow: var(--ring-2), var(--shadow-pop);
+        /* Ring only — see .surface-card in renderer/styles/surface.css. This
+           bar is a 44px-tall view of its own, so a 30px-blur shadow was cut off
+           on all four sides within a few pixels of each button. */
+        box-shadow: var(--ring-2);
     }
 
     #bar button:hover {

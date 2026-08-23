@@ -412,6 +412,12 @@ class Tabs {
             catch (e) { log.debug('tabs', 'afterIdx', e); }
         }
         tab.lazyTitle = tempTitle;
+        // Session restore is the only caller that leaves a tab lazy (every other
+        // one loads eagerly), and it rebuilds tabs without the tile bindings that
+        // died with the last window — so this is where an Essential's tab finds
+        // its tile again instead of the tile opening a second copy of it.
+        if (!eager)
+            this._scheduleEssentialRebind();
         this.navigationHistory.initializeTab(tabIndex, url || 'newtab');
         this.setupTabListeners(tabIndex, tab);
         tab.webContents.on('did-finish-load', () => {
@@ -511,7 +517,7 @@ class Tabs {
         const wd = this.getWindowData();
         if (!wd?.window?.contentView)
             return;
-        const overlays = [this.splitDivider, ...this.splitHandles, this.splitDrop, this.glanceBackdrop, this.glanceView, this.glanceBar, wd.sidePanel, wd.sidePanelHeader, wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt, wd.ctxMenu, wd.palette];
+        const overlays = [this.splitDivider, ...this.splitHandles, this.splitDrop, this.glanceBackdrop, this.glanceView, this.glanceBar, wd.sidePanel, wd.sidePanelHeader, wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt, wd.ctxMenu, wd.palette, wd.themePanel, wd.pageActions];
         overlays.forEach((view) => {
             if (!view)
                 return;
@@ -628,6 +634,9 @@ class Tabs {
             containerColor: container ? containers.colorFor(container) : null,
             containerMeta: container ? containers.meta(container) : null,
             workspace: this.profileId,
+            // An Essential's view is represented by its tile, never by a strip
+            // row — say so at creation so the row is never drawn visible.
+            essential: !!this._creatingEssential,
         });
         if (shouldActivate) {
             this.showTab(tabIndex);
@@ -834,56 +843,9 @@ class Tabs {
      * theme for nothing. The view is transparent (_applyTabBackground), so
      * about:blank shows the chrome's own page card.
      */
-    /**
-     * Open (or return to) the tab that belongs to an Essential.
-     *
-     * An Essential is not a bookmark that spawns tabs — it IS a tab. Clicking
-     * it lands you in its tab, wherever you had browsed to inside it; only
-     * "go back to its page" returns it to `home`. The binding is per window
-     * and is dropped when the tab closes.
-     *
-     * @param {string} key   `${url}|${profile ?? ''}` — the Essential's identity
-     * @param {string} home  the page to open if it has no tab yet
-     * @param {string|null} container  container/profile id, when it is bound to one
-     * @returns {number|null} the tab index it landed on
-     */
-    openEssential(key, home, container = null) {
-        if (!this.essentialTabs)
-            this.essentialTabs = new Map();
-        const bound = this.essentialTabs.get(key);
-        if (bound != null && this.tabMap.has(bound)) {
-            this.showTab(bound);
-            return bound;
-        }
-        const idx = container
-            ? this.openInContainer(container, home)
-            : this.createTab(home, true, false);
-        if (typeof idx === 'number') {
-            this.essentialTabs.set(key, idx);
-            this.sendEssentialTabs();
-        }
-        return typeof idx === 'number' ? idx : null;
-    }
-    /** Send the chrome the set of Essentials that currently have a tab. */
-    sendEssentialTabs() {
-        try {
-            const live = [];
-            for (const [key, idx] of (this.essentialTabs || new Map()))
-                if (this.tabMap.has(idx))
-                    live.push({ key, index: idx, active: idx === this.activeTabIndex });
-            this.mainWindow.webContents.send('essential-tabs', live);
-        }
-        catch (e) { log.debug('tabs', 'sendEssentialTabs', e); }
-    }
-    /** Drop bindings whose tab is gone (called from removeTab). */
-    _forgetEssentialTab(index) {
-        if (!this.essentialTabs)
-            return;
-        for (const [key, idx] of this.essentialTabs)
-            if (idx === index)
-                this.essentialTabs.delete(key);
-        this.sendEssentialTabs();
-    }
+    // Essentials — the tile grid at the top of the sidebar. An Essential IS a
+    // tab, and the whole binding lives in features/tabs/essentials.js (mixed
+    // into this prototype at the bottom of the file).
     _loadBlank(tab) {
         try { tab.webContents.loadURL('about:blank'); }
         catch (e) { log.debug('tabs', '_loadBlank', e); }
@@ -893,9 +855,38 @@ class Tabs {
         const internal = t === 'newtab' || t === 'settings' || t === 'history' || t === 'bookmarks' ||
             (typeof t === 'string' && /\/(Settings|History|Bookmarks)\//.test(t));
         try {
-            tab.setBackgroundColor(internal ? '#00000000' : '#ffffff');
+            /* A web page's view paints this before the site paints anything, so
+               it is what you see for the length of a navigation. Hardcoded white
+               meant a white flash on every load of every dark theme — the single
+               most visible thing the browser did. It is the theme's page colour
+               now, which is also what the card around it is. */
+            tab.setBackgroundColor(internal ? '#00000000' : this._pageColor());
         }
         catch (e) { log.debug('tabs', '_applyTabBackground', e); }
+    }
+
+    /** The current theme's page colour, resolved for THIS window's space. */
+    _pageColor() {
+        try {
+            const themeRuntime = require('./theme-runtime');
+            const themes = require('./themes');
+            return themes.pageColorOf(themeRuntime.themeFor(this.mainWindow.webContents));
+        }
+        catch (e) {
+            log.debug('tabs', '_pageColor', e);
+            return '#121213';
+        }
+    }
+
+    /** Re-tint every open page view — called when the theme changes. */
+    repaintTabBackgrounds() {
+        const color = this._pageColor();
+        for (const [idx, tab] of this.tabMap) {
+            const url = this.tabUrls.get(idx) || '';
+            const internal = url === 'newtab' || /^(settings|history|bookmarks)(\/|$)/.test(url);
+            try { tab.setBackgroundColor(internal ? '#00000000' : color); }
+            catch (e) { log.debug('tabs', 'repaintTabBackgrounds', e); }
+        }
     }
     // Shell margin around the floating page card (matches the shell padding in
     // Browser/styles.css). The page floats in a rounded card on a tinted shell
@@ -1013,6 +1004,21 @@ class Tabs {
         };
         tab.webContents.on('will-navigate', blockDangerousNav);
         tab.webContents.on('will-redirect', blockDangerousNav);
+        /* An Essential stays on its site. A link that would take it somewhere
+           else opens as a glance OVER it instead — Arc calls that a Peek, Zen a
+           Glance, and both do it precisely so the one tab you keep pointing at
+           a site is still pointing at it an hour later. Sign-in hand-offs and a
+           tab that has already been sent elsewhere deliberately are left alone
+           (features/tabs/essential-rules.js). */
+        tab.webContents.on('will-navigate', (event, url) => {
+            try {
+                if (!this._essentialPeek(tabIndex, url))
+                    return;
+                event.preventDefault();
+                this.openGlance(url);
+            }
+            catch (e) { log.debug('tabs', 'essential peek', e); }
+        });
         tab.webContents.on('did-navigate', (event, url) => {
             // Keep the view backing in sync: frosted (transparent) for internal
             // pages, opaque for web content so vibrancy doesn't bleed through.
@@ -1340,6 +1346,12 @@ class Tabs {
             tab.lazyTitle = title;
             this.navigationHistory.setCurrentTitle(tabIndex, title);
             const currentUrl = this.tabUrls.get(tabIndex) || '';
+            // The visit was recorded at navigation, before the document had a
+            // title. This is where the real one shows up, so this is where
+            // history learns it — otherwise every row keeps the URL-shaped
+            // placeholder getTitle() returned at commit time.
+            if (!this.privateTabs.has(tabIndex))
+                this.updateHistoryTitle(currentUrl, title, this.tabContainers.get(tabIndex) || null);
             if (currentUrl !== 'newtab' && currentUrl !== 'history' && !currentUrl.startsWith('file://')) {
                 this.sendTabUpdate(tabIndex, tab, currentUrl, title);
             }
@@ -1620,6 +1632,12 @@ class Tabs {
             catch (error) { log.debug('tabs', 'sendNavigationUpdate', error); }
         }
     }
+    updateHistoryTitle(url, title, profile = null) {
+        if (!this.history || !url || url.startsWith('file://') || url === 'newtab')
+            return;
+        this.history.updateTitle(url, title, profile || null)
+            .catch(error => log.debug('tabs', 'updateHistoryTitle', error));
+    }
     addToHistory(url, title, profile = null) {
         if (this.history && url && !url.startsWith('file://')) {
             const profileName = profile ? (containers.meta(profile)?.name || null) : null;
@@ -1796,13 +1814,17 @@ class Tabs {
         }
     }
     loadUrl(index, url) {
-        // northstar:// internal pages: typing one navigates the current tab to
-        // the internal page (replace-in-place, since Settings needs its own
-        // preload chosen at tab creation).
+        // northstar:// internal pages open in a NEW tab. They cannot navigate an
+        // existing tab (Settings needs its own privileged preload, chosen at tab
+        // creation), and replacing the active tab in place meant typing
+        // northstar://settings destroyed the page you were reading. The one
+        // exception is a blank tab, which has nothing to preserve and would
+        // otherwise be left behind as an orphan.
         const internal = parseNorthstarUrl(url);
         if (internal) {
             this.activeTabIndex = index;
-            this.openInternalPage(internal.type, internal.section, true);
+            const blank = this.tabUrls.get(index) === 'newtab';
+            this.openInternalPage(internal.type, internal.section, blank);
             return;
         }
         if (this.tabMap.has(index)) {
@@ -2309,13 +2331,21 @@ class Tabs {
             : order.filter(idx => this.pinnedTabs.has(idx) && !this.privateTabs.has(idx));
         const keepHistory = this.persistence?.get('restoreTabHistory') !== false;
         const tabs = selected.map((idx) => {
-            const url = this.tabUrls.get(idx) || 'newtab';
+            /* An Essential comes back at its OWN page, not three links deep
+               into wherever it was left last night — a pin that reverts to the
+               url it was pinned at is the behaviour of both browsers this
+               follows (Arc resets Favourites and Pinned Tabs to their original
+               link; Zen has the same for its pins and Essentials). Its
+               back/forward tree and reading position go with it, since they
+               describe a session that has ended. */
+            const essentialHome = this._essentialHomeOfTab(idx);
+            const url = essentialHome || this.tabUrls.get(idx) || 'newtab';
             let title = this.computeDisplayTitleFor(idx) || i18n.t('tab.untitled');
             // Back/forward and scroll position, so a restored tab is the tab you
             // left rather than a fresh load of the same address. Capped: a very
             // long history is not worth an unbounded state file.
             let history = null, historyIndex = 0;
-            if (keepHistory) {
+            if (keepHistory && !essentialHome) {
                 const h = this.navigationHistory.getHistory(idx);
                 if (h && Array.isArray(h.entries) && h.entries.length > 1) {
                     const entries = h.entries
@@ -2338,7 +2368,7 @@ class Tabs {
                 label: this.tabLabels.get(idx) || null,
                 icon: this.tabIcons.get(idx) || null,
                 home: this.pinnedHome.get(idx) || null,
-                scroll: this.tabScroll.get(idx) || 0,
+                scroll: essentialHome ? 0 : (this.tabScroll.get(idx) || 0),
                 ...(history ? { history, historyIndex } : {}),
             };
         });
@@ -2364,7 +2394,7 @@ class Tabs {
 // ── Prototype mixins ─────────────────────────────────────────────────────────
 // Cohesive subsystems kept out of this file. They are plain objects of methods,
 // so `this` is the Tabs instance and nothing needs to require Tabs back.
-Object.assign(Tabs.prototype, require('./tabs/split'), require('./tabs/glance'), require('./tabs/organize'));
+Object.assign(Tabs.prototype, require('./tabs/split'), require('./tabs/glance'), require('./tabs/organize'), require('./tabs/essentials'));
 
 Tabs.parseNorthstarUrl = parseNorthstarUrl;
 module.exports = Tabs;

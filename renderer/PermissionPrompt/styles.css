@@ -6,7 +6,11 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
-  margin: 0; padding: var(--sp-3);
+  /* No gutter: the card has no drop shadow to make room for (see .surface-card
+     in renderer/styles/surface.css), so it fills the view and
+     features/permission-ui.js asks panelBounds for the plain rect. The 12px
+     that used to be here was a transparent halo that only swallowed clicks. */
+  margin: 0; padding: 0;
   font-family: var(--font);
   background: transparent; color: var(--text);
   font-size: var(--fs-body); -webkit-font-smoothing: antialiased;

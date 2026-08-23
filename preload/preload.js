@@ -293,6 +293,18 @@ exposeInternal('ctxMenu', {
 exposeInternal('palette', {
     open: () => ipcRenderer.invoke('palette:open'),
 });
+/* The theme popup, opened from the sidebar's context menu. It carries the
+   trigger's rect so features/overlay-bounds.js can hang the panel off it. */
+/* The page-actions panel: the toolbar's page-scoped controls behind one button.
+   `state` is what the chrome already knows about the active tab. */
+exposeInternal('pageActions', {
+    toggle: (anchor, state) => ipcRenderer.invoke('page-actions-toggle', anchor, state),
+    onAction: (fn) => ipcRenderer.on('page-action', (_e, action) => fn(action)),
+});
+exposeInternal('themePanel', {
+    // `scope` is a space id, or null to edit the global theme.
+    toggle: (anchor, scope) => ipcRenderer.invoke('theme-panel-toggle', anchor, scope || null),
+});
 exposeInternal('containers', {
     listNamed: () => ipcRenderer.invoke('containers:listNamed'),
     createNamed: (name) => ipcRenderer.invoke('containers:createNamed', name),

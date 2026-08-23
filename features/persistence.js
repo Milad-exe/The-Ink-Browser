@@ -5,6 +5,11 @@ const { app } = require('electron');
 const { encrypt, decrypt, isEncrypted } = require('./encryption');
 const DEFAULTS = {
     theme: 'default',
+    // User-made themes: [{ id: 'custom:…', name, seed: { mode, base, accent, ink? } }].
+    // Seeds, not token sets — features/theme-derive.js turns three decisions
+    // into the sixteen tokens, so a stored theme cannot have its elevation
+    // upside down or its body text unreadable.
+    customThemes: [],
     persistAllTabs: false,
     searchEngine: 'google', // 'google' | 'duckduckgo' | 'bing'
     bookmarkBarVisible: false,
@@ -21,6 +26,9 @@ const DEFAULTS = {
     tabSleepMinutes: 30,
     // Mini player overlay for media playing in a background tab
     miniPlayerEnabled: true,
+    // An Essential stays on its site: a link leaving it opens as a glance over
+    // it rather than navigating it away (Arc's Peek, Zen's Glance).
+    essentialsPeek: true,
     settingsPage: 'general',
     windowBounds: null,
     windowState: null,

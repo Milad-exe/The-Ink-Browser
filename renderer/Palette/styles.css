@@ -36,7 +36,10 @@ html, body {
   width: min(720px, 78%);
   background: color-mix(in srgb, var(--surface) 96%, transparent);
   border-radius: var(--r-xl);
-  box-shadow: var(--ring-2), var(--shadow-pop);
+  /* Ring only — see .surface-card in renderer/styles/surface.css. The scrim
+     below already detaches the palette from the page; a drop shadow on top of
+     it only thickened the edge. */
+  box-shadow: var(--ring-2);
   overflow: hidden;
   /* A short rise on open: enough to register as arriving, short enough that it
      never delays typing. */

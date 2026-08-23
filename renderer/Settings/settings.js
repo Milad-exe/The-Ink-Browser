@@ -234,44 +234,33 @@
             })();
         }
         // ── Appearance: Theme ──────────────────────────────────────────────────
-        const themePicker = document.getElementById('theme-picker');
-        if (themePicker) {
-            const options = [...themePicker.querySelectorAll('.theme-option')];
-            // Retired theme names (chalk/midnight/ember/mist/dusk/sage) fall back.
-            let current = settings.theme || 'default';
-            if (!options.some(o => o.dataset.themeValue === current)) {
-                current = 'default';
-                save('theme', current);
-            }
-            const paint = (value) => {
-                for (const o of options) {
-                    const on = o.dataset.themeValue === value;
-                    o.setAttribute('aria-checked', String(on));
-                    o.tabIndex = on ? 0 : -1;
-                }
-            };
-            paint(current);
-            const choose = async (value) => {
-                if (value === current)
-                    return;
-                current = value;
-                paint(value);
-                await save('theme', value);
-                showToast('Theme updated');
-            };
-            for (const o of options)
-                o.addEventListener('click', () => choose(o.dataset.themeValue));
-            // A radiogroup is one tab stop; arrows move within it.
-            themePicker.addEventListener('keydown', (e) => {
-                const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-                if (!step)
-                    return;
-                e.preventDefault();
-                const i = options.findIndex(o => o.getAttribute('aria-checked') === 'true');
-                const next = options[(i + step + options.length) % options.length];
-                next.focus();
-                choose(next.dataset.themeValue);
-            });
+        // The picker and editor are one instrument, shared with the popup that
+        // opens from the sidebar's context menu — see renderer/lib/theme-editor.js.
+        // This page supplies the container and the bridge; everything else is
+        // the same code in both places.
+        if (window.Ink?.themeEditor && window.northstarThemes) {
+            /* A theme belongs to a SPACE. Settings runs in a tab, that tab is in
+               a window, and that window is in one space — so the picker here
+               sets this space's theme, exactly as the sidebar's popup does.
+               Writing the global setting instead is what made per-space theming
+               look broken: you chose a theme here, and a space that already had
+               one of its own quite correctly ignored it. The global setting
+               stays as what a space with no theme of its own inherits. */
+            (async () => {
+                let space = null;
+                try { space = await window.northstarProfiles?.current?.(); }
+                catch (e) { window.inkLog?.debug('settings', 'current space: ' + e); }
+                window.Ink.themeEditor.mount({
+                    picker: document.getElementById('theme-picker'),
+                    editor: document.getElementById('theme-editor'),
+                    api: window.northstarThemes,
+                    setTheme: (id) => (space
+                        ? window.northstarProfiles.update(space.id, { theme: id })
+                        : save('theme', id)),
+                    toast: showToast,
+                    currentTheme: (space && space.theme) || settings.theme || 'default',
+                });
+            })();
         }
         // ── Appearance: Bookmark bar ───────────────────────────────────────────
         // Toolbar customization — one persisted object; every key defaults to true.

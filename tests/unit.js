@@ -410,19 +410,66 @@ test('locale resolution falls back from a region to its language, then English',
 // ── Overlay placement ────────────────────────────────────────────────────────
 // Panels used to invent their own geometry (six widths, four gaps, two
 // hardcoded y values). These pin the one rule they all follow now.
-const { panelBounds, CARD_TOP, SHELL_PAD } = require(path.join(root, 'features/overlay-bounds'));
+const { panelBounds, CARD_TOP, SHELL_PAD, SHELL_TOP, BAR_H } = require(path.join(root, 'features/overlay-bounds'));
 const fakeWin = (width = 1440, height = 900) => ({ getContentBounds: () => ({ x: 0, y: 0, width, height }) });
+/* A control sitting in the toolbar, derived from the bar rather than written
+   out: these fixtures were literal pixels for a 40px bar, so shortening the bar
+   made them stop describing a toolbar button at all — and the tests failed for
+   the fixture's reason, not the code's. */
+const CTRL = 32;
+const toolbarAnchor = (right, w = 30) => ({
+    left: right - w, right,
+    top: SHELL_TOP + Math.round((BAR_H - CTRL) / 2),
+    bottom: SHELL_TOP + Math.round((BAR_H - CTRL) / 2) + CTRL,
+});
 
 test('a panel from the toolbar opens in the page card\'s top-right corner', () => {
-    const b = panelBounds(fakeWin(), { anchor: { left: 1274, right: 1304, top: 13, bottom: 43 }, width: 320, height: 177 });
+    const b = panelBounds(fakeWin(), { anchor: toolbarAnchor(1304), width: 320, height: 177 });
     assert.strictEqual(b.y, CARD_TOP, 'level with the top of the page card');
     assert.strictEqual(b.x + b.width, 1440 - SHELL_PAD, 'flush with the shell gutter');
 });
 
 test('toolbar panels share an edge whichever icon opened them', () => {
-    const mk = (right) => panelBounds(fakeWin(), { anchor: { left: right - 30, right, top: 13, bottom: 43 }, width: 320, height: 177 });
+    const mk = (right) => panelBounds(fakeWin(), { anchor: toolbarAnchor(right), width: 320, height: 177 });
     assert.strictEqual(mk(1304).x, mk(1432).x, 'the icons are one cluster, not three anchors');
 });
+
+test('the theme panel opens beside the sidebar, level with the click', () => {
+    // Right-clicking a space is about that space, so its panel hangs off the
+    // rail at the point you clicked — not in the toolbar's shared corner, which
+    // is where an anchor-less panel goes.
+    const RAIL = 256, CLICK_Y = 300;
+    const b = panelBounds(fakeWin(), {
+        anchor: { left: RAIL, right: RAIL, top: CLICK_Y, bottom: CLICK_Y },
+        width: 340, height: 500, align: 'left',
+    });
+    assert.strictEqual(b.x, RAIL, 'card starts on the rail edge');
+    assert.strictEqual(b.y, CLICK_Y + SHELL_PAD, 'card sits just under the click');
+    // …and a click low enough that the panel would not fit flips it upward
+    // rather than squashing it.
+    const low = panelBounds(fakeWin(), {
+        anchor: { left: RAIL, right: RAIL, top: 860, bottom: 880 },
+        width: 340, height: 500, align: 'left',
+    });
+    assert.strictEqual(low.height, 500, 'keeps its full height');
+    assert.ok(low.y + 500 <= 880, 'opens above the click');
+});
+
+test('a tall panel slides to fit rather than being squashed', () => {
+    // The default window is 800x600. A 500px panel triggered from the middle of
+    // the sidebar fits neither below the click nor entirely above it, and the
+    // old behaviour — trim to whatever is left — left every control in the
+    // theme panel scrolled out of view.
+    const small = { getContentBounds: () => ({ x: 0, y: 0, width: 800, height: 600 }) };
+    const b = panelBounds(small, {
+        anchor: { left: 256, right: 256, top: 300, bottom: 300 },
+        width: 340, height: 500, align: 'left',
+    });
+    assert.strictEqual(b.height, 500, 'keeps its full height');
+    assert.ok(b.y >= CARD_TOP, 'never tucks under the toolbar');
+    assert.ok(b.y + b.height <= 600 - SHELL_PAD, 'stays inside the window');
+});
+
 
 test('a panel triggered low in the window opens upwards instead of being squashed', () => {
     const b = panelBounds(fakeWin(), { anchor: { left: 9, right: 39, top: 862, bottom: 892 }, width: 320, height: 177 });
@@ -431,16 +478,233 @@ test('a panel triggered low in the window opens upwards instead of being squashe
 });
 
 test('a panel anchored to the address field hangs from it, not from the corner', () => {
-    const b = panelBounds(fakeWin(), { anchor: { left: 535, right: 557, top: 17, bottom: 39 }, align: 'left', width: 320, height: 300 });
+    const b = panelBounds(fakeWin(), { anchor: { ...toolbarAnchor(557, 22), left: 535 }, align: 'left', width: 320, height: 300 });
     assert.strictEqual(b.x, 535);
     assert.strictEqual(b.y, CARD_TOP);
 });
 
 test('a panel taller than the window stops at the bottom gutter', () => {
-    const b = panelBounds(fakeWin(), { anchor: { left: 1274, right: 1304, top: 13, bottom: 43 }, width: 320, height: 1200 });
+    const b = panelBounds(fakeWin(), { anchor: toolbarAnchor(1304), width: 320, height: 1200 });
     assert.strictEqual(b.y + b.height, 900 - SHELL_PAD);
 });
 
+// ── The omnibox dropdown ─────────────────────────────────────────────────────
+// The one overlay that still casts a shadow, so the one whose view has to make
+// room for it. The three numbers below live in ipc/suggestions.js and again as
+// the body padding in renderer/Suggestions/styles.css — they have drifted apart
+// twice, and each time the shadow came back as a hard band at the view's edge.
+const suggestions = require(path.join(root, 'ipc/suggestions'));
+
+test('the dropdown lands exactly on the address field', () => {
+    // `bounds` is where the CARD goes; the view grows around it and must never
+    // move it. The card used to sit 4px low, because the page padded the top
+    // for a shadow gutter that main had not accounted for — so the gap under
+    // the field was drawn twice.
+    const field = { left: 256, top: 46, width: 1100 }; // .omnibox rect, +4px
+    const v = suggestions.itemBounds(field, 4);
+    const { PAD_X, PAD_BOTTOM } = suggestions;
+    assert.strictEqual(v.x + PAD_X, field.left, 'card keeps the field\'s left edge');
+    assert.strictEqual(v.y, field.top, 'no top pad: the view starts where the card does');
+    assert.strictEqual(v.width - PAD_X * 2, field.width, 'card is exactly as wide as the field');
+});
+
+test('the dropdown view has room for its shadow on the sides and below', () => {
+    const v = suggestions.itemBounds({ left: 256, top: 46, width: 400 }, 3);
+    const { PAD_X, PAD_BOTTOM, ITEM_HEIGHT } = suggestions;
+    const cardH = 3 * ITEM_HEIGHT + 8; // rows + the card's own padding
+    assert.strictEqual(v.height - cardH, PAD_BOTTOM, 'the gutter below is the whole shadow');
+    assert.ok(PAD_X >= 20 && PAD_BOTTOM >= 26,
+        'sized from the measured reach of 0 6px 16px — shrinking these clips it');
+});
+
+test('the dropdown keeps the field\'s left edge even at the window edge', () => {
+    // Clamping x to 0 for a field near the left edge shifted the card right of
+    // the field instead. The part that hangs off the window is only shadow.
+    const v = suggestions.itemBounds({ left: 4, top: 46, width: 300 }, 2);
+    assert.strictEqual(v.x + suggestions.PAD_X, 4, 'card still starts on the field');
+    assert.ok(v.x < 0, 'the view is allowed off-window; nobody can see shadow there');
+});
+
+test('a full dropdown fits without scrolling', () => {
+    // The list is capped at 8 rows in renderer.js; the cap here has to leave
+    // room for all of them plus the gutter, or the last row scrolls.
+    const { ITEM_HEIGHT, LIST_CHROME, MAX_HEIGHT } = suggestions;
+    assert.strictEqual(MAX_HEIGHT, 8 * ITEM_HEIGHT + LIST_CHROME);
+    const v = suggestions.itemBounds({ left: 256, top: 46, width: 400 }, 8);
+    assert.strictEqual(v.height, MAX_HEIGHT, 'eight rows are not trimmed');
+});
+
+
+// ── Theme derivation ─────────────────────────────────────────────────────────
+// A user theme is three decisions, not sixteen hex values. These pin the rules
+// that make a derived palette a usable browser rather than a colour scheme.
+const themeDerive = require(path.join(root, 'features/theme-derive'));
+
+test('the ramp keeps the elevation running the right way', () => {
+    const L = hex => themeDerive.toLch(hex).L;
+    const dark = themeDerive.derive({ mode: 'dark', base: '#0a0a0b', accent: '#e5484d' }).tokens;
+    assert.ok(L(dark['--bg']) < L(dark['--shell']), 'a well sits below the shell');
+    assert.ok(L(dark['--shell']) < L(dark['--page']), 'the page sits above the shell');
+    assert.ok(L(dark['--page']) < L(dark['--surface']), 'cards sit above the page');
+    const light = themeDerive.derive({ mode: 'light', base: '#e8e9ec', accent: '#e5484d' }).tokens;
+    assert.ok(L(light['--bg']) < L(light['--shell']), 'a well is still the darkest step in a light theme');
+    assert.ok(L(light['--surface']) < L(light['--page']), 'past white, elevation runs the other way');
+});
+
+test('the ground the user picked is the ground they get', () => {
+    // Absolute lightness stops turned #0a0a0b into #161617 — not the colour
+    // anyone chose. The shell must land on the pick, not near it.
+    for (const base of ['#0a0a0b', '#050b14', '#e8e9ec', '#efe1c6']) {
+        const t = themeDerive.derive({
+            mode: themeDerive.toLch(base).L > 0.6 ? 'light' : 'dark',
+            base, accent: '#e5484d',
+        }).tokens;
+        assert.strictEqual(t['--shell'].toLowerCase(), base.toLowerCase(), `${base} survives the ramp`);
+    }
+});
+
+test('body text stays readable whatever ground is picked', () => {
+    for (const base of ['#000000', '#ffffff', '#0a0a0b', '#7a3d00', '#123456', '#efe1c6']) {
+        for (const mode of ['dark', 'light']) {
+            const t = themeDerive.derive({ mode, base, accent: '#e5484d' }).tokens;
+            const c = themeDerive.contrast(t['--text'], t['--page']);
+            assert.ok(c >= 4.5, `${mode} on ${base} gives ${c.toFixed(2)}:1`);
+        }
+    }
+});
+
+test('text on the accent is chosen by contrast, not assumed to be white', () => {
+    // A yellow accent with white text is unreadable, and yellow is a real pick.
+    const yellow = themeDerive.derive({ mode: 'dark', base: '#0a0a0b', accent: '#ffd400' }).tokens;
+    assert.ok(themeDerive.contrast(yellow['--accent-ink'], yellow['--accent']) >= 3,
+        'dark ink on a yellow accent');
+    const navy = themeDerive.derive({ mode: 'light', base: '#efe1c6', accent: '#122c63' }).tokens;
+    assert.ok(themeDerive.contrast(navy['--accent-ink'], navy['--accent']) >= 3,
+        'light ink on a navy accent');
+});
+
+test('danger never reads as the accent', () => {
+    // themes.css: with a red identity colour, a destructive row and a selected
+    // row must not look alike.
+    const t = themeDerive.derive({ mode: 'dark', base: '#0a0a0b', accent: '#e5484d' }).tokens;
+    assert.notStrictEqual(t['--danger'], t['--accent']);
+    assert.ok(themeDerive.contrast(t['--danger'], t['--accent']) > 1.2, 'visibly apart');
+});
+
+test('an explicit ink keeps its character; a derived one stays near-neutral', () => {
+    const dune = themeDerive.derive({ mode: 'light', base: '#efe1c6', accent: '#e5484d', ink: '#122c63' }).tokens;
+    assert.ok(themeDerive.toLch(dune['--text']).C > 0.03, 'navy ink is still navy');
+    const plain = themeDerive.derive({ mode: 'light', base: '#efe1c6', accent: '#e5484d' }).tokens;
+    assert.ok(themeDerive.toLch(plain['--text']).C < 0.02, 'no ink chosen → near-neutral');
+});
+
+test('a theme that cannot be read cannot be saved', () => {
+    assert.ok(!themeDerive.validate({ mode: 'dark', base: 'not-a-colour', accent: '#e5484d' }).ok);
+    assert.ok(themeDerive.validate({ mode: 'dark', base: '#0a0a0b', accent: '#e5484d' }).ok);
+});
+
+test('an accent that vanishes into the page is refused', () => {
+    // The failure mode that can actually happen: body text is safe whatever is
+    // picked (the ramp owns lightness), but an accent a shade off the ground
+    // leaves the selected row and the focus ring marking nothing.
+    assert.ok(!themeDerive.validate({ mode: 'light', base: '#ffffff', accent: '#fbfbfb' }).ok);
+    assert.ok(!themeDerive.validate({ mode: 'dark', base: '#0a0a0b', accent: '#050505' }).ok);
+    // …and every shipped ground still passes.
+    for (const [mode, base] of [['dark', '#0a0a0b'], ['dark', '#050b14'], ['light', '#e8e9ec'], ['light', '#efe1c6']])
+        assert.ok(themeDerive.validate({ mode, base, accent: '#e5484d' }).ok, `${base} still valid`);
+});
+
+// ── Forking a theme ──────────────────────────────────────────────────────────
+// "New theme" copies the theme you are wearing, so every built-in has to be
+// expressible as dots on the wheel. The seed for that is solved backwards in
+// features/themes.js; these pin that it is actually a COPY, which the first
+// attempt was not — reading the ground off the dot's own lightness landed a
+// fork of Harbour two elevation steps darker than Harbour.
+const themeRegistry = require(path.join(root, 'features/themes'));
+
+test('a theme forked from a built-in reproduces its ground exactly', () => {
+    for (const t of themeRegistry.all()) {
+        if (t.id === 'blocks')
+            continue;   // vivid: out of reach by design, see below
+        const forked = themeDerive.derive(t.wheelSeed).tokens;
+        assert.strictEqual(forked['--shell'], t.swatch.shell, `${t.id} keeps its ground`);
+        assert.strictEqual(forked['--accent'], t.swatch.accent, `${t.id} keeps its accent`);
+    }
+});
+
+test('…and the whole palette, where the wheel can express it', () => {
+    // Harbour and Dusk are pure ground-plus-house-accent themes, so a fork is
+    // the same sixteen tokens. Fog and Clay carry a hand-set INK hue, which a
+    // wheel seed has no dot for — their text lands at the same lightness in a
+    // slightly different hue, and that is the documented limit.
+    for (const id of ['harbour', 'dusk']) {
+        const t = themeRegistry.all().find(x => x.id === id);
+        const src = themeDerive.derive(t.seed).tokens;
+        const fork = themeDerive.derive(t.wheelSeed).tokens;
+        for (const k of Object.keys(src))
+            assert.strictEqual(fork[k], src[k], `${id} ${k}`);
+    }
+});
+
+test('a fork is never vivid, and says so by being quieter', () => {
+    // The chroma ceiling is what stops a user theme shouting over its own
+    // accent; Blocks opts out of it and a fork cannot. It keeps the hue.
+    const blocks = themeRegistry.all().find(t => t.id === 'blocks');
+    const fork = themeDerive.derive(blocks.wheelSeed).tokens;
+    assert.ok(themeDerive.toLch(fork['--shell']).C < themeDerive.toLch(blocks.swatch.shell).C,
+        'the fork is less saturated than Blocks');
+    assert.ok(Math.abs(themeDerive.toLch(fork['--shell']).h - themeDerive.toLch(blocks.swatch.shell).h) < 10,
+        'but it is the same blue');
+});
+
+test('every fork is a palette that can be saved', () => {
+    for (const t of themeRegistry.all())
+        assert.ok(themeDerive.validate(t.wheelSeed).ok, `${t.id} forks to something legible`);
+});
+
+test('a seed with no level derives exactly as it did before level existed', () => {
+    // Every theme saved before the ground's depth became its own field has no
+    // `level`, and must not move under one. The wheel only ever wrote dots at
+    // WHEEL_L, so the old reading was already this constant in practice.
+    /* The dot has to be WHEEL-SHAPED — at WHEEL_L — because that is the only
+       kind the wheel ever wrote, and the whole claim rests on it. A hand-picked
+       hex at some other lightness reads differently under the old formula
+       (`0.09 + dotL * 0.12` follows the DOT's lightness), so a fixture like
+       that tests a seed no saved theme can contain. */
+    const hue = themeDerive.toLch('#3a6ea5');
+    const dot = themeDerive.fromLch({ L: themeDerive.WHEEL_L, C: Math.min(0.16, hue.C), h: hue.h });
+    const legacy = { mode: 'dark', colors: [dot], intensity: 0.7, grain: 0 };
+    const old = themeDerive.derive(legacy).tokens;
+    // …and the default level lands on exactly the same ground.
+    const now = themeDerive.derive({ ...legacy, level: themeDerive.DEFAULT_LEVEL }).tokens;
+    assert.strictEqual(now['--shell'], old['--shell'],
+        'the default level is where a level-less seed already sat');
+});
+
+test('level moves the ground across the mode band, and only the ground', () => {
+    const seed = l => ({ mode: 'dark', colors: ['#3a6ea5'], intensity: 0.7, grain: 0, level: l });
+    const L = hex => themeDerive.toLch(hex).L;
+    const dark = themeDerive.derive(seed(0)).tokens;
+    const light = themeDerive.derive(seed(1)).tokens;
+    assert.ok(L(dark['--shell']) < L(light['--shell']), 'level 0 is the darker ground');
+    assert.strictEqual(dark['--accent'], light['--accent'], 'the accent does not follow the ground');
+    // The elevation still runs the right way at both ends.
+    for (const t of [dark, light]) {
+        assert.ok(L(t['--bg']) < L(t['--shell']), 'a well sits below the shell');
+        assert.ok(L(t['--shell']) < L(t['--page']), 'the page sits above the shell');
+    }
+});
+
+test('a user theme keeps its level through a save', () => {
+    const prepared = themeRegistry.prepareCustom({
+        name: 'Test', seed: { mode: 'dark', colors: ['#3a6ea5'], intensity: 0.7, grain: 0, level: 0.82 },
+    });
+    assert.ok(prepared.ok);
+    assert.strictEqual(prepared.theme.seed.level, 0.82);
+    // …and one that never had one gets the house default rather than undefined.
+    const bare = themeRegistry.prepareCustom({ name: 'Test', seed: { mode: 'dark', colors: ['#3a6ea5'] } });
+    assert.strictEqual(bare.theme.seed.level, themeDerive.DEFAULT_LEVEL);
+});
 
 // ── Sidebar clamp ────────────────────────────────────────────────────────────
 // The drag in the chrome and the main process (which takes over once the
@@ -500,11 +764,12 @@ function contrast(a, b) {
     return (x + 0.05) / (y + 0.05);
 }
 
+/* Only two palettes are still written out in CSS: Slate (the default, at
+   :root) and private mode. Every other theme is derived at runtime, so the
+   same floors are checked against the registry further down instead of
+   against a stylesheet block. */
 const THEMES = {
     slate: ':root',
-    fathom: 'html[data-theme="fathom"]',
-    porcelain: 'html[data-theme="porcelain"]',
-    dune: 'html[data-theme="dune"]',
     private: 'html[data-private-window="true"]',
 };
 // [ink, ground, floor] — 4.5 for anything you read, 3 for marks and captions.
@@ -526,6 +791,38 @@ for (const [name, selector] of Object.entries(THEMES)) {
     });
 }
 
+/* The derived themes get the same floors, from the ramp rather than the
+   stylesheet — these are the ones a hand-check would never cover, since there
+   is no block to read. */
+{
+    const registry = require(path.join(root, 'features/themes'));
+    registry.bind({ get: () => [] });
+    for (const t of registry.all()) {
+        const resolved = registry.resolve(t.id);
+        if (!resolved.tokens)
+            continue; // css-backed, checked above
+        test(`${t.name} (derived) clears its contrast floors`, () => {
+            const p = {};
+            for (const [k, v] of Object.entries(resolved.tokens))
+                p[k.replace(/^--/, '')] = v;
+            /* A vivid ground is a mid-tone, and a mid-tone cannot carry three
+               tiers of ink at the body floor: nothing clears 4.5:1 against both
+               the shell and a card while staying distinct from the primary ink.
+               Secondary and tertiary drop to 3:1 there — the floor for text you
+               are not reading. BODY text keeps 4.5:1 on every theme, vivid
+               included; that line does not move. */
+            const vivid = !!t.seed?.vivid;
+            for (const [ink, ground, floor] of PAIRS) {
+                const need = (vivid && (ink === 'text-2' || ink === 'text-3')) ? 3 : floor;
+                const r = contrast(p[ink], p[ground]);
+                assert.ok(r >= need,
+                    `--${ink} on --${ground} is ${r.toFixed(2)}:1, needs ${need}:1`);
+            }
+            assert.ok(contrast(p.text, p.page) >= 4.5, 'body text never drops below 4.5:1');
+        });
+    }
+}
+
 test('every theme defines the whole palette', () => {
     const base = Object.keys(paletteOf(':root')).filter(k => !['radius', 'radius-lg', 'radius-pill'].includes(k));
     for (const [name, selector] of Object.entries(THEMES)) {
@@ -534,6 +831,191 @@ test('every theme defines the whole palette', () => {
         const missing = base.filter(k => !(k in p) && !k.startsWith('shadow') && !k.startsWith('ring'));
         assert.deepStrictEqual(missing, [], `${name} is missing: ${missing.join(', ')}`);
     }
+});
+
+// ── Essentials ───────────────────────────────────────────────────────────────
+// An Essential IS a tab: the tile is the tab's only representation, so every
+// one of these is a way the tile and the tab can come apart. The methods take
+// no Electron (they are a mixin over the Tabs instance), so a hand-made `this`
+// is enough to pin what clicking a tile does.
+const essentialRules = require(path.join(root, 'features/tabs/essential-rules'));
+const essentialsMixin = require(path.join(root, 'features/tabs/essentials'));
+// The stored Essentials are read lazily through features/profiles; stub it so
+// these never touch (or invent) a profiles.json on disk.
+let STORED_ESSENTIALS = [];
+{
+    const id = require.resolve(path.join(root, 'features/profiles'));
+    require.cache[id] = {
+        id, filename: id, loaded: true,
+        exports: { essentials: () => STORED_ESSENTIALS.map(e => ({ ...e, home: e.home || e.url })) },
+    };
+}
+function fakeTabs(profileId = '1') {
+    const t = {
+        profileId,
+        activeTabIndex: -1,
+        _next: 1,
+        tabMap: new Map(),
+        tabUrls: new Map(),
+        tabProfiles: new Map(),
+        privateTabs: new Set(),
+        tabOrder: [],
+        loads: [],
+        shown: [],
+        sent: [],
+        mainWindow: { webContents: { send: (ch, payload) => t.sent.push({ ch, payload }) } },
+        createTab() {
+            const i = t._next++;
+            t.tabMap.set(i, {});
+            t.tabUrls.set(i, 'newtab');   // createTab opens a BLANK tab
+            t.tabProfiles.set(i, t.profileId);
+            t.tabOrder.push(i);
+            t.activeTabIndex = i;
+            return i;
+        },
+        openInContainer(url, container) {
+            const i = t.createTab();
+            t.container = container;
+            t.loadUrl(i, url);
+            return i;
+        },
+        loadUrl(i, url) { t.loads.push([i, url]); t.tabUrls.set(i, url); },
+        showTab(i) { t.shown.push(i); t.activeTabIndex = i; },
+        // A tab that already exists — a restored one, or one the user opened.
+        seed(url, space = profileId) {
+            const i = t.createTab();
+            t.tabProfiles.set(i, space);
+            t.tabUrls.set(i, url);
+            t.loads.length = 0;
+            return i;
+        },
+    };
+    return Object.assign(t, essentialsMixin);
+}
+const KEY = 'https://mail.example.com/inbox|';
+const HOME = 'https://mail.example.com/inbox';
+
+test('clicking an Essential with no tab opens its page, not a blank tab', () => {
+    const t = fakeTabs();
+    const idx = t.openEssential(KEY, HOME);
+    assert.strictEqual(typeof idx, 'number', 'it lands in a tab');
+    assert.deepStrictEqual(t.loads, [[idx, HOME]], 'the new tab is taken to the Essential\'s page');
+    assert.strictEqual(t.essentialTabIndex(KEY), idx, 'the tile owns it');
+});
+
+test('clicking the Essential you are already in takes it back to its page', () => {
+    const t = fakeTabs();
+    const idx = t.openEssential(KEY, HOME);
+    t.tabUrls.set(idx, 'https://mail.example.com/message/9');
+    t.loads.length = 0;
+    t.openEssential(KEY, HOME);
+    assert.deepStrictEqual(t.loads, [[idx, HOME]], 'the second click is "take me back"');
+});
+
+test('clicking an Essential you are not in lands you in it, wherever it got to', () => {
+    const t = fakeTabs();
+    const idx = t.openEssential(KEY, HOME);
+    t.tabUrls.set(idx, 'https://mail.example.com/message/9');
+    const other = t.createTab();
+    t.loads.length = 0;
+    assert.strictEqual(t.openEssential(KEY, HOME), idx);
+    assert.deepStrictEqual(t.loads, [], 'it keeps the page you had browsed to');
+    assert.strictEqual(t.activeTabIndex, idx);
+    assert.notStrictEqual(other, idx);
+});
+
+test('an Essential adopts the tab already on its page instead of opening a second copy', () => {
+    const t = fakeTabs();
+    const open = t.seed(HOME);
+    assert.strictEqual(t.openEssential(KEY, HOME), open);
+    assert.strictEqual(t.tabMap.size, 1, 'no second copy of a page that was already there');
+});
+
+test('an Essential bound to a container opens ITS page in THAT container', () => {
+    const t = fakeTabs();
+    const idx = t.openEssential(`${HOME}|work`, HOME, 'work');
+    assert.deepStrictEqual(t.loads, [[idx, HOME]], 'the url is the url, not the container id');
+    assert.strictEqual(t.container, 'work');
+});
+
+test('an Essential owns one tab PER SPACE — the tile is global, its tab is not', () => {
+    const t = fakeTabs('1');
+    const first = t.openEssential(KEY, HOME);
+    t.profileId = '2';
+    const second = t.openEssential(KEY, HOME);
+    assert.notStrictEqual(second, first, 'space 2 gets its own tab');
+    t.profileId = '1';
+    assert.strictEqual(t.essentialTabIndex(KEY), first, 'and space 1 still has its own');
+});
+
+test('an Essential never adopts a tab from another space, or a private one', () => {
+    const t = fakeTabs('1');
+    t.seed(HOME, '2');
+    const priv = t.seed(HOME, '1');
+    t.privateTabs.add(priv);
+    const idx = t.openEssential(KEY, HOME);
+    assert.strictEqual(t.loads.length, 1, 'it opened its own tab');
+    assert.strictEqual(idx, t.essentialTabIndex(KEY));
+});
+
+test('closing an Essential\'s tab hands the tile back its "no tab" state', () => {
+    const t = fakeTabs();
+    const idx = t.openEssential(KEY, HOME);
+    t.tabMap.delete(idx);
+    t._forgetEssentialTab(idx);
+    assert.strictEqual(t.essentialTabIndex(KEY), null);
+});
+
+test('removing an Essential gives its tab back to the strip', () => {
+    const t = fakeTabs();
+    const idx = t.openEssential(KEY, HOME);
+    assert.strictEqual(t.unbindEssential(KEY), true);
+    assert.strictEqual(t.essentialTabIndex(KEY), null, 'nothing claims the tab');
+    assert.ok(t.tabMap.has(idx), 'and the tab itself is left open');
+});
+
+test('a restored tab finds its tile again rather than being left orphaned', () => {
+    STORED_ESSENTIALS = [{ url: HOME, title: 'Mail', profile: null }];
+    try {
+        const t = fakeTabs();
+        const restored = t.seed(HOME);
+        t._rebindRestoredEssentials();
+        assert.strictEqual(t.essentialTabIndex(KEY), restored);
+        const live = t.sent.filter(m => m.ch === 'essential-tabs').pop();
+        assert.deepStrictEqual(live.payload, [{ key: KEY, index: restored, active: true }]);
+    }
+    finally { STORED_ESSENTIALS = []; }
+});
+
+test('an Essential\'s tab is written to the session at its own page', () => {
+    STORED_ESSENTIALS = [{ url: HOME, title: 'Mail', profile: null, home: 'https://mail.example.com/' }];
+    try {
+        const t = fakeTabs();
+        const idx = t.openEssential(KEY, 'https://mail.example.com/');
+        t.tabUrls.set(idx, 'https://mail.example.com/message/9');
+        // What buildSerializableState() writes instead of the live url.
+        assert.strictEqual(t._essentialHomeOfTab(idx), 'https://mail.example.com/');
+    }
+    finally { STORED_ESSENTIALS = []; }
+});
+
+test('an Essential stays on its site: off-site links peek, its own do not', () => {
+    const R = essentialRules;
+    assert.strictEqual(R.shouldPeek(HOME, HOME, 'https://mail.example.com/message/9'), false);
+    assert.strictEqual(R.shouldPeek(HOME, HOME, 'https://m.example.com/x'), false, 'subdomains are the same place');
+    assert.strictEqual(R.shouldPeek(HOME, HOME, 'https://news.example.org/story'), true);
+    assert.strictEqual(R.shouldPeek(HOME, HOME, 'mailto:someone@example.org'), false, 'only http(s) is peekable');
+    assert.strictEqual(R.shouldPeek(HOME, 'https://news.example.org/story', 'https://other.example.net/'),
+        false, 'a tab sent elsewhere deliberately is left alone');
+    assert.strictEqual(R.shouldPeek(HOME, HOME, 'https://accounts.google.com/o/oauth2/auth?client_id=1'),
+        false, 'a sign-in hand-off has to be allowed to leave and come back');
+});
+
+test('an Essential\'s binding key survives a url with a pipe in it', () => {
+    const R = essentialRules;
+    const key = R.identity('https://e.example/a|b', null);
+    assert.strictEqual(R.urlOfIdentity(key), 'https://e.example/a|b');
+    assert.strictEqual(R.keyOfBinding(R.bindingKey('3', key)), key);
 });
 
 // ── Report ───────────────────────────────────────────────────────────────────

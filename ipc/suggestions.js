@@ -11,12 +11,26 @@ const log = require('../features/log');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
-const { PANEL_RADIUS } = require('../features/overlay-bounds');
 const ITEM_HEIGHT = 38; // --row-h (36) + the row's 1px margins (Suggestions/styles.css)
-const LIST_CHROME = 16; // body padding (8) + the card's own padding (8)
+/* Room inside the view for the card's shadow, and the ONLY panel that has one
+   (see .surface-card in renderer/styles/surface.css). A WebContentsView clips
+   at its own bounds, so every pixel the shadow needs has to be inside them.
+   Measured in the app: this card's shadow — 0 6px 16px / 0 1px 4px, in
+   Suggestions/styles.css — fades to nothing 20px to either side and 26px below.
+   The page's body padding is these same numbers, so the card still lands
+   exactly on `bounds`, i.e. flush under the address field.
+
+   There is NO top pad: the view's top edge IS the card's top edge, so the part
+   of the shadow that would fall upwards is simply never inside the view and can
+   never be cut into a band. Padding the top instead (it used to be 4px) pushed
+   the card 4px below the y the address bar asked for, doubling the gap. */
+const PAD_X = 20;
+const PAD_BOTTOM = 26;
+const LIST_CHROME = PAD_BOTTOM + 8; // body padding bottom + the card's own
 // Fits the full capped list (≤8 rows: base + ≤4 links + ≤3 search) without
-// scrolling. 8 * 38 + 16 = 320; the caps live in renderer.js updateSuggestions.
-const MAX_HEIGHT = 328;
+// scrolling: 8 * ITEM_HEIGHT + LIST_CHROME. The caps live in renderer.js
+// updateSuggestions.
+const MAX_HEIGHT = 8 * ITEM_HEIGHT + LIST_CHROME;
 /** Create (once) and load the overlay view for a window. Resolves when loaded. */
 async function ensureView(wd) {
     if (wd.suggestions) {
@@ -32,7 +46,10 @@ async function ensureView(wd) {
         },
     });
     view.setBackgroundColor('#00000000');
-    try { view.setBorderRadius(PANEL_RADIUS) } catch (e) { log.debug('suggestions', 'if', e); }
+    /* No radius on the VIEW: the card inside draws its own, and rounding both at
+       the same radius is what clipped the shadow at the corner. The view is a
+       transparent rectangle the card floats in. */
+    try { view.setBorderRadius(0) } catch (e) { log.debug('suggestions', 'setBorderRadius', e); }
     view.setVisible(false);
     wd.suggestions = view;
     wd.window.contentView.addChildView(view);
@@ -156,13 +173,19 @@ function register(ipcMain, { wm }) {
     });
 }
 // ── Helpers ──────────────────────────────────────────────────────────────────
+/* `bounds` is where the CARD goes (renderer.js getSuggestionsBounds: the
+   address field's rect, 4px below it). The view is grown around it — never
+   moved — so the card lands on `bounds` whatever the pad is. x is allowed to go
+   negative for a field close to the window's left edge: the part that hangs off
+   is shadow nobody can see, and clamping it to 0 shifted the card right of the
+   field instead. */
 function itemBounds(bounds, count) {
     return {
-        x: Math.max(0, Math.floor(bounds.left)),
+        x: Math.floor(bounds.left - PAD_X),
         y: Math.max(0, Math.floor(bounds.top)),
-        width: Math.floor(bounds.width),
+        width: Math.floor(bounds.width + PAD_X * 2),
         height: Math.min(MAX_HEIGHT, Math.max(1, count) * ITEM_HEIGHT + LIST_CHROME),
     };
 }
 
-module.exports = { register };
+module.exports = { register, itemBounds, PAD_X, PAD_BOTTOM, ITEM_HEIGHT, LIST_CHROME, MAX_HEIGHT };

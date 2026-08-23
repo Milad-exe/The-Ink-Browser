@@ -32,9 +32,44 @@ html, body {
 body::before {
   content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(140% 46% at 50% 0%, color-mix(in srgb, var(--text) 5%, transparent), transparent 70%);
+    radial-gradient(140% 46% at 50% 0%, color-mix(in srgb, var(--text) 5%, transparent), transparent 70%),
+    /* The wash: a user theme's picked colours, painted OVER --shell rather than
+       replacing it, so everything reading --shell as a flat colour (the
+       vibrancy mix, the tab-strip scroll fades) still works. `none` for every
+       theme that is a single ground. */
+    var(--shell-wash, none);
+}
+/* Grain. Texture belongs behind the UI, not on it, so it sits on this fixed
+   layer under the chrome — the dotted dither this shell used to carry read as
+   noise ON the interface and fought every hairline. Off (0) unless a theme
+   asks for it. The turbulence is inlined: the CSP here allows no remote
+   assets, and a tiling PNG would be one more binary to keep in step. */
+body {
+  /* Declared on BODY, not on ::before. A custom property inherits down the
+     tree, and ::before/::after are siblings — neither can read the other's.
+     Declared on the pseudo-element it was invisible to the layer that uses it,
+     so `var(--grain-tile)` resolved to nothing and grain never rendered at all. */
+  --grain-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
 }
 body::after {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  /* MASKED, not blended. `mix-blend-mode: overlay` was the first attempt and it
+     is invisible on a near-black shell — overlay against black stays black, so
+     the slider moved and nothing happened. Masking the ink colour with the
+     noise instead works on any ground: light speckle on a dark shell, dark
+     speckle on a pale one, because it is the theme's own text colour either
+     way. Capped at 0.4 so a full slider is texture, not static. */
+  background-color: var(--text);
+  -webkit-mask-image: var(--grain-tile);
+  mask-image: var(--grain-tile);
+  -webkit-mask-size: 160px 160px;
+  mask-size: 160px 160px;
+  opacity: calc(var(--grain, 0) * 0.4);
+}
+/* The bright hairline along the window's top edge. It was body::after until the
+   grain layer needed that slot; it is its own element-free layer on html now so
+   both can exist. */
+html::after {
   content: ''; position: fixed; left: 0; right: 0; top: 0; height: 1px;
   z-index: 0; pointer-events: none;
   background: color-mix(in srgb, var(--text) 8%, transparent);
@@ -193,6 +228,12 @@ html[data-tabbar="top"] .tab-button:not(.has-favicon)::before {
   color: var(--text);
   box-shadow: var(--ring);
 }
+
+/* An Essential's view has no row in the strip: its tile at the top of the
+   sidebar is its one representation. The row still exists in the DOM so all the
+   strip's bookkeeping (indices, roving focus, drag) keeps working — it is only
+   not shown. */
+.tab-button.is-essential { display: none; }
 
 /* The dragged tab lifts; others part around it. */
 .tab-button.dragging { opacity: 0.6; }
@@ -876,13 +917,36 @@ html[data-tabbar="side"] .sidebar-foot {
    (set below) and unset in compact/top mode, where the cluster is free to be
    its own width. */
 .lead-cluster {
-  display: flex; align-items: center; gap: var(--sp-3);
+  display: flex; align-items: center; 
   box-sizing: border-box; flex-shrink: 0;
+  /* As wide as the sidebar — but NEVER narrower than the buttons in it. The
+     width alone let a narrow sidebar squeeze the box below its own content, and
+     since the address field is the next item in the row it started where the
+     box claimed to end: on top of the reload button. `min-width: max-content`
+     means the cluster gives up aligning with the sidebar before it gives up
+     being clickable. */
   width: var(--omni-left, auto);
+  min-width: max-content;
   /* The rail insets its rows by --sp-3 (the column) + --gutter (the row); the
      nav buttons sit on that same edge. */
   padding-left: calc(var(--sp-3) + var(--gutter));
+  /* Everything packs to the LEFT, sidebar toggle first.
+
+     The toolbar's controls are narrower than the sidebar column they sit over,
+     so there is always slack somewhere. Putting it between the toggle and the
+     nav buttons (space-between) just moved the gap into the middle of the
+     cluster, which reads worse than having it at the end: the four controls
+     stopped being one group. It sits before the address field instead, which is
+     where every browser puts it. */
+  /* ONE gap declaration. This rule carried two, so the first was dead and the
+     sidebar toggle sat 6px from the nav buttons while they sat 4px from each
+     other — the toggle read as a separate thing near them, not the first of
+     four. */
+  gap: var(--sp-2);
 }
+/* Toggle first: it owns the leftmost thing on screen. DOM order above is the
+   TAB order (nav before the toggle); this is the visual one. */
+.lead-cluster #compact-btn { order: -1; }
 #utility-bar button,
 #utility-bar input,
 #utility-bar .omnibox,
@@ -893,9 +957,15 @@ html[data-tabbar="side"] .sidebar-foot {
 
 /* Toolbar icons float directly on the shell (Arc-style, flat) — no boxed rail
    background; each button carries its own hover/active surface instead. */
+/* ONE gap between icons, everywhere in this bar. It used to be --sp-1 (2px)
+   inside a group and --sp-3 (6px) between the sidebar toggle and the nav
+   buttons, which made the toggle read as a separate thing sitting near them
+   rather than as the first of four. At 4px the 32px hit areas still do not
+   collide on hover, and every icon in the bar is the same distance from its
+   neighbour. */
 .nav-buttons,
 .trailing-icons {
-  display: flex; align-items: center; gap: var(--sp-1);
+  display: flex; align-items: center; gap: var(--sp-2);
   flex-shrink: 0;
 }
 
@@ -920,6 +990,19 @@ html[data-tabbar="side"] .sidebar-foot {
 #reload-btn.loading .nav-reload { display: none; }
 #reload-btn.loading .nav-stop   { display: block; }
 
+/* The page-scoped controls live in the page-actions panel now. They stay in
+   the DOM — every one of them already carries its handler, and the panel drives
+   them by pressing them — but they are not in the bar. Hidden rather than
+   removed also means the bar's width no longer changes as you browse: reader,
+   PiP and downloads used to appear and disappear per page, which is what made
+   the toolbar feel restless. */
+#utility-bar #reader-btn,
+#utility-bar #pip-btn,
+#utility-bar #downloads-btn,
+#utility-bar #bookmark-btn,
+#utility-bar #focus-btn,
+#utility-bar #extensions-btn { display: none; }
+
 /* Profile switcher badge: coloured circle with the profile's initial. */
 .profile-badge {
   width: var(--icon); height: var(--icon); border-radius: 50%; flex-shrink: 0;
@@ -941,13 +1024,22 @@ html[data-tabbar="side"] .sidebar-foot {
 /* The wrapper is the column between the lead cluster and the trailing icons,
    so it already starts on the page card's left edge; its right padding is the
    field's only separation from the icons. */
-.omnibox-wrapper { flex: 1; min-width: 0; padding-right: var(--sp-4); }
+/* The field is separated from the icons by MORE than the icons are from each
+   other — three times as much. At 8px against a 2px icon gap the trailing
+   cluster read as though it began inside the field's own margin; the jump has
+   to be unmistakable or the bar has no grouping at all. */
+.omnibox-wrapper { flex: 1; min-width: 0; padding-right: var(--sp-5); }
 .omnibox {
-  /* In flow, and left-aligned in its column: the field is the thing you use
-     most, so it takes as much of the bar as the controls at either end can
-     spare — up to 860px on a wide window, growing to the right from the card's
-     edge rather than drifting away from it. */
-  width: 100%; max-width: 860px;
+  /* Fills its column. The column already stops where the trailing icons begin,
+     so the field spans exactly the page card's width minus those — its left
+     edge on the card's, its right edge before the icons.
+
+     It used to be capped at 860px and left-aligned. On a narrow window that is
+     invisible, which is why it survived so long; on a wide one the field stops
+     dead two thirds across and leaves several hundred pixels of empty bar
+     between it and the icons. A browser's address bar is the widest thing in
+     the chrome for a reason — the URLs it holds are long. */
+  width: 100%;
   display: flex; align-items: center; height: var(--control-h);
   /* The field is a recessed well, not a raised card: it belongs to the shell,
      and focus is carried by the accent ring rather than by lifting it. */
@@ -969,6 +1061,25 @@ html[data-tabbar="side"]:not([data-compact="on"]) #utility-bar {
     inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
     0 0 0 3px var(--accent-wash);
 }
+
+/* Page actions, at the field's trailing end. The divider is what makes it read
+   as a control INSIDE the field rather than an icon that happens to sit there —
+   the same job the separator does in a native search field. */
+.omni-divider {
+  width: 1px; align-self: stretch; margin: 6px 0 6px var(--sp-2);
+  background: var(--border-2); flex-shrink: 0;
+}
+.omni-action {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; margin-left: 2px; margin-right: -6px;
+  flex-shrink: 0; padding: 0; border: none; border-radius: var(--r-sm);
+  background: transparent; color: var(--text-3); cursor: pointer;
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.omni-action svg { width: 16px; height: 16px; }
+.omni-action:hover { background: var(--hover); color: var(--text); }
+.omni-action.active { background: var(--active-bg); color: var(--text); }
+.omni-action:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-wash); }
 
 /* The lock/search glyph is a real button (it opens site info), so it gets a
    button's reset, a hit area and a focus ring — it was a <span> that only a

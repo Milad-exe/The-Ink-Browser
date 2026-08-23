@@ -87,7 +87,9 @@ async function showNext(wd) {
             },
         });
         view.setBackgroundColor('#00000000');
-        try { view.setBorderRadius(PANEL_RADIUS) } catch (e) { log.debug('permission-ui', 'item', e); }
+        /* The card fills the view now that it has no shadow to leave room for,
+           so the view carries the same radius as every other flush panel. */
+        try { view.setBorderRadius(PANEL_RADIUS) } catch (e) { log.debug('permission-ui', 'setBorderRadius', e); }
         wd.permView = view;
         wd.window.contentView.addChildView(view);
         view.webContents.loadFile(resolveAppFile('renderer/PermissionPrompt/index.html'));
@@ -125,6 +127,7 @@ async function showNext(wd) {
     }
     // Hangs from the address field, like the site-info panel it sits beside.
     wd.permAnchor = { left: Math.round(anchor.x), bottom: Math.round(anchor.y) };
+    // A first guess only; the page measures itself and calls back below.
     view.setBounds(panelBounds(wd.window, { anchor: wd.permAnchor, align: 'left', width: PANEL_W, height: 150 }));
     view.setVisible(true);
     wd.permShownAt = Date.now();
@@ -173,9 +176,13 @@ function register(ipcMain, { wm }) {
         const wd = findWdByOverlay(e.sender);
         if (wd && wd.permView && !wd.permView.webContents.isDestroyed()) {
             try {
+                /* The reported height is the CARD's. It used to be clamped to
+                   320, so a prompt with a long host or a longer translation was
+                   simply cut off and grew a scrollbar; panelBounds already trims
+                   to the window, which is the only ceiling that means anything. */
                 wd.permView.setBounds(panelBounds(wd.window, {
                     anchor: wd.permAnchor, align: 'left', width: PANEL_W,
-                    height: Math.max(70, Math.min(320, Math.round(height))),
+                    height: Math.max(70, Math.round(height)),
                 }));
             }
             catch (e) { log.debug('permission-ui', 'permission-ui-resize', e); }

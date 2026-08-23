@@ -34,9 +34,12 @@
         }
         function reportHeight() {
             requestAnimationFrame(() => {
+                /* Report the CARD's height only. The view is grown around it by
+                   features/overlay-bounds.js (the shadow gutter) and this page
+                   pads to match, so adding the padding here counted it twice. */
                 const h = document.getElementById('card').getBoundingClientRect().height;
                 try {
-                    window.permissionUI.resize(h + 12);
+                    window.permissionUI.resize(h);
                 }
                 catch (e) { window.inkLog?.debug('prompt', 'reportHeight: ' + e); }
             });

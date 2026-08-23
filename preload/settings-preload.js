@@ -40,6 +40,26 @@ contextBridge.exposeInMainWorld('northstarSettings', {
     openBookmarksTab: () => ipcRenderer.invoke('open-bookmarks-tab'),
     cachedFavicon: (host) => ipcRenderer.invoke('favicon-cached', host),
 });
+/* Themes. A user theme is saved as a seed — mode, ground, accent and an
+   optional ink — and the main process derives the sixteen tokens from it, so
+   this bridge never carries a token set in either direction. `preview` derives
+   without saving and reports the two contrast ratios, which is what lets the
+   editor explain a refusal instead of just rejecting the colour. */
+/* Settings is a tab, and a tab belongs to a window, and a window is in one
+   space — so "the theme" on this page means this space's theme. */
+contextBridge.exposeInMainWorld('northstarProfiles', {
+    current: () => ipcRenderer.invoke('profiles:current'),
+    update: (id, patch) => ipcRenderer.invoke('profiles:update', id, patch),
+});
+contextBridge.exposeInMainWorld('northstarThemes', {
+    list: () => ipcRenderer.invoke('themes-list'),
+    preview: (seed) => ipcRenderer.invoke('theme-preview', seed),
+    // Paint a seed on screen without saving it — what a drag uses.
+    live: (seed) => ipcRenderer.invoke('theme-live', seed),
+    save: (theme) => ipcRenderer.invoke('theme-save', theme),
+    remove: (id) => ipcRenderer.invoke('theme-delete', id),
+    onChanged: (fn) => ipcRenderer.on('themes-changed', () => fn()),
+});
 // Search engines, per-site zoom, import/export, updates, diagnostics — the
 // Settings page is the only surface that manages these.
 contextBridge.exposeInMainWorld('northstarEngines', {

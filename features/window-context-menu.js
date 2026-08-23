@@ -120,6 +120,15 @@ class WindowContextMenu {
                             url: u, title,
                             profile: windowData.tabs.tabContainers.get(tabIndex) || null,
                         });
+                        /* Promote THIS tab into the tile rather than leaving both:
+                           the strip hides a row a tile owns, so without the
+                           binding you got a tile that opens a second copy and an
+                           original row still sitting in the strip. */
+                        try {
+                            windowData.tabs.bindEssentialTab?.(
+                                `${u}|${windowData.tabs.tabContainers.get(tabIndex) || ''}`, tabIndex);
+                        }
+                        catch (e) { log.debug('window-context-menu', 'bindEssentialTab', e); }
                         try { windowData.window.webContents.send('essentials-changed'); }
                         catch (e) { log.debug('window-context-menu', 'isMuted', e); }
                     },

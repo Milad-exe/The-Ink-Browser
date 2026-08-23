@@ -81,6 +81,8 @@ const permissionUI = require('./features/permission-ui');
 const privateSessions = require('./features/private-session');
 const downloadManager = require('./features/download-manager');
 const appIcon = require('./features/app-icon');
+const themes = require('./features/themes');
+const themeRuntime = require('./features/theme-runtime');
 const extensionManager = require('./features/extensions');
 // IPC feature modules
 const tabsIpc = require('./ipc/tabs');
@@ -97,6 +99,8 @@ const siteInfoIpc = require('./ipc/site-info');
 const miniPlayerIpc = require('./ipc/mini-player');
 const ctxMenuIpc = require('./ipc/ctxmenu');
 const paletteIpc = require('./ipc/palette');
+const themePanelIpc = require('./ipc/theme-panel');
+const pageActionsIpc = require('./ipc/page-actions');
 const userDataIpc = require('./ipc/user-data');
 const certErrors = require('./features/cert-errors');
 const defaultBrowser = require('./features/default-browser');
@@ -149,6 +153,8 @@ class Northstar {
         downloadsIpc.register(ipcMain, deps);
         ctxMenuIpc.register(ipcMain, deps);
         paletteIpc.register(ipcMain, deps);
+        themePanelIpc.register(ipcMain, deps);
+        pageActionsIpc.register(ipcMain, deps);
         extensionsIpc.register(ipcMain, deps);
         passwordsIpc.register(ipcMain, deps);
         siteInfoIpc.register(ipcMain, deps);
@@ -174,6 +180,42 @@ class Northstar {
             log.warn('main', 'protocol registration failed', e);
         }
         app.whenReady().then(async () => {
+            themes.bind(this.windowManager.persistence);
+            // Spaces can carry their own theme, so a surface resolves through
+            // the window it belongs to before falling back to the global one.
+            themeRuntime.bind({ wm: this.windowManager, profiles: require('./features/profiles') });
+            const savedTheme = this.windowManager.persistence.get('theme');
+            // `mode` comes from the registry now: it used to be a hardcoded
+            // list of two ids, so any theme added after it — and every theme a
+            // user makes — booted with the wrong nativeTheme and native
+            // widgets (scrollbars, pickers) came up in the wrong scheme.
+            nativeTheme.themeSource = themes.modeOf(savedTheme) === 'light' ? 'light' : 'dark';
+            /* The icon follows the theme (features/app-icon.js), and it is set
+               FIRST — before Widevine, before any window. Two things used to
+               leave the wrong mark in the dock at launch:
+
+                 - this ran after `await components.whenReady()`, so for as long
+                   as the CDM took to load the dock showed whatever the bundle
+                   carried, then visibly swapped;
+                 - it was skipped entirely for the default theme, on the grounds
+                   that the bundle icon is built from `default`. That holds for a
+                   packaged build and nowhere else: run from source the dock
+                   belongs to Electron, and a bundle whose .icns predates a
+                   redesign keeps showing the old mark for the whole session,
+                   because nothing ever overrides it.
+
+               Setting it unconditionally, early, costs one nativeImage read.
+               The per-theme PNGs carry the macOS safe-area margin (824 in 1024)
+               so this does not render larger than the bundle icon it replaces.
+
+               What this CANNOT fix: between the process starting and
+               `whenReady` firing, the dock shows the bundle icon, which is
+               built from `default`. On a non-default theme that flash is the
+               OS's, not ours. */
+            appIcon.apply(savedTheme || 'default', this.windowManager);
+            // Derived + user themes have no CSS in the stylesheets; every surface
+            // gets its tokens injected as it loads (features/theme-runtime.js).
+            app.on('web-contents-created', (_ev, wc) => themeRuntime.attach(wc));
             // Widevine CDM (castlabs Electron build) — required to decrypt DRM
             // video such as Crunchyroll / Netflix / Spotify. Must finish loading
             // before any window is created. No-op on a vanilla Electron binary.
@@ -185,17 +227,6 @@ class Northstar {
             catch (e) {
                 console.error('Widevine components load failed:', e && e.message);
             }
-            const savedTheme = this.windowManager.persistence.get('theme');
-            nativeTheme.themeSource = (savedTheme === 'porcelain' || savedTheme === 'dune') ? 'light' : 'dark';
-            // The icon follows the theme (features/app-icon.js). The bundle icon
-            // is built from the default theme, so only a non-default theme needs
-            // an override — which keeps the common case off dock.setIcon
-            // entirely. The per-theme PNGs carry the macOS safe-area margin: a
-            // full-bleed PNG renders edge-to-edge there, larger than the bundle
-            // icon, and the dock icon visibly "expanded" as the app finished
-            // launching.
-            if (savedTheme && savedTheme !== 'default')
-                appIcon.apply(savedTheme, this.windowManager);
             // macOS delivers standard keyboard shortcuts through the application
             // menu's key-equivalents. With no menu (setApplicationMenu(null)) it
             // silently drops some — notably Cmd+1-9 tab switching and Cmd+C/V/X/A

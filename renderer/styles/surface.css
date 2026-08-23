@@ -33,10 +33,21 @@
        The half-pixel highlight along the top edge is the light catching a
        raised edge — the one thing that separates a panel that reads as glass
        from one that reads as a grey rectangle. It is a highlight, not a
-       shadow: nothing here pretends to float higher than it does. */
+       shadow: nothing here pretends to float higher than it does.
+
+       NO --shadow-pop. Every panel is its own WebContentsView, and a view
+       CLIPS at its bounds: a 30px-blur shadow needs ~34px of clearance to the
+       sides and ~46px below before it reaches zero (measured), so a card drawn
+       anywhere near the view's edge ends in a hard band rather than a shadow.
+       Growing the views enough to contain it would wrap every panel in a
+       30-40px transparent halo that swallows clicks — so the panels carry
+       their edge the way the rest of the chrome does, on the ring and the
+       highlight. The ONE exception is the omnibox dropdown, which is anchored
+       to the address field and paints its own contained shadow
+       (renderer/Suggestions/styles.css). */
     box-shadow:
       inset 0 0.5px 0 color-mix(in srgb, #fff 8%, transparent),
-      var(--ring-2), var(--shadow-pop);
+      var(--ring-2);
     overflow: hidden;
     font-family: var(--font);
     -webkit-font-smoothing: antialiased;

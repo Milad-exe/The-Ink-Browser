@@ -50,7 +50,6 @@
       "package.json",
       "logo.png",
       "logo-win.png",
-      "icons/themes/*.png",
       "node_modules/**/*"
     ],
     "asarUnpack": [

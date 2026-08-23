@@ -6,6 +6,7 @@
   <meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none';" />
   <title>Settings</title>
   <link rel="stylesheet" href="../styles/ui.css">
+  <link rel="stylesheet" href="../styles/theme-editor.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -146,38 +147,103 @@
         <div class="card">
           <div class="card-title" data-i18n="settings.theme">Theme</div>
           <div class="card-desc" data-i18n="settings.themeDesc">Choose a color palette for the browser</div>
-          <!-- Each option is a miniature of the browser painted in that theme's
-               own palette — a name and a colour swatch never told you what
-               "Dune" would actually look like. -->
-          <div class="theme-picker" id="theme-picker" role="radiogroup" aria-label="Theme" data-i18n-label="settings.theme">
-            <button class="theme-option" role="radio" data-theme-value="default" aria-checked="true">
-              <span class="theme-preview" data-preview="default" aria-hidden="true">
-                <span class="tp-bar"><span class="tp-field"></span></span>
-                <span class="tp-body"><span class="tp-rail"></span><span class="tp-page"><span class="tp-line"></span><span class="tp-line short"></span></span></span>
-              </span>
-              <span class="theme-name">Slate</span>
-            </button>
-            <button class="theme-option" role="radio" data-theme-value="fathom" aria-checked="false">
-              <span class="theme-preview" data-preview="fathom" aria-hidden="true">
-                <span class="tp-bar"><span class="tp-field"></span></span>
-                <span class="tp-body"><span class="tp-rail"></span><span class="tp-page"><span class="tp-line"></span><span class="tp-line short"></span></span></span>
-              </span>
-              <span class="theme-name">Fathom</span>
-            </button>
-            <button class="theme-option" role="radio" data-theme-value="porcelain" aria-checked="false">
-              <span class="theme-preview" data-preview="porcelain" aria-hidden="true">
-                <span class="tp-bar"><span class="tp-field"></span></span>
-                <span class="tp-body"><span class="tp-rail"></span><span class="tp-page"><span class="tp-line"></span><span class="tp-line short"></span></span></span>
-              </span>
-              <span class="theme-name">Porcelain</span>
-            </button>
-            <button class="theme-option" role="radio" data-theme-value="dune" aria-checked="false">
-              <span class="theme-preview" data-preview="dune" aria-hidden="true">
-                <span class="tp-bar"><span class="tp-field"></span></span>
-                <span class="tp-body"><span class="tp-rail"></span><span class="tp-page"><span class="tp-line"></span><span class="tp-line short"></span></span></span>
-              </span>
-              <span class="theme-name">Dune</span>
-            </button>
+          <!-- The row of swatches, the "+" beside it and the caption naming
+               what is selected are all built by renderer/lib/theme-editor.js —
+               the picker below is only the radiogroup it fills. -->
+          <div class="theme-picker" id="theme-picker" role="radiogroup" aria-label="Theme" data-i18n-label="settings.theme"></div>
+
+          <!-- Theme editor.
+
+               Laid out as one instrument rather than a form: the field you drag
+               in, what the dots MEAN and the actions on them directly
+               underneath, then the three amounts. Colours are placed as DOTS —
+               angle is hue, distance from the centre is saturation — which
+               never asks what a "ground" or an "ink" is. The ramp in
+               features/theme-derive.js turns one to three dots plus those
+               amounts into the whole palette, with the elevation the right way
+               up and the contrast floors met.
+
+               The markup is duplicated in renderer/ThemePanel/index.html rather
+               than templated because it is markup, not logic: one script drives
+               both copies and is the single place any behaviour lives. -->
+          <div class="theme-editor" id="theme-editor" hidden>
+            <div class="te-stage">
+              <!-- Mode sits above the field, as a property of what you are
+                   looking at rather than as another form row. -->
+              <div class="te-modes" id="te-mode-seg" role="radiogroup" aria-label="Mode">
+                <button type="button" data-m="dark" class="on" role="radio" aria-checked="true" title="Dark" aria-label="Dark">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5z"/></svg>
+                </button>
+                <button type="button" data-m="light" role="radio" aria-checked="false" tabindex="-1" title="Light" aria-label="Light">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></svg>
+                </button>
+              </div>
+
+              <div class="te-wheel" id="te-wheel" role="application"
+                   aria-label="Colour field — drag a dot to change its hue and saturation">
+                <canvas id="te-wheel-canvas" width="440" height="440" aria-hidden="true"></canvas>
+                <div class="te-dots" id="te-dots"></div>
+              </div>
+
+              <!-- What each dot IS on the left, what you can do to the set on
+                   the right. The roles are filled in by the script, because
+                   which dot becomes the accent depends on where they sit. -->
+              <div class="te-bar">
+                <div class="te-roles" id="te-roles"></div>
+                <div class="te-tools">
+                  <button type="button" id="te-add" title="Add a colour" aria-label="Add a colour">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                  </button>
+                  <button type="button" id="te-remove" title="Remove the last colour" aria-label="Remove the last colour">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 12h14"/></svg>
+                  </button>
+                  <button type="button" id="te-scatter" title="Space the colours evenly around the wheel" aria-label="Space the colours evenly around the wheel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="15" r="2.4"/><circle cx="16" cy="16.5" r="1.8"/><circle cx="13" cy="8" r="2.1"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Three amounts, one anatomy: name, track, value. Each track IS
+                 its own range — Shade runs through the grounds you are choosing
+                 between, Intensity from neutral to the fullest tint that
+                 survives the chroma ceiling, Grain draws the texture it sets.
+                 The gradients are painted by the script from the current dots. -->
+            <div class="te-controls">
+              <label class="te-ctl">
+                <span class="te-ctl-name">Shade</span>
+                <span class="te-ctl-track" id="te-shade-track">
+                  <input id="te-shade" type="range" min="0" max="100" value="50" aria-label="Shade">
+                </span>
+                <span class="te-ctl-val" id="te-shade-val">50</span>
+              </label>
+              <label class="te-ctl">
+                <span class="te-ctl-name">Intensity</span>
+                <span class="te-ctl-track" id="te-intensity-track">
+                  <input id="te-intensity" type="range" min="0" max="100" value="70" aria-label="Intensity">
+                </span>
+                <span class="te-ctl-val" id="te-intensity-val">70</span>
+              </label>
+              <label class="te-ctl">
+                <span class="te-ctl-name">Grain</span>
+                <span class="te-ctl-track te-wave">
+                  <svg class="te-wave-art" viewBox="0 0 240 24" aria-hidden="true" preserveAspectRatio="none">
+                    <path d="M0 12 L240 12"/>
+                  </svg>
+                  <input id="te-grain" type="range" min="0" max="100" value="0" aria-label="Grain">
+                </span>
+                <span class="te-ctl-val" id="te-grain-val">0</span>
+              </label>
+            </div>
+
+            <!-- Why a drag stopped painting anything. Hidden until it happens. -->
+            <p class="te-warn" id="te-warn" role="status" hidden></p>
+
+            <div class="te-foot">
+              <button class="btn btn-danger btn-sm" id="te-delete" type="button" hidden>Delete</button>
+              <button class="btn btn-ghost btn-sm" id="te-cancel" type="button">Done</button>
+            </div>
+
           </div>
         </div>
 
@@ -536,6 +602,9 @@
   </div>
 
   <div class="toast" id="toast"></div>
+  <!-- The theme instrument is shared with the sidebar's popup; it registers
+       Ink.themeEditor and must load BEFORE the page script that mounts it. -->
+  <script src="../lib/theme-editor.js"></script>
   <script src="settings.js"></script>
 </body>
 </html>
