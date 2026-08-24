@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     getSettings: () => ipcRenderer.invoke("settings-get"),
     find: () => ipcRenderer.invoke("menu-find"),
     print: () => ipcRenderer.invoke("menu-print"),
+    savePage: () => ipcRenderer.invoke("menu-save-page"),
     zoom: (dir) => ipcRenderer.invoke("menu-zoom", dir),
 });
 // Expose persistence controls to the menu renderer

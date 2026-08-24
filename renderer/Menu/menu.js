@@ -43,6 +43,7 @@
         document.getElementById('btn-new-window').addEventListener('click', act(() => api.newWindow()));
         document.getElementById('btn-new-private').addEventListener('click', act(() => api.newPrivateWindow()));
         document.getElementById('btn-find').addEventListener('click', act(() => api.find()));
+        document.getElementById('btn-save-page').addEventListener('click', act(() => api.savePage()));
         document.getElementById('btn-print').addEventListener('click', act(() => api.print()));
         document.getElementById('btn-history').addEventListener('click', act(() => api.openHistoryTab()));
         document.getElementById('btn-bookmarks').addEventListener('click', act(() => api.openBookmarksTab()));

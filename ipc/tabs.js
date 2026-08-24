@@ -836,6 +836,34 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         }
         return true;
     });
+    /* Save the page you are on, as a complete document (the html plus the
+       resources it needs) so it opens offline. Electron asks for the path
+       itself, so there is no dialog to build here. */
+    ipcMain.handle('menu-save-page', async (_e) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        const tab = activeTabOf(wd);
+        if (!tab)
+            return false;
+        const { dialog } = require('electron');
+        let name = 'page';
+        try { name = (new URL(tab.webContents.getURL()).hostname || 'page').replace(/^www\./, ''); }
+        catch (e) { log.debug('tabs', 'menu-save-page name', e); }
+        try {
+            const r = await dialog.showSaveDialog(wd.window, {
+                title: 'Save page as',
+                defaultPath: name + '.html',
+                filters: [{ name: 'Web page, complete', extensions: ['html'] }],
+            });
+            if (r.canceled || !r.filePath)
+                return false;
+            await tab.webContents.savePage(r.filePath, 'HTMLComplete');
+            return true;
+        }
+        catch (e) {
+            log.warn('tabs', 'could not save the page', e);
+            return false;
+        }
+    });
     ipcMain.handle('menu-zoom', (_e, dir) => {
         const tab = activeTabOf(wm.getWindowByWebContents(_e.sender));
         if (!tab)
