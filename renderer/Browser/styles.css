@@ -665,7 +665,7 @@ html[data-tabbar="side"][data-rail="on"] .sb-ws-name { display: none; }
 html[data-tabbar="side"] #tab-bar.creating-space > *:not(#space-create):not(#window-controls):not(#sidebar-resizer) { display: none !important; }
 .space-create { display: flex; flex-direction: column; gap: 8px; padding: 6px 4px; -webkit-app-region: no-drag; }
 .space-create.hidden { display: none; }
-.sc-title { font-size: 15px; font-weight: 650; color: var(--text); }
+.sc-title { font-size: var(--fs-lg); font-weight: 650; color: var(--text); }
 .sc-sub { font-size: var(--fs-small); line-height: 1.45; color: var(--text-3); margin-bottom: 4px; }
 .sc-namerow {
   display: flex; align-items: center; gap: 8px; padding: 5px;
@@ -729,8 +729,14 @@ html[data-tabbar="side"] .sidebar-foot {
 .sb-ws:hover { background: var(--hover); }
 .sb-ws.active { background: var(--surface); box-shadow: var(--ring); }
 .sb-ws .profile-badge { width: 22px; height: 22px; font-size: var(--fs-micro); }
-/* Inactive spaces keep their emoji but read as muted — greyed, not dropped. */
-.sb-ws:not(.active) .profile-badge { opacity: 0.45; filter: grayscale(1); }
+/* Inactive spaces read as muted — but muted still has to be VISIBLE. Full
+   grayscale at 0.45 turned every coloured emoji into a near-black blob on a
+   near-black shell: the crescent and the briefcase disappeared outright. The
+   active space is already marked three ways (full colour, a --surface fill and
+   a ring), so the inactive ones do not need to be crushed to be told apart.
+   Partial desaturation keeps them legible on a light ground too, where a
+   brightness lift would have blown them out. */
+.sb-ws:not(.active) .profile-badge { opacity: 0.75; filter: grayscale(0.55); }
 .sb-ws:hover .profile-badge { opacity: 1; filter: none; }
 .sb-add-ws { flex-shrink: 0; width: var(--control-h); height: var(--control-h); font-size: 16px; font-weight: 300; color: var(--text-3); }
 .sb-add-ws:hover { color: var(--text); }
@@ -897,8 +903,9 @@ html[data-tabbar="side"] .sidebar-foot {
 
      THE BAR SITS ON THE SAME VERTICAL GUIDES AS THE WINDOW BELOW IT, and it
      does that structurally rather than by centring anything:
-       .lead-cluster is exactly the sidebar's width, so the field that follows
-         it begins on the PAGE CARD's left edge;
+       .lead-cluster is exactly the sidebar's width and holds only the toggle
+         that owns the sidebar, so the NAV BUTTONS that follow it begin on the
+         PAGE CARD's left edge (they act on the page, so they live over it);
        the right padding is SHELL_PAD, so the trailing icons end on the card's
          right edge;
        the cluster's own inset is the rail's content edge, so back/forward sit
@@ -927,26 +934,25 @@ html[data-tabbar="side"] .sidebar-foot {
      being clickable. */
   width: var(--omni-left, auto);
   min-width: max-content;
+  /* INSIDE the fixed width (border-box), so side mode is untouched — the nav
+     buttons still start exactly on the sidebar's edge. It only shows in compact
+     mode, where this box shrinks to the toggle and there would otherwise be
+     nothing at all between the toggle and the back button. --sp-4 is the step
+     between GROUPS; the icons within a group sit at --sp-2. */
+  padding-right: var(--sp-4);
   /* The rail insets its rows by --sp-3 (the column) + --gutter (the row); the
      nav buttons sit on that same edge. */
   padding-left: calc(var(--sp-3) + var(--gutter));
-  /* Everything packs to the LEFT, sidebar toggle first.
-
-     The toolbar's controls are narrower than the sidebar column they sit over,
-     so there is always slack somewhere. Putting it between the toggle and the
-     nav buttons (space-between) just moved the gap into the middle of the
-     cluster, which reads worse than having it at the end: the four controls
-     stopped being one group. It sits before the address field instead, which is
-     where every browser puts it. */
-  /* ONE gap declaration. This rule carried two, so the first was dead and the
-     sidebar toggle sat 6px from the nav buttons while they sat 4px from each
-     other — the toggle read as a separate thing near them, not the first of
-     four. */
+  /* The slack in this box is deliberate and it all sits at the END. The toggle
+     is the only thing that belongs to the RAIL, so it is the only thing in the
+     rail's column; everything after this box begins where the rail ends. That
+     is why back/forward/reload are no longer in here — they act on the PAGE, so
+     they start on the page card's left edge with the field beside them, and the
+     field shortens by exactly their width. Before, the nav buttons sat over the
+     rail and the leftover slack opened a 32px hole between reload and the
+     field that belonged to nothing. */
   gap: var(--sp-2);
 }
-/* Toggle first: it owns the leftmost thing on screen. DOM order above is the
-   TAB order (nav before the toggle); this is the visual one. */
-.lead-cluster #compact-btn { order: -1; }
 #utility-bar button,
 #utility-bar input,
 #utility-bar .omnibox,
@@ -968,6 +974,17 @@ html[data-tabbar="side"] .sidebar-foot {
   display: flex; align-items: center; gap: var(--sp-2);
   flex-shrink: 0;
 }
+/* One cluster separation, the same 8px the field uses internally. The nav
+   buttons and the field are different things, so they are not 4px apart like
+   siblings in a cluster — but they are both about the page, so they are not
+   flung apart either. */
+.nav-buttons { margin-right: var(--sp-4); }
+/* An empty flex child still takes a gap. #ext-actions holds the installed
+   extensions' toolbar buttons and is empty on most profiles, so it was adding a
+   phantom 4px between the address field and the menu — a gap with nothing in
+   it, which is why that separation measured 16 instead of the --sp-5 the
+   wrapper asks for. */
+.trailing-icons #ext-actions:empty { display: none; }
 
 .nav-btn,
 .icon-btn {
@@ -982,7 +999,12 @@ html[data-tabbar="side"] .sidebar-foot {
 .nav-btn:active,
 .icon-btn:active { background: var(--active-bg); }
 .nav-btn:disabled { opacity: 0.3; background: transparent; cursor: default; }
-.nav-btn svg { pointer-events: none; }
+/* The nav icons carried NO size rule at all, so they fell back to the browser's
+   default for a viewBox-only SVG in a flex box — 20px, next to the sidebar
+   toggle's 18. Four different glyph sizes ended up in one 40px bar (18 / 20 /
+   16 / 18), which is what made the cluster read as scattered rather than as one
+   group. --icon is the size; nothing here writes a bare px for it. */
+.nav-btn svg { pointer-events: none; width: var(--icon); height: var(--icon); }
 .icon-svg { width: var(--icon); height: var(--icon); flex-shrink: 0; pointer-events: none; }
 .icon-btn.active { color: var(--text); background: var(--active-bg); }
 
@@ -1049,12 +1071,14 @@ html[data-tabbar="side"] .sidebar-foot {
   transition: background var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
 }
 .omnibox:hover:not(:focus-within) { background: var(--bg); }
-/* Sidebar mode: the page card starts after the sidebar, so the lead cluster is
-   exactly that wide and the field begins where the card does. Compact mode
-   hides the sidebar → the cluster falls back to its own width. */
+/* Sidebar mode: the page card starts after the sidebar, so the toggle's column
+   is exactly that wide and NAVIGATION begins where the card does. Compact mode
+   hides the sidebar → the column falls back to its own width and the nav
+   buttons follow the toggle directly. */
 html[data-tabbar="side"]:not([data-compact="on"]) #utility-bar {
   --omni-left: var(--sidebar-w, 256px);
 }
+
 .omnibox:focus-within {
   background: var(--page);
   box-shadow:
@@ -1065,18 +1089,22 @@ html[data-tabbar="side"]:not([data-compact="on"]) #utility-bar {
 /* Page actions, at the field's trailing end. The divider is what makes it read
    as a control INSIDE the field rather than an icon that happens to sit there —
    the same job the separator does in a native search field. */
+/* A hairline, not a wall. At 6px inset it stood 20px tall in a 32px field and
+   read as a hard rule splitting the field in two; and its own margin-left sat
+   ON TOP of the omnibox's 8px gap, so the run to the trailing button measured
+   12 / 10 / 6 — three values in 40px. The gap alone now spaces all of it. */
 .omni-divider {
-  width: 1px; align-self: stretch; margin: 6px 0 6px var(--sp-2);
+  width: 1px; align-self: stretch; margin: 8px 0;
   background: var(--border-2); flex-shrink: 0;
 }
 .omni-action {
   display: flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; margin-left: 2px; margin-right: -6px;
+  width: 26px; height: 26px; margin-right: -3px;
   flex-shrink: 0; padding: 0; border: none; border-radius: var(--r-sm);
   background: transparent; color: var(--text-3); cursor: pointer;
   transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
-.omni-action svg { width: 16px; height: 16px; }
+.omni-action svg { width: var(--icon); height: var(--icon); }
 .omni-action:hover { background: var(--hover); color: var(--text); }
 .omni-action.active { background: var(--active-bg); color: var(--text); }
 .omni-action:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-wash); }
@@ -1110,7 +1138,7 @@ html[data-tabbar="side"]:not([data-compact="on"]) #utility-bar {
   /* padding:0 is load-bearing: the UA default (1px 2px) would offset the input's
      glyphs from the #omni-ghost / #url-display overlays painted at left:0. */
   width: 100%; padding: 0; background: transparent; border: none; outline: none;
-  font-family: var(--font); font-size: 15px; font-weight: 500;
+  font-family: var(--font); font-size: var(--fs-body); font-weight: 500;
   letter-spacing: -0.01em; color: var(--text);
 }
 #searchBar::placeholder { color: var(--text-3); }
@@ -1120,7 +1148,7 @@ html[data-tabbar="side"]:not([data-compact="on"]) #utility-bar {
 #omni-ghost {
   position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
   display: none; white-space: pre; overflow: hidden;
-  font-family: var(--font); font-size: 15px; font-weight: 500;
+  font-family: var(--font); font-size: var(--fs-body); font-weight: 500;
   letter-spacing: -0.01em; color: var(--text-3);
   pointer-events: none;
 }
@@ -1130,7 +1158,7 @@ html[data-tabbar="side"]:not([data-compact="on"]) #utility-bar {
 #url-display {
   position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
   display: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-family: var(--font); font-size: 15px; font-weight: 500;
+  font-family: var(--font); font-size: var(--fs-body); font-weight: 500;
   letter-spacing: -0.01em; color: var(--text-2);
   pointer-events: none;
 }
@@ -1163,6 +1191,17 @@ browser-action-list::part(badge) {
 }
 .downloads-btn.has-new .downloads-dot { display: block; }
 .downloads-btn.downloading .icon-svg { opacity: 0.6; }
+
+/* Phosphor pairs a LINE weight and a FILL weight as two different drawings, not
+   one path with a fill toggled — so an icon that has an on-state carries both
+   paths and the state flips which is shown. Pure CSS: a class change on the
+   button, no DOM swap, so toggling costs nothing on a tab switch. Icons with no
+   on-state ship the line path alone and stay one path. */
+.i-fill { display: none; }
+.icon-btn.active > svg > .i-fill,
+.icon-btn.on > svg > .i-fill { display: inline; }
+.icon-btn.active > svg > .i-line,
+.icon-btn.on > svg > .i-line { display: none; }
 
 #bookmark-btn .bookmark-filled { display: none; }
 #bookmark-btn.bookmarked .bookmark-outline { display: none; }
@@ -1435,6 +1474,20 @@ html[data-tabbar="side"] .sb-workspaces.reordering {
   padding: 6px; border-radius: 12px; background: var(--hover);
 }
 html[data-tabbar="side"] .sb-workspaces.reordering .sb-ws { cursor: grab; }
+/* Overflow you can SEE. The scrollbar is hidden (it would double the row's
+   height for four pixels of information), so the edge that still has spaces
+   behind it fades instead. Both classes are set from the scroll position, so a
+   strip scrolled to its start does not pretend there is something to its left.
+   The reorder grid wraps rather than scrolling, so it is never masked. */
+html[data-tabbar="side"] .sb-workspaces.overflowing:not(.reordering) {
+  mask-image: linear-gradient(to right, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+}
+html[data-tabbar="side"] .sb-workspaces.overflowing.at-start:not(.reordering) {
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 20px), transparent 100%);
+}
+html[data-tabbar="side"] .sb-workspaces.overflowing.at-end:not(.reordering) {
+  mask-image: linear-gradient(to right, transparent 0, #000 20px, #000 100%);
+}
 }
 
 @layer components {

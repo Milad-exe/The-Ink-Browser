@@ -1099,7 +1099,13 @@
             const available = [];
             if (shown('reader-btn')) available.push('reader');
             if (shown('pip-btn')) available.push('pip');
-            if (shown('downloads-btn')) available.push('downloads');
+            /* Downloads is always offered. Reader and PiP genuinely depend on
+               what the page contains, but the downloads list is browser-level:
+               the toolbar icon hid itself when the list was empty because an
+               icon that is always there says nothing, whereas a PANEL row that
+               is dead until you have downloaded something is just a dead row —
+               and its panel already has an empty state to show. */
+            available.push('downloads');
             const url = String(tabUrls.get(activeTabIndex) || '');
             const internal = !!northstarDisplay(url) || !/^https?:/i.test(url);
             let host = '';
@@ -1808,6 +1814,40 @@
             setTimeout(pullContainers, 800);
         }
         catch (e) { window.inkLog?.debug('renderer', 'pullContainers: ' + e); }
+        /* The foot's space row is a shortcut, not the full list — the header
+           pill is the complete switcher — so it scrolls rather than growing. But
+           a scroller with its scrollbar hidden says nothing about what it is
+           hiding, and this one did not follow the active space: with nine
+           spaces, the one you had just switched to sat off the end of a strip
+           still scrolled to zero. Now it follows, and the ends fade while there
+           is more in that direction. */
+        function syncSpaceOverflow(row) {
+            if (!row)
+                return;
+            /* Centre the active space rather than asking scrollIntoView for it:
+               the row carries scroll-snap, which fought the "nearest" scroll and
+               left a middle space clipped at the edge. Centred also shows the
+               neighbours on both sides, which is what the snapping wants. */
+            const active = row.querySelector('.sb-ws.active');
+            if (active) {
+                const want = active.offsetLeft - (row.clientWidth - active.offsetWidth) / 2;
+                row.scrollLeft = Math.max(0, Math.min(want, row.scrollWidth - row.clientWidth));
+            }
+            const paint = () => {
+                const over = row.scrollWidth - row.clientWidth > 1;
+                row.classList.toggle('overflowing', over);
+                row.classList.toggle('at-start', !over || row.scrollLeft <= 1);
+                row.classList.toggle('at-end', !over || row.scrollLeft >= row.scrollWidth - row.clientWidth - 1);
+            };
+            paint();
+            if (row.dataset.overflowBound)
+                return;
+            row.dataset.overflowBound = '1';
+            row.addEventListener('scroll', paint, { passive: true });
+            try { new ResizeObserver(paint).observe(row); }
+            catch (e) { window.inkLog?.debug('renderer', 'syncSpaceOverflow: ' + e); }
+        }
+
         function initProfiles() {
             const btn = document.getElementById('profile-btn');
             const badge = document.getElementById('profile-badge');
@@ -2041,6 +2081,7 @@
                         });
                         wsRow.appendChild(b);
                     }
+                    syncSpaceOverflow(wsRow);
                 }
             };
             initSpaceRowGestures();
@@ -2266,7 +2307,7 @@
                 const shield = document.createElement('span');
                 shield.className = 'tab-private-icon';
                 shield.title = 'Private tab';
-                shield.innerHTML = '<svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><path d="M8 1L2 3.5V8c0 3.3 2.5 5.7 6 7 3.5-1.3 6-3.7 6-7V3.5L8 1zm0 6.5h4c-.3 2.2-1.8 4-4 5.1V7.5H4V5l4-1.7V7.5z"/></svg>';
+                shield.innerHTML = '<svg width="10" height="10" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208,36H48A20,20,0,0,0,28,56v56c0,54.29,26.32,87.22,48.4,105.29,23.71,19.39,47.44,26,48.44,26.29a12.1,12.1,0,0,0,6.32,0c1-.28,24.73-6.9,48.44-26.29,22.08-18.07,48.4-51,48.4-105.29V56A20,20,0,0,0,208,36Zm-4,76c0,35.71-13.09,64.69-38.91,86.15A126.28,126.28,0,0,1,128,219.38a126.14,126.14,0,0,1-37.09-21.23C65.09,176.69,52,147.71,52,112V60H204ZM79.51,144.49a12,12,0,1,1,17-17L112,143l47.51-47.52a12,12,0,0,1,17,17l-56,56a12,12,0,0,1-17,0Z"/></svg>';
                 btn.appendChild(shield);
             }
             btn.appendChild(titleSpan);
@@ -2707,13 +2748,13 @@
             '<stop offset="0" stop-color="var(--folder-sheen)"/>' +
             '<stop offset="1" stop-color="var(--folder-fill)"/></linearGradient></defs>';
         const FOLDER_GLYPH = {
-            closed: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.17" stroke-linejoin="round">' + FOLDER_DEFS +
+            closed: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round">' + FOLDER_DEFS +
                 '<path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v6.3a1.7 1.7 0 0 1-1.7 1.7H4.2a1.7 1.7 0 0 1-1.7-1.7z" fill="url(#fg)"/>' +
-                '<path d="M3.6 8.4h12.8" stroke="var(--folder-sheen)" stroke-width="1" stroke-linecap="round" opacity="0.7"/></svg>',
-            open: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.17" stroke-linejoin="round">' + FOLDER_DEFS +
+                '<path d="M3.6 8.4h12.8" stroke="var(--folder-sheen)" stroke-width="1.25" stroke-linecap="round" opacity="0.7"/></svg>',
+            open: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round">' + FOLDER_DEFS +
                 '<path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.1l1.6 1.9h7A1.7 1.7 0 0 1 17.5 8v1.2H5.6z" fill="url(#fg)"/>' +
                 '<path d="M2.5 6.6l1.3 7.9a1.7 1.7 0 0 0 1.7 1.5h10.3a1.7 1.7 0 0 0 1.7-1.5l1-5.2H5.6z" fill="url(#fg)"/>' +
-                '<path d="M5.9 10.1h11.3" stroke="var(--folder-sheen)" stroke-width="1" stroke-linecap="round" opacity="0.55"/></svg>',
+                '<path d="M5.9 10.1h11.3" stroke="var(--folder-sheen)" stroke-width="1.25" stroke-linecap="round" opacity="0.55"/></svg>',
         };
         function setFolderIcon(el, f) {
             if (f.icon) { el.innerHTML = ''; el.textContent = f.icon; return; }
@@ -3105,10 +3146,10 @@
         }
         // ── Tab media indicator: audible/muted speaker, recording mic/camera ─────
         const INDICATOR_SVG = {
-            audio: '<svg viewBox="0 0 20 20" width="11" height="11" fill="currentColor"><path d="M3.5 7.5v5H7l4 3.5v-12L7 7.5H3.5z"/><path d="M13.5 7a4 4 0 010 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
-            muted: '<svg viewBox="0 0 20 20" width="11" height="11" fill="currentColor"><path d="M3.5 7.5v5H7l4 3.5v-12L7 7.5H3.5z"/><path d="M13 8l4 4M17 8l-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
-            mic: '<svg viewBox="0 0 20 20" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.91" stroke-linecap="round" stroke-linejoin="round"><rect x="7.5" y="2.5" width="5" height="9" rx="2.5"/><path d="M4.5 9.5a5.5 5.5 0 0011 0M10 15v2.5"/></svg>',
-            camera: '<svg viewBox="0 0 20 20" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.91" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5.5" width="11" height="9" rx="1.5"/><path d="M13 9l5-2.5v7L13 11"/></svg>',
+            audio: '<svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M157.27,21.22a12,12,0,0,0-12.64,1.31L75.88,76H32A20,20,0,0,0,12,96v64a20,20,0,0,0,20,20H75.88l68.75,53.47A12,12,0,0,0,164,224V32A12,12,0,0,0,157.27,21.22ZM36,100H68v56H36Zm104,99.46L92,162.13V93.87l48-37.33ZM212,128a44,44,0,0,1-11,29.11,12,12,0,1,1-18-15.88,20,20,0,0,0,0-26.43,12,12,0,0,1,18-15.86A43.94,43.94,0,0,1,212,128Zm40,0a83.87,83.87,0,0,1-21.39,56,12,12,0,0,1-17.89-16,60,60,0,0,0,0-80,12,12,0,1,1,17.88-16A83.87,83.87,0,0,1,252,128Z"/></svg>',
+            muted: '<svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M157.27,21.22a12,12,0,0,0-12.64,1.31L75.88,76H32A20,20,0,0,0,12,96v64a20,20,0,0,0,20,20H75.88l68.75,53.47A12,12,0,0,0,164,224V32A12,12,0,0,0,157.27,21.22ZM36,100H68v56H36Zm104,99.47L92,162.12V93.88l48-37.34Zm108.49-55.95a12,12,0,0,1-17,17L216,145l-15.51,15.52a12,12,0,0,1-17-17L199,128l-15.52-15.51a12,12,0,0,1,17-17L216,111l15.51-15.51a12,12,0,0,1,17,17L233,128Z"/></svg>',
+            mic: '<svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M128,180a52.06,52.06,0,0,0,52-52V64A52,52,0,0,0,76,64v64A52.06,52.06,0,0,0,128,180ZM100,64a28,28,0,0,1,56,0v64a28,28,0,0,1-56,0Zm40,155.22V240a12,12,0,0,1-24,0V219.22A92.14,92.14,0,0,1,36,128a12,12,0,0,1,24,0,68,68,0,0,0,136,0,12,12,0,0,1,24,0A92.14,92.14,0,0,1,140,219.22Z"/></svg>',
+            camera: '<svg width="11" height="11" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M249.45,69.31a12,12,0,0,0-12.51,1L212,88.43V72a20,20,0,0,0-20-20H32A20,20,0,0,0,12,72V184a20,20,0,0,0,20,20H192a20,20,0,0,0,20-20V167.57l24.94,18.14A12,12,0,0,0,256,176V80A12,12,0,0,0,249.45,69.31ZM188,180H36V76H188Zm44-27.57-20-14.54V118.11l20-14.54Z"/></svg>',
         };
         const INDICATOR_TITLE = {
             audio: 'Playing audio — click to mute',
