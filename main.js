@@ -55,6 +55,25 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
     app.quit();
 }
+/* A signal is a QUIT, not a kill. Node ends the process on SIGTERM/SIGINT
+   without ever reaching 'before-quit', which is where the session snapshot is
+   written — so `npm run dev`'s restart, and any plain `pkill`, threw the whole
+   window state away and every tab came back empty. Route them through
+   app.quit() so the normal teardown runs; the guard is because a second signal
+   arriving mid-quit must not restart the teardown. */
+let quittingBySignal = false;
+for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
+    try {
+        process.on(sig, () => {
+            if (quittingBySignal)
+                return;
+            quittingBySignal = true;
+            try { app.quit(); }
+            catch (e) { process.exit(0); }
+        });
+    }
+    catch (e) { log.debug('main', 'signal handler', e); }
+}
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 // Use Chromium's built-in (mock) storage for its cookie/password encryption key
 // instead of the OS keychain. The keychain path makes macOS pop a "wants to use
