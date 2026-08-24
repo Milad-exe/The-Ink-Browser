@@ -185,18 +185,23 @@ class Northstar {
         // TLS failures get a real interstitial (what's wrong, which certificate,
         // an informed way through) instead of the generic network error page.
         certErrors.register(app);
-        // Offer to be the system's http(s) handler. Registering is not the same
-        // as being chosen — the OS still asks the user — but without it the app
-        // never appears in the list at all.
+        /* Open what the OS hands us — open-url on macOS, argv on Windows and
+           Linux — so a link that arrives lands in a tab rather than nowhere.
+
+           This deliberately does NOT call registerProtocols(). That runs
+           setAsDefaultProtocolClient('http'/'https'), which on macOS makes the
+           SYSTEM put up "change your default browser?" — and it ran on every
+           single launch, so the answer was asked for again every time the app
+           started. It was never needed to appear in the OS's browser list
+           either: the packaged Info.plist already declares both schemes
+           (build.protocols in package.json), which is what puts Northstar
+           there. Registering is now what the "Make default" button in Settings
+           does, when the user actually asks for it. */
         try {
-            defaultBrowser.registerProtocols();
-            // …and actually open what the OS hands us (open-url on macOS, argv
-            // on Windows/Linux). Registering without this would make Northstar
-            // a link black hole.
             defaultBrowser.init(this.windowManager);
         }
         catch (e) {
-            log.warn('main', 'protocol registration failed', e);
+            log.warn('main', 'link intake setup failed', e);
         }
         app.whenReady().then(async () => {
             themes.bind(this.windowManager.persistence);
