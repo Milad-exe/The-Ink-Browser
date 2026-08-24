@@ -1018,6 +1018,43 @@ test('an Essential\'s binding key survives a url with a pipe in it', () => {
     assert.strictEqual(R.keyOfBinding(R.bindingKey('3', key)), key);
 });
 
+// ── Captive portal ───────────────────────────────────────────────────────────
+// The branches that matter are the ones you cannot reproduce at a desk: a
+// portal that redirects, and a portal that answers 200 with its own page.
+const captive = require('../features/captive-portal');
+
+test('a redirect means a portal, and its target is the sign-in page', () => {
+    const r = captive.classify(302, '', 'http://wifi.hotel.example/login');
+    assert.strictEqual(r.portal, true);
+    assert.strictEqual(r.online, false);
+    assert.strictEqual(r.portalUrl, 'http://wifi.hotel.example/login');
+});
+
+test('a redirect with a duplicated Location header takes the first', () => {
+    const r = captive.classify(307, '', ['http://a.example/login', 'http://b.example/login']);
+    assert.strictEqual(r.portalUrl, 'http://a.example/login');
+});
+
+test('the expected body means genuinely online', () => {
+    const r = captive.classify(200, 'success', undefined);
+    assert.deepStrictEqual(r, { online: true, portal: false, portalUrl: null });
+});
+
+test('trailing whitespace in the probe body is still online', () => {
+    // Some middleboxes append a newline; that is not a portal.
+    assert.strictEqual(captive.classify(200, 'success\n').online, true);
+});
+
+test('200 with someone else\'s page is a portal serving its own login', () => {
+    const r = captive.classify(200, '<html>Sign in to WiFi</html>', undefined);
+    assert.strictEqual(r.portal, true);
+    assert.strictEqual(r.portalUrl, null, 'no Location header — the caller falls back');
+});
+
+test('a server error is a portal too, not silently online', () => {
+    assert.strictEqual(captive.classify(503, '').online, false);
+});
+
 // ── Report ───────────────────────────────────────────────────────────────────
 if (failures.length) {
     console.error(`\n${failures.length} of ${passed + failures.length} unit tests failed:\n`);

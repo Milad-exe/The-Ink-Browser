@@ -30,6 +30,25 @@ let checking = false;
 let signInOpen = false; // a sign-in tab is already open for the current portal
 let monitorTimer = null;
 
+/**
+ * What a response MEANS. Split out from probe() so the three branches can be
+ * tested without a network — the portal cases are the ones that matter and the
+ * ones you cannot reproduce on a desk.
+ *
+ *   3xx                  → a portal redirected us; its login is the target
+ *   200 + exact body     → really online
+ *   200 + anything else  → the portal served its own page at the probe url
+ */
+function classify(status, body, location) {
+    if (status >= 300 && status < 400) {
+        const loc = Array.isArray(location) ? location[0] : location;
+        return { online: false, portal: true, portalUrl: loc || null };
+    }
+    if (status === 200 && String(body || '').trim() === EXPECT)
+        return { online: true, portal: false, portalUrl: null };
+    return { online: false, portal: true, portalUrl: null };
+}
+
 /** One probe → { online, portal, portalUrl }. Never rejects. */
 function probe() {
     return new Promise((resolve) => {
@@ -39,20 +58,10 @@ function probe() {
             const req = net.request({ url: PROBE_URL, useSessionCookies: false, cache: 'no-cache', redirect: 'manual' });
             req.on('response', (res) => {
                 const status = res.statusCode || 0;
-                if (status >= 300 && status < 400) {
-                    const loc = res.headers.location || res.headers.Location;
-                    res.on('data', () => { });
-                    res.on('end', () => finish({ online: false, portal: true, portalUrl: Array.isArray(loc) ? loc[0] : loc || null }));
-                    return;
-                }
+                const loc = res.headers.location || res.headers.Location;
                 let body = '';
                 res.on('data', (c) => { if (body.length < 4096) body += c.toString(); });
-                res.on('end', () => {
-                    if (status === 200 && body.trim() === EXPECT)
-                        finish({ online: true, portal: false, portalUrl: null });
-                    else
-                        finish({ online: false, portal: true, portalUrl: null }); // 200 w/ wrong body = portal page
-                });
+                res.on('end', () => finish(classify(status, body, loc)));
             });
             req.on('error', () => finish({ online: false, portal: false, portalUrl: null })); // no network → not a portal
             setTimeout(() => finish({ online: false, portal: false, portalUrl: null }), 6000);
@@ -104,4 +113,4 @@ async function check(onPortal) {
     }
 }
 
-module.exports = { probe, check };
+module.exports = { probe, check, classify };
