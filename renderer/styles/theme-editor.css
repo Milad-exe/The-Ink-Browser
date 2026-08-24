@@ -138,6 +138,21 @@
   font-size: var(--fs-body); font-weight: 550; color: var(--text);
   letter-spacing: var(--tracking);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  /* It is a <button> so a custom theme's name can be renamed in place, but it
+     must still read as the heading it is — no chrome until you are over it. */
+  background: none; border: 0; padding: 2px 4px; margin-left: -4px;
+  font-family: inherit; text-align: left; border-radius: var(--r-sm, 6px);
+  cursor: default;
+}
+.theme-current-name.is-editable { cursor: text; }
+.theme-current-name.is-editable:hover { background: var(--hover); }
+.theme-current-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.theme-current-name-input {
+  font-size: var(--fs-body); font-weight: 550; color: var(--text);
+  letter-spacing: var(--tracking); font-family: inherit;
+  background: var(--surface); border: 1px solid var(--accent);
+  border-radius: var(--r-sm, 6px); padding: 2px 4px; margin-left: -4px;
+  min-width: 0; max-width: 180px; outline: none;
 }
 .theme-current-kind {
   flex: 1 1 auto; min-width: 0;

@@ -161,7 +161,13 @@
 
         const caption = document.createElement('div');
         caption.className = 'theme-current';
-        const capName = document.createElement('span');
+        /* The name is a BUTTON when the theme is yours. Custom themes are named
+           from their hue, so three blue ones came out "Blue", "Blue 2",
+           "Blue 3" and nothing told them apart — and there was no way to change
+           that. Clicking the name renames it in place, which is where a name
+           is. Built-ins stay a plain label: their names are not yours to edit. */
+        const capName = document.createElement('button');
+        capName.type = 'button';
         capName.className = 'theme-current-name';
         const capKind = document.createElement('span');
         capKind.className = 'theme-current-kind';
@@ -175,6 +181,52 @@
             const t = list.find(x => x.id === current);
             openEditor(t && t.kind === 'custom' ? t : null, t || null);
             editor.scrollIntoView({ block: 'nearest' });
+        });
+        /* Rename in place: the label becomes a field, Enter commits, Escape
+           puts it back. The save carries the theme's existing seed — a rename
+           must not re-derive the palette from whatever the wheel happens to be
+           showing. */
+        let renaming = false;
+        const commitRename = async (t, value, field) => {
+            const next = String(value || '').trim().slice(0, 40);
+            renaming = false;
+            field.remove();
+            capName.hidden = false;
+            if (!next || next === t.name) {
+                paint(current);
+                return;
+            }
+            try {
+                const r = await T.save({ id: t.id, name: next, seed: t.seed });
+                if (!r || r.ok === false)
+                    warn('That name could not be saved.');
+            }
+            catch (e) {
+                warn('That name could not be saved.');
+                window.inkLog?.debug('theme-editor', 'rename: ' + e);
+            }
+            refresh();
+        };
+        capName.addEventListener('click', () => {
+            const t = list.find(x => x.id === current);
+            if (!t || t.kind !== 'custom' || renaming)
+                return;
+            renaming = true;
+            const field = document.createElement('input');
+            field.type = 'text';
+            field.className = 'theme-current-name-input';
+            field.value = t.name;
+            field.maxLength = 40;
+            field.setAttribute('aria-label', 'Theme name');
+            capName.hidden = true;
+            capName.parentNode.insertBefore(field, capName);
+            field.focus();
+            field.select();
+            field.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); commitRename(t, field.value, field); }
+                else if (e.key === 'Escape') { e.preventDefault(); commitRename(t, t.name, field); }
+            });
+            field.addEventListener('blur', () => { if (renaming) commitRename(t, field.value, field); });
         });
         caption.append(capName, capKind, capEdit);
         row.parentNode.insertBefore(caption, row.nextSibling);
@@ -223,6 +275,10 @@
             syncPickerOverflow();
             const t = list.find(x => x.id === value);
             capName.textContent = t ? t.name : '';
+            const mine = !!t && t.kind === 'custom';
+            capName.classList.toggle('is-editable', mine);
+            capName.disabled = !mine;
+            capName.title = mine ? 'Rename this theme' : '';
             capKind.textContent = t ? (t.kind === 'custom' ? 'Your theme' : 'Built-in') : '';
             /* Say what "+" will copy. "New theme" alone left the one thing
                people asked for — that it starts from what they are wearing —
