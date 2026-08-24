@@ -208,3 +208,17 @@
     background: color-mix(in srgb, var(--text) 18%, transparent); background-clip: padding-box;
   }
 }
+
+/* ── Icon line/fill pairing ────────────────────────────────────────────────
+   Phosphor ships the line weight and the fill weight as two DIFFERENT
+   drawings, not one path with a fill applied — so a control with an on-state
+   carries both paths and the state decides which shows. Pure CSS, so toggling
+   is a class change with no DOM swap. Controls with no on-state ship the line
+   path alone. */
+.i-fill { display: none; }
+.on > svg > .i-fill,
+.active > svg > .i-fill,
+[aria-pressed="true"] > svg > .i-fill { display: inline; }
+.on > svg > .i-line,
+.active > svg > .i-line,
+[aria-pressed="true"] > svg > .i-line { display: none; }

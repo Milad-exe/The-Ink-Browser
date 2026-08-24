@@ -101,7 +101,7 @@
             const remove = document.createElement('button');
             remove.className = 'row-action';
             remove.title = T('history.remove', 'Remove from history');
-            remove.innerHTML = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.29" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+            remove.innerHTML = '<svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg>';
             remove.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 try {
