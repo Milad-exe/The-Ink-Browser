@@ -107,6 +107,12 @@
             node.style.setProperty('--tp-shell', sw.shell);
             node.style.setProperty('--tp-accent', sw.accent);
             node.style.setProperty('--tp-ink', inkOn(sw.shell));
+            /* The accent badge is only drawn for a theme that HAS an accent of
+               its own. Every built-in but Blocks wears the house accent, so
+               badging them all put six identical red discs in a row — which
+               says nothing, and reads as six error markers rather than as a
+               colour. */
+            node.classList.toggle('has-accent', !!sw.ownAccent);
         };
 
         const optionFor = (t) => {
@@ -172,6 +178,36 @@
         });
         caption.append(capName, capKind, capEdit);
         row.parentNode.insertBefore(caption, row.nextSibling);
+        /* In the popup the editor is always open, so the caption's right side is
+           empty — there is nothing to "Customise". The mode toggle moves into
+           it: dark/light is a property of the theme whose name is right there,
+           and above the wheel it was an unlabelled pair of glyphs floating in
+           their own 36px band, which is exactly the height that pushed the Grain
+           slider under the foot. The Settings column keeps it inside the editor,
+           where the editor is a block you open rather than the whole panel. */
+        if (ctx.alwaysOpen) {
+            const modes = document.getElementById('te-mode-seg');
+            if (modes)
+                caption.appendChild(modes);
+        }
+
+        /* Which end of the swatch row still has themes behind it. Set from the
+           scroll position so a row scrolled to its start does not pretend there
+           is something to its left. */
+        function syncPickerOverflow() {
+            if (!picker)
+                return;
+            const over = picker.scrollWidth - picker.clientWidth > 1;
+            picker.classList.toggle('overflowing', over);
+            picker.classList.toggle('at-start', !over || picker.scrollLeft <= 1);
+            picker.classList.toggle('at-end', !over || picker.scrollLeft >= picker.scrollWidth - picker.clientWidth - 1);
+            if (picker.dataset.overflowBound)
+                return;
+            picker.dataset.overflowBound = '1';
+            picker.addEventListener('scroll', syncPickerOverflow, { passive: true });
+            try { new ResizeObserver(syncPickerOverflow).observe(picker); }
+            catch (e) { /* the scroll listener alone still covers the common case */ }
+        }
 
         const paint = (value) => {
             for (const o of options()) {
@@ -184,6 +220,7 @@
                 if (on)
                     o.scrollIntoView({ block: 'nearest', inline: 'nearest' });
             }
+            syncPickerOverflow();
             const t = list.find(x => x.id === value);
             capName.textContent = t ? t.name : '';
             capKind.textContent = t ? (t.kind === 'custom' ? 'Your theme' : 'Built-in') : '';

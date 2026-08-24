@@ -205,11 +205,32 @@ function remove(id) {
     return true;
 }
 
-// ── Essentials (global across spaces; the big favicon tiles) ─────────────────
-// Essentials are GLOBAL across spaces — unlike pinned tabs, which are
-// per-space. They used to be stored per profile, so the first read folds any
-// old per-profile lists into the shared one (de-duped) and drops them.
+/* ── Essentials (per COOKIE JAR; the big favicon tiles) ──────────────────────
+ *
+ * An Essential is a logged-in destination, so it belongs to the jar it is
+ * logged in to — not to one space, and not to the whole browser. Spaces bound
+ * to the same container share their Essentials (same account, same tiles); a
+ * space with its own jar gets its own set. Both of the browsers this design
+ * follows land here: one scopes them to the Profile that owns the Spaces, the
+ * other to the container.
+ *
+ * They used to be one list shown in EVERY space, which made the tile lie: the
+ * same favicon in a work space and a personal space opened the same site as two
+ * different people. (Before that they were per-space, which was the opposite
+ * error — two spaces sharing one login still had to add the tile twice.)
+ */
 const ESSENTIALS_MAX = 12;
+/* A space's jar, as a stable string. A bound space shares its container's jar;
+   an unbound one has its own — except space '1', which IS the default session
+   (see sessionFor), so it must name the same jar as an explicit 'default'
+   binding or the two would not see each other's tiles. */
+function jarOf(id) {
+    const key = String(id || '1');
+    const bound = _find(key)?.container;
+    if (bound)
+        return 'c:' + bound;
+    return key === '1' ? 'c:default' : 's:' + key;
+}
 function _essentials() {
     const reg = load();
     if (!Array.isArray(reg.essentials)) {
@@ -227,24 +248,42 @@ function _essentials() {
         }
         save();
     }
+    /* Entries written before Essentials were scoped go to EVERY jar that exists
+       now. They were showing in every space by definition, so keeping only the
+       ones that belonged to whichever space happened to be active would read as
+       tiles vanishing. From here the sets diverge per jar. */
+    if (reg.essentials.some(e => !e.jar)) {
+        const jars = [...new Set(reg.list.map(p => jarOf(p.id)))];
+        const legacy = reg.essentials.filter(e => !e.jar);
+        reg.essentials = reg.essentials.filter(e => e.jar);
+        for (const e of legacy)
+            for (const jar of jars)
+                reg.essentials.push({ ...e, jar });
+        save();
+    }
     return reg.essentials;
 }
-// The id argument is kept so existing per-window callers still work; Essentials
-// no longer vary by space.
-function essentials(_id) {
+const _same = (a, url, profile, jar) =>
+    a.url === url && (a.profile || null) === (profile || null) && a.jar === jar;
+
+function essentials(id) {
+    const jar = jarOf(id);
     // `home` is what "go back to its page" uses; unset means the Essential's
     // own url, so old entries keep working without a migration.
-    return _essentials().map(e => ({ ...e, home: e.home || e.url }));
+    return _essentials().filter(e => e.jar === jar).map(e => ({ ...e, home: e.home || e.url }));
 }
-function addEssential(_id, e) {
+function addEssential(id, e) {
     if (!e || !e.url)
         return false;
+    const jar = jarOf(id);
     const list = _essentials();
-    if (list.some(x => x.url === e.url && (x.profile || null) === (e.profile || null)))
+    if (list.some(x => _same(x, e.url, e.profile, jar)))
         return false;
-    if (list.length >= ESSENTIALS_MAX)
+    // The cap is per jar: twelve tiles is what the rail holds, and a work space
+    // filling up should not stop a personal one from having any.
+    if (list.filter(x => x.jar === jar).length >= ESSENTIALS_MAX)
         return false;
-    list.push({ url: e.url, title: e.title || e.url, profile: e.profile || null });
+    list.push({ url: e.url, title: e.title || e.url, profile: e.profile || null, jar });
     save();
     return true;
 }
@@ -257,8 +296,9 @@ function addEssential(_id, e) {
  * front page instead, or vice versa. It defaults to the url the Essential was
  * created from, which stays its identity key.
  */
-function setEssentialHome(_id, url, profile, home) {
-    const e = _essentials().find(x => x.url === url && (x.profile || null) === (profile || null));
+function setEssentialHome(id, url, profile, home) {
+    const jar = jarOf(id);
+    const e = _essentials().find(x => _same(x, url, profile, jar));
     if (!e)
         return false;
     const next = String(home || '').trim();
@@ -270,17 +310,19 @@ function setEssentialHome(_id, url, profile, home) {
 }
 // A static icon pinned to an Essential, overriding the live favicon (upstream
 // behaviour: an Essential's icon does not change when the site's does).
-function setEssentialIcon(_id, url, profile, icon) {
-    const e = _essentials().find(x => x.url === url && (x.profile || null) === (profile || null));
+function setEssentialIcon(id, url, profile, icon) {
+    const jar = jarOf(id);
+    const e = _essentials().find(x => _same(x, url, profile, jar));
     if (!e)
         return false;
     e.icon = (icon || '').trim().slice(0, 8) || null;
     save();
     return true;
 }
-function removeEssential(_id, url, profile = null) {
+function removeEssential(id, url, profile = null) {
+    const jar = jarOf(id);
     const list = _essentials();
-    const i = list.findIndex(x => x.url === url && (x.profile || null) === (profile || null));
+    const i = list.findIndex(x => _same(x, url, profile, jar));
     if (i === -1)
         return false;
     list.splice(i, 1);
@@ -288,4 +330,4 @@ function removeEssential(_id, url, profile = null) {
     return true;
 }
 
-module.exports = { list, meta, create, remove, reorder, rename, update, sessionFor, essentials, addEssential, removeEssential, setEssentialIcon, setEssentialHome, COLORS, EMOJIS };
+module.exports = { list, meta, create, remove, reorder, rename, update, sessionFor, jarOf, essentials, addEssential, removeEssential, setEssentialIcon, setEssentialHome, COLORS, EMOJIS };

@@ -40,7 +40,7 @@ const IDENTITY_ACCENT = '#e5484d';
    the ramp. Five colours, read off renderer/styles/themes.css. */
 const CSS_BACKED = [
     { id: 'default',   name: 'Slate',     mode: 'dark',  icon: { field: '#0a0a0b', mark: '#fafafa' },
-      swatch: { shell: '#0a0a0b', page: '#121213', bg: '#050506', text: '#fafafa', accent: '#e5484d' } },
+      swatch: { shell: '#0a0a0b', page: '#121213', bg: '#050506', text: '#fafafa', accent: '#e5484d', ownAccent: false } },
 ];
 
 /** The five colours a picker miniature needs, from a full token set. */
@@ -48,7 +48,20 @@ function swatchOf(tokens) {
     return {
         shell: tokens['--shell'], page: tokens['--page'], bg: tokens['--bg'],
         text: tokens['--text'], accent: tokens['--accent'],
+        ownAccent: !sameHex(tokens['--accent'], IDENTITY_ACCENT),
     };
+}
+/* Does this theme carry an accent of its own, or the house one? The picker
+   badges only the ones that do. Every built-in but Blocks shares IDENTITY_ACCENT
+   by design, so badging all of them drew six identical red dots that said
+   nothing — and a small red disc on the shoulder of a swatch reads as an error
+   marker, not as a colour. */
+function sameHex(a, b) {
+    const n = (h) => {
+        const v = String(h || '').trim().replace('#', '').toLowerCase();
+        return v.length === 3 ? v.split('').map(c => c + c).join('') : v;
+    };
+    return n(a) === n(b);
 }
 
 /* Derived grounds. Each is one colour plus a mode; the ramp does the rest.

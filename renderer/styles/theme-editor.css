@@ -32,6 +32,12 @@
   overflow-x: auto; scrollbar-width: none;
 }
 .theme-picker::-webkit-scrollbar { display: none; }
+/* The row scrolls with its scrollbar hidden, so the end that still has themes
+   behind it fades — otherwise the last swatch is simply cut in half by the card
+   edge and reads as a rendering fault rather than as "there are more". */
+.theme-picker.overflowing { mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%); }
+.theme-picker.overflowing.at-start { mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%); }
+.theme-picker.overflowing.at-end { mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 100%); }
 
 .theme-option {
   position: relative; flex-shrink: 0;
@@ -52,7 +58,7 @@
   background: var(--tp-shell);
   box-shadow: inset 0 0 0 0.5px var(--border-2);
 }
-.theme-swatch::after {
+.theme-swatch.has-accent::after {
   content: ''; position: absolute; right: 0; bottom: 0;
   width: 11px; height: 11px; border-radius: 50%;
   background: var(--tp-accent);
@@ -139,6 +145,10 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .theme-current-edit { flex: none; }
+/* The popup parks the mode toggle at the caption's trailing end (see
+   theme-editor.js). margin-left:auto is what pushes it there whether or not
+   "Customise" is present beside it. */
+.theme-current .te-modes { margin-left: auto; flex: none; }
 .theme-current-edit[hidden] { display: none; }
 
 /* ── Theme editor ───────────────────────────────────────────────────────────

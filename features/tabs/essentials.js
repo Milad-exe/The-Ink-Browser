@@ -18,9 +18,11 @@
 const log = require('../log');
 const rules = require('./essential-rules');
 
-/** The Essentials as stored, or [] — read lazily so unit tests need no Electron. */
-function stored() {
-    try { return require('../profiles').essentials() || []; }
+/* The Essentials of a space's cookie jar, or [] — read lazily so unit tests
+   need no Electron. The space id matters: Essentials are per jar, so a window
+   in a work space must not resolve a tile that belongs to a personal one. */
+function stored(profileId) {
+    try { return require('../profiles').essentials(profileId || '1') || []; }
     catch (e) { log.debug('essentials', 'stored', e); return []; }
 }
 
@@ -55,7 +57,7 @@ module.exports = {
         const key = this.essentialKeyOfTab(index);
         if (!key)
             return null;
-        const it = stored().find(e => rules.identity(e.url, e.profile) === key);
+        const it = stored(this.profileId).find(e => rules.identity(e.url, e.profile) === key);
         return it ? (it.home || it.url) : null;
     },
     bindEssentialTab(key, index) {
@@ -212,7 +214,7 @@ module.exports = {
         });
     },
     _rebindRestoredEssentials() {
-        const items = stored();
+        const items = stored(this.profileId);
         if (!items.length || !this.tabMap.size)
             return;
         const map = this._essentialMap();
