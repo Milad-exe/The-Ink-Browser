@@ -1741,6 +1741,16 @@
                             }],
                             ['sep'],
                             ['Open in a new tab', () => window.browserBookmarks.openInNewTab(it.url, true)],
+                            /* Renaming is cosmetic — the url stays the identity key, so
+                               a tile can be called "Mail" without re-pointing it or
+                               orphaning the tab it owns. */
+                            ['Rename…', () => {
+                                const current = it.title || it.url;
+                                promptForText('Name for this essential', current, (v) => {
+                                    if (v != null && v !== current)
+                                        window.essentials.rename(it.url, it.profile || null, v);
+                                });
+                            }],
                             ['Change icon…', () => openEmojiPicker(ev.clientX, ev.clientY,
                                 (emo) => window.essentials.setIcon(it.url, it.profile || null, emo), true)],
                             ['Bookmark…', () => window.browserBookmarks.add(it.url, it.title || '')],

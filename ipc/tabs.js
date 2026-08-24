@@ -505,6 +505,11 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (ok) broadcastEssentials();
         return ok;
     });
+    ipcMain.handle('essentials:rename', (_e, url, profile, title) => {
+        const ok = profiles.renameEssential(wm.profileOf(_e.sender), url, profile || null, title);
+        if (ok) broadcastEssentials();
+        return ok;
+    });
     ipcMain.handle('essentials:icon', (_e, url, profile, icon) => {
         const ok = profiles.setEssentialIcon(wm.profileOf(_e.sender), url, profile || null, icon);
         if (ok) broadcastEssentials();

@@ -308,6 +308,24 @@ function setEssentialHome(id, url, profile, home) {
     save();
     return true;
 }
+/**
+ * An Essential's label. The url stays its identity key, so renaming is purely
+ * cosmetic and never re-points the tile or orphans its tab — which is the whole
+ * reason a tile can be called "Mail" rather than the title the site happens to
+ * be serving today.
+ */
+function renameEssential(id, url, profile, title) {
+    const jar = jarOf(id);
+    const e = _essentials().find(x => _same(x, url, profile, jar));
+    if (!e)
+        return false;
+    const next = String(title || '').trim().slice(0, 60);
+    // Empty falls back to the url, the same default addEssential uses — a tile
+    // with no label at all is unclickable-looking.
+    e.title = next || url;
+    save();
+    return true;
+}
 // A static icon pinned to an Essential, overriding the live favicon (upstream
 // behaviour: an Essential's icon does not change when the site's does).
 function setEssentialIcon(id, url, profile, icon) {
@@ -330,4 +348,4 @@ function removeEssential(id, url, profile = null) {
     return true;
 }
 
-module.exports = { list, meta, create, remove, reorder, rename, update, sessionFor, jarOf, essentials, addEssential, removeEssential, setEssentialIcon, setEssentialHome, COLORS, EMOJIS };
+module.exports = { list, meta, create, remove, reorder, rename, update, sessionFor, jarOf, essentials, addEssential, removeEssential, setEssentialIcon, setEssentialHome, renameEssential, COLORS, EMOJIS };

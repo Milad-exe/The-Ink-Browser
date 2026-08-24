@@ -176,6 +176,17 @@
             refreshDefaultBrowser();
         });
         refreshDefaultBrowser();
+        // ── Appearance: Essentials ────────────────────────────────────────────
+        const peekToggle = document.getElementById('essentials-peek-toggle');
+        if (peekToggle) {
+            // Defaults to ON, so an unset value must read as checked — `!== false`
+            // rather than a truthiness test.
+            peekToggle.checked = settings.essentialsPeek !== false;
+            peekToggle.addEventListener('change', async () => {
+                await save('essentialsPeek', peekToggle.checked);
+                showToast(peekToggle.checked ? 'Links preview over essentials' : 'Links open in the essential');
+            });
+        }
         // ── General: Performance (tab sleeping) ────────────────────────────────
         const tabSleepToggle = document.getElementById('tabsleep-toggle');
         const tabSleepMins = document.getElementById('tabsleep-mins');
