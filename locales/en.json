@@ -152,6 +152,10 @@
     "split.movePane": "Move this pane",
     "split.moveRight": "Move to right",
     "split.moveTop": "Move to top",
-    "tab.untitled": "New tab"
+    "tab.untitled": "New tab",
+    "notice.defaultBrowser": "Make Northstar your default browser?",
+    "notice.makeDefault": "Make default",
+    "notice.notNow": "Not now",
+    "notice.captivePortal": "This network needs you to sign in."
   }
 }

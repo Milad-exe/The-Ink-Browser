@@ -195,6 +195,20 @@
     <div id="bookmark-bar-items"></div>
   </div>
 
+  <!-- One-line notices that belong to the BROWSER rather than to a page: the
+       offer to become the default browser, a captive portal that wants a
+       sign-in. It sits in the same strip as the bookmark bar and is measured
+       with it (bookmark-bar.js reportChromeHeight), so the page card moves down
+       instead of being covered. Never more than one at a time, and every one of
+       them is dismissible — a notice you cannot get rid of is a nag. -->
+  <div id="notice-bar" class="notice-bar hidden" role="status">
+    <span class="notice-text" id="notice-text"></span>
+    <div class="notice-actions">
+      <button class="btn btn-sm btn-primary" id="notice-primary" type="button"></button>
+      <button class="btn btn-sm btn-ghost" id="notice-dismiss" type="button" data-i18n="notice.notNow">Not now</button>
+    </div>
+  </div>
+
   <!-- Content Area -->
   <div id="content-area"></div>
 

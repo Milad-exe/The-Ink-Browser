@@ -742,7 +742,15 @@ class Tabs {
                 return;
             const idx = this.createTab(this.activeTabIndex, true, false);
             this.loadUrl(idx, url || 'http://neverssl.com/');
-            try { this.mainWindow.webContents.send('captive-portal', { url: url || null }); }
+            /* Say WHY a tab just appeared. Deliberately carries no id, so it is
+               not remembered — the next network is a different question, and a
+               "never tell me about captive portals again" would be a bad thing
+               to be able to answer by accident. */
+            try {
+                this.mainWindow.webContents.send('notice', {
+                    text: i18n.t('notice.captivePortal'),
+                });
+            }
             catch (e) { log.debug('tabs', 'openCaptivePortalSignIn', e); }
         }
         catch (e) { log.debug('tabs', 'openCaptivePortalSignIn', e); }

@@ -745,7 +745,15 @@
             // Measured, not hardcoded: this number offsets the page view, so a
             // constant that drifted from .bookmark-bar's height (30 here, 34 in
             // CSS, 28 in the docs) left the page sitting above its own card.
-            const h = showBar ? Math.round(bookmarkBar.getBoundingClientRect().height) : 0;
+            let h = showBar ? Math.round(bookmarkBar.getBoundingClientRect().height) : 0;
+            /* The notice bar shares this strip, so it shares the measurement.
+               Reported from here because there is exactly ONE number the main
+               process offsets the page by — a second reporter would race this
+               one and whichever spoke last would win. renderer.js calls
+               reportHeight() when a notice appears or goes. */
+            const notice = document.getElementById('notice-bar');
+            if (notice && !notice.classList.contains('hidden'))
+                h += Math.round(notice.getBoundingClientRect().height);
             window.electronAPI.reportChromeHeight(h);
         }
         reportChromeHeight();
@@ -943,6 +951,6 @@
             });
             input.addEventListener('blur', commit, { once: true });
         }
-        return { init: initBookmarkBar, updateButton: updateBookmarkBtn, isVisible: () => bookmarkBarVisible };
+        return { init: initBookmarkBar, updateButton: updateBookmarkBtn, isVisible: () => bookmarkBarVisible, reportHeight: reportChromeHeight };
     };
 })(typeof window !== 'undefined' ? window : globalThis);

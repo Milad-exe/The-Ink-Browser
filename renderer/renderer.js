@@ -226,6 +226,84 @@
             makeFolderIcon,
         });
         const initBookmarkBar = bookmarks.init;
+        /* ── Notice bar ────────────────────────────────────────────────────
+           Browser-level messages, one at a time, every one dismissible. Declared
+           HERE rather than further down the file because the init sequence below
+           reaches it (CLAUDE.md invariant 2 — a const declared after those calls
+           is TDZ when they run, and it has bitten in exactly this spot). */
+        const noticeBar = document.getElementById('notice-bar');
+        const noticeText = document.getElementById('notice-text');
+        const noticePrimary = document.getElementById('notice-primary');
+        const noticeDismiss = document.getElementById('notice-dismiss');
+        let noticeCurrent = null;
+
+        function hideNotice(remember) {
+            if (remember && noticeCurrent?.id) {
+                try { window.electronAPI.dismissNotice(noticeCurrent.id); }
+                catch (e) { window.inkLog?.debug('renderer', 'dismissNotice: ' + e); }
+            }
+            noticeCurrent = null;
+            noticeBar?.classList.add('hidden');
+            bookmarks.reportHeight();
+        }
+        /* showNotice({ id, text, action, onAction }) — `id` is what a dismissal
+           is remembered against, so a notice the user has said no to never comes
+           back. A notice with no action is just a statement and shows only the
+           dismiss button. */
+        function showNotice(n) {
+            if (!noticeBar || !n || !n.text)
+                return;
+            noticeCurrent = n;
+            noticeText.textContent = n.text;
+            const hasAction = !!(n.action && typeof n.onAction === 'function');
+            noticePrimary.textContent = n.action || '';
+            noticePrimary.hidden = !hasAction;
+            noticeBar.classList.remove('hidden');
+            bookmarks.reportHeight();
+        }
+        noticePrimary?.addEventListener('click', () => {
+            const n = noticeCurrent;
+            // Acting on it settles the question, so it does not come back either.
+            hideNotice(true);
+            try { n?.onAction?.(); }
+            catch (e) { window.inkLog?.debug('renderer', 'notice action: ' + e); }
+        });
+        noticeDismiss?.addEventListener('click', () => hideNotice(true));
+
+        /* What the main process already knows we should be asking. Pulled once
+           at startup rather than pushed, so a window opened later does not race
+           the check. */
+        const T_NOTICE = (k, fallback) => {
+            const v = window.Ink?.i18n?.t(k);
+            return (!v || v === k) ? fallback : v;
+        };
+        function initNotices() {
+            try {
+                window.electronAPI.pendingNotices?.().then((list) => {
+                    const n = (list || [])[0];
+                    if (n?.id === 'default-browser') {
+                        showNotice({
+                            id: 'default-browser',
+                            text: T_NOTICE('notice.defaultBrowser', 'Make Northstar your default browser?'),
+                            action: T_NOTICE('notice.makeDefault', 'Make default'),
+                            onAction: () => window.electronAPI.makeDefaultBrowser?.(),
+                        });
+                    }
+                }).catch(() => { });
+            }
+            catch (e) { window.inkLog?.debug('renderer', 'initNotices: ' + e); }
+            /* A captive portal opens its sign-in page on its own; this says WHY
+               a tab just appeared. Not dismissible-forever — the next network
+               is a different question — so it carries no id. */
+            try {
+                window.electronAPI.onNotice?.((n) => {
+                    if (!n) return;
+                    showNotice({ text: n.text, action: n.action || '', onAction: n.onAction });
+                });
+            }
+            catch (e) { window.inkLog?.debug('renderer', 'onNotice: ' + e); }
+        }
+
         const updateBookmarkBtn = bookmarks.updateButton;
         // ── Init sequence ─────────────────────────────────────────────────────────
         initTabBarSide(); // set side/top layout BEFORE anything measures the strip
@@ -236,6 +314,7 @@
         initBookmarkBar();
         initFocusModeAndPomodoro();
         initPageActions();
+        initNotices();
         initMenu();
         initDownloads();
         initExtensions();

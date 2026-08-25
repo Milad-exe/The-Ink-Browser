@@ -29,6 +29,11 @@ const DEFAULTS = {
     // An Essential stays on its site: a link leaving it opens as a glance over
     // it rather than navigating it away (Arc's Peek, Zen's Glance).
     essentialsPeek: true,
+    /* Notices the user has said no to, by id. A browser-level notice (be the
+       default browser, sign in to this network) must never come back once it
+       has been answered — that is the whole difference between a notice and a
+       nag. */
+    dismissedNotices: [],
     settingsPage: 'general',
     windowBounds: null,
     windowState: null,

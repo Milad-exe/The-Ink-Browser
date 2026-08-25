@@ -199,6 +199,28 @@ function register(ipcMain, { wm, webContents, app }) {
         if (safe)
             await shell.openExternal(safe);
     });
+    ipcMain.on('notice-dismissed', (_e, id) => {
+        const key = String(id || '').slice(0, 40);
+        if (!key)
+            return;
+        const seen = wm.persistence.get('dismissedNotices') || [];
+        if (!seen.includes(key))
+            wm.persistence.set('dismissedNotices', [...seen, key]);
+    });
+    /* Offer to become the default browser ONCE, in the app, where the answer can
+       be remembered. This used to be the OS asking on every single launch
+       (setAsDefaultProtocolClient at startup), which no answer could stop. */
+    ipcMain.handle('notices:pending', (_e) => {
+        const seen = wm.persistence.get('dismissedNotices') || [];
+        const out = [];
+        try {
+            const st = defaultBrowser.status();
+            if (!st.isDefault && st.canPrompt && !seen.includes('default-browser'))
+                out.push({ id: 'default-browser' });
+        }
+        catch (e) { log.debug('user-data', 'notices:pending', e); }
+        return out;
+    });
     ipcMain.handle('app:default-browser-status', () => defaultBrowser.status());
     ipcMain.handle('app:make-default-browser', () => defaultBrowser.makeDefault());
     ipcMain.handle('app:key-protection', () => keyProtection());

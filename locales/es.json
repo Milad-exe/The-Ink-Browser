@@ -152,6 +152,10 @@
     "split.movePane": "Mover este panel",
     "split.moveRight": "Mover a la derecha",
     "split.moveTop": "Mover arriba",
-    "tab.untitled": "Nueva pestaña"
+    "tab.untitled": "Nueva pestaña",
+    "notice.defaultBrowser": "¿Hacer de Northstar tu navegador predeterminado?",
+    "notice.makeDefault": "Hacer predeterminado",
+    "notice.notNow": "Ahora no",
+    "notice.captivePortal": "Esta red requiere que inicies sesión."
   }
 }

@@ -1522,3 +1522,26 @@ html[data-tabbar="side"] .tab-button.multi-selected { box-shadow: inset 0 0 0 1.
   outline-offset: -2px;
   z-index: 10;
 }
+
+/* ── Notice bar ────────────────────────────────────────────────────────────
+   A browser-level message, in the strip above the page card. Same height as a
+   control row so the card's top edge lands on the grid whether this is showing
+   or not, and it carries the shell's own colours rather than an alert palette:
+   none of these are errors, and a yellow bar across the top of a browser reads
+   as one. */
+.notice-bar {
+  display: flex; align-items: center; gap: var(--sp-4);
+  height: var(--row-h); flex-shrink: 0;
+  padding: 0 var(--sp-5) 0 calc(var(--sp-3) + var(--gutter));
+  background: transparent; color: var(--text);
+  font-size: var(--fs-small);
+  -webkit-app-region: no-drag;
+}
+.notice-bar.hidden { display: none; }
+.notice-text {
+  flex: 1 1 auto; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--text-2);
+}
+.notice-actions { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
+.notice-bar .btn-sm { height: 26px; padding: 0 10px; font-size: var(--fs-small); }
