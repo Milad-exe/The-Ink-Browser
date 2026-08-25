@@ -34,6 +34,8 @@ const DEFAULTS = {
        has been answered — that is the whole difference between a notice and a
        nag. */
     dismissedNotices: [],
+    // The first-run card shows once, on a profile that has never had a tab.
+    seenWelcome: false,
     settingsPage: 'general',
     windowBounds: null,
     windowState: null,

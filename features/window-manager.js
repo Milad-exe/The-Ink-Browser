@@ -302,6 +302,11 @@ class WindowManager {
             catch (e) { log.debug('window-manager', 'navigate', e); }
             // inactive: tab tear-off — focusing a new window mid-drag would
             // break mouse capture.
+            /* deferShow: the window is built and loaded but stays hidden until
+               someone reveals it — the first-launch splash uses this so the
+               browser boots BEHIND the animation rather than after it. */
+            if (options?.deferShow)
+                return;
             try {
                 options?.inactive ? window.showInactive() : window.show();
             }
@@ -312,7 +317,8 @@ class WindowManager {
         // don't leave the user with an invisible window.
         setTimeout(() => {
             try {
-                if (!window.isDestroyed() && !window.isVisible())
+                // A deferred window is hidden on purpose; reveal() shows it.
+                if (!window.isDestroyed() && !window.isVisible() && !options?.deferShow)
                     window.show();
             }
             catch (e) { log.debug('window-manager', 'navigate', e); }
@@ -539,6 +545,16 @@ class WindowManager {
             return { action: 'deny' };
         });
         return windowData;
+    }
+    /* Show a window created with `deferShow` — the first-launch splash builds
+       the browser behind its animation and reveals it when the animation ends.
+       Idempotent: a window already visible is left alone. */
+    reveal(wd) {
+        const w = wd?.window;
+        if (!w || w.isDestroyed() || w.isVisible())
+            return false;
+        try { w.show(); w.focus(); return true; }
+        catch (e) { log.debug('window-manager', 'reveal', e); return false; }
     }
     getWindowByWebContents(webContents) {
         for (const [id, windowData] of this.windows) {
