@@ -84,7 +84,13 @@ module.exports = {
         try {
             const bar = new WebContentsView({
                 webPreferences: {
-                    preload: path.join(__dirname, '../preload/glance-bar-preload.js'),
+                    /* resolveAppFile, NOT __dirname: this file lives in
+                       features/tabs/, so '../preload' resolved to
+                       features/preload — a directory that does not exist. The
+                       preload silently did not load, window.glanceBar was
+                       undefined, and both buttons on the glance header did
+                       nothing. split.js had the same bug twice. */
+                    preload: resolveAppFile('preload/glance-bar-preload.js'),
                     contextIsolation: true,
                     nodeIntegration: false,
                 },

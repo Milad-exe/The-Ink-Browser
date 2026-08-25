@@ -277,6 +277,32 @@
             const v = window.Ink?.i18n?.t(k);
             return (!v || v === k) ? fallback : v;
         };
+        /* #ext-actions is <browser-action-list>, whose buttons live in a SHADOW
+           root — so CSS cannot tell whether it holds anything (:empty only sees
+           light-DOM children, and matched even with extensions installed, which
+           hid every extension button in the bar). Watch the shadow root and say
+           so with a class. */
+        function initExtActionsGap() {
+            const el = document.getElementById('ext-actions');
+            if (!el)
+                return;
+            const sync = () => {
+                const root = el.shadowRoot;
+                // No shadow root yet = the element has not upgraded; assume it
+                // will have content rather than hiding it pre-emptively.
+                const count = root ? root.querySelectorAll('*').length : 1;
+                el.classList.toggle('is-empty', count === 0);
+            };
+            sync();
+            try {
+                if (el.shadowRoot)
+                    new MutationObserver(sync).observe(el.shadowRoot, { childList: true, subtree: true });
+                else
+                    setTimeout(initExtActionsGap, 600); // wait for the upgrade
+            }
+            catch (e) { window.inkLog?.debug('renderer', 'extActions: ' + e); }
+        }
+
         function initNotices() {
             try {
                 window.electronAPI.pendingNotices?.().then((list) => {
@@ -315,6 +341,7 @@
         initFocusModeAndPomodoro();
         initPageActions();
         initNotices();
+        initExtActionsGap();
         initMenu();
         initDownloads();
         initExtensions();

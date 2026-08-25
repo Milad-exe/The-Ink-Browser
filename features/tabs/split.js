@@ -70,7 +70,7 @@ module.exports = {
     _splitControlView(hash) {
         const view = new WebContentsView({
             webPreferences: {
-                preload: path.join(__dirname, '../preload/split-preload.js'),
+                preload: resolveAppFile('preload/split-preload.js'),
                 contextIsolation: true,
                 nodeIntegration: false,
             },
@@ -274,7 +274,7 @@ module.exports = {
         try {
             const view = new WebContentsView({
                 webPreferences: {
-                    preload: path.join(__dirname, '../preload/split-drop-preload.js'),
+                    preload: resolveAppFile('preload/split-drop-preload.js'),
                     contextIsolation: true,
                     nodeIntegration: false,
                 },

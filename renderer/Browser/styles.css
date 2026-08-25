@@ -980,11 +980,15 @@ html[data-tabbar="side"] .sidebar-foot {
    flung apart either. */
 .nav-buttons { margin-right: var(--sp-4); }
 /* An empty flex child still takes a gap. #ext-actions holds the installed
-   extensions' toolbar buttons and is empty on most profiles, so it was adding a
-   phantom 4px between the address field and the menu — a gap with nothing in
-   it, which is why that separation measured 16 instead of the --sp-5 the
-   wrapper asks for. */
-.trailing-icons #ext-actions:empty { display: none; }
+   extensions' toolbar buttons and is empty on most profiles, so it adds a
+   phantom 4px between the address field and the menu.
+
+   It is NOT `:empty` that decides. #ext-actions is <browser-action-list>, a
+   custom element that renders its buttons into a SHADOW ROOT — and :empty only
+   considers light-DOM children, so it matched even with extensions installed
+   and hid every extension button in the bar. The renderer sets .is-empty from
+   the shadow root's actual contents instead. */
+.trailing-icons #ext-actions.is-empty { display: none; }
 
 .nav-btn,
 .icon-btn {
