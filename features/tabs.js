@@ -1112,6 +1112,36 @@ class Tabs {
         // the opener (postMessage) and closes itself (window.close()). Forcing
         // those into a tab silently breaks login and leaves an orphaned tab that
         // the page can never close.
+        /* A popup has no chrome — no address bar, no lock — so the ONLY thing
+           identifying it is its title bar, and by default that shows whatever
+           title the page gives itself. A window that can name itself
+           "Sign in — Google" while being served from somewhere else is a
+           phishing surface, which is why real browsers show the ORIGIN in a
+           popup and refuse to let the page override it. So do we: the title is
+           the origin, it follows navigation, and page-title-updated is
+           suppressed. */
+        tab.webContents.on('did-create-window', (win, details) => {
+            try {
+                const originOf = (u) => {
+                    try { return new URL(u).origin.replace(/^https:\/\//, ''); }
+                    catch (e) { return u || ''; }
+                };
+                const paint = (u) => {
+                    if (win.isDestroyed())
+                        return;
+                    try { win.setTitle(originOf(u)); }
+                    catch (e) { log.debug('tabs', 'popup title', e); }
+                };
+                paint(details?.url || win.webContents.getURL());
+                win.webContents.on('page-title-updated', (e) => {
+                    e.preventDefault();
+                    paint(win.webContents.getURL());
+                });
+                win.webContents.on('did-navigate', (_e, u) => paint(u));
+                win.webContents.on('did-navigate-in-page', (_e, u) => paint(u));
+            }
+            catch (e) { log.debug('tabs', 'did-create-window', e); }
+        });
         tab.webContents.setWindowOpenHandler(({ url, disposition, features }) => {
             // Block dangerous protocols outright, whatever the disposition.
             try {
