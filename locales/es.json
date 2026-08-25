@@ -156,6 +156,8 @@
     "notice.defaultBrowser": "¿Hacer de Northstar tu navegador predeterminado?",
     "notice.makeDefault": "Hacer predeterminado",
     "notice.notNow": "Ahora no",
-    "notice.captivePortal": "Esta red requiere que inicies sesión."
+    "notice.captivePortal": "Esta red requiere que inicies sesión.",
+    "settings.startupEmpty": "Empezar con una ventana vacía",
+    "settings.startupRestore": "Restaurar la sesión anterior"
   }
 }

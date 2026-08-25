@@ -156,6 +156,8 @@
     "notice.defaultBrowser": "Make Northstar your default browser?",
     "notice.makeDefault": "Make default",
     "notice.notNow": "Not now",
-    "notice.captivePortal": "This network needs you to sign in."
+    "notice.captivePortal": "This network needs you to sign in.",
+    "settings.startupEmpty": "Start with an empty window",
+    "settings.startupRestore": "Restore previous session"
   }
 }
