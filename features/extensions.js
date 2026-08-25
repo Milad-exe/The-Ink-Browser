@@ -138,13 +138,26 @@ class Extensions {
                 if (!sw || sw._inkGapWired)
                     return;
                 sw._inkGapWired = true;
-                try { require('../ipc/extensions').attachGapHandlers(sw, this.wm); }
-                catch (e) { console.error('extension gap handlers:', e.message); }
+                /* The gap layer lives in ipc/, which is a LAYER ABOVE this one.
+                   Fetching it from here inverted that — features reaching up
+                   into ipc — and was the single edge every circular dependency
+                   in this tree routed through. ipc/extensions hands it down at
+                   register() time instead. */
+                try { this._gapHandlers && this._gapHandlers(sw, this.wm); }
+                catch (e) { log.error('extensions', 'extension gap handlers', e); }
             });
         }
         catch (e) {
             console.error('extension polyfill registration:', e.message);
         }
+    }
+    /**
+     * Who wires the chrome.* gap layer onto a new service worker. Injected by
+     * ipc/extensions at registration rather than required from here, so this
+     * module never depends on the layer above it.
+     */
+    setGapHandlers(fn) {
+        this._gapHandlers = typeof fn === 'function' ? fn : null;
     }
     /**
      * The host for a session, created on first use. Spaces and containers get

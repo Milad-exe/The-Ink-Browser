@@ -107,7 +107,7 @@ class Shortcuts {
         this.registerShortcut('CmdOrCtrl+T', () => {
             try {
                 const wd = this.tabManager.getWindowData?.();
-                if (wd) { require('../ipc/palette').openFor(wd); return; }
+                if (wd) { require('./palette-bridge').openFor(wd); return; }
             }
             catch (e) { log.debug('shortcuts', 'registerTabShortcuts', e); }
             this.tabManager.createTab();

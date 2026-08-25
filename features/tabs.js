@@ -1846,7 +1846,7 @@ class Tabs {
             try {
                 const wd = this.getWindowData();
                 if (wd?.paletteOpen)
-                    require('../ipc/palette').hidePalette(wd);
+                    require('./palette-bridge').hidePalette(wd);
             }
             catch (e) { log.debug('tabs', 'hide palette on switch', e); }
         }
@@ -1880,7 +1880,7 @@ class Tabs {
                 try {
                     const wd = this.getWindowData();
                     if (wd?.paletteOpen)
-                        require('../ipc/palette').hidePalette(wd);
+                        require('./palette-bridge').hidePalette(wd);
                 }
                 catch (e) { log.debug('tabs', 'hide palette on load', e); }
             }
@@ -2127,7 +2127,7 @@ class Tabs {
                 try {
                     const wd = this.getWindowData();
                     if (wd?.paletteOpen)
-                        require('../ipc/palette').hidePalette(wd);
+                        require('./palette-bridge').hidePalette(wd);
                 }
                 catch (e) { log.debug('tabs', 'hide palette on load', e); }
             }

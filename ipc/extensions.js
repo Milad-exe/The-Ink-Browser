@@ -543,6 +543,12 @@ function register(ipcMain, { wm }) {
     // Extension pages (popups, options) reach the gap layer over the global
     // ipcMain; service workers get their own router in attachGapHandlers.
     extEvents.setWindowManager(wm);
+    /* Hand the gap layer DOWN to features/extensions. It used to reach up and
+       require this module at call time, which made features depend on ipc —
+       the inverse of how these layers are meant to sit, and the one edge every
+       circular dependency in the tree passed through. */
+    try { extensions.setGapHandlers(attachGapHandlers); }
+    catch (e) { log.debug('extensions', 'setGapHandlers', e); }
     registerFrameGapHandlers(ipcMain, wm);
     extensions.onChanged(() => {
         for (const wd of wm.getAllWindows()) {

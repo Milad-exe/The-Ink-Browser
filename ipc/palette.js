@@ -143,4 +143,9 @@ function register(ipcMain, { wm }) {
     }
 }
 
+/* features/ reaches the palette through features/palette-bridge, never by
+   requiring this module — that would be a layer below depending on one above.
+   Registering here, at load, is what makes the bridge work. */
+require('../features/palette-bridge').provide({ openFor, hidePalette });
+
 module.exports = { register, hidePalette, openFor };
