@@ -630,11 +630,11 @@
             try {
                 const mode = await window.userData.keyProtection();
                 if (mode === 'os-keychain') {
-                    el.textContent = 'Saved passwords are encrypted with a key held in your system keychain.';
+                    el.textContent = 'Saved passwords are encrypted with a key held in your operating system\u2019s secure store.';
                     el.classList.remove('risk');
                 }
                 else if (mode === 'file') {
-                    el.textContent = 'Your system keychain is unavailable, so the encryption key is protected by file permissions only. Anyone with access to your user account could read saved passwords.';
+                    el.textContent = 'Your operating system\u2019s secure store is unavailable, so the encryption key is protected by file permissions only. Anyone with access to your user account could read saved passwords.';
                     el.classList.add('risk');
                 }
                 else {

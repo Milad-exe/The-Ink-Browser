@@ -76,11 +76,15 @@ for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
 }
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 // Use Chromium's built-in (mock) storage for its cookie/password encryption key
-// instead of the OS keychain. The keychain path makes macOS pop a "wants to use
-// your confidential information in <app> Safe Storage" prompt on every launch of
-// an unsigned dev build; this suppresses it. (Our own password store encrypts
-// via Features/encryption.js, so nothing depends on the keychain.)
-app.commandLine.appendSwitch('use-mock-keychain');
+// instead of the OS keychain. This is a macOS concern ONLY: there, the keychain
+// path pops a "wants to use your confidential information in <app> Safe Storage"
+// prompt on every launch of an unsigned dev build, and this suppresses it. The
+// switch is macOS-specific — applying it on Windows/Linux is meaningless and
+// prints a Chromium notice about a keychain (a mac term) at startup, so it is
+// gated. (Our own password store encrypts via features/encryption.js, so
+// nothing depends on the OS store either way.)
+if (process.platform === 'darwin')
+    app.commandLine.appendSwitch('use-mock-keychain');
 // Disable FedCM (the browser-native "Sign in with Google" flow). Chromium
 // exposes navigator.credentials.get({identity}) + window.IdentityCredential, so
 // Google Identity Services picks the FedCM path — but Electron doesn't render

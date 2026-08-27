@@ -83,7 +83,7 @@ function writeKey(key) {
             return;
         }
         catch (e) {
-            log.warn('encryption', 'keychain write failed; falling back to a file-protected key', e);
+            log.warn('encryption', 'OS secure store write failed; falling back to a file-protected key', e);
         }
     }
     fs.writeFileSync(rawKeyPath(), key, { mode: 0o600 });
@@ -101,10 +101,10 @@ function getKey() {
     // 1. Wrapped key — the normal path once migrated.
     if (fs.existsSync(wrappedKeyPath())) {
         if (!ss) {
-            // The keychain is unavailable *right now* (locked session, denied
-            // access). Unwrapping is impossible; regenerating would orphan the
+            // The OS secure store is unavailable *right now* (locked session,
+            // denied access). Unwrapping is impossible; regenerating would orphan the
             // user's data, so fail loudly instead.
-            throw new Error('encryption key is keychain-wrapped but the OS keychain is unavailable');
+            throw new Error('encryption key is wrapped by the OS secure store, which is currently unavailable');
         }
         try {
             const b64 = ss.decryptString(fs.readFileSync(wrappedKeyPath()));
@@ -131,11 +131,11 @@ function getKey() {
                     fs.writeFileSync(wrappedKeyPath(), ss.encryptString(stored.toString('base64')), { mode: 0o600 });
                     fs.unlinkSync(rawKeyPath()); // the plaintext copy is the whole problem
                     protection = 'os-keychain';
-                    log.info('encryption', 'migrated the at-rest key into the OS keychain');
+                    log.info('encryption', 'migrated the at-rest key into the OS secure store');
                 }
                 catch (e) {
                     protection = 'file';
-                    log.warn('encryption', 'keychain migration failed; key stays file-protected', e);
+                    log.warn('encryption', 'OS secure store migration failed; key stays file-protected', e);
                 }
             }
             else {
