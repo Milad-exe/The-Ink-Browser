@@ -609,6 +609,47 @@ Encrypts and writes the tab state object to disk synchronously.
 
 ---
 
+## Module index
+
+`features/README.md` documents the modules it documents in depth; this is the
+list of what is in the directory, so a module is at least findable. Twenty-nine
+of these had no mention here at all.
+
+| Module | What it owns |
+|---|---|
+| `ad-blocker.js` | Filter lists, request blocking |
+| `app-icon.js` | The dock/taskbar icon (fixed palette — see CLAUDE.md) |
+| `captive-portal.js` | Detecting a wifi sign-in page. `classify()` is pure and unit-tested |
+| `containers.js` | Named cookie jars and per-site isolation |
+| `devtools-ext.js` | DevTools panels contributed by extensions |
+| `dnr.js` | declarativeNetRequest (inert in Electron; ink overrides it) |
+| `download-manager.js` | Downloads, Save As |
+| `ext-events.js`, `ext-identity.js`, `ext-proxy.js` | The chrome.* gap layer |
+| `extensions.js` | Loading, updating and hosting extensions |
+| `favicon-store.js` | Favicon cache |
+| `mini-player.js` | The floating video player |
+| `overlay-bounds.js` | `panelBounds()` — where every panel goes, decided once |
+| `overlay-menu.js` | Draws an Electron menu template as the app's own menu |
+| `palette-bridge.js` | Lets features/ reach the palette without requiring ipc/ |
+| `password-store.js` | Encrypted credentials |
+| `permission-prompt.js` | The permission policy (tiers, persistence) |
+| `permission-ui.js` | The doorhanger that asks |
+| `private-session.js` | Per-tab private sessions, wiped on close |
+| `profiles.js` | Spaces, and the cookie jar each one belongs to |
+| `reader.js` | Readability extraction |
+| `side-panel.js` | Extension side panels |
+| `site-permissions.js` | Remembered per-origin decisions |
+| `splash.js` | The first-launch window, shown once |
+| `theme-derive.js` | Sixteen tokens derived from a seed, in OKLCH |
+| `theme-runtime.js` | Injecting a theme into every surface |
+| `themes.js` | The theme registry |
+| `url-security.js` | `sanitizeUrl`, `isSafeExternal` |
+
+`features/tabs/*.js` are mixed into `Tabs.prototype` (see CLAUDE.md): `split`,
+`glance`, `organize`, `essentials`, `listeners`, `navigation`, `reader`.
+
+---
+
 ## shortcuts.ts
 
 ### Purpose

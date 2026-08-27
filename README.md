@@ -49,11 +49,13 @@ src/                      ALL source code (TypeScript + HTML + CSS)
   preload/                contextBridge scripts (one per view type)
   renderer/               One folder per UI surface (chrome, overlays, pages)
     Browser/              Main chrome shell (tab bar, omnibox, bookmark bar)
-    NewTab/, History/, Settings/, Bookmarks/, …
+    History/, Settings/, Bookmarks/, Splash/, …   (no NewTab: there is no
+    new-tab page — a window opens with no tabs)
     styles/               Shared styling
       ui.css              Tailwind v4 entry — tokens + utilities (built)
       themes.css          The four palettes + private-mode palette (CSS vars)
-      fonts.css           Self-hosted Manrope @font-face
+      fonts.css           Self-hosted Onest + Geist Mono @font-face (readable source;
+                          the copy that RUNS is inlined in ui.css)
     assets/               Fonts, images
   types/                  Ambient declarations (window.* bridges, DOM augments)
 

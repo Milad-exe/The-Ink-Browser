@@ -220,7 +220,8 @@ IPC handlers for the URL/search suggestion overlay. The overlay is a transparent
 | Name | Type | Purpose |
 |---|---|---|
 | `ITEM_HEIGHT` | `number` (35) | Height in pixels of each suggestion row |
-| `MAX_HEIGHT` | `number` (280) | Maximum overlay height in pixels |
+| `MAX_HEIGHT` | `number` | Height of the suggestions overlay — eight rows plus the shadow gutter |
+| `PANEL_HEIGHT` | `number` | What the panel is ALWAYS drawn at (= `MAX_HEIGHT`). It used to be sized to the result count, so the box resized on every keystroke |
 
 #### `itemBounds(bounds, count)`
 Computes pixel bounds for the overlay given a position rect and item count.
