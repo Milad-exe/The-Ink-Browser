@@ -194,6 +194,79 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
    puts #tab-actions ahead of the tabs in the strip's DOM. In the top strip the
    + belongs after the last tab, where every other browser keeps it. */
 html[data-tabbar="top"] #tab-actions { order: 2; }
+
+/* ── Top / horizontal mode: Spaces and Essentials get a home ─────────────────
+   In the sidebar these sit ABOVE the tabs. In the top strip they move to the
+   LEFT of them, the way other browsers place the same things: the space
+   switcher first (like Vivaldi / Edge workspace buttons), then Essentials as
+   compact favicon tiles (like Chrome's pinned tabs — which is what an Essential
+   is). The sidebar foot's Settings / Downloads / new-workspace all have other
+   homes in this mode (the ☰ menu, the page-actions panel, and the space
+   switcher's own menu), so the foot itself stays hidden.
+   Every rule here is gated to [data-tabbar="top"]; side mode is untouched. */
+html[data-tabbar="top"] #tab-bar { gap: var(--sp-3); }
+html[data-tabbar="top"] #space-header    { order: 0; }
+html[data-tabbar="top"] .essentials       { order: 1; }
+html[data-tabbar="top"] #tab-scroll-left  { order: 2; }
+html[data-tabbar="top"] #tabs-container   { order: 3; }
+html[data-tabbar="top"] #tab-scroll-right { order: 4; }
+html[data-tabbar="top"] #tab-actions      { order: 5; }
+html[data-tabbar="top"] #tab-drag-spacer  { order: 6; }
+html[data-tabbar="top"] #chrome-status    { order: 7; }
+html[data-tabbar="top"] .sidebar-foot,
+html[data-tabbar="top"] #sidebar-resizer  { display: none; }
+/* No sidebar to collapse in the top strip, so its toggle has no meaning. */
+html[data-tabbar="top"] #compact-btn { display: none; }
+
+/* The space switcher, as a compact pill at the strip's left. Same button and
+   menu as the sidebar's — only the layout differs. */
+html[data-tabbar="top"] .space-header {
+  display: flex; align-items: center; gap: var(--sp-3);
+  flex: 0 0 auto; height: var(--control-h); max-width: 190px;
+  padding: 0 var(--sp-4); border-radius: var(--r-md);
+  background: transparent; border: none; cursor: pointer; color: var(--text-2);
+  -webkit-app-region: no-drag;
+}
+html[data-tabbar="top"] .space-header:hover,
+html[data-tabbar="top"] .space-header[aria-expanded="true"] { background: var(--hover); color: var(--text); }
+html[data-tabbar="top"] .space-header:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+html[data-tabbar="top"] .space-header .space-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-body); font-weight: 600;
+}
+html[data-tabbar="top"] .space-header .space-chevron { flex: 0 0 auto; opacity: 0.6; }
+/* A hairline between the left cluster (space + essentials) and the tabs. */
+html[data-tabbar="top"] #space-header::after {
+  content: ''; position: absolute; right: calc(var(--sp-3) * -1);
+  width: 1px; height: 18px; background: var(--border);
+}
+html[data-tabbar="top"] #space-header { position: relative; }
+
+/* Essentials as a horizontal row of favicon tiles — pinned-tab style. */
+html[data-tabbar="top"] .essentials {
+  display: flex; align-items: center; gap: 3px; flex: 0 0 auto;
+  padding: 0; margin: 0; -webkit-app-region: no-drag;
+}
+html[data-tabbar="top"] .essentials:empty { display: none; }
+html[data-tabbar="top"] .essential-tile {
+  width: var(--control-h); height: var(--control-h);
+  border-radius: var(--r-md);
+  /* Explicit: the strip is a drag region, and a child with no app-region can
+     inherit it and swallow the click. */
+  -webkit-app-region: no-drag;
+}
+html[data-tabbar="top"] .essential-tile img,
+html[data-tabbar="top"] .essential-tile .ess-fallback { width: var(--icon); height: var(--icon); }
+
+/* The create-space form is a child of the strip; in the top strip it must not
+   sit inline and stretch the row. Float it under the space pill instead. */
+html[data-tabbar="top"] #space-create:not(.hidden) {
+  position: absolute; top: calc(var(--tabstrip-h) + var(--bar-h));
+  left: var(--sp-5); z-index: 60; width: 300px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-pop); padding: 12px;
+}
+
 #tab-drag-spacer { flex: 1 1 auto; min-width: 40px; height: 100%; -webkit-app-region: drag; }
 
 /* Rounded pill tabs. */

@@ -384,6 +384,9 @@ class Shortcuts {
             if (!p)
                 return;
             const next = (p.get('tabBarSide') ?? 'side') === 'top' ? 'side' : 'top';
+            // The reflow (broadcast + resize) lives in ipc/settings.js's
+            // settings-set handler now, so setting the key is enough — but the
+            // shortcut writes persistence directly, so do the broadcast here too.
             p.set('tabBarSide', next);
             const all = this.windowManager ? this.windowManager.getAllWindows() : [];
             for (const wd of all) {

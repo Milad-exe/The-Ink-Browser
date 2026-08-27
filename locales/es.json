@@ -158,6 +158,8 @@
     "notice.notNow": "Ahora no",
     "notice.captivePortal": "Esta red requiere que inicies sesión.",
     "settings.startupEmpty": "Empezar con una ventana vacía",
-    "settings.startupRestore": "Restaurar la sesión anterior"
+    "settings.startupRestore": "Restaurar la sesión anterior",
+    "settings.tabsSidebar": "En una barra lateral",
+    "settings.tabsTop": "En la parte superior"
   }
 }

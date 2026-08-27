@@ -158,6 +158,8 @@
     "notice.notNow": "Not now",
     "notice.captivePortal": "This network needs you to sign in.",
     "settings.startupEmpty": "Start with an empty window",
-    "settings.startupRestore": "Restore previous session"
+    "settings.startupRestore": "Restore previous session",
+    "settings.tabsSidebar": "In a sidebar",
+    "settings.tabsTop": "Across the top"
   }
 }

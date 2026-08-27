@@ -176,6 +176,16 @@
             refreshDefaultBrowser();
         });
         refreshDefaultBrowser();
+        // ── Appearance: tab bar position ──────────────────────────────────────
+        const tabbarRadios = document.querySelectorAll('input[name="tabbar"]');
+        const tabbarVal = (settings.tabBarSide === 'top') ? 'top' : 'side';
+        tabbarRadios.forEach(r => { if (r.value === tabbarVal) r.checked = true; });
+        tabbarRadios.forEach(r => r.addEventListener('change', async () => {
+            if (!r.checked) return;
+            await save('tabBarSide', r.value);
+            showToast(r.value === 'top' ? 'Tabs moved to the top' : 'Tabs moved to the sidebar');
+        }));
+
         // ── Appearance: Essentials ────────────────────────────────────────────
         const peekToggle = document.getElementById('essentials-peek-toggle');
         if (peekToggle) {
