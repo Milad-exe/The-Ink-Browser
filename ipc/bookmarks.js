@@ -5,6 +5,7 @@
  * so every view (bookmark bar, bookmarks page, history) stays in sync.
  */
 const log = require('../features/log');
+const overlayMenu = require('../features/overlay-menu');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView, Menu } = require('electron');
@@ -243,7 +244,8 @@ function showBookmarkBarContextMenu(wd, item, wm, webContents) {
                 click: () => wd.window.webContents.send('toggle-bookmark-bar') },
         ];
     }
-    Menu.buildFromTemplate(template).popup({ window: wd.window });
+    if (!overlayMenu.popup(wd, template, 0, 0))
+        Menu.buildFromTemplate(template).popup({ window: wd.window });
 }
 
 module.exports = { register };

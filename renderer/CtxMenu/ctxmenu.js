@@ -50,8 +50,21 @@
             }
             const here = path.concat(i);
             const b = document.createElement('button');
-            b.className = 'ctx-menu-item' + (r.cls ? ' ' + r.cls : '') + (r.sub ? ' has-sub' : '');
+            /* `disabled` and `checked` come from Electron menu templates routed
+               through features/overlay-menu.js — a page or bookmark menu can
+               have a greyed row or a tick, and dropping them would have made
+               those menus lie. */
+            b.className = 'ctx-menu-item' + (r.cls ? ' ' + r.cls : '')
+                + (r.sub ? ' has-sub' : '') + (r.checked ? ' is-checked' : '');
+            if (r.disabled)
+                b.disabled = true;
             b.appendChild(document.createTextNode(r.label));
+            if (r.checked) {
+                const tick = document.createElement('span');
+                tick.className = 'ctx-check';
+                tick.textContent = '✓';
+                b.appendChild(tick);
+            }
             if (r.sub) {
                 const ar = document.createElement('span');
                 ar.className = 'ctx-sub-arrow';

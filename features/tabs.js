@@ -1,6 +1,7 @@
 const { WebContentsView, Menu, dialog } = require('electron');
 const { resolveAppFile } = require('../app-paths');
 const log = require('./log');
+const overlayMenu = require('./overlay-menu');
 const i18n = require('./i18n');
 const preloadForPage = require('./tabs/preload-for-page');
 const path = require('path');
@@ -370,7 +371,16 @@ class Tabs {
                 menuParams = { ...params, selectionText: '' };
             }
             const contextMenuInstance = new contextMenu(tab, menuParams, this);
-            const menu = Menu.buildFromTemplate(contextMenuInstance.getTemplate());
+            const template = contextMenuInstance.getTemplate();
+            /* The app's own menu, not the OS's — a right-click on a page should
+               look like a right-click anywhere else in this browser. Falls back
+               to native if the overlay cannot be shown, so a menu is never
+               simply missing. */
+            const bounds = this.getTabBounds();
+            if (overlayMenu.popup(this.getWindowData(), template,
+                bounds.x + (params.x || 0), bounds.y + (params.y || 0)))
+                return;
+            const menu = Menu.buildFromTemplate(template);
             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
                 menu.popup({ window: this.mainWindow });
             }
@@ -580,7 +590,16 @@ class Tabs {
                 menuParams = { ...params, selectionText: '' };
             }
             const contextMenuInstance = new contextMenu(tab, menuParams, this);
-            const menu = Menu.buildFromTemplate(contextMenuInstance.getTemplate());
+            const template = contextMenuInstance.getTemplate();
+            /* The app's own menu, not the OS's — a right-click on a page should
+               look like a right-click anywhere else in this browser. Falls back
+               to native if the overlay cannot be shown, so a menu is never
+               simply missing. */
+            const bounds = this.getTabBounds();
+            if (overlayMenu.popup(this.getWindowData(), template,
+                bounds.x + (params.x || 0), bounds.y + (params.y || 0)))
+                return;
+            const menu = Menu.buildFromTemplate(template);
             menu.popup({ window: this.mainWindow });
         });
         const bounds = this.getTabBounds();

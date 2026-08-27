@@ -7,6 +7,7 @@
  * a cursor-polling loop to forward position events to the bar renderer.
  */
 const log = require('../features/log');
+const overlayMenu = require('../features/overlay-menu');
 const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { panelBounds, PANEL_RADIUS, W_SM } = require('../features/overlay-bounds');
@@ -293,7 +294,8 @@ function showFolderDropdownContextMenu(wd, item, wm, webContents) {
         ];
     }
     if (template.length)
-        Menu.buildFromTemplate(template).popup({ window: wd.window });
+        if (!overlayMenu.popup(wd, template, 0, 0))
+            Menu.buildFromTemplate(template).popup({ window: wd.window });
 }
 // ── Helpers ──────────────────────────────────────────────────────────────────
 /** Compute initial pixel bounds for a newly opened dropdown. */

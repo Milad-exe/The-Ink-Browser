@@ -11,6 +11,7 @@ const zoom = require('./zoom');
 const searchEngines = require('./search-engines');
 const i18n = require('./i18n');
 const log = require('./log');
+const overlayMenu = require('./overlay-menu');
 const appIcon = require('./app-icon');
 class WindowManager {
     windows; // windowId → { id, window, tabs, shortcuts, menu, … overlays }
@@ -398,7 +399,11 @@ class WindowManager {
             if (contextMenuInstance.getTemplate().length === 0) {
                 return;
             }
-            const menu = Menu.buildFromTemplate(contextMenuInstance.getTemplate());
+            const template = contextMenuInstance.getTemplate();
+            // The app's own menu; native only if the overlay cannot be shown.
+            if (overlayMenu.popup(this.getWindowByWebContents(window.webContents), template, 0, 0))
+                return;
+            const menu = Menu.buildFromTemplate(template);
             menu.popup({ window });
         });
         const windowData = {

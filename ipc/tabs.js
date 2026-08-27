@@ -6,6 +6,7 @@
  *         and session persistence mode.
  */
 const log = require('../features/log');
+const overlayMenu = require('../features/overlay-menu');
 const { Menu, net } = require('electron');
 const { sanitizeUrl } = require('../features/url-security');
 const zoom = require('../features/zoom');
@@ -440,7 +441,11 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             label: 'Rename Workspace…',
             click: () => { try { wd.window.webContents.send('rename-profile', renameTarget); } catch (e) { log.debug('tabs', 'profiles:menu', e); } },
         });
-        try { Menu.buildFromTemplate(template).popup({ window: wd.window, x: Math.round(x), y: Math.round(y) }); }
+        try {
+            if (overlayMenu.popup(wd, template, x, y))
+                return;
+            Menu.buildFromTemplate(template).popup({ window: wd.window, x: Math.round(x), y: Math.round(y) });
+        }
         catch (e) { log.debug('tabs', 'profiles:menu', e); }
     });
     // ── Essentials (pinned favourites; per profile) ────────────────────────────

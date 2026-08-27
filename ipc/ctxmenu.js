@@ -65,8 +65,7 @@ function hideMenu(wd) {
 }
 
 function register(ipcMain, { wm }) {
-    ipcMain.handle('ctxmenu:open', async (_e, data) => {
-        const wd = wm.getWindowByWebContents(_e.sender);
+    async function openMenu(wd, data) {
         if (!wd)
             return false;
         /* Record what to show BEFORE the view exists. On the first right-click of
@@ -100,9 +99,15 @@ function register(ipcMain, { wm }) {
             return true;
         }
         catch (err) {
-            console.error('ctxmenu:open:', err);
+            log.error('ctxmenu', 'could not open the menu', err);
             return false;
         }
+    }
+    ipcMain.handle('ctxmenu:open', (_e, data) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        // The chrome owns callbacks for menus it raises.
+        if (wd) wd.ctxMenuOwner = null;
+        return openMenu(wd, data);
     });
     /* What the menu should be showing, asked for by the page once it is ready.
        Returns null when nothing is pending, so a reload of an idle view draws
@@ -115,21 +120,37 @@ function register(ipcMain, { wm }) {
         return null;
     });
 
+    /* A pick goes to whoever opened the menu. Normally that is the chrome, which
+       owns the callbacks for menus it raised; when MAIN raised it (a page,
+       bookmark or space menu going through features/overlay-menu) the callback
+       is held here instead and the chrome is not involved. */
+    const settle = (wd, result) => {
+        hideMenu(wd);
+        const own = wd.ctxMenuOwner;
+        wd.ctxMenuOwner = null;
+        if (own) {
+            try { own(result); }
+            catch (e) { log.warn('ctxmenu', 'menu callback threw', e); }
+            return;
+        }
+        try { wd.window.webContents.send('ctxmenu:picked', result); }
+        catch (e) { log.debug('ctxmenu', 'settle', e); }
+    };
     ipcMain.on('ctxmenu:pick', (_e, result) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        if (!wd)
-            return;
-        hideMenu(wd);
-        try { wd.window.webContents.send('ctxmenu:picked', result); }
-        catch (e) { log.debug('ctxmenu', 'ctxmenu:pick', e); }
+        if (wd) settle(wd, result);
     });
     ipcMain.on('ctxmenu:dismiss', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        if (!wd)
-            return;
-        hideMenu(wd);
-        try { wd.window.webContents.send('ctxmenu:picked', null); }
-        catch (e) { log.debug('ctxmenu', 'ctxmenu:dismiss', e); }
+        if (wd) settle(wd, null);
+    });
+
+    /* Let main-process code raise this same menu (features/overlay-menu.js
+       adapts an Electron template to it), so a right-click on a page looks like
+       a right-click on the sidebar. */
+    require('../features/overlay-menu').provide((wd, data, onPick) => {
+        wd.ctxMenuOwner = onPick;
+        openMenu(wd, data);
     });
 }
 

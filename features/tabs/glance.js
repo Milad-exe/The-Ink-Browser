@@ -9,6 +9,7 @@
  */
 'use strict';
 const log = require('../log');
+const overlayMenu = require('../overlay-menu');
 const path = require('path');
 const { WebContentsView, Menu } = require('electron');
 const { resolveAppFile } = require('../../app-paths');
@@ -241,7 +242,10 @@ module.exports = {
                 catch (e) { log.debug('glance', '_adoptViewAsTab', e); }
                 menuParams = { ...params, selectionText: '' };
             }
-            const menu = Menu.buildFromTemplate(new contextMenu(view, menuParams, this).getTemplate());
+            const template = new contextMenu(view, menuParams, this).getTemplate();
+            if (overlayMenu.popup(this.getWindowData(), template, menuParams.x || 0, menuParams.y || 0))
+                return;
+            const menu = Menu.buildFromTemplate(template);
             if (this.mainWindow && !this.mainWindow.isDestroyed())
                 menu.popup({ window: this.mainWindow });
         });

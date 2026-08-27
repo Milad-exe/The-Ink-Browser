@@ -67,3 +67,11 @@ html, body {
 }
 
 }
+
+/* Rows that came from an Electron template (features/overlay-menu.js) can be
+   disabled or ticked — a page menu greys "Back" with no history, a bookmark-bar
+   menu ticks "Show bookmark bar". Without these the menu would show them as
+   ordinary rows and quietly lie. */
+.ctx-menu-item:disabled { opacity: 0.38; cursor: default; }
+.ctx-menu-item:disabled:hover { background: transparent; }
+.ctx-check { margin-left: auto; padding-left: var(--sp-4); opacity: 0.75; }
