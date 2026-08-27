@@ -1449,6 +1449,8 @@
                     }
                 }
                 updateTabTitle(data.index, data.title || data.url, data.favicon);
+                const _b = tabs.get(data.index);
+                if (_b) _b.dataset.customLabel = data.hasCustomLabel ? '1' : '';
             });
             window.tab.onNavigationUpdated((_e, data) => {
                 if (data.index === activeTabIndex)
@@ -2514,10 +2516,10 @@
                     ['Change label…', () => startTabRename(btn, idx)],
                     ['Change icon…', () => openEmojiPicker(e.clientX, e.clientY,
                         (emo) => window.tab.setIcon(idx, emo), true)],
-                    ['Reset label', () => window.tab.setLabel(idx, '')],
-                    ['Reset icon', () => window.tab.setIcon(idx, '')],
+                    ...(btn.dataset.customLabel ? [['Reset label', () => window.tab.setLabel(idx, '')]] : []),
+                    ...(btn.dataset.customIcon ? [['Reset icon', () => window.tab.setIcon(idx, '')]] : []),
                     ['Reload tab', () => window.tab.reload(idx)],
-                    ['Mute tab', () => window.tab.toggleMute(idx)],
+                    [btn.dataset.muted ? 'Unmute tab' : 'Mute tab', () => window.tab.toggleMute(idx)],
                     ['sep'],
                     [isPinned ? 'Unpin tab' : 'Pin tab', () => window.tab.pin(idx)],
                     ['Unload tab', () => window.tab.unload(idx)],
@@ -3338,6 +3340,9 @@
             const btn = tabs.get(index);
             if (!btn)
                 return;
+            // So the tab menu can say "Unmute tab" on a muted tab. Tracked here
+            // because this is the one event that carries the muted flag.
+            btn.dataset.muted = d.muted ? '1' : '';
             let el = btn.querySelector('.tab-indicator');
             // Recording outranks audio: you must always see that a tab has your mic.
             // A muted tab keeps its (crossed) speaker while media plays, so there's

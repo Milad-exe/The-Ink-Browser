@@ -1098,6 +1098,9 @@ class Tabs {
             private: this.privateTabs.has(tabIndex),
             container: ctrId,
             containerMeta: ctrId ? containers.meta(ctrId) : null,
+            // So the tab menu can offer "Reset label" only when there is a
+            // user label to reset, rather than as an always-present no-op.
+            hasCustomLabel: !!this.tabLabels?.get(tabIndex),
         });
         // Keep the window title in sync with the active tab
         if (tabIndex === this.activeTabIndex) {
