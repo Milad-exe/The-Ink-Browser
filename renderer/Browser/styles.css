@@ -965,13 +965,20 @@ html[data-tabbar="side"] .sidebar-foot {
      field that belonged to nothing. */
   gap: var(--sp-2);
 }
+/* Only what you CLICK is no-drag. The containers were in this list too, and
+   between them .lead-cluster, .nav-buttons and .trailing-icons cover the whole
+   bar — so the empty 140px inside the lead cluster and the 80px before the menu
+   button were dead to a drag, and there was nowhere to grab the window by.
+   The containers are named as drag explicitly rather than left to inherit it
+   from #utility-bar, which does not happen here. */
 #utility-bar button,
 #utility-bar input,
 #utility-bar .omnibox,
-#utility-bar .pomodoro-pill,
-#utility-bar .trailing-icons,
+#utility-bar .pomodoro-pill { -webkit-app-region: no-drag; }
 #utility-bar .lead-cluster,
-#utility-bar .nav-buttons { -webkit-app-region: no-drag; }
+#utility-bar .nav-buttons,
+#utility-bar .trailing-icons,
+#utility-bar .omnibox-wrapper { -webkit-app-region: drag; }
 
 /* Toolbar icons float directly on the shell (Arc-style, flat) — no boxed rail
    background; each button carries its own hover/active surface instead. */
