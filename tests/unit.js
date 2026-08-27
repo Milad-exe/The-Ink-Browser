@@ -509,10 +509,13 @@ test('the dropdown lands exactly on the address field', () => {
 });
 
 test('the dropdown view has room for its shadow on the sides and below', () => {
-    const v = suggestions.itemBounds({ left: 256, top: 46, width: 400 }, 3);
+    /* The view is a constant height now, so the gutter is whatever is left
+       under the card — and the case that has to still fit is the FULLEST one,
+       eight rows, where there is least room to spare. */
+    const v = suggestions.itemBounds({ left: 256, top: 46, width: 400 }, 8);
     const { PAD_X, PAD_BOTTOM, ITEM_HEIGHT } = suggestions;
-    const cardH = 3 * ITEM_HEIGHT + 8; // rows + the card's own padding
-    assert.strictEqual(v.height - cardH, PAD_BOTTOM, 'the gutter below is the whole shadow');
+    const fullCardH = 8 * ITEM_HEIGHT + 8; // rows + the card's own padding
+    assert.strictEqual(v.height - fullCardH, PAD_BOTTOM, 'a full list still leaves the whole shadow');
     assert.ok(PAD_X >= 20 && PAD_BOTTOM >= 26,
         'sized from the measured reach of 0 6px 16px — shrinking these clips it');
 });
@@ -526,12 +529,22 @@ test('the dropdown keeps the field\'s left edge even at the window edge', () => 
 });
 
 test('a full dropdown fits without scrolling', () => {
-    // The list is capped at 8 rows in renderer.js; the cap here has to leave
-    // room for all of them plus the gutter, or the last row scrolls.
+    // The list is capped at 8 rows in renderer.js; the panel has to leave room
+    // for all of them plus the gutter, or the last row scrolls.
     const { ITEM_HEIGHT, LIST_CHROME, MAX_HEIGHT } = suggestions;
     assert.strictEqual(MAX_HEIGHT, 8 * ITEM_HEIGHT + LIST_CHROME);
     const v = suggestions.itemBounds({ left: 256, top: 46, width: 400 }, 8);
     assert.strictEqual(v.height, MAX_HEIGHT, 'eight rows are not trimmed');
+});
+
+test('the dropdown is the same height whatever it is showing', () => {
+    /* It used to be sized to the result count, so the box resized on every
+       keystroke and its edge moved under the cursor while you typed. One
+       result or eight, the surface holds still. */
+    const at = (n) => suggestions.itemBounds({ left: 256, top: 46, width: 400 }, n).height;
+    const heights = new Set([at(0), at(1), at(3), at(8), at(50)]);
+    assert.strictEqual(heights.size, 1, 'the panel resized with its contents');
+    assert.strictEqual(at(1), suggestions.MAX_HEIGHT, 'and it is the height that fits a full list');
 });
 
 

@@ -31,6 +31,12 @@ const LIST_CHROME = PAD_BOTTOM + 8; // body padding bottom + the card's own
 // scrolling: 8 * ITEM_HEIGHT + LIST_CHROME. The caps live in renderer.js
 // updateSuggestions.
 const MAX_HEIGHT = 8 * ITEM_HEIGHT + LIST_CHROME;
+/* The constant the panel is always drawn at. It is MAX_HEIGHT — the full eight
+   rows renderer.js caps the list at — because a shorter preset would hide the
+   last results behind a scroll on every full dropdown, and these are ranked:
+   the ones you cannot see are the ones you asked for. One height that fits
+   everything beats a shorter one that fits most things. */
+const PANEL_HEIGHT = MAX_HEIGHT;
 /** Create (once) and load the overlay view for a window. Resolves when loaded. */
 async function ensureView(wd) {
     if (wd.suggestions) {
@@ -180,12 +186,24 @@ function register(ipcMain, { wm }) {
    is shadow nobody can see, and clamping it to 0 shifted the card right of the
    field instead. */
 function itemBounds(bounds, count) {
+    /* ONE height, always. This used to be sized to the result count, so the box
+       resized on every keystroke — 262px on opening, then 186, then 148, then
+       72 as the list narrowed — and the panel's edge moved under the cursor the
+       whole time you were typing. A dropdown that changes shape while you aim
+       at it is the thing to avoid; the browsers this design follows keep it a
+       constant surface and let the list scroll inside.
+
+       PANEL_HEIGHT is what the box measures when it first opens, so focusing
+       the field no longer resizes anything either. Fewer results leave the
+       lower part of the card empty, which is the cost of a surface that holds
+       still, and it is worth paying. */
+    void count;
     return {
         x: Math.floor(bounds.left - PAD_X),
         y: Math.max(0, Math.floor(bounds.top)),
         width: Math.floor(bounds.width + PAD_X * 2),
-        height: Math.min(MAX_HEIGHT, Math.max(1, count) * ITEM_HEIGHT + LIST_CHROME),
+        height: PANEL_HEIGHT,
     };
 }
 
-module.exports = { register, itemBounds, PAD_X, PAD_BOTTOM, ITEM_HEIGHT, LIST_CHROME, MAX_HEIGHT };
+module.exports = { register, itemBounds, PAD_X, PAD_BOTTOM, ITEM_HEIGHT, LIST_CHROME, MAX_HEIGHT, PANEL_HEIGHT };

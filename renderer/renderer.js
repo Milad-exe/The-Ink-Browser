@@ -1930,38 +1930,54 @@
             setTimeout(pullContainers, 800);
         }
         catch (e) { window.inkLog?.debug('renderer', 'pullContainers: ' + e); }
-        /* The foot's space row is a shortcut, not the full list — the header
-           pill is the complete switcher — so it scrolls rather than growing. But
-           a scroller with its scrollbar hidden says nothing about what it is
-           hiding, and this one did not follow the active space: with nine
-           spaces, the one you had just switched to sat off the end of a strip
-           still scrolled to zero. Now it follows, and the ends fade while there
-           is more in that direction. */
-        function syncSpaceOverflow(row) {
+        /* The foot's space row shows AS MANY AS FIT, then how many it could
+           not. It used to be a horizontal scroller with its scrollbar hidden,
+           which meant that with nine spaces you saw four and reached the rest
+           by dragging a 162px strip sideways with no scrollbar to grab — the
+           worst way to do the thing the row exists for.
+
+           The overflow chip opens the same list the space pill in the head
+           opens, so every space is one click away instead of an unknown amount
+           of scrolling. The ACTIVE space is always in the visible set, even if
+           it would not have fitted, because the row's first job is showing
+           where you are. */
+        function fitSpaceRow(row, openList) {
             if (!row)
                 return;
-            /* Centre the active space rather than asking scrollIntoView for it:
-               the row carries scroll-snap, which fought the "nearest" scroll and
-               left a middle space clipped at the edge. Centred also shows the
-               neighbours on both sides, which is what the snapping wants. */
-            const active = row.querySelector('.sb-ws.active');
-            if (active) {
-                const want = active.offsetLeft - (row.clientWidth - active.offsetWidth) / 2;
-                row.scrollLeft = Math.max(0, Math.min(want, row.scrollWidth - row.clientWidth));
-            }
-            const paint = () => {
-                const over = row.scrollWidth - row.clientWidth > 1;
-                row.classList.toggle('overflowing', over);
-                row.classList.toggle('at-start', !over || row.scrollLeft <= 1);
-                row.classList.toggle('at-end', !over || row.scrollLeft >= row.scrollWidth - row.clientWidth - 1);
-            };
-            paint();
-            if (row.dataset.overflowBound)
+            const chip = row.querySelector('.sb-ws-more');
+            const avatars = [...row.querySelectorAll('.sb-ws')];
+            if (!avatars.length)
                 return;
-            row.dataset.overflowBound = '1';
-            row.addEventListener('scroll', paint, { passive: true });
-            try { new ResizeObserver(paint).observe(row); }
-            catch (e) { window.inkLog?.debug('renderer', 'syncSpaceOverflow: ' + e); }
+            // Measure with everything shown, or a previous run's hiding sticks.
+            for (const a of avatars) a.style.display = '';
+            if (chip) chip.style.display = 'none';
+            const room = row.clientWidth;
+            const step = avatars[0].getBoundingClientRect().width + 4; // + gap
+            if (!room || !step)
+                return;
+            let fit = Math.floor((room + 4) / step);
+            if (fit >= avatars.length) {
+                row.classList.remove('has-more');
+                return;
+            }
+            // One slot goes to the chip.
+            fit = Math.max(1, fit - 1);
+            const activeIdx = avatars.findIndex(a => a.classList.contains('active'));
+            const shown = new Set();
+            for (let i = 0; i < fit; i++) shown.add(i);
+            if (activeIdx >= 0 && !shown.has(activeIdx)) {
+                shown.delete(Math.max(...shown));   // drop the last to make room
+                shown.add(activeIdx);
+            }
+            avatars.forEach((a, i) => { a.style.display = shown.has(i) ? '' : 'none'; });
+            const hidden = avatars.length - shown.size;
+            if (chip) {
+                chip.style.display = '';
+                chip.textContent = '+' + hidden;
+                chip.title = hidden + (hidden === 1 ? ' more space' : ' more spaces');
+                chip.onclick = (e) => { e.stopPropagation(); openList(chip); };
+            }
+            row.classList.add('has-more');
         }
 
         function initProfiles() {
@@ -2167,6 +2183,10 @@
                 }
                 // Avatar row: one per workspace, active one labelled.
                 if (wsRow) {
+                    /* Keep the "+N" chip: innerHTML = '' would delete it and
+                       fitSpaceRow would then have nothing to show the overflow
+                       with. It is re-appended after the avatars below. */
+                    const moreChip = wsRow.querySelector('.sb-ws-more');
                     wsRow.innerHTML = '';
                     for (const p of all) {
                         const b = document.createElement('button');
@@ -2197,7 +2217,10 @@
                         });
                         wsRow.appendChild(b);
                     }
-                    syncSpaceOverflow(wsRow);
+                    if (moreChip)
+                        wsRow.appendChild(moreChip);
+                    // Fit after layout — clientWidth is 0 until the row is laid out.
+                    requestAnimationFrame(() => fitSpaceRow(wsRow, (chip) => openSpaceList(chip, false)));
                 }
             };
             initSpaceRowGestures();
@@ -2227,8 +2250,10 @@
             // The space pill at the top of the rail: switch spaces, or make one.
             // The same list the foot avatars offer, but named — which is what
             // you want when you have more spaces than you can recognise by icon.
-            document.getElementById('space-header')?.addEventListener('click', (e) => {
-                const btn = e.currentTarget;
+            /* Every space, as a list. The head pill opens it downwards; the
+               foot's "+N" overflow chip opens the same list upwards, so the two
+               places that switch spaces answer identically. */
+            function openSpaceList(btn, below = true) {
                 const r = btn.getBoundingClientRect();
                 const rows = [];
                 for (const p of (_spacesCache || [])) {
@@ -2240,8 +2265,12 @@
                     rows.push(['sep']);
                 rows.push(['Rename this space…', () => openProfileModal(activeWorkspace)]);
                 rows.push(['New space…', () => openCreateSpace()]);
+                openCtxMenu(r.left, below ? r.bottom + 4 : r.top - 8, rows);
+            }
+            document.getElementById('space-header')?.addEventListener('click', (e) => {
+                const btn = e.currentTarget;
                 btn.setAttribute('aria-expanded', 'true');
-                openCtxMenu(r.left, r.bottom + 4, rows);
+                openSpaceList(btn, true);
             });
             // Right-click it and you get what you get on the space's avatar in
             // the foot — the pill is the space, so both surfaces of it answer
