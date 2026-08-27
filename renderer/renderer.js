@@ -2544,13 +2544,24 @@
                     ['sep'],
                     // Pinned tabs are workspace-scoped; promoting one to an
                     // Essential makes it global, so the pin is dropped with it.
-                    [isPinned ? 'Move to essentials' : 'Add to essentials', async () => {
-                        const url = await window.tab.getTabUrl(idx);
-                        const title = btn.querySelector('.tab-title')?.textContent || '';
-                        if (!/^https?:/i.test(url || '')) return;
-                        const ok = await window.essentials.add(url, title, null);
-                        if (ok && isPinned) window.tab.pin(idx);
-                    }],
+                    /* Reflect whether THIS tab is already an essential. An
+                       essential's row is normally display:none (it lives as a
+                       tile), so the "Remove" variant is rarely reached from
+                       here — but "Add" on a tab that already is one would be a
+                       lie, and the button carries the is-essential class either
+                       way. */
+                    ...(btn.classList.contains('is-essential')
+                        ? [['Remove from essentials', async () => {
+                            const url = await window.tab.getTabUrl(idx);
+                            if (/^https?:/i.test(url || '')) window.essentials.remove(url, null);
+                        }]]
+                        : [[isPinned ? 'Move to essentials' : 'Add to essentials', async () => {
+                            const url = await window.tab.getTabUrl(idx);
+                            const title = btn.querySelector('.tab-title')?.textContent || '';
+                            if (!/^https?:/i.test(url || '')) return;
+                            const ok = await window.essentials.add(url, title, null);
+                            if (ok && isPinned) window.tab.pin(idx);
+                        }]]),
                     ['Open in new container tab', (() => {
                         const openInC = async (containerId) => {
                             const url = await window.tab.getTabUrl(idx);
