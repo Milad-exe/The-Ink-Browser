@@ -1068,6 +1068,88 @@ test('a server error is a portal too, not silently online', () => {
     assert.strictEqual(captive.classify(503, '').online, false);
 });
 
+// ── Tab sleeping (the collaborator, in isolation) ────────────────────────────
+// The point of making TabSleeper a collaborator rather than a mixin: it can be
+// exercised against a stub Tabs, with no Electron and no real window. These pin
+// the scan's "never sleep" rules.
+const { TabSleeper } = require('../features/tabs/sleep');
+
+function stubTabs(overrides = {}) {
+    const now = Date.now();
+    const tab = (props) => ({
+        slept: false, lazyLoaded: true, hasPlayingMedia: false,
+        webContents: {
+            isDestroyed: () => false, isCrashed: () => false,
+            isCurrentlyAudible: () => false, isDevToolsOpened: () => false,
+            forcefullyCrashRenderer() { this._crashed = true; },
+        },
+        ...props,
+    });
+    const tabs = {
+        mainWindow: { isDestroyed: () => false },
+        persistence: { get: (k) => (k === 'tabSleepMinutes' ? 30 : undefined) },
+        activeTabIndex: 0,
+        pinnedTabs: new Set(),
+        tabUrls: new Map(),
+        tabLastActive: new Map(),
+        tabMap: new Map(),
+        ...overrides,
+    };
+    tabs._mk = tab;
+    return tabs;
+}
+
+test('the sleeper discards an idle background web tab', () => {
+    const t = stubTabs();
+    const tab = t._mk({});
+    t.tabMap.set(1, tab);
+    t.tabUrls.set(1, 'https://example.com');
+    t.tabLastActive.set(1, Date.now() - 60 * 60_000); // an hour ago
+    new TabSleeper(t).scan();
+    assert.strictEqual(tab.slept, true, 'a stale background tab is slept');
+});
+
+test('the sleeper never sleeps the active tab', () => {
+    const t = stubTabs({ activeTabIndex: 1 });
+    const tab = t._mk({});
+    t.tabMap.set(1, tab);
+    t.tabUrls.set(1, 'https://example.com');
+    t.tabLastActive.set(1, Date.now() - 60 * 60_000);
+    new TabSleeper(t).scan();
+    assert.strictEqual(tab.slept, false);
+});
+
+test('the sleeper never sleeps a pinned, audible, or recently-active tab', () => {
+    for (const setup of [
+        (t, tab) => t.pinnedTabs.add(1),
+        (t, tab) => { tab.webContents.isCurrentlyAudible = () => true; },
+        (t, tab) => t.tabLastActive.set(1, Date.now()), // just now
+        (t, tab) => t.tabUrls.set(1, 'northstar://settings'), // not a web page
+    ]) {
+        const t = stubTabs();
+        const tab = t._mk({});
+        t.tabMap.set(1, tab);
+        t.tabUrls.set(1, 'https://example.com');
+        t.tabLastActive.set(1, Date.now() - 60 * 60_000);
+        setup(t, tab);
+        new TabSleeper(t).scan();
+        assert.strictEqual(tab.slept, false, 'protected tab was slept anyway');
+    }
+});
+
+test('sleeping is skippable by setting, and stops when the window is gone', () => {
+    const off = stubTabs({ persistence: { get: (k) => (k === 'tabSleepEnabled' ? false : 30) } });
+    const tab = off._mk({});
+    off.tabMap.set(1, tab); off.tabUrls.set(1, 'https://e.example'); off.tabLastActive.set(1, 0);
+    new TabSleeper(off).scan();
+    assert.strictEqual(tab.slept, false, 'the setting turns sleeping off');
+
+    const gone = stubTabs({ mainWindow: { isDestroyed: () => true } });
+    const s = new TabSleeper(gone); s.start();
+    s.scan();
+    assert.strictEqual(s.timer, null, 'a destroyed window stops the scan');
+});
+
 // ── Report ───────────────────────────────────────────────────────────────────
 if (failures.length) {
     console.error(`\n${failures.length} of ${passed + failures.length} unit tests failed:\n`);

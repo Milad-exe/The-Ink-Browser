@@ -1,6 +1,7 @@
 const { WebContentsView, Menu, dialog } = require('electron');
 const { resolveAppFile } = require('../app-paths');
 const log = require('./log');
+const { TabSleeper } = require('./tabs/sleep');
 const overlayMenu = require('./overlay-menu');
 const i18n = require('./i18n');
 const preloadForPage = require('./tabs/preload-for-page');
@@ -175,7 +176,6 @@ class Tabs {
     // ── Timers / transient ────────────────────────────────────────────────
     bookmarkBarHeight;
     saveTimer;
-    _sleepTimer;
     _pendingPrevActive; // tab to reactivate after a background-tab close
     constructor(mainWindow, History, Persistence, options = {}) {
         this.mainWindow = mainWindow;
@@ -193,10 +193,10 @@ class Tabs {
         // tabs (Chrome's "memory saver"). tabLastActive tracks when a tab was
         // last the active tab; the scan puts stale ones to sleep.
         this.tabLastActive = new Map();
-        this._sleepTimer = setInterval(() => { try {
-            this._sleepScan();
-        }
-        catch (e) { log.debug('tabs', 'constructor', e); } }, 60_000);
+        // Tab sleeping is a COLLABORATOR (features/tabs/sleep.js), not a mixin:
+        // it owns its own timer and names exactly what it reads off Tabs.
+        this.sleeper = new TabSleeper(this);
+        this.sleeper.start();
         // -1 until a tab exists: a window opens with none, and pointing at
         // tab 0 while the map is empty makes every lookup a silent miss.
         this.activeTabIndex = -1;
@@ -1113,60 +1113,6 @@ class Tabs {
     // showTab()/loadUrl() transparently revive the tab with a reload. Never
     // sleeps: the active tab, pinned tabs, tabs playing audio/media, internal
     // pages, unloaded lazy tabs, or tabs with DevTools open.
-    _sleepScan() {
-        if (!this.mainWindow || this.mainWindow.isDestroyed()) {
-            clearInterval(this._sleepTimer);
-            return;
-        }
-        const p = this.persistence;
-        if (p && p.get('tabSleepEnabled') === false)
-            return;
-        const mins = Math.max(1, Number(p?.get('tabSleepMinutes')) || 30);
-        const cutoff = Date.now() - mins * 60_000;
-        this.tabMap.forEach((tab, i) => {
-            if (i === this.activeTabIndex || tab.slept)
-                return;
-            if (tab.lazyLoaded === false)
-                return; // not loaded — nothing to free
-            if (this.pinnedTabs.has(i))
-                return;
-            const url = this.tabUrls.get(i) || '';
-            if (!/^https?:/i.test(url))
-                return; // only real web pages
-            if ((this.tabLastActive.get(i) || 0) > cutoff)
-                return;
-            try {
-                const wc = tab.webContents;
-                if (!wc || wc.isDestroyed() || wc.isCrashed())
-                    return;
-                if (tab.hasPlayingMedia || wc.isCurrentlyAudible())
-                    return;
-                if (wc.isDevToolsOpened())
-                    return;
-                tab.slept = true;
-                wc.forcefullyCrashRenderer(); // frees the whole renderer process
-            }
-            catch (e) { log.debug('tabs', '_sleepScan', e); }
-        });
-    }
-    /**
-     * Revive a slept tab: the renderer process is gone, so the page has to be
-     * reloaded.
-     *
-     * KNOWN GAP vs Chrome: its memory saver restores the scroll position, we
-     * land at the top. Capturing the position needs an async read of the page
-     * before the renderer is discarded, and deferring the discard behind that
-     * read risks a page that never answers keeping its renderer alive — which
-     * would defeat the point. Not worth trading a memory guarantee for a
-     * convenience until it can be verified end to end.
-     */
-    _wakeTab(tab) {
-        if (!tab)
-            return;
-        tab.slept = false;
-        try { tab.webContents.reload(); }
-        catch (e) { log.debug('tabs', '_wakeTab', e); }
-    }
     // Tell the chrome a tab started/stopped loading so it can show a tab
     // spinner and flip the reload button to a stop button (and back).
     sendLoadingState(tabIndex, loading) {
@@ -1268,7 +1214,7 @@ class Tabs {
             this.tabLastActive.set(this.activeTabIndex, Date.now());
             this.tabLastActive.set(index, Date.now());
             if (tab.slept)
-                this._wakeTab(tab);
+                this.sleeper.wake(tab);
             // Eager background tabs load muted; restore sound on first view.
             if (tab.mutedUntilShown) {
                 tab.mutedUntilShown = false;

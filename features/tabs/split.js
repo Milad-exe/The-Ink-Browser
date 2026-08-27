@@ -55,7 +55,7 @@ module.exports = {
         const place = (idx, bounds) => {
             const tab = this.tabMap.get(idx);
             if (tab.slept)
-                this._wakeTab(tab);
+                this.sleeper.wake(tab);
             tab.setBounds(bounds);
             try { tab.setBorderRadius(radius); } catch (e) { log.debug('split', 'place', e); }
             tab.setVisible(true);
