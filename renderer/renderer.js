@@ -2549,12 +2549,26 @@
                         const ok = await window.essentials.add(url, title, null);
                         if (ok && isPinned) window.tab.pin(idx);
                     }],
-                    ['Open in new container tab', (_containersCache || []).map(c => [
-                        c.name, async () => {
+                    ['Open in new container tab', (() => {
+                        const openInC = async (containerId) => {
                             const url = await window.tab.getTabUrl(idx);
-                            if (/^https?:/i.test(url || '')) window.tab.openInContainer(c.id, url);
-                        },
-                    ])],
+                            if (/^https?:/i.test(url || '')) window.tab.openInContainer(containerId, url);
+                        };
+                        const sub = (_containersCache || []).map(c => [c.name, () => openInC(c.id)]);
+                        /* Always offer to make one, and say so when there are none
+                           — an empty flyout looked broken. Creating a container
+                           here opens the tab in it straight away. */
+                        if (sub.length) sub.push(['sep']);
+                        sub.push(['New container…', () => {
+                            promptForText('Name the container', '', async (name) => {
+                                const nm = (name || '').trim();
+                                if (!nm) return;
+                                const c = await window.containers.createNamed(nm);
+                                if (c?.id) openInC(c.id);
+                            });
+                        }]);
+                        return sub;
+                    })()],
                     ['Move tab', [
                         ['Move to Top', () => {
                             const first = [...tabsContainer.querySelectorAll('.tab-button:not(.pinned):not(.in-folder)')][0];
