@@ -1980,6 +1980,22 @@
             row.classList.add('has-more');
         }
 
+        /* Re-fit when the row's width changes. Without this the row kept
+           whatever count it computed on the last render, so dragging the
+           sidebar narrower left three avatars in an 84px row — overflowing a
+           container with overflow:hidden, which clips them away and reads as
+           the foot losing its contents. The scroller this replaced had a
+           ResizeObserver; dropping it was the regression. */
+        function watchSpaceRow(row, openList) {
+            if (!row || row.dataset.fitBound)
+                return;
+            row.dataset.fitBound = '1';
+            try {
+                new ResizeObserver(() => fitSpaceRow(row, openList)).observe(row);
+            }
+            catch (e) { window.inkLog?.debug('renderer', 'watchSpaceRow: ' + e); }
+        }
+
         function initProfiles() {
             const btn = document.getElementById('profile-btn');
             const badge = document.getElementById('profile-badge');
@@ -2220,7 +2236,9 @@
                     if (moreChip)
                         wsRow.appendChild(moreChip);
                     // Fit after layout — clientWidth is 0 until the row is laid out.
-                    requestAnimationFrame(() => fitSpaceRow(wsRow, (chip) => openSpaceList(chip, false)));
+                    const openList = (chip) => openSpaceList(chip, false);
+                    requestAnimationFrame(() => fitSpaceRow(wsRow, openList));
+                    watchSpaceRow(wsRow, openList);
                 }
             };
             initSpaceRowGestures();
