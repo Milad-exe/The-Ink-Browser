@@ -57,6 +57,29 @@ Anything drawn over a page — menus, panels, prompts — is its own
 `WebContentsView`, because the page is a native view and chrome DOM can never
 paint on top of it.
 
+## Adding a feature
+
+```bash
+node scripts/new-feature.js reading-list          # logic + ipc
+node scripts/new-feature.js reading-list --panel  # ...plus an overlay panel
+```
+
+That writes `features/<name>.js`, `ipc/<name>.js`, and (with `--panel`) a
+`renderer/<Name>/` overlay, in the shapes the codebase already uses, and prints
+the one or two lines left to add by hand.
+
+The wiring is mostly automatic:
+
+- **IPC is auto-loaded.** `ipc/index.js` registers every `ipc/*.js` that exports
+  `register(ipcMain, deps)` — a new handler file is live the moment it exists,
+  with no edit to `main.js`.
+- **A bridge is one line.** Add `exposeInternal('<name>', { … })` to
+  `preload/preload.js` so the renderer can call `window.<name>.*`.
+- **An overlay is declared once.** If the feature is a `WebContentsView` panel,
+  add its view to `features/overlay-registry.js` — that single list is what
+  raises it above the page and resolves its window, so it can't sink or fail to
+  resolve.
+
 ## Contributing
 
 `CLAUDE.md` at the root is the working brief: the design rules, the invariants
