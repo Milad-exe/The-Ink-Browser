@@ -210,7 +210,6 @@ exposeInternal("tab", {
     reload: (index) => ipcRenderer.invoke("reload", index),
     stop: (index) => ipcRenderer.invoke("stopTab", index),
     getTabUrl: (index) => ipcRenderer.invoke("getTabUrl", index),
-    getButton: (index) => ipcRenderer.invoke("getTabButton", index),
     pin: (index) => ipcRenderer.invoke("pinTab", index),
     setLabel: (index, label) => ipcRenderer.invoke('tab:setLabel', index, label),
     setIcon: (index, icon) => ipcRenderer.invoke('tab:setIcon', index, icon),
