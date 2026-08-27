@@ -20,12 +20,13 @@
  * Only the app's own surfaces are touched. Injecting a palette into whatever
  * page a tab happens to be showing would be restyling the web.
  */
-const { nativeTheme, webContents } = require('electron');
+const { app, nativeTheme, webContents } = require('electron');
 const themes = require('./themes');
 const log = require('./log');
 
 /* wc.id → the insertCSS key currently applied, so a switch removes the old
    palette instead of stacking a new one on top of it. */
+let bound = false;
 const applied = new Map();
 /* wc.id → the CSS text currently applied. Live editing repaints on every drag
    frame, and re-inserting an identical sheet is work the compositor can see. */
@@ -42,6 +43,22 @@ let readProfileTheme = null; // (profileId) → theme id | null
  * carry one.
  */
 function bind({ wm, profiles }) {
+    /* Paint every surface the moment it exists, not only when the theme next
+       changes. Overlays are created LAZILY — the context menu on your first
+       right-click, the downloads panel the first time you open it — so a panel
+       first opened after the last theme change was painted with the DEFAULT
+       palette and stayed that way: the right-click menu came up in the stock
+       colours while the chrome around it wore your theme.
+
+       Doing it here rather than in each of the nineteen places that construct a
+       view means it also covers the next one somebody adds. attach() paints on
+       dom-ready and applyCssTo re-checks isAppSurface, so a tab showing a
+       website is left alone. */
+    if (!bound) {
+        bound = true;
+        try { app.on('web-contents-created', (_e, wc) => attach(wc)); }
+        catch (e) { log.debug('theme-runtime', 'web-contents-created', e); }
+    }
     resolveWindow = (wc) => {
         try { return wm.getWindowByWebContents(wc); }
         catch { return null; }

@@ -525,7 +525,20 @@ class Tabs {
         const wd = this.getWindowData();
         if (!wd?.window?.contentView)
             return;
-        const overlays = [this.splitDivider, ...this.splitHandles, this.splitDrop, this.glanceBackdrop, this.glanceView, this.glanceBar, wd.sidePanel, wd.sidePanelHeader, wd.menu, wd.suggestions, wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel, wd.extensionsPanel, wd.passwordPrompt, wd.ctxMenu, wd.palette, wd.themePanel, wd.pageActions];
+        /* EVERY overlay view belongs here. One left out sinks behind the tab views the
+           moment a tab is created or shown — which is what put the permission
+           doorhanger, the mini player and the site-info panel behind the page
+           (CLAUDE.md invariant 4). If you add an overlay, add it here and to
+           getWindowByWebContents(). */
+        const overlays = [
+            this.splitDivider, ...this.splitHandles, this.splitDrop,
+            this.glanceBackdrop, this.glanceView, this.glanceBar,
+            wd.sidePanel, wd.sidePanelHeader, wd.menu, wd.suggestions,
+            wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel,
+            wd.extensionsPanel, wd.passwordPrompt, wd.ctxMenu, wd.palette,
+            wd.themePanel, wd.pageActions,
+            wd.permView, wd.miniPlayer, wd.siteInfoView,
+        ];
         overlays.forEach((view) => {
             if (!view)
                 return;

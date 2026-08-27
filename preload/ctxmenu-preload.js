@@ -9,6 +9,28 @@ try {
     });
 }
 catch { }
+/* The theme, same bootstrap every other overlay preload carries — this one had
+   none, so the context menu came up in the stock palette while the chrome
+   around it wore the space's theme. Read synchronously at construction so the
+   first paint is already right, then followed on every change. */
+try {
+    const settings = ipcRenderer.sendSync('settings-get-sync');
+    if (settings && settings.theme && settings.theme !== 'default') {
+        const applyTheme = () => document.documentElement.setAttribute('data-theme', settings.theme);
+        if (document.documentElement)
+            applyTheme();
+        else
+            document.addEventListener('DOMContentLoaded', applyTheme);
+    }
+}
+catch (e) { /* no settings yet: the default palette is the right fallback */ }
+ipcRenderer.on('theme-changed', (_e, theme) => {
+    if (theme && theme !== 'default')
+        document.documentElement.setAttribute('data-theme', theme);
+    else
+        document.documentElement.removeAttribute('data-theme');
+});
+
 // Bridge for the context-menu overlay view. A pick is reported as either a path
 // of row indices (regular menus) or { emoji } (the picker) — main forwards it to
 // the chrome, which owns the actual handlers.
