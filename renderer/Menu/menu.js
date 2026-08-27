@@ -11,6 +11,10 @@
         const api = window.electronAPI;
         const mac = api.platform === 'darwin';
         const MOD = mac ? '⌘' : 'Ctrl ';
+        // Menu markup uses mac glyphs in data-sc (⇧, ⌥). On Windows/Linux those
+        // read wrong next to "Ctrl" — turn them into words.
+        const scLabel = (sc) => mac ? sc
+            : String(sc).replace(/⇧/g, 'Shift ').replace(/⌥/g, 'Alt ').replace(/↵/g, 'Enter');
         const close = async () => { try {
             await api.closeMenu();
         }
@@ -21,7 +25,7 @@
         catch (e) { window.inkLog?.debug('menu', 'act: ' + e); } await close(); };
         // Fill keyboard-shortcut hints (platform-aware).
         document.querySelectorAll('.sc[data-sc]').forEach(el => {
-            el.textContent = MOD + el.dataset.sc;
+            el.textContent = MOD + scLabel(el.dataset.sc);
         });
         const histSc = document.getElementById('sc-history');
         if (histSc)
