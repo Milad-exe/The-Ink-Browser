@@ -104,23 +104,7 @@ const themes = require('./features/themes');
 const themeRuntime = require('./features/theme-runtime');
 const extensionManager = require('./features/extensions');
 // IPC feature modules
-const tabsIpc = require('./ipc/tabs');
-const menuIpc = require('./ipc/menu');
-const suggestionsIpc = require('./ipc/suggestions');
-const historyIpc = require('./ipc/history');
-const bookmarksIpc = require('./ipc/bookmarks');
-const folderDropdownIpc = require('./ipc/folder-dropdown');
-const settingsIpc = require('./ipc/settings');
-const downloadsIpc = require('./ipc/downloads');
-const extensionsIpc = require('./ipc/extensions');
-const passwordsIpc = require('./ipc/passwords');
-const siteInfoIpc = require('./ipc/site-info');
-const miniPlayerIpc = require('./ipc/mini-player');
-const ctxMenuIpc = require('./ipc/ctxmenu');
-const paletteIpc = require('./ipc/palette');
-const themePanelIpc = require('./ipc/theme-panel');
-const pageActionsIpc = require('./ipc/page-actions');
-const userDataIpc = require('./ipc/user-data');
+const ipcRegistrar = require('./ipc');
 const certErrors = require('./features/cert-errors');
 const defaultBrowser = require('./features/default-browser');
 // ── App ──────────────────────────────────────────────────────────────────────
@@ -162,23 +146,10 @@ class Northstar {
             app,
             focusMode,
         };
-        tabsIpc.register(ipcMain, deps);
-        menuIpc.register(ipcMain, deps);
-        suggestionsIpc.register(ipcMain, deps);
-        historyIpc.register(ipcMain, deps);
-        bookmarksIpc.register(ipcMain, deps);
-        folderDropdownIpc.register(ipcMain, deps);
-        settingsIpc.register(ipcMain, deps);
-        downloadsIpc.register(ipcMain, deps);
-        ctxMenuIpc.register(ipcMain, deps);
-        paletteIpc.register(ipcMain, deps);
-        themePanelIpc.register(ipcMain, deps);
-        pageActionsIpc.register(ipcMain, deps);
-        extensionsIpc.register(ipcMain, deps);
-        passwordsIpc.register(ipcMain, deps);
-        siteInfoIpc.register(ipcMain, deps);
-        miniPlayerIpc.register(ipcMain, deps);
-        userDataIpc.register(ipcMain, deps); // import/export, cert exceptions, updates
+        // Every ipc/<area>.js that exports register() is wired up automatically
+        // (see ipc/index.js) — a new one needs no edit here.
+        ipcRegistrar.registerAll(ipcMain, deps);
+        // permissionUI lives in features/, not ipc/, so it is registered by hand.
         permissionUI.register(ipcMain, deps); // doorhanger controller: init(wm) + IPC
     }
     initApp() {
