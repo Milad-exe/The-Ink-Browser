@@ -211,8 +211,9 @@ module.exports = {
     },
     reopenClosedTab() {
         const last = this.closedTabHistory.pop();
+        // Nothing to reopen means nothing happens — a blank tab is not a
+        // reopened one.
         if (last && last.url && last.url !== 'newtab') { const i = this.createTab(); this.loadUrl(i, last.url); }
-        else this.createTab();
     },
     toggleCompact() {
         this.sidebarCompact = !this.sidebarCompact;
@@ -231,7 +232,15 @@ module.exports = {
     applyWorkspace() {
         const mine = this.tabsInWorkspace(this.profileId);
         if (!mine.length) {
-            this.createTab(); // lands in the new workspace (uses this.profileId)
+            /* An empty space shows an EMPTY space. This used to open a blank
+               tab on arrival, which is the most visible way a "new tab page"
+               kept coming back: switching to a space you had emptied handed you
+               a blank one every time. A window with no tabs is a supported
+               state (CLAUDE.md) — the rail is empty and the card is the theme's
+               colour. */
+            this.activeTabIndex = -1;
+            try { this.mainWindow.webContents.send('tab-switched', { index: -1 }); }
+            catch (e) { log.debug('organize', 'applyWorkspace', e); }
             return;
         }
         let target = mine.includes(this.activeTabIndex) ? this.activeTabIndex : null;

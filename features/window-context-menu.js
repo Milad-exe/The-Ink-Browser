@@ -74,7 +74,7 @@ class WindowContextMenu {
         this.sep();
         this.contextTemplate.push({
             label: i18n.t('chrome.newTab'),
-            click: () => { try { require('./palette-bridge').openFor(windowData); } catch { windowData.tabs.createTab(); } },
+            click: () => { require('./palette-bridge').openFor(windowData); },
         }, { type: 'separator' }, {
             label: 'Reload Tab',
             click: () => windowData.tabs.reload(tabIndex),
@@ -164,12 +164,12 @@ class WindowContextMenu {
                 label: 'Reopen Closed Tab',
                 click: () => {
                     const last = closed.pop();
+                    // Nothing to reopen means nothing happens — a blank tab is
+                    // not what "Reopen Closed Tab" promises, and this browser
+                    // has none to open.
                     if (last && last.url && last.url !== 'newtab') {
                         const newIndex = windowData.tabs.createTab();
                         windowData.tabs.loadUrl(newIndex, last.url);
-                    }
-                    else {
-                        windowData.tabs.createTab();
                     }
                 },
             });
@@ -187,7 +187,7 @@ class WindowContextMenu {
         this.sep();
         this.contextTemplate.push({
             label: i18n.t('chrome.newTab'),
-            click: () => { try { require('./palette-bridge').openFor(windowData); } catch { windowData.tabs.createTab(); } },
+            click: () => { require('./palette-bridge').openFor(windowData); },
         });
         const closed = windowData.tabs.closedTabHistory;
         if (closed && closed.length > 0) {
@@ -195,12 +195,12 @@ class WindowContextMenu {
                 label: 'Reopen Closed Tab',
                 click: () => {
                     const last = closed.pop();
+                    // Nothing to reopen means nothing happens — a blank tab is
+                    // not what "Reopen Closed Tab" promises, and this browser
+                    // has none to open.
                     if (last && last.url && last.url !== 'newtab') {
                         const newIndex = windowData.tabs.createTab();
                         windowData.tabs.loadUrl(newIndex, last.url);
-                    }
-                    else {
-                        windowData.tabs.createTab();
                     }
                 },
             });

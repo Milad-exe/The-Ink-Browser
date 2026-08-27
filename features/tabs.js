@@ -795,7 +795,12 @@ class Tabs {
         this.raiseFloatingViews();
         UserAgent.setupTab(tab);
         this._applyTabBackground(tab, pageType);
-        extensions.addTab(tab.webContents, this.mainWindow);
+        /* Internal pages are NOT registered with the extension system. They are
+           chrome, served from file://, where content scripts cannot run — so an
+           extension that messages every tab it knows about (1Password does, on
+           a timer) got "Could not establish connection. Receiving end does not
+           exist." for each one, forever. Settings is also simply none of an
+           extension's business. */
         const bounds = this.getTabBounds();
         tab.setBounds(bounds);
         tab.lazyTitle = pageTitle || pageType;
@@ -1643,10 +1648,12 @@ class Tabs {
             const totalTabs = this.tabMap.size;
             const futurePinned = this.pinnedTabs.size + 1;
             const futureUnpinned = totalTabs - futurePinned;
-            if (futureUnpinned <= 0) {
-                // Auto-create a new unpinned tab to keep at least one unpinned
-                this.createTab();
-            }
+            /* No auto-created tab. "Always keep one unpinned tab" is a
+               top-tab-strip rule; this browser is allowed to have NO tabs at
+               all (CLAUDE.md: a window opens with none, and closing the last
+               leaves it that way), so pinning your only tab used to spawn a
+               blank one out of nowhere. */
+            void futureUnpinned;
             this.pinnedTabs.add(index);
             // Pinning captures where the tab "lives"; Reset returns here however
             // far the tab has since navigated.

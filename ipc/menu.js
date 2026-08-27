@@ -92,8 +92,10 @@ function register(ipcMain, { wm }) {
     // user-facing new-tab entry point.
     ipcMain.handle('menu-new-tab', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
+        // No fallback tab: the palette is how a tab gets made, and a blank one
+        // is not the consolation prize (this browser has none).
         try { return require('./palette').openFor(wd); }
-        catch { wd?.tabs?.createTab(); return false; }
+        catch { return false; }
     });
     ipcMain.on('window-click', (_e, pos) => {
         const wd = wm.getWindowByWebContents(_e.sender);

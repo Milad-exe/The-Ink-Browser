@@ -92,12 +92,12 @@ class Shortcuts {
         if (!closed || closed.length === 0)
             return;
         const last = closed.pop();
+        /* Nothing to reopen means nothing happens. It used to open a BLANK
+           tab, which is not "reopen closed tab" — and this browser has no
+           blank tab to open. */
         if (last && last.url && last.url !== 'newtab') {
             const newIndex = this.tabManager.createTab();
             this.tabManager.loadUrl(newIndex, last.url);
-        }
-        else {
-            this.tabManager.createTab();
         }
     }
     // ── Tab shortcuts ──────────────────────────────────────────────────────────
@@ -110,7 +110,9 @@ class Shortcuts {
                 if (wd) { require('./palette-bridge').openFor(wd); return; }
             }
             catch (e) { log.debug('shortcuts', 'registerTabShortcuts', e); }
-            this.tabManager.createTab();
+            /* No fallback tab. The palette IS how a tab gets made here, and if
+               it cannot be raised the answer is nothing — a blank tab is not
+               the consolation prize, and this browser has none. */
         });
         // New private tab — fully isolated session, wiped when the tab closes
         this.registerShortcut('CmdOrCtrl+Alt+T', () => {
@@ -169,9 +171,8 @@ class Shortcuts {
                 catch (e) { log.debug('shortcuts', 'openPrivateWindow', e); }
                 this.tabManager.createLazyTab(url, title, false, false, true, true);
             }
-            else {
-                this.tabManager.createTab();
-            }
+            // Nothing to duplicate means nothing happens. It used to open a
+            // blank tab, which is not a duplicate of anything.
         });
         // Next / previous tab
         this.registerShortcut('CmdOrCtrl+Tab', () => this.switchToNextTab());

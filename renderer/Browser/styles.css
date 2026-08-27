@@ -979,6 +979,21 @@ html[data-tabbar="side"] .sidebar-foot {
    siblings in a cluster — but they are both about the page, so they are not
    flung apart either. */
 .nav-buttons { margin-right: var(--sp-4); }
+
+/* THE FIELD IS CENTRED ON THE PAGE CARD, and it gets there by balance rather
+   than by being positioned. The trailing cluster reserves the same width the
+   nav cluster occupies on the other side, so the space left between them is
+   symmetric about the card's centre and the field simply fills it.
+
+   Not by centring it out of flow with a clamped width: that was tried, and it
+   put the field's left edge wherever the window width happened to leave it,
+   aligned with nothing (see the note on #utility-bar). Balanced columns keep
+   every edge on a real guide — nav on the card's left edge, the trailing icons
+   on its right — AND put the field's centre on the card's.
+
+   --omni-side is that width: the three nav buttons plus the gap after them. */
+#utility-bar { --omni-side: calc(var(--control-h) * 3 + var(--sp-2) * 2 + var(--sp-4)); }
+.trailing-icons { min-width: calc(var(--omni-side) - var(--sp-5)); justify-content: flex-end; }
 /* An empty flex child still takes a gap. #ext-actions holds the installed
    extensions' toolbar buttons and is empty on most profiles, so it adds a
    phantom 4px between the address field and the menu.
