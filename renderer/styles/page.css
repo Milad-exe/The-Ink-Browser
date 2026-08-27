@@ -90,12 +90,17 @@
   /* ── Groups + rows ────────────────────────────────────────────────────────
      A card is RAISED from the page (surface over page), which is the one rule
      these screens were getting backwards. */
+  /* A sheet, not a box. These pages are lists, and a list reads better as one
+     continuous surface divided by hairlines than as a rounded card floating on
+     a ground almost its own colour — which is also what this app says about
+     elevation: a raised surface FLOATS above the page, and a list of your own
+     history does not float, it sits. Settings/styles.css does the same to its
+     sections, so the internal pages agree. */
   .card {
-    background: var(--surface);
-    border-radius: var(--r-lg);
-    box-shadow: var(--ring);
-    overflow: hidden;
-    margin-bottom: var(--sp-5);
+    background: none;
+    border-radius: 0;
+    box-shadow: none;
+    margin-bottom: var(--sp-7);
   }
   .group-label {
     padding: var(--sp-5) var(--sp-2) var(--sp-3);

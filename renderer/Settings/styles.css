@@ -103,26 +103,46 @@ html[data-vibrancy="true"], html[data-vibrancy="true"] body {
   margin-top: calc(var(--sp-6) * -1); margin-bottom: var(--sp-5); line-height: 1.5;
 }
 
-/* ── Card ── */
+/* ── Section ──────────────────────────────────────────────────────────────
+   NOT a card. These were rounded boxes on a fill, stacked down the middle —
+   which is what every settings page looks like, and which contradicts this
+   app's own rule: elevation means "floats above the page", and anything
+   embedded gets a hairline and nothing else (CLAUDE.md). A settings group is
+   embedded. It is furniture, not a popover.
+
+   So: one continuous sheet, divided by hairlines, with each section's LABEL in
+   the left margin and its rows in the right column. That two-column rhythm is
+   the chrome's own structure — a narrow column that names things, a wide one
+   that holds them — and it uses the width the page card actually has instead
+   of stacking narrow boxes in the centre of it. */
 .card {
-  background: var(--surface); border: none;
-  border-radius: var(--r-lg); box-shadow: var(--ring);
-  padding: var(--sp-6) var(--sp-7); margin-bottom: var(--sp-5);
+  display: grid;
+  grid-template-columns: var(--sec-label-w, 156px) minmax(0, 1fr);
+  column-gap: var(--sp-7); align-items: start;
+  background: none; border: none; border-radius: 0; box-shadow: none;
+  padding: var(--sp-7) 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 }
+.card:first-of-type { border-top: none; padding-top: var(--sp-4); }
+/* Everything that is not the label sits in the content column. */
+.card > * { grid-column: 2; }
 
 .card-title {
-  font-size: var(--fs-small); font-weight: 600; letter-spacing: 0.04em;
+  /* The structural device: it names the section from the margin, and it is the
+     only thing in column one. Quiet, tracked, and it does not compete with the
+     26px page title above it. */
+  grid-column: 1; grid-row: 1 / span 99;
+  position: sticky; top: var(--sp-6);
+  font-size: var(--fs-small); font-weight: 600; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--text-3);
-  margin-bottom: var(--sp-1);
+  margin: 0; padding-top: 2px; line-height: 1.45;
 }
 /* A title directly followed by rows (no description between) still needs the
    gap the description would have provided. */
-.card-title + .toggle-row,
-.card-title + .radio-row,
-.card-title + .select-row,
-.card-title + .btn-row { margin-top: var(--sp-5); }
+/* The label is in the other column now, so nothing after it needs the gap it
+   used to leave behind. */
 
-.card-desc { font-size: var(--fs-small); color: var(--text-2); margin-bottom: var(--sp-5); line-height: 1.45; }
+.card-desc { font-size: var(--fs-small); color: var(--text-2); margin: 0 0 var(--sp-5); line-height: 1.45; }
 
 /* ── Radio rows ── */
 .radio-row {
@@ -192,6 +212,13 @@ select:focus { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%,
    so a 536px page card — an ordinary small window — left the content column
    just under 300px and every setting row was crushed. It gives way as soon as
    the content would drop below a comfortable reading width. */
+/* Below this the margin column costs more than it gives: the label goes back
+   above its rows and the sheet is one column. */
+@media (max-width: 640px) {
+  .card { grid-template-columns: minmax(0, 1fr); row-gap: var(--sp-4); }
+  .card > *, .card-title { grid-column: 1; }
+  .card-title { position: static; grid-row: auto; margin-bottom: var(--sp-2); }
+}
 @media (max-width: 720px) {
   .sidebar { width: 56px; min-width: 56px; }
   .sidebar-header { display: none; }
@@ -349,12 +376,17 @@ input, textarea, select { user-select: text; -webkit-user-select: text; }
 
 /* ── Search engines, data import/export, diagnostics ───────────────────────── */
 .engine-list { margin-top: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-3); }
+/* A list on the sheet, not boxes on it. Each engine used to carry its own fill
+   and ring, which put a box inside a section that is itself no longer a box —
+   nesting the exact thing this page stopped doing. Rows are divided by the same
+   hairline the sections use. */
 .engine-row {
   display: flex; align-items: center; gap: var(--sp-4);
-  min-height: var(--row-h); padding: var(--sp-3) var(--sp-4);
-  border: none; box-shadow: var(--ring); border-radius: var(--r-md);
-  background: var(--surface);
+  min-height: var(--row-h); padding: var(--sp-3) 0;
+  border: none; box-shadow: none; border-radius: 0; background: none;
+  border-top: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
 }
+.engine-row:first-of-type { border-top: none; }
 .engine-row .name { font-size: var(--fs-small); font-weight: 600; color: var(--text); }
 .engine-row .kw {
   font-family: var(--mono); font-size: var(--fs-micro); color: var(--accent);
