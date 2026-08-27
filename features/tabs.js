@@ -2,6 +2,7 @@ const { WebContentsView, Menu, dialog } = require('electron');
 const { resolveAppFile } = require('../app-paths');
 const log = require('./log');
 const { TabSleeper } = require('./tabs/sleep');
+const { overlayViewsOf } = require('./overlay-registry');
 const overlayMenu = require('./overlay-menu');
 const i18n = require('./i18n');
 const preloadForPage = require('./tabs/preload-for-page');
@@ -525,29 +526,16 @@ class Tabs {
         const wd = this.getWindowData();
         if (!wd?.window?.contentView)
             return;
-        /* EVERY overlay view belongs here. One left out sinks behind the tab views the
-           moment a tab is created or shown — which is what put the permission
-           doorhanger, the mini player and the site-info panel behind the page
-           (CLAUDE.md invariant 4). If you add an overlay, add it here and to
-           getWindowByWebContents(). */
-        const overlays = [
-            this.splitDivider, ...this.splitHandles, this.splitDrop,
-            this.glanceBackdrop, this.glanceView, this.glanceBar,
-            wd.sidePanel, wd.sidePanelHeader, wd.menu, wd.suggestions,
-            wd.bookmarkPrompt, wd.folderDropdown, wd.downloadsPanel,
-            wd.extensionsPanel, wd.passwordPrompt, wd.ctxMenu, wd.palette,
-            wd.themePanel, wd.pageActions,
-            wd.permView, wd.miniPlayer, wd.siteInfoView,
-        ];
-        overlays.forEach((view) => {
-            if (!view)
-                return;
+        // The overlay set lives in ONE place (features/overlay-registry.js), so
+        // this list and getWindowByWebContents can never disagree about what an
+        // overlay is (CLAUDE.md invariant 4).
+        for (const view of overlayViewsOf(wd)) {
             try {
                 wd.window.contentView.removeChildView(view);
                 wd.window.contentView.addChildView(view);
             }
             catch (e) { log.debug('tabs', 'raiseFloatingViews', e); }
-        });
+        }
     }
     setShortcuts(shortcuts) {
         this.shortcuts = shortcuts;

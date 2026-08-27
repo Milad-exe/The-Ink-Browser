@@ -11,6 +11,7 @@ const zoom = require('./zoom');
 const searchEngines = require('./search-engines');
 const i18n = require('./i18n');
 const log = require('./log');
+const { isOverlayOf } = require('./overlay-registry');
 const overlayMenu = require('./overlay-menu');
 const appIcon = require('./app-icon');
 class WindowManager {
@@ -565,50 +566,20 @@ class WindowManager {
         for (const [id, windowData] of this.windows) {
             if (windowData.window.webContents === webContents)
                 return windowData;
-            // Also match child WebContentsViews (suggestions, menu, bookmarkPrompt, folderDropdown, downloads)
-            if (windowData.suggestions?.webContents === webContents)
+            // Any overlay view (menu, panel, prompt, split/glance furniture)
+            // resolves to its window through the ONE shared set — see
+            // features/overlay-registry.js. Previously every view was named
+            // here AND in Tabs.raiseFloatingViews, and the two drifted.
+            if (isOverlayOf(windowData, webContents))
                 return windowData;
-            if (windowData.menu?.webContents === webContents)
+            // A popup opened by a page in this window (window.open) has no
+            // chrome of its own; resolve it to its opener.
+            if (windowData.popups && [...windowData.popups].some(w => !w.isDestroyed?.() && w.webContents === webContents))
                 return windowData;
-            if (windowData.bookmarkPrompt?.webContents === webContents)
-                return windowData;
-            if (windowData.folderDropdown?.webContents === webContents)
-                return windowData;
-            if (windowData.downloadsPanel?.webContents === webContents)
-                return windowData;
-            if (windowData.ctxMenu?.webContents === webContents)
-                return windowData;
-            if (windowData.palette?.webContents === webContents)
-                return windowData;
-            if (windowData.themePanel?.webContents === webContents)
-                return windowData;
-            if (windowData.pageActions?.webContents === webContents)
-                return windowData;
-            if (windowData.extensionsPanel?.webContents === webContents)
-                return windowData;
-            if (windowData.sidePanel?.webContents === webContents)
-                return windowData;
-            if (windowData.sidePanelHeader?.webContents === webContents)
-                return windowData;
-            if (windowData.passwordPrompt?.webContents === webContents)
-                return windowData;
-            if (windowData.siteInfoView?.webContents === webContents)
-                return windowData;
-            if (windowData.miniPlayer?.webContents === webContents)
-                return windowData;
-            if (windowData.tabs?.glanceView?.webContents === webContents)
-                return windowData;
-            if (windowData.tabs?.glanceBackdrop?.webContents === webContents)
-                return windowData;
-            if (windowData.tabs?.glanceBar?.webContents === webContents)
-                return windowData;
-            if (windowData.tabs?.splitDivider?.webContents === webContents)
-                return windowData;
-            if (windowData.tabs?.splitDrop?.webContents === webContents)
-                return windowData;
-            if (windowData.tabs?.splitHandles?.some?.(v => v?.webContents === webContents))
-                return windowData;
-            // Match tab WebContentsViews
+            // And the tabs themselves — a tab's own WebContentsView resolves to
+            // its window. (This is the branch the overlay-registry refactor must
+            // not drop: without it a page cannot resolve its window for
+            // permissions, context menus, downloads.)
             if (windowData.tabs) {
                 for (const [, tab] of windowData.tabs.tabMap) {
                     if (tab && tab.webContents === webContents)
