@@ -293,6 +293,15 @@ html[data-tabbar="top"] .tab-favicon { flex: 0 0 var(--icon); }
 html[data-tabbar="top"] .tab-button:not(.has-favicon)::before {
   content: ''; width: var(--icon); flex: 0 0 var(--icon);
 }
+/* A compact tile (folder member or pinned tab) has no title to fall back on, so
+   a favicon-less one would render as an empty box. Give it a quiet placeholder
+   square instead — a folder of not-yet-loaded tabs reads as tabs, not junk.
+   Full-width tabs keep their title, so they stay a bare slot. */
+html[data-tabbar="top"] .tab-button.in-folder:not(.has-favicon)::before,
+html[data-tabbar="top"] .tab-button.pinned:not(.has-favicon)::before {
+  width: 15px; height: 15px; flex: 0 0 15px;
+  border-radius: 4px; background: var(--hover);
+}
 .tab-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 10; }
 .tab-button.active {
   background: var(--surface);
