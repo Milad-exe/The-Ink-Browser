@@ -193,8 +193,13 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
    below it, then the bookmark bar and the page — the standard top-tabs stack. */
 html[data-tabbar="top"] #tab-bar      { order: 0; }
 html[data-tabbar="top"] #utility-bar  { order: 1; }
-html[data-tabbar="top"] #bookmark-bar { order: 2; }
-html[data-tabbar="top"] #content-area { order: 3; }
+/* Browser notices (default-browser offer, captive portal) sit BELOW the address
+   bar, not between the tabs and it — without an explicit order they default to 0
+   and land up by the tab strip. The page offset is a sum of heights
+   (reportChromeHeight), so their exact row here doesn't affect it. */
+html[data-tabbar="top"] #notice-bar   { order: 2; }
+html[data-tabbar="top"] #bookmark-bar { order: 3; }
+html[data-tabbar="top"] #content-area { order: 4; }
 html[data-tabbar="top"] #tab-bar { gap: var(--sp-3); }
 html[data-tabbar="top"] #space-header    { order: 0; }
 html[data-tabbar="top"] .essentials       { order: 1; }
