@@ -126,6 +126,15 @@ function register(ipcMain, { wm }) {
             catch (e) { log.debug('palette', 'palette:open', e); }
             view.setVisible(true);
             wd.paletteOpen = true;
+            // Bind the scrim to the page card, exactly as openFor does. Without
+            // this the --frame-* vars stay unset and #surface falls back to a
+            // stale default top, so the dimming scrim ("the shadow") covers the
+            // chrome instead of sitting inside the tab view.
+            sendFrame(wd);
+            if (!wd._paletteResizeHooked) {
+                wd._paletteResizeHooked = true;
+                wd.window.on('resize', () => { if (wd.paletteOpen) sendFrame(wd); });
+            }
             view.webContents.send('palette:data', {});
             try { view.webContents.focus(); }
             catch (e) { log.debug('palette', 'palette:open', e); }

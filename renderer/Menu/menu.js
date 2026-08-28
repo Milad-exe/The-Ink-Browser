@@ -74,6 +74,13 @@
         // somewhere to start.
         document.querySelectorAll('.menu-row').forEach(r => r.setAttribute('role', 'menuitem'));
         window.Ink?.keys?.rows(document, { selector: '.menu-row, #zoom-reset', onEscape: close, focusFirst: true });
+        // Tell main the card's real height so the overlay is sized to it and the
+        // menu never scrolls. Measured after layout; re-measured if a webfont
+        // reflows the rows.
+        const card = document.querySelector('.surface-card') || document.body;
+        const reportHeight = () => { try { api.reportHeight?.(Math.ceil(card.getBoundingClientRect().height)); } catch (e) { window.inkLog?.debug('menu', 'reportHeight: ' + e); } };
+        requestAnimationFrame(reportHeight);
+        try { document.fonts?.ready?.then(reportHeight); } catch (e) { window.inkLog?.debug('menu', 'fonts: ' + e); }
         // Left/Right work the zoom row from its single stop, the way a slider
         // row behaves in a native menu.
         document.getElementById('zoom-reset').addEventListener('keydown', (e) => {

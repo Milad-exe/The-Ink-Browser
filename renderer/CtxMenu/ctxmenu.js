@@ -162,10 +162,15 @@
     // Clear the chain as well as telling main to hide us, so the view never
     // holds a stale menu that could flash on the next open.
     const dismiss = () => { clear(); window.overlayMenu.dismiss(); };
-    // A click that reaches the surface missed every menu.
-    surface.addEventListener('mousedown', (e) => {
+    // A press anywhere outside the open menu chain closes it. Listen on the
+    // document in CAPTURE so it fires whichever element takes the event — the
+    // bare surface, a submenu gutter, the search field — rather than relying on
+    // the press landing on #surface specifically (a left-click just outside a
+    // menu was landing on nothing the surface listener saw, so it never closed).
+    // pointerdown covers mouse, pen and touch in one.
+    document.addEventListener('pointerdown', (e) => {
         if (!chain.some(m => m.contains(e.target))) dismiss();
-    });
+    }, true);
     // A context menu you can only click is half a menu: arrows move, Enter
     // activates, Escape closes, and typing jumps by first letter. Re-armed on
     // every open because the rows are rebuilt each time.

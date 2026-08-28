@@ -52,6 +52,22 @@ function register(ipcMain, { wm }) {
         cleanups.push(() => wd.window.webContents.removeListener('focus', closeOnce));
         wd.menuCleanups = cleanups;
     });
+    // Size the overlay to the menu card's real height so nothing is clipped into
+    // a scroll. panelBounds still trims it to the window, so a short window falls
+    // back to scrolling — but a normal one shows every row. MENU_HEIGHT is just
+    // the first-paint guess before this arrives.
+    ipcMain.on('menu-report-height', (_e, h) => {
+        const height = Math.max(0, Math.round(h || 0));
+        if (!height)
+            return;
+        for (const wd of wm.getAllWindows()) {
+            if (wd.menu?.webContents === _e.sender) {
+                try { wd.menu.setBounds(panelBounds(wd.window, { width: MENU_WIDTH, height })); }
+                catch (e) { log.debug('menu', 'report-height', e); }
+                return;
+            }
+        }
+    });
     // ── Close ─────────────────────────────────────────────────────────────────
     ipcMain.handle('close-menu', (_e) => {
         const wd = wm.getWindowByWebContents(_e.sender);
