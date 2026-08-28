@@ -252,21 +252,23 @@ html[data-tabbar="top"] .essentials:not(:empty)::after {
 }
 /* Quiet favicon tiles — NOT the glassy, ring-shadowed boxes of the sidebar grid
    (that base styling is what made three Essentials read as a loud cluster). In
-   the strip an Essential is a Chrome-style pinned favicon: transparent at rest,
-   a soft wash on hover. */
+   the strip an Essential is a compact favicon tile: a faint fill so it reads as
+   a defined tile rather than a favicon floating on the shell, brighter on hover.
+   Shares its resting fill with pinned tabs and folder members below. */
 html[data-tabbar="top"] .essential-tile {
-  width: var(--control-h); height: var(--control-h);
-  border-radius: var(--r-md); background: transparent; box-shadow: none;
+  width: var(--row-h); height: var(--row-h);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--text) 6%, transparent); box-shadow: none;
   /* Explicit: the strip is a drag region, and a child with no app-region can
      inherit it and swallow the click. */
   -webkit-app-region: no-drag;
 }
-html[data-tabbar="top"] .essential-tile:hover { background: var(--hover); box-shadow: none; }
+html[data-tabbar="top"] .essential-tile:hover { background: color-mix(in srgb, var(--text) 12%, transparent); box-shadow: none; }
 html[data-tabbar="top"] .essential-tile img,
 html[data-tabbar="top"] .essential-tile .ess-fallback { width: var(--icon); height: var(--icon); }
-/* The letter fallback drops its accent chip for a faint neutral one, so a
-   favicon-less Essential is a quiet placeholder, not a bright block. */
-html[data-tabbar="top"] .essential-tile .ess-fallback { background: var(--hover); color: var(--text-2); }
+html[data-tabbar="top"] .essential-tile img { border-radius: 5px; }
+/* The letter fallback is just the glyph now — the tile itself is the container. */
+html[data-tabbar="top"] .essential-tile .ess-fallback { background: transparent; color: var(--text-2); font-weight: 600; }
 
 /* The create-space form is a child of the strip; in the top strip it must not
    sit inline and stretch the row. Float it under the space pill instead. */
@@ -626,6 +628,19 @@ html[data-tabbar="top"] .tab-button.in-folder {
 }
 html[data-tabbar="top"] .tab-button.in-folder .tab-title,
 html[data-tabbar="top"] .tab-button.in-folder .tab-close { display: none; }
+/* Pinned tabs and folder members share the Essentials' resting fill so every
+   compact favicon tile in the strip reads as one family — defined tiles, not
+   loose favicons. The active one keeps its surface + ring (.tab-button.active). */
+html[data-tabbar="top"] .tab-button.pinned:not(.active),
+html[data-tabbar="top"] .tab-button.in-folder:not(.active) {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+html[data-tabbar="top"] .tab-button.pinned:not(.active):hover,
+html[data-tabbar="top"] .tab-button.in-folder:not(.active):hover {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+html[data-tabbar="top"] .tab-button.pinned .tab-favicon,
+html[data-tabbar="top"] .tab-button.in-folder .tab-favicon { border-radius: 5px; }
 /* Folded away: hides both a collapsed folder's member tabs and any nested
    folder headers under it (both carry .folder-collapsed from the render). */
 html[data-tabbar="top"] .folder-collapsed { display: none !important; }
