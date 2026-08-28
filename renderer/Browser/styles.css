@@ -537,15 +537,6 @@ html[data-tabbar="side"] .folder-header {
   color: var(--text-2); position: relative;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-/* The disclosure hangs in the column's own padding rather than taking a slot
-   in the row — taking one pushed the glyph and the name off the rail's grid. */
-.folder-chevron {
-  position: absolute; left: 2px; top: 50%; transform: translateY(-50%);
-  width: 10px; text-align: center;
-}
-html[data-tabbar="side"] .folder-header:not(.collapsed) .folder-chevron {
-  transform: translateY(-50%) rotate(90deg);
-}
 html[data-tabbar="side"] .folder-header:hover { background: var(--hover); color: var(--text); }
 /* How many tabs the folder holds. Sits where the delete button appears, so it
    steps aside on hover rather than crowding it. */
@@ -563,7 +554,6 @@ html[data-tabbar="side"] .folder-header.drop-target {
   background: var(--accent-wash, color-mix(in srgb, var(--accent) 18%, transparent));
   box-shadow: inset 0 0 0 1px var(--accent);
 }
-.folder-chevron { font-size: 10px; color: var(--text-3); transition: transform var(--dur-1) var(--ease); }
 /* Emoji icons render as text; the default folder glyph is an inline SVG that
    picks up the row's colour, with a darker fill behind the outline. */
 .folder-header.folder-dragging { opacity: 0.55; }
@@ -617,9 +607,6 @@ html[data-tabbar="top"] .folder-header {
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 html[data-tabbar="top"] .folder-header:hover { background: var(--hover); color: var(--text); }
-/* No disclosure triangle in the top strip — the folder glyph itself shows the
-   open/closed state, and clicking the chip toggles it. */
-html[data-tabbar="top"] .folder-chevron { display: none; }
 html[data-tabbar="top"] .folder-name { flex: 0 1 auto; }
 html[data-tabbar="top"] .folder-header.drop-target {
   background: var(--accent-wash, color-mix(in srgb, var(--accent) 18%, transparent));

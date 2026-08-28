@@ -2966,7 +2966,7 @@
                     startFolderRename(h, f.id);
                 }
             });
-            h.innerHTML = '<span class="folder-chevron">▸</span><span class="folder-icon">📁</span><span class="folder-name"></span><span class="folder-count" aria-hidden="true"></span><button class="folder-del" title="Delete folder">×</button>';
+            h.innerHTML = '<span class="folder-icon">📁</span><span class="folder-name"></span><span class="folder-count" aria-hidden="true"></span><button class="folder-del" title="Delete folder">×</button>';
             h.addEventListener('click', (e) => {
                 if (h.classList.contains('renaming') || e.target.closest('.folder-del')) return;
                 if (h.dataset.suppressClick) return; // a drag just ended here
