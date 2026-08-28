@@ -188,6 +188,13 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
    homes in this mode (the ☰ menu, the page-actions panel, and the space
    switcher's own menu), so the foot itself stays hidden.
    Every rule here is gated to [data-tabbar="top"]; side mode is untouched. */
+/* Body is a flex column; the tab strip sits at the very top (beside the traffic
+   lights, whose space its own #window-controls reserves), the address/nav bar
+   below it, then the bookmark bar and the page — the standard top-tabs stack. */
+html[data-tabbar="top"] #tab-bar      { order: 0; }
+html[data-tabbar="top"] #utility-bar  { order: 1; }
+html[data-tabbar="top"] #bookmark-bar { order: 2; }
+html[data-tabbar="top"] #content-area { order: 3; }
 html[data-tabbar="top"] #tab-bar { gap: var(--sp-3); }
 html[data-tabbar="top"] #space-header    { order: 0; }
 html[data-tabbar="top"] .essentials       { order: 1; }
@@ -316,7 +323,9 @@ html[data-tabbar="top"] .tab-button.pinned:not(.has-favicon)::before {
 .tab-button.is-essential { display: none; }
 
 /* The dragged tab lifts; others part around it. */
-.tab-button.dragging { opacity: 0.6; }
+/* pointer-events off so elementFromPoint sees the folder chip/tile under the
+   cursor (the drop-target hit-test), not the lifted tab itself. */
+.tab-button.dragging { opacity: 0.6; pointer-events: none; }
 
 /* ── Sidebar mode (vertical tabs; html[data-tabbar="side"]) ──────────────────
    Full-height left panel with the canonical sidebar anatomy:
@@ -603,13 +612,9 @@ html[data-tabbar="top"] .folder-header {
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 html[data-tabbar="top"] .folder-header:hover { background: var(--hover); color: var(--text); }
-/* The chevron is a collapse indicator: right (▸) when the folder is folded, down
-   (▾) when its tabs are laid out inline. Left-clicking the chip toggles it. */
-html[data-tabbar="top"] .folder-chevron {
-  position: static; left: auto; top: auto; transform: none;
-  flex: 0 0 auto; color: var(--text-3);
-}
-html[data-tabbar="top"] .folder-header:not(.collapsed) .folder-chevron { transform: rotate(90deg); }
+/* No disclosure triangle in the top strip — the folder glyph itself shows the
+   open/closed state, and clicking the chip toggles it. */
+html[data-tabbar="top"] .folder-chevron { display: none; }
 html[data-tabbar="top"] .folder-name { flex: 0 1 auto; }
 html[data-tabbar="top"] .folder-header.drop-target {
   background: var(--accent-wash, color-mix(in srgb, var(--accent) 18%, transparent));
@@ -621,7 +626,6 @@ html[data-tabbar="top"] .folder-header.collapsed.has-active-member {
   background: var(--accent-wash, color-mix(in srgb, var(--accent) 16%, transparent));
   color: var(--text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
 }
-html[data-tabbar="top"] .folder-header.collapsed.has-active-member .folder-chevron { color: var(--accent); }
 /* A folder's tabs sit inline like pinned tabs — favicon-only, compact — so an
    expanded folder is a tight group of icons after its chip, not a run of
    full-width tabs. Collapsing the folder folds them all away into the chip. */
@@ -748,11 +752,11 @@ html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
    traffic lights sit over its left end in every mode — always reserve them. */
 /* macOS owns the top-left corner, so the cluster cannot sit on the rail's
    content edge there: 14 (traffic-light x, window-manager.js) + 52 (the three
-   lights) + 18 clears them. Windows/Linux keep the rail edge. Both layouts run
-   the utility bar full-width, so the lights sit over its left end in top mode
-   too — the toggle is hidden there, leaving the padding as a pure spacer that
-   pushes back/forward clear of the lights. */
-html[data-platform="darwin"] .lead-cluster { padding-left: 84px; }
+   lights) + 18 clears them. Windows/Linux keep the rail edge. Only side mode
+   needs this: in top mode the tab strip is the top row and its own
+   #window-controls spacer reserves the lights, so the address bar below is free
+   to sit at the edge. */
+html[data-platform="darwin"][data-tabbar="side"] .lead-cluster { padding-left: 84px; }
 
 /* Icon rail: drag the divider narrow to collapse tab rows to favicons only
    (Arc). Labels, close buttons and the "New Tab" caption fall away; every

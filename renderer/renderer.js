@@ -2653,6 +2653,7 @@
                 let frozen = false; // reorder preview paused while the pointer rests
                 let lastMoveAt = Date.now(), lastPX = e.clientX, lastPY = e.clientY;
                 let dwellTimer = null;
+                let springId = null, springTimer = null; // dwell over a collapsed folder → it opens
                 const clearSplitTarget = () => {
                     splitTarget = null;
                     tabsContainer.querySelectorAll('.tab-button.split-target')
@@ -2730,8 +2731,10 @@
                     }
                     edgeAutoScroll(ev.clientX, ev.clientY);
                     placeDraggedTab(btn, sideTabs() ? ev.clientY : ev.clientX);
-                    // Which folder (if any) is the tab hovering over? (drop target)
-                    if (sideTabs() && !btn.classList.contains('pinned')) {
+                    // Which folder (if any) is the tab hovering over? (drop target).
+                    // Both layouts: elementFromPoint finds the chip or a member tile
+                    // under the cursor (the dragged tab is pointer-events:none).
+                    if (!btn.classList.contains('pinned')) {
                         const el = document.elementFromPoint(ev.clientX, ev.clientY);
                         const fh = el?.closest?.('.folder-header');
                         const mem = el?.closest?.('.tab-button.in-folder');
@@ -2740,6 +2743,18 @@
                             : null;
                         tabsContainer.querySelectorAll('.folder-header.drop-target').forEach(h => h.classList.remove('drop-target'));
                         if (dropFolder) tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(dropFolder)}"]`)?.classList.add('drop-target');
+                        // Spring-load: hold over a COLLAPSED folder and it opens, so a
+                        // tab can be dropped among its tabs (Finder / Chrome behaviour).
+                        const overFolder = fh?.dataset.folder || null;
+                        if (overFolder !== springId) {
+                            springId = overFolder;
+                            clearTimeout(springTimer); springTimer = null;
+                            const f = overFolder && folderState.folders.find(x => x.id === overFolder);
+                            if (f && f.collapsed)
+                                springTimer = setTimeout(() => {
+                                    if (springId === overFolder) window.folders.toggle(overFolder);
+                                }, 550);
+                        }
                     }
                 };
                 const cleanup = () => {
@@ -2751,6 +2766,7 @@
                     btn.classList.remove('dragging', 'drag-outside');
                     clearSplitTarget();
                     clearInterval(dwellTimer);
+                    clearTimeout(springTimer);
                     stopEdgeScroll();
                     activeTabDrag = null;
                     window.dragdrop.dragTrack?.(false);
