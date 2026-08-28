@@ -123,30 +123,6 @@ html[data-vibrancy="true"] #content-area {
 .wc-win .wc-btn:hover { background: var(--hover); color: var(--text); }
 .wc-win .wc-close:hover { background: var(--danger); color: #fff; }
 
-/* ── Clock + sync status ─────────────────── */
-.chrome-status {
-  display: flex; align-items: center; gap: 8px;
-  padding: 5px 10px; margin-right: 4px; flex-shrink: 0;
-  border-radius: var(--r-md);
-  background: var(--surface);
-  /* Mono micro-labels — terminal-adjacent, deterministic. */
-  font-family: var(--mono);
-  color: var(--text-2); font-size: 11px; font-weight: 500;
-  user-select: none; -webkit-user-select: none;
-}
-.cs-tabs { color: var(--text-3); letter-spacing: 0.08em; text-transform: uppercase; font-size: 10px; }
-.cs-clock { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
-/* North-star motif separator — the icon's copper star, tying the mark, the mono
-   status and the accent together. */
-.cs-star { color: var(--accent); font-size: 9px; line-height: 1; }
-.cs-sep { width: 1px; height: 12px; background: var(--border-2); }
-.cs-synced { display: flex; align-items: center; gap: 5px; }
-.cs-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--accent); box-shadow: 0 0 6px var(--accent);
-}
-@media (max-width: 680px) { .chrome-status { display: none; } }
-
 /* ── Tab Bar (top strip) ─────────────────── */
 #tab-bar {
   /* Height MUST match Tabs.TAB_BAR_H — see the metrics block in ui.css. */
@@ -160,8 +136,11 @@ html[data-vibrancy="true"] #content-area {
 }
 html.tab-dragging * { user-select: none !important; -webkit-user-select: none !important; cursor: grabbing !important; }
 
-/* Interactive bits opt out of the drag region. */
+/* Interactive bits opt out of the drag region. #tabs-container MUST be here: a
+   macOS drag region swallows wheel/trackpad gestures, so if the scroll container
+   inherits drag from #tab-bar the strip can't be scrolled at all. */
 #tab-bar .tab-button,
+#tab-bar #tabs-container,
 #tab-bar #tab-actions,
 #tab-bar #tab-actions button,
 #tab-bar .tab-scroll-btn,
@@ -178,8 +157,13 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
 }
 #tab-scroll-left  { background: linear-gradient(to right, var(--shell) 45%, transparent); }
 #tab-scroll-right { background: linear-gradient(to left,  var(--shell) 45%, transparent); }
+/* Shown as a fade+arrow whenever there is more to scroll — not hidden until you
+   happen to hover, which is why overflow felt invisible. Hover just widens the
+   hit target. */
+#tab-bar.scrollable-left  #tab-scroll-left,
+#tab-bar.scrollable-right #tab-scroll-right { width: 26px; opacity: 1; pointer-events: auto; }
 #tab-bar.scrollable-left:hover  #tab-scroll-left,
-#tab-bar.scrollable-right:hover #tab-scroll-right { width: 34px; opacity: 1; pointer-events: auto; }
+#tab-bar.scrollable-right:hover #tab-scroll-right { width: 34px; }
 .tab-scroll-btn:hover { color: var(--text); }
 
 #tabs-container {
@@ -190,10 +174,10 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
 #tabs-container::-webkit-scrollbar { display: none; }
 
 #tab-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; padding-left: 2px; }
-/* The sidebar renders "+ New Tab" as the first row (Arc), so the render path
-   puts #tab-actions ahead of the tabs in the strip's DOM. In the top strip the
-   + belongs after the last tab, where every other browser keeps it. */
-html[data-tabbar="top"] #tab-actions { order: 2; }
+/* The sidebar renders "+ New Tab" as a row inside the tab list (Arc); the top
+   strip keeps it a sibling of the scroll container so it stays put — see the
+   ordered layout below, where it sits at order 5 between the tabs and the drag
+   spacer. */
 
 /* ── Top / horizontal mode: Spaces and Essentials get a home ─────────────────
    In the sidebar these sit ABOVE the tabs. In the top strip they move to the
@@ -212,7 +196,6 @@ html[data-tabbar="top"] #tabs-container   { order: 3; }
 html[data-tabbar="top"] #tab-scroll-right { order: 4; }
 html[data-tabbar="top"] #tab-actions      { order: 5; }
 html[data-tabbar="top"] #tab-drag-spacer  { order: 6; }
-html[data-tabbar="top"] #chrome-status    { order: 7; }
 html[data-tabbar="top"] .sidebar-foot,
 html[data-tabbar="top"] #sidebar-resizer  { display: none; }
 /* No sidebar to collapse in the top strip, so its toggle has no meaning. */
@@ -244,19 +227,34 @@ html[data-tabbar="top"] #space-header { position: relative; }
 
 /* Essentials as a horizontal row of favicon tiles — pinned-tab style. */
 html[data-tabbar="top"] .essentials {
-  display: flex; align-items: center; gap: 3px; flex: 0 0 auto;
-  padding: 0; margin: 0; -webkit-app-region: no-drag;
+  display: flex; align-items: center; gap: 2px; flex: 0 0 auto;
+  padding: 0; margin: 0; position: relative; -webkit-app-region: no-drag;
 }
 html[data-tabbar="top"] .essentials:empty { display: none; }
+/* A hairline closes the meta cluster (space + essentials) off from the tabs,
+   the mirror of the one after the space pill — so the left end reads as two
+   quiet groups with a gap, not one dense clump against the first tab. */
+html[data-tabbar="top"] .essentials:not(:empty)::after {
+  content: ''; position: absolute; right: calc(var(--sp-3) * -1); top: 50%;
+  transform: translateY(-50%); width: 1px; height: 18px; background: var(--border);
+}
+/* Quiet favicon tiles — NOT the glassy, ring-shadowed boxes of the sidebar grid
+   (that base styling is what made three Essentials read as a loud cluster). In
+   the strip an Essential is a Chrome-style pinned favicon: transparent at rest,
+   a soft wash on hover. */
 html[data-tabbar="top"] .essential-tile {
   width: var(--control-h); height: var(--control-h);
-  border-radius: var(--r-md);
+  border-radius: var(--r-md); background: transparent; box-shadow: none;
   /* Explicit: the strip is a drag region, and a child with no app-region can
      inherit it and swallow the click. */
   -webkit-app-region: no-drag;
 }
+html[data-tabbar="top"] .essential-tile:hover { background: var(--hover); box-shadow: none; }
 html[data-tabbar="top"] .essential-tile img,
 html[data-tabbar="top"] .essential-tile .ess-fallback { width: var(--icon); height: var(--icon); }
+/* The letter fallback drops its accent chip for a faint neutral one, so a
+   favicon-less Essential is a quiet placeholder, not a bright block. */
+html[data-tabbar="top"] .essential-tile .ess-fallback { background: var(--hover); color: var(--text-2); }
 
 /* The create-space form is a child of the strip; in the top strip it must not
    sit inline and stretch the row. Float it under the space pill instead. */
@@ -579,6 +577,45 @@ html[data-tabbar="side"] .folder-header.drop-target {
 /* Member tabs sit indented beneath their folder header. */
 html[data-tabbar="side"] .tab-button.in-folder { margin-left: 16px; width: auto; }
 html[data-tabbar="side"] .tab-button.folder-collapsed { display: none !important; }
+
+/* Folders in the horizontal strip: a compact chip the height of a tab, laid out
+   in one row. Without this the header falls back to a block <div> and its
+   children spill — the chevron flings to the strip's left edge (it is absolutely
+   positioned for the sidebar's gutter), the icon floats above the 44px bar and
+   the name/× stack below it. */
+html[data-tabbar="top"] .folder-header {
+  display: inline-flex; align-items: center; gap: var(--sp-4);
+  flex: 0 0 auto; align-self: center; height: var(--row-h); max-width: 170px;
+  padding: 0 var(--sp-4); border-radius: var(--r-md);
+  /* A faint resting fill so the folder reads as one defined group chip in the
+     flow of tabs (Chrome's group label), not a run of loose text against them. */
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  cursor: pointer; color: var(--text-2); position: relative;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+html[data-tabbar="top"] .folder-header:hover { background: var(--hover); color: var(--text); }
+/* The chevron points DOWN here — the chip is a dropdown trigger, not a collapse
+   toggle: clicking it opens a flyout of the folder's tabs (they never flow into
+   the strip). */
+html[data-tabbar="top"] .folder-chevron {
+  position: static; left: auto; top: auto; transform: rotate(90deg);
+  flex: 0 0 auto; color: var(--text-3);
+}
+html[data-tabbar="top"] .folder-name { flex: 0 1 auto; }
+html[data-tabbar="top"] .folder-header.drop-target {
+  background: var(--accent-wash, color-mix(in srgb, var(--accent) 18%, transparent));
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+/* You're inside one of the folder's tabs: the chip lights up so the strip still
+   says where you are even though the rest of its tabs are tucked in the flyout. */
+html[data-tabbar="top"] .folder-header.has-active-member {
+  background: var(--accent-wash, color-mix(in srgb, var(--accent) 16%, transparent));
+  color: var(--text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+html[data-tabbar="top"] .folder-header.has-active-member .folder-chevron { color: var(--accent); }
+/* Folder tabs live in the flyout, not the strip — the one exception is the
+   active tab, which stays visible so "where am I" is never a click away. */
+html[data-tabbar="top"] .tab-button.in-folder:not(.active) { display: none !important; }
 /* Dark context menu (folders, spaces, …). */
 .ctx-menu {
   position: fixed; z-index: 1500; min-width: 190px; padding: 5px;
@@ -634,7 +671,6 @@ html[data-tabbar="side"] #new-tab-btn:hover { color: var(--text); background: va
 html[data-tabbar="side"] #tab-drag-spacer { width: auto; min-width: 0; height: auto; min-height: 20px; flex: 1 1 auto; }
 /* The sidebar has no status/clock strip — the foot carries downloads, spaces
    and add. Kept for top-strip mode, hidden here. */
-html[data-tabbar="side"] .chrome-status { display: none; }
 html[data-tabbar="side"] #tab-bar.merge-target::after { inset: 6px 4px; }
 /* The profile avatar lives in the sidebar foot here — drop the toolbar copy. */
 html[data-tabbar="side"] #profile-btn { display: none; }
@@ -695,8 +731,11 @@ html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
    traffic lights sit over its left end in every mode — always reserve them. */
 /* macOS owns the top-left corner, so the cluster cannot sit on the rail's
    content edge there: 14 (traffic-light x, window-manager.js) + 52 (the three
-   lights) + 18 clears them. Windows/Linux keep the rail edge. */
-html[data-platform="darwin"][data-tabbar="side"] .lead-cluster { padding-left: 84px; }
+   lights) + 18 clears them. Windows/Linux keep the rail edge. Both layouts run
+   the utility bar full-width, so the lights sit over its left end in top mode
+   too — the toggle is hidden there, leaving the padding as a pure spacer that
+   pushes back/forward clear of the lights. */
+html[data-platform="darwin"] .lead-cluster { padding-left: 84px; }
 
 /* Icon rail: drag the divider narrow to collapse tab rows to favicons only
    (Arc). Labels, close buttons and the "New Tab" caption fall away; every

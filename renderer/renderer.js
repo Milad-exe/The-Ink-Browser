@@ -86,7 +86,6 @@
                 const ws = btn.dataset.ws || '1';
                 btn.classList.toggle('ws-hidden', ws !== activeWorkspace);
             }
-            updateChromeTabs(document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden)').length);
         }
         let activeTabIndex = 0;
         let currentTabUrl = '';
@@ -347,32 +346,8 @@
         initExtensions();
         initUtilityBarConfig();
         initReaderAndPip();
-        initChromeClock();
         initProfiles();
         initEssentials();
-        // ─────────────────────────────────────────────────────────────────────────
-        // Chrome status clock (tab strip) — updates on the minute, no seconds timer
-        // ─────────────────────────────────────────────────────────────────────────
-        function initChromeClock() {
-            const el = document.getElementById('chrome-clock');
-            if (!el)
-                return;
-            // 12- or 24-hour according to the user's locale — this used to be
-            // hardcoded 24-hour, which is simply wrong in most of the world.
-            const paint = () => { el.textContent = i18n.time(); };
-            paint();
-            // Align to the top of the next minute, then tick each minute.
-            setTimeout(() => { paint(); setInterval(paint, 60000); }, (60 - new Date().getSeconds()) * 1000);
-        }
-        // Mono "TABS·N" micro-label in the chrome status. Prefers the count the
-        // main process sends; falls back to counting the rendered tab buttons.
-        function updateChromeTabs(n) {
-            const el = document.getElementById('chrome-tabs');
-            if (!el)
-                return;
-            const count = (typeof n === 'number' && n > 0) ? n : document.querySelectorAll('.tab-button').length;
-            el.textContent = 'TABS·' + count;
-        }
         // ─────────────────────────────────────────────────────────────────────────
         // Window controls
         // ─────────────────────────────────────────────────────────────────────────
@@ -1392,8 +1367,6 @@
             window.tab.onTabCreated((_e, data) => {
                 tabPrivate.set(data.index, !!data.private);
                 createTabButton(data.index, data.title, data.afterIndex ?? null, data.active !== false, !!data.private, !!data.container, data.workspace || '1', !!data.essential);
-                // Count only the active workspace's tabs (others live hidden).
-                updateChromeTabs(document.querySelectorAll('#tabs-container .tab-button:not(.ws-hidden)').length);
                 setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
             });
             // Speaker on audible tabs; mic/camera in danger colour while recording.
@@ -1404,7 +1377,6 @@
                 tabLoading.delete(data.index);
                 removeTabButton(data.index);
                 hideSuggestions();
-                updateChromeTabs(data.totalTabs);
                 setTimeout(() => { updateTabWidths(data.totalTabs); updateScrollShadows(); }, 10);
             });
             window.tab.onTabSwitched((_e, data) => {
@@ -2898,6 +2870,15 @@
             }
             activeTabIndex = index;
             applySplitMarks();
+            // Top strip: the active tab's folder chip lights up (its members are
+            // otherwise tucked in the flyout). CSS already shows/hides the active
+            // member itself; this keeps the chip in sync without a full re-layout.
+            if (!sideTabs()) {
+                const activeFolder = folderState.assign?.get(index);
+                tabsContainer.querySelectorAll('.folder-header').forEach(h => {
+                    h.classList.toggle('has-active-member', !!activeFolder && h.dataset.folder === activeFolder);
+                });
+            }
         }
         /**
          * Move keyboard focus within the tab strip. `step` is +1/-1, or the
@@ -2962,7 +2943,8 @@
             h.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    window.folders.toggle(f.id);
+                    if (sideTabs()) window.folders.toggle(f.id);
+                    else openFolderFlyout(f.id, h);
                 }
                 else if (e.key === 'F2') {
                     e.preventDefault();
@@ -2973,7 +2955,10 @@
             h.addEventListener('click', (e) => {
                 if (h.classList.contains('renaming') || e.target.closest('.folder-del')) return;
                 if (h.dataset.suppressClick) return; // a drag just ended here
-                window.folders.toggle(f.id);
+                // Side: collapse in place. Top: the strip has no room to expand a
+                // folder inline, so the chip is a dropdown of its tabs instead.
+                if (sideTabs()) window.folders.toggle(f.id);
+                else openFolderFlyout(f.id, h);
             });
             h.addEventListener('dblclick', (e) => { e.preventDefault(); startFolderRename(h, f.id); });
             h.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); showFolderMenu(e.clientX, e.clientY, f.id); });
@@ -3159,6 +3144,33 @@
             );
             openCtxMenu(x, y, rows);
         }
+        // Top-strip folders don't expand inline — the chip drops this flyout of
+        // its tabs (the "sub-pages"). Left-click builds it; the right-click menu
+        // (rename/icon/move/delete) stays separate on showFolderMenu.
+        function openFolderFlyout(id, headerEl) {
+            const name = (folderState.folders.find(f => f.id === id)?.name) || 'folder';
+            const members = [...folderState.assign.entries()]
+                .filter(([, fid]) => fid === id)
+                .map(([i]) => i)
+                .sort((a, b) => a - b);
+            const rows = [];
+            for (const i of members) {
+                const btn = tabs.get(i);
+                if (!btn) continue;
+                const title = btn.querySelector('.tab-title')?.textContent?.trim() || 'Tab';
+                const active = btn.classList.contains('active');
+                rows.push([title, () => window.tab.switch(i), active ? 'active' : '']);
+            }
+            if (rows.length) rows.push(['sep']);
+            rows.push([`New tab in ${name}`, async () => {
+                try {
+                    const idx = await window.tab.add();
+                    if (typeof idx === 'number') window.folders.assign(idx, id);
+                } catch (e) { window.inkLog?.debug('renderer', 'openFolderFlyout: ' + e); }
+            }]);
+            const r = headerEl.getBoundingClientRect();
+            openCtxMenu(Math.round(r.left), Math.round(r.bottom + 4), rows);
+        }
         function showFolderMenu(x, y, id) {
             // Spaces other than the current one; the folder and its tabs move together.
             const spaceRows = (_spacesCache || [])
@@ -3304,15 +3316,20 @@
                     if (!header.classList.contains('renaming')) header.querySelector('.folder-name').textContent = f.name || 'Folder';
                     frag.appendChild(header);
                     let count = 0;
+                    let anyActive = false;
                     for (const btn of normal) {
                         if (folderState.assign.get(+btn.dataset.index) !== f.id) continue;
                         btn.classList.add('in-folder');
                         btn.style.setProperty('--depth', String(depth + 1));
                         if (hidden || f.collapsed) btn.classList.add('folder-collapsed');
+                        if (btn.classList.contains('active')) anyActive = true;
                         frag.appendChild(btn);
                         grouped.add(btn);
                         count++;
                     }
+                    // Top strip only: light the chip when you're inside one of its
+                    // tabs (that active tab is the one member still shown in-strip).
+                    header.classList.toggle('has-active-member', anyActive);
                     // How many tabs are in there — the one thing a collapsed
                     // folder cannot tell you by looking at it.
                     const countEl = header.querySelector('.folder-count');
@@ -3326,13 +3343,28 @@
             walk(null, 0, false);
             const actions = document.getElementById('tab-actions');
             if (actions) {
-                // Divider sits above New Tab whenever anything precedes it —
-                // folders or pinned tiles — separating that block from the tabs.
-                actions.classList.toggle('after-folders', folders.length > 0 || pinned.length > 0);
-                frag.appendChild(actions);
+                if (sideTabs()) {
+                    // Sidebar: "+ New tab" is a row after the pinned/folder block
+                    // (Arc). The divider above it appears whenever anything
+                    // precedes it — folders or pinned tiles.
+                    actions.classList.toggle('after-folders', folders.length > 0 || pinned.length > 0);
+                    frag.appendChild(actions);
+                } else {
+                    // Top strip: the + is pinned after the scrolling tab list and
+                    // stays visible (every browser keeps it there). It must NOT ride
+                    // inside #tabs-container or it scrolls off the right past a full
+                    // strip — it lives between the container and the drag spacer.
+                    actions.classList.remove('after-folders');
+                    const spacer = document.getElementById('tab-drag-spacer');
+                    if (actions.parentElement !== tabBar || actions.nextElementSibling !== spacer)
+                        tabBar.insertBefore(actions, spacer);
+                }
             }
             for (const btn of normal) if (!grouped.has(btn)) frag.appendChild(btn);
             tabsContainer.appendChild(frag);
+            // The composition just changed how wide the strip's content is, so the
+            // overflow indicators have to be re-evaluated once layout has settled.
+            requestAnimationFrame(updateScrollShadows);
         }
         // ── Tab media indicator: audible/muted speaker, recording mic/camera ─────
         const INDICATOR_SVG = {
