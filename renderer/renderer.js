@@ -2943,8 +2943,7 @@
             h.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    if (sideTabs()) window.folders.toggle(f.id);
-                    else openFolderFlyout(f.id, h);
+                    window.folders.toggle(f.id);
                 }
                 else if (e.key === 'F2') {
                     e.preventDefault();
@@ -2955,10 +2954,9 @@
             h.addEventListener('click', (e) => {
                 if (h.classList.contains('renaming') || e.target.closest('.folder-del')) return;
                 if (h.dataset.suppressClick) return; // a drag just ended here
-                // Side: collapse in place. Top: the strip has no room to expand a
-                // folder inline, so the chip is a dropdown of its tabs instead.
-                if (sideTabs()) window.folders.toggle(f.id);
-                else openFolderFlyout(f.id, h);
+                // Both modes: left-click collapses the folder in place. Its tabs
+                // are grouped inline like pinned tabs and fold away into the chip.
+                window.folders.toggle(f.id);
             });
             h.addEventListener('dblclick', (e) => { e.preventDefault(); startFolderRename(h, f.id); });
             h.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); showFolderMenu(e.clientX, e.clientY, f.id); });
@@ -3143,33 +3141,6 @@
                 ]]] : []),
             );
             openCtxMenu(x, y, rows);
-        }
-        // Top-strip folders don't expand inline — the chip drops this flyout of
-        // its tabs (the "sub-pages"). Left-click builds it; the right-click menu
-        // (rename/icon/move/delete) stays separate on showFolderMenu.
-        function openFolderFlyout(id, headerEl) {
-            const name = (folderState.folders.find(f => f.id === id)?.name) || 'folder';
-            const members = [...folderState.assign.entries()]
-                .filter(([, fid]) => fid === id)
-                .map(([i]) => i)
-                .sort((a, b) => a - b);
-            const rows = [];
-            for (const i of members) {
-                const btn = tabs.get(i);
-                if (!btn) continue;
-                const title = btn.querySelector('.tab-title')?.textContent?.trim() || 'Tab';
-                const active = btn.classList.contains('active');
-                rows.push([title, () => window.tab.switch(i), active ? 'active' : '']);
-            }
-            if (rows.length) rows.push(['sep']);
-            rows.push([`New tab in ${name}`, async () => {
-                try {
-                    const idx = await window.tab.add();
-                    if (typeof idx === 'number') window.folders.assign(idx, id);
-                } catch (e) { window.inkLog?.debug('renderer', 'openFolderFlyout: ' + e); }
-            }]);
-            const r = headerEl.getBoundingClientRect();
-            openCtxMenu(Math.round(r.left), Math.round(r.bottom + 4), rows);
         }
         function showFolderMenu(x, y, id) {
             // Spaces other than the current one; the folder and its tabs move together.
@@ -3362,9 +3333,11 @@
             }
             for (const btn of normal) if (!grouped.has(btn)) frag.appendChild(btn);
             tabsContainer.appendChild(frag);
-            // The composition just changed how wide the strip's content is, so the
-            // overflow indicators have to be re-evaluated once layout has settled.
-            requestAnimationFrame(updateScrollShadows);
+            // Membership/collapse just changed which tiles are compact (favicon
+            // width) and how wide the rest are, so recompute widths, then re-check
+            // the overflow indicators once that has applied.
+            updateTabWidths(tabs.size);
+            setTimeout(updateScrollShadows, 20);
         }
         // ── Tab media indicator: audible/muted speaker, recording mic/camera ─────
         const INDICATOR_SVG = {
@@ -3568,16 +3541,22 @@
                 const MIN_W = 120; // comfortable resting minimum
                 const COMFY_W = 200; // preferred width when there's room to spare
                 const allTabs = [...tabs.values()];
-                const pinned = allTabs.filter(t => t.classList.contains('pinned'));
-                const unpinned = allTabs.filter(t => !t.classList.contains('pinned'));
-                pinned.forEach(t => Object.assign(t.style, { width: `${PINNED_W}px`, minWidth: `${PINNED_W}px`, maxWidth: `${PINNED_W}px`, flex: '0 0 auto' }));
+                // Pinned tabs AND a folder's member tabs render as compact favicon
+                // tiles (PINNED_W); everything else is a full-width tab.
+                const isCompact = t => t.classList.contains('pinned') || t.classList.contains('in-folder');
+                const compact = allTabs.filter(isCompact);
+                const unpinned = allTabs.filter(t => !isCompact(t));
+                compact.forEach(t => Object.assign(t.style, { width: `${PINNED_W}px`, minWidth: `${PINNED_W}px`, maxWidth: `${PINNED_W}px`, flex: '0 0 auto' }));
                 if (!unpinned.length) {
                     tabBar.classList.add('only-pinned');
                     tabsContainer.style.overflowX = 'hidden';
                     return;
                 }
                 tabBar.classList.remove('only-pinned');
-                const remaining = barW - pinned.length * PINNED_W;
+                // Only tiles actually on screen claim width — a collapsed folder's
+                // members are display:none and reserve nothing.
+                const shownCompact = compact.filter(t => !t.classList.contains('folder-collapsed')).length;
+                const remaining = barW - shownCompact * PINNED_W;
                 const ideal = Math.floor(Math.max(0, remaining) / unpinned.length);
                 // Tabs sit at a comfortable fixed width (COMFY_W), left-packed. With
                 // many tabs they shrink evenly to share the bar, down to MIN_W, after

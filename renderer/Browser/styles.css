@@ -594,28 +594,36 @@ html[data-tabbar="top"] .folder-header {
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 html[data-tabbar="top"] .folder-header:hover { background: var(--hover); color: var(--text); }
-/* The chevron points DOWN here — the chip is a dropdown trigger, not a collapse
-   toggle: clicking it opens a flyout of the folder's tabs (they never flow into
-   the strip). */
+/* The chevron is a collapse indicator: right (▸) when the folder is folded, down
+   (▾) when its tabs are laid out inline. Left-clicking the chip toggles it. */
 html[data-tabbar="top"] .folder-chevron {
-  position: static; left: auto; top: auto; transform: rotate(90deg);
+  position: static; left: auto; top: auto; transform: none;
   flex: 0 0 auto; color: var(--text-3);
 }
+html[data-tabbar="top"] .folder-header:not(.collapsed) .folder-chevron { transform: rotate(90deg); }
 html[data-tabbar="top"] .folder-name { flex: 0 1 auto; }
 html[data-tabbar="top"] .folder-header.drop-target {
   background: var(--accent-wash, color-mix(in srgb, var(--accent) 18%, transparent));
   box-shadow: inset 0 0 0 1px var(--accent);
 }
-/* You're inside one of the folder's tabs: the chip lights up so the strip still
-   says where you are even though the rest of its tabs are tucked in the flyout. */
-html[data-tabbar="top"] .folder-header.has-active-member {
+/* You're inside one of the folder's tabs while it's COLLAPSED: the chip lights
+   up so the strip still says where you are even though its tabs are folded in. */
+html[data-tabbar="top"] .folder-header.collapsed.has-active-member {
   background: var(--accent-wash, color-mix(in srgb, var(--accent) 16%, transparent));
   color: var(--text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
 }
-html[data-tabbar="top"] .folder-header.has-active-member .folder-chevron { color: var(--accent); }
-/* Folder tabs live in the flyout, not the strip — the one exception is the
-   active tab, which stays visible so "where am I" is never a click away. */
-html[data-tabbar="top"] .tab-button.in-folder:not(.active) { display: none !important; }
+html[data-tabbar="top"] .folder-header.collapsed.has-active-member .folder-chevron { color: var(--accent); }
+/* A folder's tabs sit inline like pinned tabs — favicon-only, compact — so an
+   expanded folder is a tight group of icons after its chip, not a run of
+   full-width tabs. Collapsing the folder folds them all away into the chip. */
+html[data-tabbar="top"] .tab-button.in-folder {
+  min-width: 0; max-width: none; padding: 0 9px; justify-content: center;
+}
+html[data-tabbar="top"] .tab-button.in-folder .tab-title,
+html[data-tabbar="top"] .tab-button.in-folder .tab-close { display: none; }
+/* Folded away: hides both a collapsed folder's member tabs and any nested
+   folder headers under it (both carry .folder-collapsed from the render). */
+html[data-tabbar="top"] .folder-collapsed { display: none !important; }
 /* Dark context menu (folders, spaces, …). */
 .ctx-menu {
   position: fixed; z-index: 1500; min-width: 190px; padding: 5px;
