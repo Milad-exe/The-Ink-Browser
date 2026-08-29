@@ -9,6 +9,11 @@
     Tabs instance and nothing here requires Tabs back. */
 const log = require('../log');
 const { resolveAppFile } = require('../../app-paths');
+// The injected page scripts live in features/reader.js. They used to be reachable
+// as top-level consts in features/tabs.js, but this mixin is its own module, so
+// import them here — reading them from tabs.js's scope threw "not defined" and
+// left reader mode and PiP silently dead.
+const { READERABLE_JS, EXTRACT_JS, PIP_JS } = require('../reader');
 
 module.exports = {
     // ── Reader mode ────────────────────────────────────────────────────────────

@@ -457,7 +457,7 @@ module.exports = {
                         this.sendLoadingState(tabIndex, false);
                     }
                 }
-                catch (e) { log.debug('tabs', 'host', e); }
+                catch(e){}
             }, 3000);
         });
         tab.webContents.on('did-finish-load', () => {
@@ -473,7 +473,7 @@ module.exports = {
                     try {
                         tab.webContents.executeJavaScript(`window.scrollTo(0, ${Number(y) || 0})`, true).catch(() => { });
                     }
-                    catch (e) { log.debug('tabs', 'host', e); }
+                    catch(e){}
                 }, 220);
             }
         });
@@ -492,9 +492,9 @@ module.exports = {
             // hold, so it plays normally once the user actually opens the tab.
             if (tab.bgHoldMedia && tabIndex !== this.activeTabIndex) {
                 try {
-                    tab.webContents.executeJavaScript("(()=>{try{document.querySelectorAll('video,audio').forEach(m=>{try{m.pause();}catch (e) { log.debug('tabs', 'host', e); }});}catch (e) { log.debug('tabs', 'host', e); }})()", true).catch(() => { });
+                    tab.webContents.executeJavaScript("(()=>{try{document.querySelectorAll('video,audio').forEach(m=>{try{m.pause();}catch(e){}});}catch(e){}})()", true).catch(() => { });
                 }
-                catch (e) { log.debug('tabs', 'host', e); }
+                catch(e){}
                 return;
             }
             tab.hasPlayingMedia = true;
@@ -502,13 +502,13 @@ module.exports = {
                 try {
                     this.mainWindow.webContents.send('media-state', { index: tabIndex, playing: true });
                 }
-                catch (e) { log.debug('tabs', 'host', e); }
+                catch(e){}
             }
             // Mini player: media playing in a background tab shows the overlay.
             try {
                 miniPlayer.onMediaState(this.getWindowData(), tabIndex, true);
             }
-            catch (e) { log.debug('tabs', 'host', e); }
+            catch(e){}
             this.sendMediaIndicators(tabIndex, tab); // muted tabs stay marked while playing
         });
         tab.webContents.on('media-paused', () => {
@@ -517,12 +517,12 @@ module.exports = {
                 try {
                     this.mainWindow.webContents.send('media-state', { index: tabIndex, playing: false });
                 }
-                catch (e) { log.debug('tabs', 'host', e); }
+                catch(e){}
             }
             try {
                 miniPlayer.onMediaState(this.getWindowData(), tabIndex, false);
             }
-            catch (e) { log.debug('tabs', 'host', e); }
+            catch(e){}
             this.sendMediaIndicators(tabIndex, tab);
         });
         // ── Tab-strip media indicators ────────────────────────────────────────

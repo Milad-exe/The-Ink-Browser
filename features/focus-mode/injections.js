@@ -142,8 +142,8 @@ const YT_SHORTS_BLOCK_JS = `
         if (!_gesture) return Promise.resolve();
         return _origPlay.apply(this, arguments);
       };
-    } catch (e) { log.debug('injections', '_markGesture', e); }
-    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch (e) { log.debug('injections', '_pauseVid', e); } }
+    } catch (e) { }
+    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch (e) { } }
     document.querySelectorAll('video').forEach(_pauseVid);
     // Watch for new videos — pause them AND reset gesture so player init can't ride a navigation click
     new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
@@ -304,8 +304,8 @@ const TIKTOK_BLOCK_JS = `
         if (!_gesture) return Promise.resolve();
         return _origPlay.apply(this, arguments);
       };
-    } catch (e) { log.debug('injections', '_markGesture', e); }
-    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch (e) { log.debug('injections', '_pauseVid', e); } }
+    } catch (e) { }
+    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch (e) { } }
     document.querySelectorAll('video').forEach(_pauseVid);
     // Watch for new videos — pause them AND reset gesture so player init can't ride a navigation click
     new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
@@ -459,8 +459,8 @@ const INSTAGRAM_BLOCK_JS = `
         if (!_gesture) return Promise.resolve();
         return _origPlay.apply(this, arguments);
       };
-    } catch (e) { log.debug('injections', '_markGesture', e); }
-    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch (e) { log.debug('injections', '_pauseVid', e); } }
+    } catch (e) { }
+    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch (e) { } }
     document.querySelectorAll('video').forEach(_pauseVid);
     // Watch for new videos — pause them AND reset gesture so player init can't ride a navigation click
     new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
@@ -614,8 +614,8 @@ const YT_SHORTS_ONLY_JS = `
         if (!_gesture) return Promise.resolve();
         return _origPlay.apply(this, arguments);
       };
-    } catch (e) { log.debug('injections', '_markGesture', e); }
-    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch (e) { log.debug('injections', '_pauseVid', e); } }
+    } catch (e) { }
+    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch (e) { } }
     document.querySelectorAll('video').forEach(_pauseVid);
     // Watch for new videos — pause them AND reset gesture so player init can't ride a navigation click
     new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
@@ -776,8 +776,8 @@ const TIKTOK_SHORTFORM_JS = `
         if (!_gesture) return Promise.resolve();
         return _origPlay.apply(this, arguments);
       };
-    } catch (e) { log.debug('injections', '_markGesture', e); }
-    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch (e) { log.debug('injections', '_pauseVid', e); } }
+    } catch (e) { }
+    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch (e) { } }
     document.querySelectorAll('video').forEach(_pauseVid);
     // Watch for new videos — pause them AND reset gesture so player init can't ride a navigation click
     new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
@@ -931,8 +931,8 @@ const INSTAGRAM_SHORTFORM_JS = `
         if (!_gesture) return Promise.resolve();
         return _origPlay.apply(this, arguments);
       };
-    } catch (e) { log.debug('injections', '_markGesture', e); }
-    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch (e) { log.debug('injections', '_pauseVid', e); } }
+    } catch (e) { }
+    function _pauseVid(v) { try { v.removeAttribute('autoplay'); if (!v.paused) v.pause(); } catch (e) { } }
     document.querySelectorAll('video').forEach(_pauseVid);
     // Watch for new videos — pause them AND reset gesture so player init can't ride a navigation click
     new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
