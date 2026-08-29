@@ -641,6 +641,27 @@ html[data-tabbar="top"] .tab-button.in-folder:not(.active):hover {
 }
 html[data-tabbar="top"] .tab-button.pinned .tab-favicon,
 html[data-tabbar="top"] .tab-button.in-folder .tab-favicon { border-radius: 5px; }
+/* An EXPANDED folder is drawn as one connected pill — the chip and its member
+   tiles fuse (Chrome's tab group), instead of a row of separate rounded tiles
+   that only proximity groups. The chip rounds its left, the members square up
+   against it and each other with the container gap pulled out, and the last
+   member caps the right. A COLLAPSED folder shows no visible member after the
+   chip, so :has leaves the chip a standalone pill. (:has needs Chromium ≥105;
+   Electron 38 is well past it — if it ever regressed the tiles simply fall back
+   to separate pills, the pre-fusion look.) The active member keeps its own
+   surface + ring from .tab-button.active, so "you are here" still reads inside
+   the group. */
+html[data-tabbar="top"] .folder-header:has(+ .tab-button.in-folder:not(.folder-collapsed)) {
+  border-top-right-radius: 0; border-bottom-right-radius: 0;
+}
+html[data-tabbar="top"] .tab-button.in-folder { border-radius: 0; }
+html[data-tabbar="top"] .tab-button.in-folder:not(:has(+ .tab-button.in-folder)) {
+  border-top-right-radius: var(--r-md); border-bottom-right-radius: var(--r-md);
+}
+html[data-tabbar="top"] .folder-header + .tab-button.in-folder,
+html[data-tabbar="top"] .tab-button.in-folder + .tab-button.in-folder {
+  margin-left: calc(var(--sp-2) * -1);
+}
 /* Folded away: hides both a collapsed folder's member tabs and any nested
    folder headers under it (both carry .folder-collapsed from the render). */
 html[data-tabbar="top"] .folder-collapsed { display: none !important; }
