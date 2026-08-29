@@ -1593,10 +1593,14 @@
                 e.preventDefault(); e.stopPropagation();
                 // Grouped as in the reference design doc. Only actions with a real
                 // implementation are listed — no placeholder rows.
-                openCtxMenu(e.clientX, e.clientY, [
-                    // Compact is a single on/off state, so it's one toggle row, not a
-                    // submenu that only ever held one child.
-                    ['Toggle compact mode', () => window.tabsUI.toggleCompact()],
+                const rows = [];
+                // Compact collapses the sidebar rail to icons; top mode has no
+                // rail, so the toggle did nothing there. Offer it only in side
+                // mode. (Compact is a single on/off state, so it is one row, not
+                // a submenu that only ever held one child.)
+                if (document.documentElement.dataset.tabbar !== 'top')
+                    rows.push(['Toggle compact mode', () => window.tabsUI.toggleCompact()]);
+                rows.push(
                     [T('chrome.newTab', 'New tab'), () => window.palette.open()],
                     ['New folder', newFolderInline],
                     ['sep'],
@@ -1615,7 +1619,8 @@
                        setting instead, which is indistinguishable from per-space
                        theming being broken. */
                     ['Edit theme…', () => openThemePanel(activeWorkspace)],
-                ]);
+                );
+                openCtxMenu(e.clientX, e.clientY, rows);
             };
             tabsContainer.addEventListener('contextmenu', emptyAreaMenu);
             // The spacer fills the rest of the column in side mode, so a
