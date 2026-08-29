@@ -3584,6 +3584,13 @@
                 return;
             }
             requestAnimationFrame(() => {
+                // Bail if we've switched to side mode since this frame was
+                // scheduled: the side path above already cleared the inline
+                // widths, and applying the top-strip's compact (favicon-width)
+                // sizing now would leave folder members and pinned tabs stuck as
+                // labelless favicon tiles in the sidebar until the next resize.
+                if (sideTabs())
+                    return;
                 // The container is content-sized now, so its own width isn't the
                 // space available for tabs. container + spacer is the full slack
                 // (invariant to tab widths); reserve a strip of it for dragging the

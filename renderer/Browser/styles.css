@@ -1326,7 +1326,11 @@ html[data-tabbar="side"]:not([data-compact="on"]) #utility-bar {
 .omnibox[data-omni="search"]   .oi-search   { display: block; }
 .omnibox[data-omni="secure"]   .oi-secure   { display: block; }
 .omnibox[data-omni="insecure"] .oi-insecure { display: block; }
-.omnibox[data-omni="secure"]   .omni-icon { color: var(--accent); cursor: pointer; }
+/* A secure site gets a QUIET lock, not an accent-coloured one: the accent is
+   red in the default theme, so a valid https lock read as a warning and was
+   indistinguishable from the insecure (--danger) state. Neutral for secure —
+   the way current browsers show it — keeps --danger meaning "not secure". */
+.omnibox[data-omni="secure"]   .omni-icon { color: var(--text-2); cursor: pointer; }
 .omnibox[data-omni="insecure"] .omni-icon { color: var(--danger); cursor: pointer; }
 .omnibox:focus-within .omni-icon { color: var(--accent); }
 .omnibox[data-omni="secure"]   .omni-icon:hover,
