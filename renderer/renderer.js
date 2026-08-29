@@ -1594,9 +1594,9 @@
                 // Grouped as in the reference design doc. Only actions with a real
                 // implementation are listed — no placeholder rows.
                 openCtxMenu(e.clientX, e.clientY, [
-                    ['Compact mode', [
-                        ['Toggle compact mode', () => window.tabsUI.toggleCompact()],
-                    ]],
+                    // Compact is a single on/off state, so it's one toggle row, not a
+                    // submenu that only ever held one child.
+                    ['Toggle compact mode', () => window.tabsUI.toggleCompact()],
                     [T('chrome.newTab', 'New tab'), () => window.palette.open()],
                     ['New folder', newFolderInline],
                     ['sep'],

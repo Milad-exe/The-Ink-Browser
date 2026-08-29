@@ -73,7 +73,8 @@
         // Escape closes, and the first row is focused so the keyboard has
         // somewhere to start.
         document.querySelectorAll('.menu-row').forEach(r => r.setAttribute('role', 'menuitem'));
-        window.Northstar?.keys?.rows(document, { selector: '.menu-row, #zoom-reset', onEscape: close, focusFirst: true });
+        // No focusFirst: a mouse-opened menu should not pre-highlight its first row.
+        window.Northstar?.keys?.rows(document, { selector: '.menu-row, #zoom-reset', onEscape: close });
         // Tell main the card's real height so the overlay is sized to it and the
         // menu never scrolls. Measured after layout; re-measured if a webfont
         // reflows the rows.

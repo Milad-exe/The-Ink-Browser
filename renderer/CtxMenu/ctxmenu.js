@@ -176,7 +176,10 @@
     // every open because the rows are rebuilt each time.
     const armKeys = () => {
         const top = chain[chain.length - 1];
-        window.Northstar?.keys?.rows(top || document, { selector: '.ctx-menu-item', onEscape: dismiss, focusFirst: true });
+        // No focusFirst: opening a menu with the mouse should not pre-select a
+        // row (right-clicking the sidebar highlighting the first item read as a
+        // stray selection). Arrow keys still start from the top/bottom.
+        window.Northstar?.keys?.rows(top || document, { selector: '.ctx-menu-item', onEscape: dismiss });
     };
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') dismiss();

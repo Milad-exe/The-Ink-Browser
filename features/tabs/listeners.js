@@ -400,7 +400,7 @@ module.exports = {
                 desc: errorDescription || '',
             });
             isNavigatingProgrammatically = true;
-            tab.webContents.loadFile(path.join(__dirname, '../renderer/Error/index.html'), { search: '?' + params.toString() });
+            tab.webContents.loadFile(resolveAppFile('renderer/Error/index.html'), { search: '?' + params.toString() });
             // A failed http(s) load may mean a captive portal intercepted us
             // (redirect / TLS block) — probe and, if so, auto-open its sign-in page.
             if ((validatedURL || '').startsWith('http'))
