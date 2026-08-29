@@ -23,6 +23,10 @@ html, body {
   top: var(--frame-top, 62px);
   bottom: var(--frame-bottom, 8px);
   display: flex; justify-content: center; align-items: center;
+  /* #surface sits exactly over the page card, so its dimming scrim must share
+     the card's rounded corners — a square scrim left dark right-angles poking
+     out past the card's radius ("the shadow isn't curved at the corners"). */
+  border-radius: var(--card-radius);
 }
 /* The FIELD sits on the centre line, not the card: results grow downward from
    it, so the thing you are typing into does not drift up the screen as they

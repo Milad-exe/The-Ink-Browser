@@ -151,7 +151,19 @@
         if (e.key === 'Escape') { e.preventDefault(); window.overlayPalette.dismiss(); return; }
         if (e.key === 'Enter') {
             e.preventDefault();
-            const pick = sel >= 0 && rows[sel] ? rows[sel].url : toUrl(input.value);
+            clearTimeout(timer);
+            const typed = input.value.trim();
+            // A typed query ALWAYS commits to its own destination. refresh() is
+            // debounced 90ms and, on open, seeds `rows` with recent pages and
+            // sel = 0 — so pressing Enter within that window used to fire the
+            // stale first row (a recent page) instead of the search that was
+            // just typed: "first search doesn't work, a tab opens on something
+            // else". Only sel > 0 (the user arrowed onto a specific suggestion)
+            // overrides the query; sel === 0 is just the auto-highlight.
+            let pick;
+            if (sel > 0 && rows[sel]) pick = rows[sel].url;
+            else if (typed) pick = toUrl(typed);
+            else if (sel >= 0 && rows[sel]) pick = rows[sel].url;
             go(pick);
             return;
         }
@@ -162,7 +174,12 @@
             paint();
         }
     });
-    surface.addEventListener('mousedown', (e) => {
+    // Any press outside the card dismisses — on DOCUMENT, not #surface. The
+    // view fills the window but #surface only covers the page card, so a press
+    // on the chrome it floats over (tab strip, address bar) lands on the bare
+    // body outside #surface; listening there let those presses fall through and
+    // the palette stayed up. document catches both.
+    document.addEventListener('mousedown', (e) => {
         if (!document.getElementById('card').contains(e.target)) window.overlayPalette.dismiss();
     });
 
