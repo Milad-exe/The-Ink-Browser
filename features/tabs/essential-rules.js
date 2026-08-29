@@ -2,19 +2,17 @@
 /**
  * Essentials — the rules, with no Electron in them.
  *
- * An Essential is a PLACE, not a document. The two browsers this follows agree
- * on what that means, and both had to be told twice:
+ * An Essential is a PLACE, not a document. The browsers this design follows
+ * agree on what that means, in a few consistent rules:
  *
- *   • Arc — a Favourite is a pinned tab that lives in every Space, shown as an
- *     icon; it "always reverts back to the original link you Pinned", and you
- *     change where it points with "Replace Pinned URL with Current" or Edit…
- *     Clicking its icon resets the tab to that page.
- *   • Zen — an Essential is an always-visible pin (max 12); closing or
- *     unloading one resets it to its pinned URL, and there is a preference for
- *     resetting pins to their pinned URL on startup.
- *   • Both keep a pin ON ITS SITE: a link leaving the site opens as a floating
- *     preview over it (Arc's Peek, Zen's Glance) instead of navigating the pin
- *     away from the page it is supposed to be.
+ *   • A pinned favourite lives in every space, shown as an icon, and always
+ *     reverts to the original link it was pinned at; you change where it points
+ *     by replacing its pinned URL. Clicking its icon resets the tab to that page.
+ *   • It is always-visible and capped (around a dozen); closing or unloading one
+ *     resets it to its pinned URL, optionally on startup too.
+ *   • A pin stays ON ITS SITE: a link leaving the site opens as a floating
+ *     preview over it instead of navigating the pin away from the page it is
+ *     supposed to be.
  *
  * These are the decisions that follow from that, kept pure so `tests/unit.js`
  * can pin them. The bookkeeping is in features/tabs/essentials.js.

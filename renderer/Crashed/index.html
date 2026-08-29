@@ -54,8 +54,8 @@
   </main>
   <script>
     // Localise before reading any label back out of the DOM.
-    try { window.Ink.i18n.init((window.northstarSettings?.getSync() || {}).i18n || {}); window.Ink.i18n.apply(document); } catch {}
-    const T = (k, v) => { try { return window.Ink.i18n.t(k, v); } catch { return k; } };
+    try { window.Northstar.i18n.init((window.northstarSettings?.getSync() || {}).i18n || {}); window.Northstar.i18n.apply(document); } catch {}
+    const T = (k, v) => { try { return window.Northstar.i18n.t(k, v); } catch { return k; } };
     const p = new URLSearchParams(location.search);
     const failedUrl = p.get('url') || '';
     const reason = p.get('reason') || '';

@@ -103,18 +103,18 @@ function clearDocumentSelection() {
 let suppressLinkSelection = false;
 let suppressLinkSelectionTimer = null;
 function ensureSuppressSelectionStyle() {
-    const styleId = 'ink-suppress-link-selection-style';
+    const styleId = 'northstar-suppress-link-selection-style';
     if (document.getElementById(styleId))
         return;
     const style = document.createElement('style');
     style.id = styleId;
     style.textContent = `
-html.ink-suppress-link-selection,
-html.ink-suppress-link-selection * {
+html.northstar-suppress-link-selection,
+html.northstar-suppress-link-selection * {
     -webkit-user-select: none !important;
     user-select: none !important;
 }
-html.ink-suppress-link-selection ::selection {
+html.northstar-suppress-link-selection ::selection {
     background: transparent !important;
     color: inherit !important;
 }
@@ -131,7 +131,7 @@ function enableLinkSelectionSuppression() {
         suppressLinkSelectionTimer = null;
     }
     try {
-        document.documentElement.classList.add('ink-suppress-link-selection');
+        document.documentElement.classList.add('northstar-suppress-link-selection');
     }
     catch { }
     clearDocumentSelection();
@@ -142,7 +142,7 @@ function disableLinkSelectionSuppression(delay = 120) {
     suppressLinkSelectionTimer = setTimeout(() => {
         suppressLinkSelection = false;
         try {
-            document.documentElement.classList.remove('ink-suppress-link-selection');
+            document.documentElement.classList.remove('northstar-suppress-link-selection');
         }
         catch { }
         clearDocumentSelection();
@@ -371,7 +371,7 @@ exposeInternal('northstarReader', {
 // Diagnostics bridge for the chrome's own scripts. Internal pages only: a web
 // page must never be able to write to the browser's log, and page-context
 // failures are not ours to record.
-exposeInternal('inkLog', {
+exposeInternal('northstarLog', {
     debug: (scope, message) => ipcRenderer.send('log:write', 'debug', scope, message),
     warn: (scope, message) => ipcRenderer.send('log:write', 'warn', scope, message),
     error: (scope, message) => ipcRenderer.send('log:write', 'error', scope, message),
@@ -563,7 +563,7 @@ exposeInternal('extensionsUI', {
     closePanel: () => ipcRenderer.invoke('extensions-panel-close'),
     onChanged: (fn) => ipcRenderer.on('extensions-changed', () => fn()),
     onPanelClosed: (fn) => ipcRenderer.on('extensions-panel-closed', () => fn()),
-    // Firefox-style pinning: unpinned actions collapse out of the toolbar strip.
+    // standard pinning: unpinned actions collapse out of the toolbar strip.
     onPinnedChanged: (fn) => ipcRenderer.on('ext-pinned-changed', (_e, map) => fn(map)),
     closeActionPopup: () => ipcRenderer.invoke('extensions-close-action-popup'),
     onActivate: (fn) => ipcRenderer.on('ext-activate-action', (_e, id) => fn(id)),

@@ -1,5 +1,5 @@
 /**
- * Download manager — Firefox-style behavior.
+ * Download manager — standard behavior.
  *
  * Files save straight into the OS Downloads folder with a collision-free name
  * (no save dialog), progress is tracked per item, and the UI (toolbar button +
@@ -168,7 +168,7 @@ class DownloadManager {
     }
 }
 // ── Helpers ──────────────────────────────────────────────────────────────────
-/** "report.pdf" → "report (1).pdf" until the name is free (Firefox behavior). */
+/** "report.pdf" → "report (1).pdf" until the name is free. */
 function uniquePath(dir, filename) {
     const ext = path.extname(filename);
     const base = path.basename(filename, ext);

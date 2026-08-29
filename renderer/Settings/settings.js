@@ -8,7 +8,7 @@
         try {
             settings = await window.northstarSettings.get();
         }
-        catch (e) { window.inkLog?.debug('settings', 'settings: ' + e); }
+        catch (e) { window.northstarLog?.debug('settings', 'settings: ' + e); }
         // ── Sidebar navigation (hash-driven: northstar://settings/<section>) ────
         // The section lives in location.hash so the omnibox can show it as a
         // northstar://settings/<section> url and typing one lands on that section.
@@ -63,7 +63,7 @@
             try {
                 await window.northstarSettings.set(key, value);
             }
-            catch (e) { window.inkLog?.debug('settings', 'save: ' + e); }
+            catch (e) { window.northstarLog?.debug('settings', 'save: ' + e); }
         }
         // ── General: On startup ────────────────────────────────────────────────
         const startupRadios = document.querySelectorAll('input[name="startup"]');
@@ -259,7 +259,7 @@
         // opens from the sidebar's context menu — see renderer/lib/theme-editor.js.
         // This page supplies the container and the bridge; everything else is
         // the same code in both places.
-        if (window.Ink?.themeEditor && window.northstarThemes) {
+        if (window.Northstar?.themeEditor && window.northstarThemes) {
             /* A theme belongs to a SPACE. Settings runs in a tab, that tab is in
                a window, and that window is in one space — so the picker here
                sets this space's theme, exactly as the sidebar's popup does.
@@ -270,8 +270,8 @@
             (async () => {
                 let space = null;
                 try { space = await window.northstarProfiles?.current?.(); }
-                catch (e) { window.inkLog?.debug('settings', 'current space: ' + e); }
-                window.Ink.themeEditor.mount({
+                catch (e) { window.northstarLog?.debug('settings', 'current space: ' + e); }
+                window.Northstar.themeEditor.mount({
                     picker: document.getElementById('theme-picker'),
                     editor: document.getElementById('theme-editor'),
                     api: window.northstarThemes,
@@ -306,7 +306,7 @@
             try {
                 window.northstarSettings.toggleBookmarkBar();
             }
-            catch (e) { window.inkLog?.debug('settings', 'refreshDefaultBrowser: ' + e); }
+            catch (e) { window.northstarLog?.debug('settings', 'refreshDefaultBrowser: ' + e); }
         });
         // ── Focus: Distraction blocking ───────────────────────────────────────
         const shortformToggle = document.getElementById('shortform-toggle');
@@ -363,7 +363,7 @@
                     privacyCount.textContent = s.blocked.toLocaleString();
                 }
             }
-            catch (e) { window.inkLog?.debug('settings', 'refreshPrivacyStats: ' + e); }
+            catch (e) { window.northstarLog?.debug('settings', 'refreshPrivacyStats: ' + e); }
         }
         refreshPrivacyStats();
         setInterval(refreshPrivacyStats, 2000);
@@ -399,7 +399,7 @@
             try {
                 items = await window.northstarPasswords.list();
             }
-            catch (e) { window.inkLog?.debug('settings', 'refreshPasswords: ' + e); }
+            catch (e) { window.northstarLog?.debug('settings', 'refreshPasswords: ' + e); }
             pwList.innerHTML = '';
             if (pwEmpty)
                 pwEmpty.style.display = items.length ? 'none' : 'block';
@@ -412,7 +412,7 @@
                 try {
                     host = new URL(entry.origin).host;
                 }
-                catch (e) { window.inkLog?.debug('settings', 'refreshPasswords: ' + e); }
+                catch (e) { window.northstarLog?.debug('settings', 'refreshPasswords: ' + e); }
                 const site = document.createElement('div');
                 site.className = 'pw-site';
                 site.textContent = host;
@@ -478,7 +478,7 @@
             try {
                 items = await window.northstarExtensions.list();
             }
-            catch (e) { window.inkLog?.debug('settings', 'refreshExtensions: ' + e); }
+            catch (e) { window.northstarLog?.debug('settings', 'refreshExtensions: ' + e); }
             extList.innerHTML = '';
             extEmpty.style.display = items.length ? 'none' : 'block';
             if (extCount)
@@ -742,7 +742,7 @@
                     grid.append(key, value);
                 }
             }
-            catch (e) { window.inkLog?.debug('settings', 'renderZoom: ' + e); }
+            catch (e) { window.northstarLog?.debug('settings', 'renderZoom: ' + e); }
         })();
         const updateState = document.getElementById('update-state');
         const releaseBtn = document.getElementById('open-release');

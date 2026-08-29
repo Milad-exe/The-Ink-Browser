@@ -115,7 +115,7 @@ class Extensions {
         try {
             session.registerPreloadScript({
                 type: 'service-worker',
-                id: 'ink-ext-polyfill',
+                id: 'northstar-ext-polyfill',
                 filePath: path.join(__dirname, '../preload/ext-polyfill.js'),
             });
             // Extension PAGES need the same APIs — a content blocker's popup
@@ -123,7 +123,7 @@ class Extensions {
             // bails on any non-chrome-extension:// origin.
             session.registerPreloadScript({
                 type: 'frame',
-                id: 'ink-ext-polyfill-frame',
+                id: 'northstar-ext-polyfill-frame',
                 filePath: path.join(__dirname, '../preload/ext-polyfill.js'),
             });
             // A service worker's IPC does NOT go through the global ipcMain — each
@@ -221,7 +221,7 @@ class Extensions {
         this.instance = this._makeHost(session);
         this.hosts.set(session, this.instance);
         // Track live browser-action popups so the browser can close them the
-        // way Firefox does (tab switch, clicking elsewhere) — the library only
+        // way browsers do (tab switch, clicking elsewhere) — the library only
         // closes them on window blur, which misses clicks landing on
         // WebContentsViews inside the same window.
         this.instance.on?.('browser-action-popup-created', (popup) => {
@@ -291,7 +291,7 @@ class Extensions {
         catch (e) { log.debug('extensions', 'addTab', e); }
     }
     selectTab(webContents) {
-        this.closePopups(); // switching tabs dismisses an open action popup (Firefox behavior)
+        this.closePopups(); // switching tabs dismisses an open action popup
         try {
             this._hostFor(webContents)?.selectTab(webContents);
         }

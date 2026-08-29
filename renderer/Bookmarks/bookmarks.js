@@ -8,9 +8,9 @@
         const listEl = document.getElementById('list');
         const searchEl = document.getElementById('search');
         const countEl = document.getElementById('count');
-        const i18n = window.Ink?.i18n;
+        const i18n = window.Northstar?.i18n;
         try { i18n?.init((window.northstarSettings?.getSync() || {}).i18n || {}); i18n?.apply(document); }
-        catch (e) { window.inkLog?.debug('bookmarks', 'i18n: ' + e); }
+        catch (e) { window.northstarLog?.debug('bookmarks', 'i18n: ' + e); }
         // t() falls through to the key when a string is missing, so a plain
         // `|| fallback` never fires. This one checks for that.
         const T = (key, fallback) => {
@@ -23,7 +23,7 @@
         let tree = [];
         const load = async () => {
             try { tree = await window.browserBookmarks.getAll() || []; }
-            catch (e) { window.inkLog?.debug('bookmarks', 'load: ' + e); tree = []; }
+            catch (e) { window.northstarLog?.debug('bookmarks', 'load: ' + e); tree = []; }
         };
 
         const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
@@ -49,7 +49,7 @@
                     img.alt = '';
                     fallback.replaceWith(img);
                 }
-                catch (e) { window.inkLog?.debug('bookmarks', 'favicon: ' + e); }
+                catch (e) { window.northstarLog?.debug('bookmarks', 'favicon: ' + e); }
             })();
 
             const text = document.createElement('div');
@@ -75,7 +75,7 @@
                     await load();
                     render(searchEl.value);
                 }
-                catch (err) { window.inkLog?.debug('bookmarks', 'remove: ' + err); }
+                catch (err) { window.northstarLog?.debug('bookmarks', 'remove: ' + err); }
             });
             row.appendChild(remove);
 

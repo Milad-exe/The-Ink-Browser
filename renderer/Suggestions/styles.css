@@ -114,7 +114,7 @@ body {
 }
 .item:hover .secondary, .item.active .secondary { color: var(--text-2); }
 
-/* Firefox-style emphasis: matched text is thin, the completion is bold. */
+/* standard emphasis: matched text is thin, the completion is bold. */
 .strong { font-weight: 650; }
 .thin   { font-weight: 400; color: var(--text-2); }
 .secondary .strong { color: var(--text-2); font-weight: 500; }

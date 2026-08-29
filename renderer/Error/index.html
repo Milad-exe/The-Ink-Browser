@@ -80,7 +80,7 @@
   </div>
 
   <script>
-    try { window.Ink.i18n.init((window.northstarSettings?.getSync() || {}).i18n || {}); window.Ink.i18n.apply(document); } catch {}
+    try { window.Northstar.i18n.init((window.northstarSettings?.getSync() || {}).i18n || {}); window.Northstar.i18n.apply(document); } catch {}
     const params = new URLSearchParams(location.search);
     const failedUrl = params.get('url') || '';
     const code = params.get('code') || '';

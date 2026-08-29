@@ -174,7 +174,7 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
 #tabs-container::-webkit-scrollbar { display: none; }
 
 #tab-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; padding-left: 2px; }
-/* The sidebar renders "+ New Tab" as a row inside the tab list (Arc); the top
+/* The sidebar renders "+ New Tab" as a row inside the tab list; the top
    strip keeps it a sibling of the scroll container so it stays put — see the
    ordered layout below, where it sits at order 5 between the tabs and the drag
    spacer. */
@@ -182,7 +182,7 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
 /* ── Top / horizontal mode: Spaces and Essentials get a home ─────────────────
    In the sidebar these sit ABOVE the tabs. In the top strip they move to the
    LEFT of them, the way other browsers place the same things: the space
-   switcher first (like Vivaldi / Edge workspace buttons), then Essentials as
+   switcher first (like other browsers' workspace buttons), then Essentials as
    compact favicon tiles (like Chrome's pinned tabs — which is what an Essential
    is). The sidebar foot's Settings / Downloads / new-workspace all have other
    homes in this mode (the ☰ menu, the page-actions panel, and the space
@@ -417,7 +417,7 @@ html[data-tabbar="side"] #tabs-container:hover::-webkit-scrollbar-thumb { backgr
 /* The only divider in the panel is between the folder block and the tab list
    (added on #tab-actions when folders exist). */
 html[data-tabbar="side"] .essentials:not(:empty) { padding-bottom: 8px; margin-bottom: 2px; }
-/* Tab rows: favicon + title + hover close, Arc-style rounded cards. */
+/* Tab rows: favicon + title + hover close, flat rounded cards. */
 html[data-tabbar="side"] .tab-button {
   width: 100%; min-width: 0; max-width: none; flex-shrink: 0;
   height: var(--row-h); padding: 0 var(--sp-4) 0 var(--gutter); gap: var(--sp-5);
@@ -676,7 +676,7 @@ html[data-tabbar="side"] #tab-actions { padding: 0; grid-column: 1 / -1; }
 html[data-tabbar="side"] #tab-actions.after-folders {
   margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border-2);
 }
-/* "+ New Tab" labelled row (Arc), not a bare plus. The glyph occupies the same
+/* "+ New Tab" labelled row, not a bare plus. The glyph occupies the same
    icon column a favicon would, so the label starts on the tab titles' left
    edge — the row is built from real spans, not ::before/::after content, so
    the label is translatable and its position is measurable. */
@@ -766,7 +766,7 @@ html[data-tabbar="side"][data-compact="on"] #tab-bar { display: none; }
 html[data-platform="darwin"][data-tabbar="side"] .lead-cluster { padding-left: 84px; }
 
 /* Icon rail: drag the divider narrow to collapse tab rows to favicons only
-   (Arc). Labels, close buttons and the "New Tab" caption fall away; every
+  . Labels, close buttons and the "New Tab" caption fall away; every
    control centres in the strip. */
 html[data-tabbar="side"][data-rail="on"] #tab-bar { padding: 0 6px 8px; }
 html[data-tabbar="side"][data-rail="on"] #tabs-container { grid-template-columns: 1fr; justify-items: center; }
@@ -1120,7 +1120,7 @@ html[data-tabbar="side"] .sidebar-foot {
 #utility-bar .trailing-icons,
 #utility-bar .omnibox-wrapper { -webkit-app-region: drag; }
 
-/* Toolbar icons float directly on the shell (Arc-style, flat) — no boxed rail
+/* Toolbar icons float directly on the shell (flat, flat) — no boxed rail
    background; each button carries its own hover/active surface instead. */
 /* ONE gap between icons, everywhere in this bar. It used to be --sp-1 (2px)
    inside a group and --sp-3 (6px) between the sidebar toggle and the nav

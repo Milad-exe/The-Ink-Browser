@@ -40,7 +40,7 @@ function register(ipcMain, { wm, webContents, app }) {
             if (!parsed.length)
                 return { ok: false, error: 'No bookmarks found in that file.' };
             const store = bmFor(e);
-            // Source folders become ink folders, created once and reused; the
+            // Source folders become Northstar folders, created once and reused; the
             // rest land at the top level.
             const folders = new Map();
             let added = 0, skipped = 0;

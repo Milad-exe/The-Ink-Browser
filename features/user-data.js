@@ -5,8 +5,8 @@
  * should be stuck in one they can't get their passwords out of. Formats are the
  * ones every other browser reads and writes:
  *
- *   bookmarks — Netscape bookmark HTML (Chrome, Firefox, Safari, Edge)
- *   passwords — CSV with a url/username/password header (Chrome, Firefox, 1Password…)
+ *   bookmarks — Netscape bookmark HTML (most browsers)
+ *   passwords — CSV with a url/username/password header (most browsers and password managers)
  *   history   — CSV out only; no browser imports history, and pretending to
  *               parse every dialect would be worse than an honest omission
  *

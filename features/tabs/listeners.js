@@ -46,8 +46,8 @@ module.exports = {
         tab.webContents.on('will-navigate', blockDangerousNav);
         tab.webContents.on('will-redirect', blockDangerousNav);
         /* An Essential stays on its site. A link that would take it somewhere
-           else opens as a glance OVER it instead — Arc calls that a Peek, Zen a
-           Glance, and both do it precisely so the one tab you keep pointing at
+           else opens as a glance OVER it instead — the browsers this design
+           follows do the same, precisely so the one tab you keep pointing at
            a site is still pointing at it an hour later. Sign-in hand-offs and a
            tab that has already been sent elsewhere deliberately are left alone
            (features/tabs/essential-rules.js). */

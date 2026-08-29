@@ -335,7 +335,7 @@ async function omniboxNavigate(page, text) {
             await chrome.evaluate(async (list) => {
                 window.tabsUI.startSidebarResize();
                 for (const x of list) {
-                    const w = Ink.util.clampSidebarWidth(x, window.innerWidth);
+                    const w = Northstar.util.clampSidebarWidth(x, window.innerWidth);
                     document.documentElement.style.setProperty('--sidebar-w', w + 'px');
                     window.tabsUI.resizeSidebar(w);
                     await new Promise(r => setTimeout(r, 60));

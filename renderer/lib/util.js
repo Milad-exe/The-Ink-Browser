@@ -15,8 +15,8 @@
     const api = factory();
     if (typeof module === 'object' && module.exports)
         module.exports = api;
-    root.Ink = root.Ink || {};
-    root.Ink.util = api;
+    root.Northstar = root.Northstar || {};
+    root.Northstar.util = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
     'use strict';
 
@@ -83,7 +83,7 @@
     }
 
     /**
-     * Firefox surfaces clean, high-frecency pages — not OAuth/sign-in redirects
+     * we surface clean, high-frecency pages — not OAuth/sign-in redirects
      * or giant tracking URLs. We lack visit counts, so approximate: a weak match
      * (title/substring only, score ≥ 2) that lands on a login redirect or a long
      * param-heavy URL is almost never what the user wants. Strong host matches

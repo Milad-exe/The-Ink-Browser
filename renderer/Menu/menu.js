@@ -4,10 +4,10 @@
 (() => {
     document.addEventListener('DOMContentLoaded', async () => {
         try {
-            window.Ink.i18n.init(window.inkI18n?.getSync() || (window.northstarSettings?.getSync() || {}).i18n || {});
-            window.Ink.i18n.apply(document);
+            window.Northstar.i18n.init(window.northstarI18n?.getSync() || (window.northstarSettings?.getSync() || {}).i18n || {});
+            window.Northstar.i18n.apply(document);
         }
-        catch (e) { window.inkLog?.debug('menu', 'i18n: ' + e); }
+        catch (e) { window.northstarLog?.debug('menu', 'i18n: ' + e); }
         const api = window.electronAPI;
         const mac = api.platform === 'darwin';
         const MOD = mac ? '⌘' : 'Ctrl ';
@@ -18,11 +18,11 @@
         const close = async () => { try {
             await api.closeMenu();
         }
-        catch (e) { window.inkLog?.debug('menu', 'close: ' + e); } };
+        catch (e) { window.northstarLog?.debug('menu', 'close: ' + e); } };
         const act = (fn) => async () => { try {
             await fn();
         }
-        catch (e) { window.inkLog?.debug('menu', 'act: ' + e); } await close(); };
+        catch (e) { window.northstarLog?.debug('menu', 'act: ' + e); } await close(); };
         // Fill keyboard-shortcut hints (platform-aware).
         document.querySelectorAll('.sc[data-sc]').forEach(el => {
             el.textContent = MOD + scLabel(el.dataset.sc);
@@ -40,7 +40,7 @@
                 document.getElementById('bookmark-bar-check').classList.add('visible');
             }
         }
-        catch (e) { window.inkLog?.debug('menu', 'act: ' + e); }
+        catch (e) { window.northstarLog?.debug('menu', 'act: ' + e); }
         // ── Actions ────────────────────────────────────────────────────────────
         document.getElementById('btn-new-tab').addEventListener('click', act(() => api.addTab()));
         document.getElementById('btn-new-private-tab').addEventListener('click', act(() => api.addPrivateTab()));
@@ -63,7 +63,7 @@
                 if (typeof pct === 'number')
                     zoomLevel.textContent = pct + '%';
             }
-            catch (e) { window.inkLog?.debug('menu', 'setZoom: ' + e); }
+            catch (e) { window.northstarLog?.debug('menu', 'setZoom: ' + e); }
         };
         document.getElementById('zoom-out').addEventListener('click', () => setZoom('out'));
         document.getElementById('zoom-in').addEventListener('click', () => setZoom('in'));
@@ -73,14 +73,14 @@
         // Escape closes, and the first row is focused so the keyboard has
         // somewhere to start.
         document.querySelectorAll('.menu-row').forEach(r => r.setAttribute('role', 'menuitem'));
-        window.Ink?.keys?.rows(document, { selector: '.menu-row, #zoom-reset', onEscape: close, focusFirst: true });
+        window.Northstar?.keys?.rows(document, { selector: '.menu-row, #zoom-reset', onEscape: close, focusFirst: true });
         // Tell main the card's real height so the overlay is sized to it and the
         // menu never scrolls. Measured after layout; re-measured if a webfont
         // reflows the rows.
         const card = document.querySelector('.surface-card') || document.body;
-        const reportHeight = () => { try { api.reportHeight?.(Math.ceil(card.getBoundingClientRect().height)); } catch (e) { window.inkLog?.debug('menu', 'reportHeight: ' + e); } };
+        const reportHeight = () => { try { api.reportHeight?.(Math.ceil(card.getBoundingClientRect().height)); } catch (e) { window.northstarLog?.debug('menu', 'reportHeight: ' + e); } };
         requestAnimationFrame(reportHeight);
-        try { document.fonts?.ready?.then(reportHeight); } catch (e) { window.inkLog?.debug('menu', 'fonts: ' + e); }
+        try { document.fonts?.ready?.then(reportHeight); } catch (e) { window.northstarLog?.debug('menu', 'fonts: ' + e); }
         // Left/Right work the zoom row from its single stop, the way a slider
         // row behaves in a native menu.
         document.getElementById('zoom-reset').addEventListener('keydown', (e) => {

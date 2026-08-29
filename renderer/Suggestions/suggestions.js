@@ -14,7 +14,7 @@
         const ENGINE_NAME = { google: 'Google', duckduckgo: 'DuckDuckGo', bing: 'Bing' };
         const isSearchType = (t) => t === 'action' || t === 'google' || t === 'duckduckgo' || t === 'bing';
         /**
-         * Firefox-style emphasis: the part of the text matching what the user typed is
+         * standard emphasis: the part of the text matching what the user typed is
          * de-emphasized (thin), and the rest — the completion — is bold. Makes it
          * obvious at a glance what each suggestion adds to your query.
          */
@@ -48,7 +48,7 @@
                 if (item.url)
                     return new URL(item.url).host;
             }
-            catch (e) { window.inkLog?.debug('suggestions', 'hostOf: ' + e); }
+            catch (e) { window.northstarLog?.debug('suggestions', 'hostOf: ' + e); }
             if (item.type === 'navigate' && item.query) {
                 const h = String(item.query).replace(/^https?:\/\//, '').split(/[/?#]/)[0];
                 if (/\.[a-z]{2,}$/i.test(h))
@@ -139,7 +139,7 @@
                     try {
                         window.overlaySuggestions.pointerDown && window.overlaySuggestions.pointerDown();
                     }
-                    catch (e) { window.inkLog?.debug('suggestions', 'addSecondary: ' + e); }
+                    catch (e) { window.northstarLog?.debug('suggestions', 'addSecondary: ' + e); }
                     window.overlaySuggestions.select(item);
                 });
                 listEl.appendChild(el);

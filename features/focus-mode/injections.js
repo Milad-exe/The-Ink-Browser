@@ -1,9 +1,9 @@
 // Focus mode injections (grayscale + recommendations + shortform blocking)
 const log = require('../log');
 const YT_BLOCK_JS = `
-(function inkFocus() {
-  if (window.__inkFocusYT) return;
-  window.__inkFocusYT = true;
+(function northstarFocus() {
+  if (window.__northstarFocusYT) return;
+  window.__northstarFocusYT = true;
 
   const SELECTORS = [
     '#related',
@@ -31,9 +31,9 @@ const YT_BLOCK_JS = `
 })();
 `;
 const YT_SHORTS_BLOCK_JS = `
-(function inkFocusShorts() {
-  if (window.__inkFocusShorts) return;
-  window.__inkFocusShorts = true;
+(function northstarFocusShorts() {
+  if (window.__northstarFocusShorts) return;
+  window.__northstarFocusShorts = true;
 
   const STYLE_KEYS = ['overflow', 'overscroll-behavior', 'height', 'touch-action'];
   const _savedStyles = { root: null, body: null };
@@ -111,8 +111,8 @@ const YT_SHORTS_BLOCK_JS = `
     if (blockKeys.has(e.key)) blockEvent(e);
   }
 
-  if (!window.__inkFocusShortsScrollLock) {
-    window.__inkFocusShortsScrollLock = true;
+  if (!window.__northstarFocusShortsScrollLock) {
+    window.__northstarFocusShortsScrollLock = true;
     document.addEventListener('wheel', blockEvent, { passive: false, capture: true });
     document.addEventListener('touchmove', blockEvent, { passive: false, capture: true });
     document.addEventListener('keydown', onKeydown, true);
@@ -172,8 +172,8 @@ const YT_SHORTS_BLOCK_JS = `
     blockEvent(e);
   }
 
-  if (!window.__inkFocusShortsNavBlock) {
-    window.__inkFocusShortsNavBlock = true;
+  if (!window.__northstarFocusShortsNavBlock) {
+    window.__northstarFocusShortsNavBlock = true;
     document.addEventListener('click', onNavClick, true);
     document.addEventListener('pointerdown', onNavClick, true);
   }
@@ -188,9 +188,9 @@ const YT_SHORTS_BLOCK_JS = `
 })();
 `;
 const TIKTOK_BLOCK_JS = `
-(function inkFocusTikTok() {
-  if (window.__inkFocusTT) return;
-  window.__inkFocusTT = true;
+(function northstarFocusTikTok() {
+  if (window.__northstarFocusTT) return;
+  window.__northstarFocusTT = true;
 
   const STYLE_KEYS = ['overflow', 'overscroll-behavior', 'height', 'touch-action'];
   const _savedStyles = { root: null, body: null };
@@ -273,8 +273,8 @@ const TIKTOK_BLOCK_JS = `
     if (blockKeys.has(e.key)) blockEvent(e);
   }
 
-  if (!window.__inkFocusTTScrollLock) {
-    window.__inkFocusTTScrollLock = true;
+  if (!window.__northstarFocusTTScrollLock) {
+    window.__northstarFocusTTScrollLock = true;
     document.addEventListener('wheel', blockEvent, { passive: false, capture: true });
     document.addEventListener('touchmove', blockEvent, { passive: false, capture: true });
     document.addEventListener('keydown', onKeydown, true);
@@ -331,8 +331,8 @@ const TIKTOK_BLOCK_JS = `
     blockEvent(e);
   }
 
-  if (!window.__inkFocusTTNavBlock) {
-    window.__inkFocusTTNavBlock = true;
+  if (!window.__northstarFocusTTNavBlock) {
+    window.__northstarFocusTTNavBlock = true;
     document.addEventListener('click', onNavClick, true);
     document.addEventListener('pointerdown', onNavClick, true);
   }
@@ -347,9 +347,9 @@ const TIKTOK_BLOCK_JS = `
 })();
 `;
 const INSTAGRAM_BLOCK_JS = `
-(function inkFocusIG() {
-  if (window.__inkFocusIG) return;
-  window.__inkFocusIG = true;
+(function northstarFocusIG() {
+  if (window.__northstarFocusIG) return;
+  window.__northstarFocusIG = true;
 
   const STYLE_KEYS = ['overflow', 'overscroll-behavior', 'height', 'touch-action'];
   const _savedStyles = { root: null, body: null };
@@ -428,8 +428,8 @@ const INSTAGRAM_BLOCK_JS = `
     if (blockKeys.has(e.key)) blockEvent(e);
   }
 
-  if (!window.__inkFocusIGScrollLock) {
-    window.__inkFocusIGScrollLock = true;
+  if (!window.__northstarFocusIGScrollLock) {
+    window.__northstarFocusIGScrollLock = true;
     document.addEventListener('wheel', blockEvent, { passive: false, capture: true });
     document.addEventListener('touchmove', blockEvent, { passive: false, capture: true });
     document.addEventListener('keydown', onKeydown, true);
@@ -486,8 +486,8 @@ const INSTAGRAM_BLOCK_JS = `
     blockEvent(e);
   }
 
-  if (!window.__inkFocusIGNavBlock) {
-    window.__inkFocusIGNavBlock = true;
+  if (!window.__northstarFocusIGNavBlock) {
+    window.__northstarFocusIGNavBlock = true;
     document.addEventListener('click', onNavClick, true);
     document.addEventListener('pointerdown', onNavClick, true);
   }
@@ -503,9 +503,9 @@ const INSTAGRAM_BLOCK_JS = `
 `;
 // Shortform-only injections (no recommendations removal)
 const YT_SHORTS_ONLY_JS = `
-(function inkShortformYT() {
-  if (window.__inkShortformYTShorts) return;
-  window.__inkShortformYTShorts = true;
+(function northstarShortformYT() {
+  if (window.__northstarShortformYTShorts) return;
+  window.__northstarShortformYTShorts = true;
 
   const STYLE_KEYS = ['overflow', 'overscroll-behavior', 'height', 'touch-action'];
   const _savedStyles = { root: null, body: null };
@@ -583,8 +583,8 @@ const YT_SHORTS_ONLY_JS = `
     if (blockKeys.has(e.key)) blockEvent(e);
   }
 
-  if (!window.__inkShortformShortsScrollLock) {
-    window.__inkShortformShortsScrollLock = true;
+  if (!window.__northstarShortformShortsScrollLock) {
+    window.__northstarShortformShortsScrollLock = true;
     document.addEventListener('wheel', blockEvent, { passive: false, capture: true });
     document.addEventListener('touchmove', blockEvent, { passive: false, capture: true });
     document.addEventListener('keydown', onKeydown, true);
@@ -644,8 +644,8 @@ const YT_SHORTS_ONLY_JS = `
     blockEvent(e);
   }
 
-  if (!window.__inkShortformShortsNavBlock) {
-    window.__inkShortformShortsNavBlock = true;
+  if (!window.__northstarShortformShortsNavBlock) {
+    window.__northstarShortformShortsNavBlock = true;
     document.addEventListener('click', onNavClick, true);
     document.addEventListener('pointerdown', onNavClick, true);
   }
@@ -660,9 +660,9 @@ const YT_SHORTS_ONLY_JS = `
 })();
 `;
 const TIKTOK_SHORTFORM_JS = `
-(function inkShortformTikTok() {
-  if (window.__inkShortformTT) return;
-  window.__inkShortformTT = true;
+(function northstarShortformTikTok() {
+  if (window.__northstarShortformTT) return;
+  window.__northstarShortformTT = true;
 
   const STYLE_KEYS = ['overflow', 'overscroll-behavior', 'height', 'touch-action'];
   const _savedStyles = { root: null, body: null };
@@ -745,8 +745,8 @@ const TIKTOK_SHORTFORM_JS = `
     if (blockKeys.has(e.key)) blockEvent(e);
   }
 
-  if (!window.__inkShortformTTScrollLock) {
-    window.__inkShortformTTScrollLock = true;
+  if (!window.__northstarShortformTTScrollLock) {
+    window.__northstarShortformTTScrollLock = true;
     document.addEventListener('wheel', blockEvent, { passive: false, capture: true });
     document.addEventListener('touchmove', blockEvent, { passive: false, capture: true });
     document.addEventListener('keydown', onKeydown, true);
@@ -803,8 +803,8 @@ const TIKTOK_SHORTFORM_JS = `
     blockEvent(e);
   }
 
-  if (!window.__inkShortformTTNavBlock) {
-    window.__inkShortformTTNavBlock = true;
+  if (!window.__northstarShortformTTNavBlock) {
+    window.__northstarShortformTTNavBlock = true;
     document.addEventListener('click', onNavClick, true);
     document.addEventListener('pointerdown', onNavClick, true);
   }
@@ -819,9 +819,9 @@ const TIKTOK_SHORTFORM_JS = `
 })();
 `;
 const INSTAGRAM_SHORTFORM_JS = `
-(function inkShortformIG() {
-  if (window.__inkShortformIG) return;
-  window.__inkShortformIG = true;
+(function northstarShortformIG() {
+  if (window.__northstarShortformIG) return;
+  window.__northstarShortformIG = true;
 
   const STYLE_KEYS = ['overflow', 'overscroll-behavior', 'height', 'touch-action'];
   const _savedStyles = { root: null, body: null };
@@ -900,8 +900,8 @@ const INSTAGRAM_SHORTFORM_JS = `
     if (blockKeys.has(e.key)) blockEvent(e);
   }
 
-  if (!window.__inkShortformIGScrollLock) {
-    window.__inkShortformIGScrollLock = true;
+  if (!window.__northstarShortformIGScrollLock) {
+    window.__northstarShortformIGScrollLock = true;
     document.addEventListener('wheel', blockEvent, { passive: false, capture: true });
     document.addEventListener('touchmove', blockEvent, { passive: false, capture: true });
     document.addEventListener('keydown', onKeydown, true);
@@ -958,8 +958,8 @@ const INSTAGRAM_SHORTFORM_JS = `
     blockEvent(e);
   }
 
-  if (!window.__inkShortformIGNavBlock) {
-    window.__inkShortformIGNavBlock = true;
+  if (!window.__northstarShortformIGNavBlock) {
+    window.__northstarShortformIGNavBlock = true;
     document.addEventListener('click', onNavClick, true);
     document.addEventListener('pointerdown', onNavClick, true);
   }

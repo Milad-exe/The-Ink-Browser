@@ -5,14 +5,14 @@
     (function () {
         'use strict';
         const T = (key, fallback) => {
-            try { const v = window.Ink?.i18n?.t(key); return (v && v !== key) ? v : fallback; }
+            try { const v = window.Northstar?.i18n?.t(key); return (v && v !== key) ? v : fallback; }
             catch (e) { return fallback; }
         };
         try {
-            window.Ink.i18n.init(window.inkI18n?.getSync() || (window.northstarSettings?.getSync() || {}).i18n || {});
-            window.Ink.i18n.apply(document);
+            window.Northstar.i18n.init(window.northstarI18n?.getSync() || (window.northstarSettings?.getSync() || {}).i18n || {});
+            window.Northstar.i18n.apply(document);
         }
-        catch (e) { window.inkLog?.debug('downloads', 'i18n: ' + e); }
+        catch (e) { window.northstarLog?.debug('downloads', 'i18n: ' + e); }
         const listEl = document.getElementById('list');
         const clearBtn = document.getElementById('clear-btn');
         // Base document outline shared by the file-type icons; `inner` draws the
@@ -65,8 +65,8 @@
         function fmtBytes(n) {
             if (!n || n < 0)
                 return '0 B';
-            if (window.Ink?.i18n)
-                return window.Ink.i18n.bytes(n);
+            if (window.Northstar?.i18n)
+                return window.Northstar.i18n.bytes(n);
             const units = ['B', 'KB', 'MB', 'GB', 'TB'];
             let i = 0;
             while (n >= 1024 && i < units.length - 1) {
@@ -163,7 +163,7 @@
         clearBtn.addEventListener('click', () => window.overlayDownloads.action('clear-finished'));
         document.getElementById('show-all')
             ?.addEventListener('click', () => window.overlayDownloads.action('show-all'));
-        window.Ink?.keys?.rows(document, { selector: '.dl-item, #show-all', typeahead: false });
+        window.Northstar?.keys?.rows(document, { selector: '.dl-item, #show-all', typeahead: false });
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape')
                 window.overlayDownloads.close();

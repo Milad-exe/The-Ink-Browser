@@ -16,8 +16,8 @@
     const api = factory();
     if (typeof module === 'object' && module.exports)
         module.exports = api;
-    root.Ink = root.Ink || {};
-    root.Ink.keys = api;
+    root.Northstar = root.Northstar || {};
+    root.Northstar.keys = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
     'use strict';
 

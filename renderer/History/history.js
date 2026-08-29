@@ -9,9 +9,9 @@
         const listEl = document.getElementById('list');
         const searchEl = document.getElementById('search');
         const countEl = document.getElementById('count');
-        const i18n = window.Ink?.i18n;
+        const i18n = window.Northstar?.i18n;
         try { i18n?.init((window.northstarSettings?.getSync() || {}).i18n || {}); i18n?.apply(document); }
-        catch (e) { window.inkLog?.debug('history', 'i18n: ' + e); }
+        catch (e) { window.northstarLog?.debug('history', 'i18n: ' + e); }
         // t() falls through to the key when a string is missing, so a plain
         // `|| fallback` never fires. This one checks for that.
         const T = (key, fallback) => {
@@ -23,12 +23,12 @@
         // overlay above this view, so it cannot see the click itself).
         document.addEventListener('click', async () => {
             try { await window.menu?.close(); }
-            catch (e) { window.inkLog?.debug('history', 'menu close: ' + e); }
+            catch (e) { window.northstarLog?.debug('history', 'menu close: ' + e); }
         });
 
         let entries = [];
         try { entries = await window.browserHistory.get() || []; }
-        catch (e) { window.inkLog?.debug('history', 'load: ' + e); }
+        catch (e) { window.northstarLog?.debug('history', 'load: ' + e); }
 
         const dayKey = (iso) => {
             const d = new Date(iso);
@@ -71,7 +71,7 @@
                     img.alt = '';
                     fallback.replaceWith(img);
                 }
-                catch (e) { window.inkLog?.debug('history', 'favicon: ' + e); }
+                catch (e) { window.northstarLog?.debug('history', 'favicon: ' + e); }
             })();
 
             const text = document.createElement('div');
@@ -110,7 +110,7 @@
                         render(searchEl.value);
                     }
                 }
-                catch (err) { window.inkLog?.debug('history', 'remove: ' + err); }
+                catch (err) { window.northstarLog?.debug('history', 'remove: ' + err); }
             });
             row.appendChild(remove);
 
@@ -182,7 +182,7 @@
                 entries = [];
                 render(searchEl.value);
             }
-            catch (e) { window.inkLog?.debug('history', 'clear: ' + e); }
+            catch (e) { window.northstarLog?.debug('history', 'clear: ' + e); }
         });
         render();
     });

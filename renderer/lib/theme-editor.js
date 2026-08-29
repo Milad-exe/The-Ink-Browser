@@ -10,7 +10,7 @@
  *
  * Mount it with:
  *
- *   Ink.themeEditor.mount({
+ *   Northstar.themeEditor.mount({
  *     picker,        // element the swatch row is built into
  *     editor,        // element holding the editor markup (see either page)
  *     api,           // the northstarThemes bridge: list/preview/save/remove
@@ -28,7 +28,7 @@
  */
 (function () {
     'use strict';
-    window.Ink = window.Ink || {};
+    window.Northstar = window.Northstar || {};
 
     function mount(ctx) {
         const picker = ctx.picker;
@@ -203,7 +203,7 @@
             }
             catch (e) {
                 warn('That name could not be saved.');
-                window.inkLog?.debug('theme-editor', 'rename: ' + e);
+                window.northstarLog?.debug('theme-editor', 'rename: ' + e);
             }
             refresh();
         };
@@ -1024,5 +1024,5 @@
         return { refresh, openEditor };
     }
 
-    window.Ink.themeEditor = { mount };
+    window.Northstar.themeEditor = { mount };
 })();

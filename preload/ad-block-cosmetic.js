@@ -22,15 +22,15 @@
     ].join(',');
     const CSS = SELECTORS + ' { display: none !important; visibility: hidden !important; }';
     function inject() {
-        if (document.getElementById('__ink-adblock'))
+        if (document.getElementById('__northstar-adblock'))
             return;
         const s = document.createElement('style');
-        s.id = '__ink-adblock';
+        s.id = '__northstar-adblock';
         s.textContent = CSS;
         (document.head || document.documentElement).appendChild(s);
     }
     function remove() {
-        document.getElementById('__ink-adblock')?.remove();
+        document.getElementById('__northstar-adblock')?.remove();
     }
     // ── Check setting at page load ────────────────────────────────────────────────
     // Optimistic: inject immediately (blocking is on by default), then confirm with

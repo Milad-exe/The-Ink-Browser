@@ -16,14 +16,14 @@
     // ── Module-level utilities ────────────────────────────────────────────────────
     /**
      * Translate, with the English already in the source as the fallback.
-     * `Ink.i18n.t` returns the KEY for an unknown string, which would paint
+     * `Northstar.i18n.t` returns the KEY for an unknown string, which would paint
      * "chrome.newTab" into a menu — this returns the fallback instead. Declared
      * up here because the init sequence runs near the top of the file (a const
      * declared below it would be in its TDZ when the chrome first paints).
      */
     const T = (key, fallback) => {
         try {
-            const v = window.Ink?.i18n?.t(key);
+            const v = window.Northstar?.i18n?.t(key);
             return (v && v !== key) ? v : fallback;
         }
         catch (e) { return fallback; }
@@ -38,7 +38,7 @@
         try {
             host = new URL(url).host;
         }
-        catch (e) { window.inkLog?.debug('renderer', 'paintCachedFavicon: ' + e); }
+        catch (e) { window.northstarLog?.debug('renderer', 'paintCachedFavicon: ' + e); }
         if (!host || !window.tab?.cachedFavicon) {
             imgEl.remove();
             return;
@@ -98,17 +98,17 @@
         // Bound here, above the init sequence: anything declared after it is TDZ
         // while init runs (see CLAUDE.md invariant 2).
         const { debounce, looksLikeUrl, normalizeUrl, linkScore, isLowValueMatch,
-                cleanliness, urlDisplayParts } = window.Ink.util;
+                cleanliness, urlDisplayParts } = window.Northstar.util;
         // ── Settings (synchronous) ────────────────────────────────────────────────
         let settings = {};
         try {
             settings = window.northstarSettings.getSync() || {};
         }
-        catch (e) { window.inkLog?.debug('renderer', 'filterTabsByWorkspace: ' + e); }
+        catch (e) { window.northstarLog?.debug('renderer', 'filterTabsByWorkspace: ' + e); }
         // ── Localisation (renderer/lib/i18n.js) ───────────────────────────────────
         // The catalogue rides along in the settings payload, so labels can be
         // resolved before the first paint. Language changes re-apply live.
-        const i18n = window.Ink.i18n;
+        const i18n = window.Northstar.i18n;
         i18n.init(settings.i18n || {});
         i18n.apply(document);
         try {
@@ -117,7 +117,7 @@
                 i18n.apply(document);
             });
         }
-        catch (e) { window.inkLog?.debug('renderer', 'language listener: ' + e); }
+        catch (e) { window.northstarLog?.debug('renderer', 'language listener: ' + e); }
         const getSearchEngine = () => settings.searchEngine || 'google';
         // Engines come from the main process (features/search-engines.js) so the
         // built-ins have one definition; `engines-changed` keeps this fresh when
@@ -126,17 +126,17 @@
             ? settings.engines
             : [{ id: 'google', name: 'Google', keyword: 'g', url: 'https://www.google.com/search?q=%s' }];
         try { window.tabsUI?.onEnginesChanged?.((list) => { if (Array.isArray(list) && list.length) engineList = list; }); }
-        catch (e) { window.inkLog?.debug('renderer', 'getSearchEngine: ' + e); }
+        catch (e) { window.northstarLog?.debug('renderer', 'getSearchEngine: ' + e); }
         const engineById = (id) => engineList.find(e => e.id === id) || engineList[0];
         /** Search URL for typed text, honouring a leading engine keyword. */
-        const searchUrlFor = (text) => window.Ink.util.searchUrl(text, engineList, getSearchEngine());
+        const searchUrlFor = (text) => window.Northstar.util.searchUrl(text, engineList, getSearchEngine());
         const getPomSetting = (key, def) => (typeof settings[key] === 'number' ? settings[key] : def);
         // ── Private window detection (synchronous) ────────────────────────────────
         let isPrivateWindow = false;
         try {
             isPrivateWindow = window.northstarPrivate?.isPrivateWindowSync?.() ?? false;
         }
-        catch (e) { window.inkLog?.debug('renderer', 'getPomSetting: ' + e); }
+        catch (e) { window.northstarLog?.debug('renderer', 'getPomSetting: ' + e); }
         if (isPrivateWindow) {
             document.documentElement.setAttribute('data-private-window', 'true');
         }
@@ -165,13 +165,13 @@
             // The page is a native view painted OVER the chrome, so it has to
             // stand aside while a modal is up (same as the profile modal).
             try { window.focusMode.overlayOpen(); }
-            catch (e) { window.inkLog?.debug('renderer', 'promptForText: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'promptForText: ' + e); }
             input.focus();
             input.select();
             const close = () => {
                 modal.classList.add('hidden');
                 try { window.focusMode.overlayClose(); }
-                catch (e) { window.inkLog?.debug('renderer', 'promptForText: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'promptForText: ' + e); }
                 document.getElementById('tp-save').removeEventListener('click', save);
                 document.getElementById('tp-cancel').removeEventListener('click', close);
                 input.removeEventListener('keydown', onKey);
@@ -213,7 +213,7 @@
         // Constructed BEFORE the init sequence below: `initBookmarkBar` is a const,
         // so calling it from the init calls while this line sits further down the
         // file is a TDZ throw (CLAUDE.md invariant 2 — it bit exactly here).
-        const bookmarks = window.Ink.createBookmarkBar({
+        const bookmarks = window.Northstar.createBookmarkBar({
             bar: bookmarkBar,
             items: bookmarkBarItems,
             button: bookmarkBtn,
@@ -239,7 +239,7 @@
         function hideNotice(remember) {
             if (remember && noticeCurrent?.id) {
                 try { window.electronAPI.dismissNotice(noticeCurrent.id); }
-                catch (e) { window.inkLog?.debug('renderer', 'dismissNotice: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'dismissNotice: ' + e); }
             }
             noticeCurrent = null;
             noticeBar?.classList.add('hidden');
@@ -265,7 +265,7 @@
             // Acting on it settles the question, so it does not come back either.
             hideNotice(true);
             try { n?.onAction?.(); }
-            catch (e) { window.inkLog?.debug('renderer', 'notice action: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'notice action: ' + e); }
         });
         noticeDismiss?.addEventListener('click', () => hideNotice(true));
 
@@ -273,7 +273,7 @@
            at startup rather than pushed, so a window opened later does not race
            the check. */
         const T_NOTICE = (k, fallback) => {
-            const v = window.Ink?.i18n?.t(k);
+            const v = window.Northstar?.i18n?.t(k);
             return (!v || v === k) ? fallback : v;
         };
         /* #ext-actions is <browser-action-list>, whose buttons live in a SHADOW
@@ -299,7 +299,7 @@
                 else
                     setTimeout(initExtActionsGap, 600); // wait for the upgrade
             }
-            catch (e) { window.inkLog?.debug('renderer', 'extActions: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'extActions: ' + e); }
         }
 
         function initNotices() {
@@ -316,7 +316,7 @@
                     }
                 }).catch(() => { });
             }
-            catch (e) { window.inkLog?.debug('renderer', 'initNotices: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'initNotices: ' + e); }
             /* A captive portal opens its sign-in page on its own; this says WHY
                a tab just appeared. Not dismissible-forever — the next network
                is a different question — so it carries no id. */
@@ -326,7 +326,7 @@
                     showNotice({ text: n.text, action: n.action || '', onAction: n.onAction });
                 });
             }
-            catch (e) { window.inkLog?.debug('renderer', 'onNotice: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'onNotice: ' + e); }
         }
 
         const updateBookmarkBtn = bookmarks.updateButton;
@@ -411,7 +411,7 @@
             // itself lands on the control rather than paying for the focus.
             window.addEventListener('pointerdown', (e) => {
                 try { window.tabsUI?.focusChrome?.(); }
-                catch (err) { window.inkLog?.debug('renderer', 'focusChrome: ' + err); }
+                catch (err) { window.northstarLog?.debug('renderer', 'focusChrome: ' + err); }
                 // A press outside the address field gives it up AT ONCE. The
                 // field used to hold on for 400ms while the suggestions faded,
                 // which made that first press read as "nothing happened".
@@ -426,7 +426,7 @@
         }
         /**
          * Back/forward buttons — click navigates one step; holding the button
-         * (or right-clicking it) shows the tab's history list, Firefox-style.
+         * (or right-clicking it) shows the tab's history list.
          */
         /**
          * Drop the focus ring a toolbar click leaves behind.
@@ -441,7 +441,7 @@
          */
         function releaseFocusToPage(btn) {
             try { btn?.blur(); }
-            catch (e) { window.inkLog?.debug('renderer', 'releaseFocusToPage: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'releaseFocusToPage: ' + e); }
         }
         function setupNavButton(btn, action) {
             let pressTimer = null;
@@ -524,7 +524,7 @@
                 }
                 else if (barEdited) {
                     // Refocusing with an uncommitted edit — keep the typed text
-                    // (Firefox preserves it until you actually navigate).
+                    // (it is preserved until you actually navigate).
                     searchBar.select();
                 }
                 else {
@@ -536,7 +536,7 @@
             searchBar.addEventListener('blur', () => {
                 clearGhost();
                 ghostAccepted = null;
-                // Uncommitted typed text stays in the bar (Firefox); otherwise rest
+                // Uncommitted typed text stays in the bar; otherwise rest
                 // on the full URL with the host emphasised (url-display overlay).
                 if (!barEdited && currentTabUrl)
                     searchBar.value = restingValueFor(currentTabUrl);
@@ -554,7 +554,7 @@
             // Moving the caret invalidates a completion that was drawn for the end
             // of the text.
             searchBar.addEventListener('mouseup', () => setTimeout(clearGhost, 0));
-            // Lock / security icon → Firefox-style site-info panel (connection,
+            // Lock / security icon → standard site-info panel (connection,
             // permissions, clear data). Only meaningful on real http(s) pages.
             omniIcon?.addEventListener('mousedown', (e) => {
                 const kind = omnibox?.dataset.omni;
@@ -566,7 +566,7 @@
                 try {
                     window.siteInfo.open({ x: Math.round(r.left), y: Math.round(r.bottom) });
                 }
-                catch (e) { window.inkLog?.debug('renderer', 'warmSuggestions: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'warmSuggestions: ' + e); }
             });
             // Overlay view was (re)created — restore focus to the address bar, but
             // only if the user was actually typing (the overlay is also pre-warmed
@@ -575,7 +575,7 @@
                 try {
                     searchBar.focus();
                 }
-                catch (e) { window.inkLog?.debug('renderer', 'warmSuggestions: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'warmSuggestions: ' + e); }
             } });
             window.suggestions.onSelected(onSuggestionSelected);
             window.suggestions.onPointerDown(() => {
@@ -597,7 +597,7 @@
                     searchBar.focus();
                     searchBar.select();
                 }
-                catch (e) { window.inkLog?.debug('renderer', 'warmSuggestions: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'warmSuggestions: ' + e); }
             });
             window.addEventListener('resize', positionSuggestions);
             window.addEventListener('scroll', positionSuggestions, true);
@@ -612,7 +612,7 @@
         // the keystroke itself. It used to run inside the debounced, awaited
         // suggestion fetch, so the address bar rewrote itself a beat AFTER you
         // stopped typing — a delayed, unasked-for edit of your own text, which
-        // is what made it feel wrong. Firefox and Chrome complete synchronously.
+        // is what made it feel wrong. browsers complete synchronously.
         let hostCache = [];
         const rememberHosts = (items) => {
             for (const it of items || []) {
@@ -621,7 +621,7 @@
                     if (h && !hostCache.includes(h))
                         hostCache.push(h);
                 }
-                catch (e) { window.inkLog?.debug('renderer', 'rememberHosts: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'rememberHosts: ' + e); }
             }
             if (hostCache.length > 400)
                 hostCache = hostCache.slice(-400);
@@ -761,7 +761,7 @@
         /**
          * Commit an address-bar navigation: load the URL, close the popup, and
          * move focus off the bar so it falls back to its resting display —
-         * exactly what Firefox does on Enter / suggestion click.
+         * the expected behaviour on Enter or a suggestion click.
          */
         function commitNavigation(value) {
             barEdited = false;
@@ -801,7 +801,7 @@
             try {
                 searchBar.focus();
             }
-            catch (e) { window.inkLog?.debug('renderer', 'onSuggestionSelected: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'onSuggestionSelected: ' + e); }
             if (item.type === 'switch-tab') {
                 hideSuggestions();
                 searchBar.blur();
@@ -845,7 +845,7 @@
             }
             if (e.key === 'ArrowLeft' || e.key === 'Home')
                 clearGhost();
-            // Firefox: Ctrl/Cmd+Enter wraps a bare term in www. … .com; anything
+            // Ctrl/Cmd+Enter wraps a bare term in www. … .com; anything
             // that already looks like a URL just navigates normally.
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
@@ -894,7 +894,7 @@
             }
             else if (e.key === 'Escape') {
                 // Popup already closed: a second Escape reverts the bar to the
-                // page URL, keeping focus (Firefox behaviour).
+                // page URL, keeping focus.
                 e.preventDefault();
                 barEdited = false;
                 userTyping = false;
@@ -1010,7 +1010,7 @@
             }
         }
         /**
-         * Firefox-style inline autocomplete: if the top domain match extends what
+         * standard inline autocomplete: if the top domain match extends what
          * the user typed, return the completed host (e.g. "you" → "youtube.com").
          * Returns null when it isn't safe to complete (caret not at end, user is
          * deleting, query has spaces, etc.). Caller paints it as ghost text.
@@ -1105,7 +1105,7 @@
                 if (ghostKey)
                     merged.push(topDomain);
                 // Search suggestions right under the heuristic row (max 3); skip
-                // base-query dupes. Firefox's default order shows suggestions
+                // base-query dupes. the default order shows suggestions
                 // ahead of history/bookmarks.
                 let searchCount = 0;
                 for (const s of search) {
@@ -1117,7 +1117,7 @@
                             break;
                     }
                 }
-                // History / bookmarks / open tabs — tight cap like Firefox (max 4).
+                // History / bookmarks / open tabs — tight cap (max 4).
                 // Caps keep the whole list (base + ≤3 search + ≤4 links = ≤8) visible
                 // without scrolling — see MAX_HEIGHT in ipc/suggestions.js.
                 let linkCount = 0;
@@ -1161,9 +1161,9 @@
                     anchor = { left: Math.round(rail.right), right: Math.round(rail.right), top: mid, bottom: mid };
                 }
             }
-            catch (e) { window.inkLog?.debug('renderer', 'openThemePanel: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'openThemePanel: ' + e); }
             try { window.themePanel?.toggle(anchor, spaceId ? String(spaceId) : null); }
-            catch (e) { window.inkLog?.debug('renderer', 'openThemePanel: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'openThemePanel: ' + e); }
         }
 
         /* ── Page actions ──────────────────────────────────────────────────
@@ -1191,7 +1191,7 @@
             const internal = !!northstarDisplay(url) || !/^https?:/i.test(url);
             let host = '';
             try { host = url && /^https?:/i.test(url) ? new URL(url).hostname.replace(/^www\./, '') : ''; }
-            catch (e) { window.inkLog?.debug('renderer', 'pageActionsState: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'pageActionsState: ' + e); }
             return {
                 available,
                 bookmarked: !!document.getElementById('bookmark-btn')?.classList.contains('active'),
@@ -1211,7 +1211,7 @@
                         { left: r.left, right: r.right, top: r.top, bottom: r.bottom },
                         pageActionsState());
                 }
-                catch (err) { window.inkLog?.debug('renderer', 'pageActions: ' + err); }
+                catch (err) { window.northstarLog?.debug('renderer', 'pageActions: ' + err); }
             });
             // The panel presses the button that already owns the behaviour.
             try {
@@ -1233,7 +1233,7 @@
                     // renderer happens to be focused.
                 });
             }
-            catch (e) { window.inkLog?.debug('renderer', 'pageActions wiring: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'pageActions wiring: ' + e); }
         }
 
         // ── URL loading ───────────────────────────────────────────────────────────
@@ -1271,7 +1271,7 @@
                 return 'northstar://' + token;
             return null;
         }
-        // ── Firefox-style resting URL display ─────────────────────────────────────
+        // ── standard resting URL display ─────────────────────────────────────
         // While the bar is unfocused the full URL stays visible, painted into the
         // #url-display overlay: host in full text colour, scheme and path dimmed.
         // The input underneath keeps the complete URL (transparent text) so focus
@@ -1305,7 +1305,7 @@
             if (document.activeElement === searchBar && userTyping)
                 return;
             // Uncommitted typed text survives same-page updates (title / favicon
-            // refreshes); only a real navigation replaces it, like Firefox.
+            // refreshes); only a real navigation replaces it.
             if (barEdited && url === currentTabUrl)
                 return;
             barEdited = false;
@@ -1361,7 +1361,7 @@
             window.dragdrop.onMergeHover?.((v) => tabBar.classList.toggle('merge-target', !!v));
             // Released over the page card: the drop sheet there handled it, and
             // this side never saw a pointerup — drop the gesture.
-            window.dragdrop.onDragEnded?.(() => { try { activeTabDrag?.cancel(); } catch (e) { window.inkLog?.debug('renderer', 'initTabBar: ' + e); } });
+            window.dragdrop.onDragEnded?.(() => { try { activeTabDrag?.cancel(); } catch (e) { window.northstarLog?.debug('renderer', 'initTabBar: ' + e); } });
             window.pinActiveTab = () => window.tab.pin(activeTabIndex);
             // ── IPC events from main process ──────────────────────────────────────
             window.tab.onTabCreated((_e, data) => {
@@ -1432,7 +1432,7 @@
                 setTabLoading(data.index, data.loading);
             });
             try { window.tab.onIconChanged(({ index, icon }) => applyCustomTabIcon(Number(index), icon)); }
-            catch (e) { window.inkLog?.debug('renderer', 'initTabBar: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'initTabBar: ' + e); }
             window.tabsUI?.onPinTab((index) => {
                 const btn = document.querySelector(`#tabs-container .tab-button[data-index="${index}"]`);
                 if (!btn)
@@ -1457,7 +1457,7 @@
                     applySplitMarks();
                 });
             }
-            catch (e) { window.inkLog?.debug('renderer', 'initTabBar: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'initTabBar: ' + e); }
             // Folders: main sends the active workspace's folders + tab assignments.
             try {
                 const applyFolders = (data) => {
@@ -1484,7 +1484,7 @@
                 pullFolders();
                 setTimeout(pullFolders, 600);
             }
-            catch (e) { window.inkLog?.debug('renderer', 'pullFolders: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'pullFolders: ' + e); }
             // Called by the main process (executeJavaScript) when a tab dragged
             // from ANOTHER window drops on our strip: x (px from our left edge) →
             // where to insert it. Returns the data-index of the tab to insert
@@ -1510,7 +1510,7 @@
                 return parseInt(after.dataset.index);
             };
             // ── Drop links / images / files / text onto the tab bar → new tab(s) ──
-            // Firefox-style: a dropped URL or image opens in a new tab, OS files
+            // : a dropped URL or image opens in a new tab, OS files
             // open as file://, and anything else (selected text/phrases) runs as a
             // search in a new tab.
             async function openDrop(dt) {
@@ -1641,12 +1641,12 @@
                 return;
             let seen = true;
             try { seen = !!(window.northstarSettings.getSync() || {}).isolationHintSeen; }
-            catch (e) { window.inkLog?.debug('renderer', 'maybeShowIsolationHint: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'maybeShowIsolationHint: ' + e); }
             if (seen)
                 return;
             isoHintShownThisSession = true;
             try { window.northstarSettings.set('isolationHintSeen', true); }
-            catch (e) { window.inkLog?.debug('renderer', 'maybeShowIsolationHint: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'maybeShowIsolationHint: ' + e); }
             const el = document.getElementById('iso-hint');
             if (!el)
                 return;
@@ -1664,14 +1664,14 @@
                 mode = (s.tabBarSide ?? 'side');
                 width = snapSidebar(Number(s.sidebarWidth) || 256);
             }
-            catch (e) { window.inkLog?.debug('renderer', 'initTabBarSide: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'initTabBarSide: ' + e); }
             document.documentElement.dataset.tabbar = mode === 'top' ? 'top' : 'side';
             applySidebarWidth(width);
             initSidebarResizer();
             try { window.tabsUI.onCloseMenus(() => { _closeCtxMenu?.(); }); }
-            catch (e) { window.inkLog?.debug('renderer', 'initTabBarSide: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'initTabBarSide: ' + e); }
             try { window.tabsUI.onSidebarWidth((w) => applySidebarWidth(w)); }
-            catch (e) { window.inkLog?.debug('renderer', 'initTabBarSide: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'initTabBarSide: ' + e); }
             try {
                 window.tabsUI.onTabBarSide((v) => {
                     document.documentElement.dataset.tabbar = v === 'top' ? 'top' : 'side';
@@ -1679,7 +1679,7 @@
                     updateScrollShadows();
                 });
             }
-            catch (e) { window.inkLog?.debug('renderer', 'initTabBarSide: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'initTabBarSide: ' + e); }
             // Compact mode: collapse the sidebar (page full-bleed).
             try {
                 window.tabsUI.onCompact((on) => {
@@ -1687,7 +1687,7 @@
                     updateTabWidths(tabs.size);
                 });
             }
-            catch (e) { window.inkLog?.debug('renderer', 'initTabBarSide: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'initTabBarSide: ' + e); }
         }
         // Drag the right edge of the sidebar to resize it (side mode). Live-resizes
         // the page view; persists (globally) on release.
@@ -1696,7 +1696,7 @@
         // so dragging narrow kept shrinking the sidebar on screen after the
         // page had already stopped moving.
         function snapSidebar(px) {
-            return Ink.util.clampSidebarWidth(px, window.innerWidth);
+            return Northstar.util.clampSidebarWidth(px, window.innerWidth);
         }
         function applySidebarWidth(w) {
             document.documentElement.style.setProperty('--sidebar-w', w + 'px');
@@ -1715,7 +1715,7 @@
                 pid = e.pointerId;
                 handle.setPointerCapture(e.pointerId);
                 document.documentElement.classList.add('sidebar-resizing');
-                try { window.tabsUI.startSidebarResize(); } catch (e) { window.inkLog?.debug('renderer', 'initSidebarResizer: ' + e); }
+                try { window.tabsUI.startSidebarResize(); } catch (e) { window.northstarLog?.debug('renderer', 'initSidebarResizer: ' + e); }
                 e.preventDefault();
             });
             handle.addEventListener('pointermove', (e) => {
@@ -1732,7 +1732,7 @@
                 if (!dragging)
                     return;
                 dragging = false;
-                try { if (pid != null) handle.releasePointerCapture(pid); } catch (e) { window.inkLog?.debug('renderer', 'stop: ' + e); }
+                try { if (pid != null) handle.releasePointerCapture(pid); } catch (e) { window.northstarLog?.debug('renderer', 'stop: ' + e); }
                 document.documentElement.classList.remove('sidebar-resizing');
                 if (commit)
                     window.tabsUI.commitSidebarWidth(pending);
@@ -1747,7 +1747,7 @@
             window.addEventListener('blur', () => stop(true));
             document.addEventListener('keydown', (e) => { if (e.key === 'Escape') stop(true); });
             // Main fires this when the release happened over the page view.
-            try { window.tabsUI.onSidebarResizeEnded((w) => { pending = clamp(w); stop(false); }); } catch (e) { window.inkLog?.debug('renderer', 'stop: ' + e); }
+            try { window.tabsUI.onSidebarResizeEnded((w) => { pending = clamp(w); stop(false); }); } catch (e) { window.northstarLog?.debug('renderer', 'stop: ' + e); }
         }
         // ── Essentials (pinned favourites; sidebar top, per profile) ──────────────
         function initEssentials() {
@@ -1757,7 +1757,7 @@
             const render = async () => {
                 let items = [];
                 try { items = (await window.essentials.list()) || []; }
-                catch (e) { window.inkLog?.debug('renderer', 'render: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'render: ' + e); }
                 grid.innerHTML = '';
                 for (const it of items) {
                     const tile = document.createElement('button');
@@ -1766,7 +1766,7 @@
                     tile.title = it.title || it.url;
                     let letter = '•';
                     try { letter = new URL(it.url).hostname.replace(/^www\./, '').charAt(0).toUpperCase(); }
-                    catch (e) { window.inkLog?.debug('renderer', 'render: ' + e); }
+                    catch (e) { window.northstarLog?.debug('renderer', 'render: ' + e); }
                     const fb = document.createElement('span');
                     fb.className = 'ess-fallback';
                     fb.textContent = letter;
@@ -1808,7 +1808,7 @@
                         ev.preventDefault(); ev.stopPropagation();
                         let homeHost = it.home || it.url;
                         try { homeHost = new URL(it.home || it.url).hostname.replace(/^www\./, ''); }
-                        catch (e) { window.inkLog?.debug('renderer', 'essential menu: ' + e); }
+                        catch (e) { window.northstarLog?.debug('renderer', 'essential menu: ' + e); }
                         openCtxMenu(ev.clientX, ev.clientY, [
                             [`Go back to ${homeHost}`, () => window.essentials.goHome(it.url, it.profile || null)],
                             ['Use this page as its page', () => window.essentials.setHome(it.url, it.profile || null, null)],
@@ -1863,9 +1863,9 @@
                         btn.classList.toggle('is-essential', owned.has(index));
                 });
             }
-            catch (e) { window.inkLog?.debug('renderer', 'essential tabs: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'essential tabs: ' + e); }
             try { window.essentials.onChanged(render); }
-            catch (e) { window.inkLog?.debug('renderer', 'render: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'render: ' + e); }
         }
         // ── Profiles ──────────────────────────────────────────────────────────────
         // The toolbar badge shows this window's profile (coloured initial); click
@@ -1903,7 +1903,7 @@
             pullContainers();
             setTimeout(pullContainers, 800);
         }
-        catch (e) { window.inkLog?.debug('renderer', 'pullContainers: ' + e); }
+        catch (e) { window.northstarLog?.debug('renderer', 'pullContainers: ' + e); }
         /* The foot's space row shows AS MANY AS FIT, then how many it could
            not. It used to be a horizontal scroller with its scrollbar hidden,
            which meant that with nine spaces you saw four and reached the rest
@@ -1967,7 +1967,7 @@
             try {
                 new ResizeObserver(() => fitSpaceRow(row, openList)).observe(row);
             }
-            catch (e) { window.inkLog?.debug('renderer', 'watchSpaceRow: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'watchSpaceRow: ' + e); }
         }
 
         function initProfiles() {
@@ -2065,7 +2065,7 @@
                     nameEl.value = '';
                     panel.classList.remove('hidden');
                     bar.classList.add('creating-space');
-                    try { window.tabsUI.focusChrome(); } catch (e) { window.inkLog?.debug('renderer', 'close: ' + e); }
+                    try { window.tabsUI.focusChrome(); } catch (e) { window.northstarLog?.debug('renderer', 'close: ' + e); }
                     nameEl.focus();
                 };
                 emojiEl.addEventListener('click', (e) => {
@@ -2100,7 +2100,7 @@
                     // before the first await or it is null by the time we need it.
                     const r = e.currentTarget.getBoundingClientRect();
                     let named = [];
-                    try { named = (await window.containers.listNamed()) || []; } catch (e) { window.inkLog?.debug('renderer', 'setContainer: ' + e); }
+                    try { named = (await window.containers.listNamed()) || []; } catch (e) { window.northstarLog?.debug('renderer', 'setContainer: ' + e); }
                     const rows = [
                         ['Own (isolated)', () => setContainer(null, 'Own')],
                         ['Default (shared)', () => setContainer('default', 'Default')],
@@ -2122,7 +2122,7 @@
                         if (name) patch.name = name;
                         if (chosen) patch.emoji = chosen;
                         if (container) patch.container = container;
-                        try { await window.profiles.update(p.id, patch); } catch (e) { window.inkLog?.debug('renderer', 'create: ' + e); }
+                        try { await window.profiles.update(p.id, patch); } catch (e) { window.northstarLog?.debug('renderer', 'create: ' + e); }
                     }
                     close();
                     if (p?.id) window.profiles.switch(p.id);
@@ -2137,9 +2137,9 @@
             const refresh = async () => {
                 let cur = null, all = [];
                 try { cur = await window.profiles.current(); }
-                catch (e) { window.inkLog?.debug('renderer', 'refresh: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'refresh: ' + e); }
                 try { all = (await window.profiles.list()) || []; }
-                catch (e) { window.inkLog?.debug('renderer', 'refresh: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'refresh: ' + e); }
                 _spacesCache = all; // menus need the space list without awaiting
                 if (cur) {
                     // Restored tabs are tagged and filtered before this resolves, so
@@ -2219,9 +2219,9 @@
             initCreateSpace();
             refresh();
             try { window.profiles.onChanged(refresh); }
-            catch (e) { window.inkLog?.debug('renderer', 'refresh: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'refresh: ' + e); }
             try { window.profiles.onForceSwitch((id) => window.profiles.switch(id)); }
-            catch (e) { window.inkLog?.debug('renderer', 'refresh: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'refresh: ' + e); }
             try {
                 window.profiles.onSwitched((id) => {
                     activeWorkspace = String(id);
@@ -2231,7 +2231,7 @@
                     // which main re-emits on switch (they're per-workspace now).
                 });
             }
-            catch (e) { window.inkLog?.debug('renderer', 'refresh: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'refresh: ' + e); }
             if (btn) {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -2292,14 +2292,14 @@
             if (dl && window.downloads) {
                 const revealIfAny = async () => {
                     try { if (((await window.downloads.getAll()) || []).length) dl.classList.remove('hidden'); }
-                    catch (e) { window.inkLog?.debug('renderer', 'revealIfAny: ' + e); }
+                    catch (e) { window.northstarLog?.debug('renderer', 'revealIfAny: ' + e); }
                 };
                 dl.addEventListener('click', () => {
                     const r = dl.getBoundingClientRect();
                     window.downloads.togglePanel({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
                 });
                 try { window.downloads.onChanged(() => dl.classList.remove('hidden')); }
-                catch (e) { window.inkLog?.debug('renderer', 'revealIfAny: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'revealIfAny: ' + e); }
                 revealIfAny();
             }
             // Edit-profile modal (name + emoji)
@@ -2333,7 +2333,7 @@
                 // One tab stop for the whole grid; arrows move within it, so a
                 // keyboard can pick an icon instead of the grid being a
                 // mouse-only feature.
-                window.Ink?.keys?.rows(picker, {
+                window.Northstar?.keys?.rows(picker, {
                     selector: '.emoji-opt',
                     typeahead: false,
                     onEscape: () => picker.classList.add('hidden'),
@@ -2346,7 +2346,7 @@
                 modal.dataset.editId = '';
                 // Bring the page (native view) back up from behind the chrome.
                 try { window.focusMode.overlayClose(); }
-                catch (e) { window.inkLog?.debug('renderer', 'close: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'close: ' + e); }
             };
             const save = async () => {
                 const id = modal.dataset.editId;
@@ -2362,7 +2362,7 @@
                 modal.dataset.editId = String(id);
                 let p = null;
                 try { p = ((await window.profiles.list()) || []).find(x => x.id === String(id)); }
-                catch (e) { window.inkLog?.debug('renderer', 'save: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'save: ' + e); }
                 input.value = p?.name || '';
                 setEmojiField(p?.emoji || '');
                 picker?.classList.add('hidden');
@@ -2370,11 +2370,11 @@
                 // The page is a native view that paints OVER the chrome DOM, so
                 // collapse it while the modal is up or the modal hides behind it.
                 try { window.focusMode.overlayOpen(); }
-                catch (e) { window.inkLog?.debug('renderer', 'save: ' + e); }
+                catch (e) { window.northstarLog?.debug('renderer', 'save: ' + e); }
                 input.focus(); input.select();
             };
             try { window.profiles.onRename((id) => openProfileModal(id)); }
-            catch (e) { window.inkLog?.debug('renderer', 'save: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'save: ' + e); }
             document.getElementById('prf-save')?.addEventListener('click', save);
             document.getElementById('prf-cancel')?.addEventListener('click', close);
             input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') close(); });
@@ -2603,7 +2603,7 @@
                 );
                 openCtxMenu(e.clientX, e.clientY, rows);
             });
-            // Firefox-style tab drag: pointer-tracked, and NOTHING moves until the
+            // standard tab drag: pointer-tracked, and NOTHING moves until the
             // button is released.
             //  - inside the strip → live reorder preview
             //  - outside the strip → the tab ghosts; on RELEASE it either moves
@@ -2614,7 +2614,7 @@
             btn.addEventListener('pointerdown', (e) => {
                 if (e.button !== 0 || e.target.closest('.tab-close'))
                     return;
-                // Firefox selects a tab on mousedown, not on click-release — so a
+                // A tab is selected on mousedown, not on click-release — so a
                 // drag always moves the tab you're looking at.
                 // Pinned sidebar tiles peek in a Glance on a plain click instead of
                 // switching — the switch is skipped here and the glance fires on
@@ -2716,7 +2716,7 @@
                     if (mode !== 'drag')
                         return;
                     // Leaving the strip vertically OR the window horizontally both
-                    // count as "outside" (Firefox tears off / merges either way).
+                    // count as "outside" (a tear-off or a merge either way).
                     const barR = tabBar.getBoundingClientRect();
                     const out = ev.clientY < barR.top - TEAR_MARGIN || ev.clientY > barR.bottom + TEAR_MARGIN
                         || ev.clientX < -TEAR_MARGIN || ev.clientX > window.innerWidth + TEAR_MARGIN;
@@ -2744,7 +2744,7 @@
                         tabsContainer.querySelectorAll('.folder-header.drop-target').forEach(h => h.classList.remove('drop-target'));
                         if (dropFolder) tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(dropFolder)}"]`)?.classList.add('drop-target');
                         // Spring-load: hold over a COLLAPSED folder and it opens, so a
-                        // tab can be dropped among its tabs (Finder / Chrome behaviour).
+                        // tab can be dropped among its tabs (Finder-style spring-loading).
                         const overFolder = fh?.dataset.folder || null;
                         if (overFolder !== springId) {
                             springId = overFolder;
@@ -2789,7 +2789,7 @@
                     if (wasMode !== 'drag') {
                         if (pinnedGlance) {
                             const u = tabUrls.get(parseInt(index)) || await window.tab.getTabUrl(index);
-                            if (u) { try { window.glance.open(u); } catch (e) { window.inkLog?.debug('renderer', 'finish: ' + e); } }
+                            if (u) { try { window.glance.open(u); } catch (e) { window.northstarLog?.debug('renderer', 'finish: ' + e); } }
                         }
                         return;
                     }
@@ -2809,7 +2809,7 @@
                         if (dropFolder !== undefined) {
                             const cur = folderState.assign.get(parseInt(index)) || null;
                             const next = dropFolder || null;
-                            if (cur !== next) { try { window.folders.assign(parseInt(index), next); } catch (e) { window.inkLog?.debug('renderer', 'finish: ' + e); } }
+                            if (cur !== next) { try { window.folders.assign(parseInt(index), next); } catch (e) { window.northstarLog?.debug('renderer', 'finish: ' + e); } }
                         }
                         return;
                     }
@@ -3039,7 +3039,7 @@
                 if (fn) fn(result);
             });
         }
-        catch (e) { window.inkLog?.debug('renderer', 'onKey: ' + e); }
+        catch (e) { window.northstarLog?.debug('renderer', 'onKey: ' + e); }
         // rows: ['Label', fn, className?] | ['Label', [subRows], className?] | ['sep'].
         // The menu itself is rendered by the CtxMenu overlay view — chrome DOM
         // cannot paint above the page's native view. Handlers can't cross IPC, so
@@ -3075,7 +3075,7 @@
             };
             _closeCtxMenu = () => { _ctxPending = null; };
             try { window.ctxMenu.open({ kind: 'menu', x, y, rows: serialize(rows) }); }
-            catch (e) { window.inkLog?.debug('renderer', 'resolve: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'resolve: ' + e); }
         }
         // Shared emoji set with search keywords, rendered by the overlay. A
         // function declaration so every scope sees it regardless of init order.
@@ -3114,7 +3114,7 @@
             };
             _closeCtxMenu = () => { _ctxPending = null; };
             try { window.ctxMenu.open({ kind: 'emoji', x, y, emojis: emojiSet(), allowNone: !!allowNone }); }
-            catch (e) { window.inkLog?.debug('renderer', 'openEmojiPicker: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'openEmojiPicker: ' + e); }
         }
         /**
          * Everything you can do to a space. Used by BOTH the pill at the top of
@@ -3183,7 +3183,7 @@
                 ['Unpack folder', () => window.folders.remove(id)],
                 ['Delete folder', () => {
                     const members = [...folderState.assign.entries()].filter(([, fid]) => fid === id).map(([i]) => i);
-                    for (const i of members) { try { window.tab.remove(i); } catch (e) { window.inkLog?.debug('renderer', 'spaceRows: ' + e); } }
+                    for (const i of members) { try { window.tab.remove(i); } catch (e) { window.northstarLog?.debug('renderer', 'spaceRows: ' + e); } }
                     window.folders.remove(id);
                 }, 'danger'],
             ]);
@@ -3192,7 +3192,7 @@
         // both scopes see it regardless of init order.
         async function newFolderInline() {
             let id = null;
-            try { id = await window.folders.create('New Folder'); } catch (e) { window.inkLog?.debug('renderer', 'newFolderInline: ' + e); }
+            try { id = await window.folders.create('New Folder'); } catch (e) { window.northstarLog?.debug('renderer', 'newFolderInline: ' + e); }
             if (id) setTimeout(() => { const h = tabsContainer.querySelector(`.folder-header[data-folder="${CSS.escape(id)}"]`); if (h) startFolderRename(h, id); }, 140);
         }
         // Inline rename for a tab row — double-click or the Change Label item.
@@ -3208,7 +3208,7 @@
             input.value = initial || '';
             input.maxLength = 300;
             label.replaceWith(input);
-            try { window.tabsUI.focusChrome(); } catch (e) { window.inkLog?.debug('renderer', 'startInlineEdit: ' + e); }
+            try { window.tabsUI.focusChrome(); } catch (e) { window.northstarLog?.debug('renderer', 'startInlineEdit: ' + e); }
             input.focus(); input.select();
             const done = (save) => {
                 if (!btn.classList.contains('renaming'))
@@ -3235,7 +3235,7 @@
             input.value = label.textContent;
             input.maxLength = 60;
             label.replaceWith(input);
-            try { window.tabsUI.focusChrome(); } catch (e) { window.inkLog?.debug('renderer', 'startTabRename: ' + e); }
+            try { window.tabsUI.focusChrome(); } catch (e) { window.northstarLog?.debug('renderer', 'startTabRename: ' + e); }
             input.focus(); input.select();
             const done = (save) => {
                 if (!btn.classList.contains('renaming'))
@@ -3262,7 +3262,7 @@
             name.replaceWith(input);
             // Pull keyboard focus to the chrome first, else the caret shows but
             // every keystroke goes to the page view that still owns focus.
-            try { window.tabsUI.focusChrome(); } catch (e) { window.inkLog?.debug('renderer', 'startFolderRename: ' + e); }
+            try { window.tabsUI.focusChrome(); } catch (e) { window.northstarLog?.debug('renderer', 'startFolderRename: ' + e); }
             input.focus(); input.select();
             const done = (save) => {
                 if (!h.classList.contains('renaming')) return;
@@ -3332,7 +3332,7 @@
             if (actions) {
                 if (sideTabs()) {
                     // Sidebar: "+ New tab" is a row after the pinned/folder block
-                    // (Arc). The divider above it appears whenever anything
+                    //. The divider above it appears whenever anything
                     // precedes it — folders or pinned tiles.
                     actions.classList.toggle('after-folders', folders.length > 0 || pinned.length > 0);
                     frag.appendChild(actions);
@@ -3475,7 +3475,7 @@
             try {
                 dataUrl = await window.tab.fetchFavicon?.(url);
             }
-            catch (e) { window.inkLog?.debug('renderer', 'onFaviconError: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'onFaviconError: ' + e); }
             if (dataUrl && el.isConnected) {
                 el.onload = () => markFaviconResolved(index);
                 el.onerror = () => setFaviconFallback(index, el); // data URL shouldn't fail, but be safe
@@ -3519,7 +3519,7 @@
                         ch = host.charAt(0).toUpperCase();
                 }
             }
-            catch (e) { window.inkLog?.debug('renderer', 'setFaviconFallback: ' + e); }
+            catch (e) { window.northstarLog?.debug('renderer', 'setFaviconFallback: ' + e); }
             const custom = tabs.get(index)?.dataset.customIcon;
             if (custom) return applyCustomTabIcon(index, custom);
             div.textContent = ch;
@@ -3609,7 +3609,7 @@
             }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
         /** Reorder preview: place the dragged tab under the cursor, keeping the
-         *  pinned block intact at the start of the strip (Firefox behaviour). */
+         *  pinned block intact at the start of the strip. */
         function placeDraggedTab(btn, x) {
             const pinned = btn.classList.contains('pinned');
             const after = getDragAfterElement(tabsContainer, x, pinned);
@@ -3660,7 +3660,7 @@
         // ─────────────────────────────────────────────────────────────────────────
         function initFocusModeAndPomodoro() {
             document.getElementById('compact-btn')?.addEventListener('click', (e) => {
-                try { window.tabsUI.toggleCompact(); } catch (err) { window.inkLog?.debug('renderer', 'initFocusModeAndPomodoro: ' + err); }
+                try { window.tabsUI.toggleCompact(); } catch (err) { window.northstarLog?.debug('renderer', 'initFocusModeAndPomodoro: ' + err); }
                 releaseFocusToPage(e.currentTarget);
             });
             const focusBtn = document.getElementById('focus-btn');
@@ -3863,7 +3863,7 @@
             if (!btn || !window.extensionsUI)
                 return;
             let panelOpen = false;
-            // ── Firefox-style pinning ────────────────────────────────────────────
+            // ── standard pinning ────────────────────────────────────────────
             // Unpinned actions stay rendered (so a panel activation can still click
             // them and anchor their popup to the toolbar) but are lifted out of the
             // strip: absolutely positioned at the list origin and invisible.
@@ -3873,10 +3873,10 @@
                 const root = list && list.shadowRoot;
                 if (!root)
                     return;
-                let style = root.getElementById('ink-pin-style');
+                let style = root.getElementById('northstar-pin-style');
                 if (!style) {
                     style = document.createElement('style');
-                    style.id = 'ink-pin-style';
+                    style.id = 'northstar-pin-style';
                     root.appendChild(style);
                 }
                 const unpinned = Object.keys(map || {}).filter(id => map[id] === false);
@@ -3895,7 +3895,7 @@
                 clearInterval(pinInit);
                 applyPinned(pinnedMap);
                 new MutationObserver(() => {
-                    if (!list.shadowRoot.getElementById('ink-pin-style'))
+                    if (!list.shadowRoot.getElementById('northstar-pin-style'))
                         applyPinned(pinnedMap);
                 }).observe(list.shadowRoot, { childList: true });
             }, 250);
@@ -3960,7 +3960,7 @@
                 btn.classList.remove('active');
             });
             // Close the panel AND any open action popup on clicks outside
-            // (chrome or page content) — mirrors Firefox dismissal behavior.
+            // (chrome or page content) — mirrors the usual dismissal behaviour.
             // Clicks inside the action strip (or our synthetic activation clicks)
             // are the ones OPENING a popup — those must not dismiss it.
             window.addEventListener('click', (e) => {

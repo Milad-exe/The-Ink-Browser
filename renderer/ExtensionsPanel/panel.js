@@ -8,14 +8,14 @@
 // control can't accidentally open a popup. The footer links to the Web Store.
 (() => {
     const T = (key, fallback) => {
-        try { const v = window.Ink?.i18n?.t(key); return (v && v !== key) ? v : fallback; }
+        try { const v = window.Northstar?.i18n?.t(key); return (v && v !== key) ? v : fallback; }
         catch (e) { return fallback; }
     };
     try {
-        window.Ink.i18n.init(window.inkI18n?.getSync() || (window.northstarSettings?.getSync() || {}).i18n || {});
-        window.Ink.i18n.apply(document);
+        window.Northstar.i18n.init(window.northstarI18n?.getSync() || (window.northstarSettings?.getSync() || {}).i18n || {});
+        window.Northstar.i18n.apply(document);
     }
-    catch (e) { window.inkLog?.debug('extpanel', 'i18n: ' + e); }
+    catch (e) { window.northstarLog?.debug('extpanel', 'i18n: ' + e); }
     const listEl = document.getElementById('list');
     const PIN_SVG = `<svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M238.15,78.54,177.46,17.86a20,20,0,0,0-28.3,0L97.2,70c-12.43-3.33-36.68-5.72-61.74,14.5a20,20,0,0,0-1.6,29.73l45.46,45.47-39.8,39.8a12,12,0,0,0,17,17l39.8-39.81,45.47,45.46A20,20,0,0,0,155.91,228c.46,0,.93,0,1.4-.05A20,20,0,0,0,171.87,220c4.69-6.23,11-16.13,14.44-28s3.45-22.88.16-33.4l51.7-51.87A20,20,0,0,0,238.15,78.54Zm-74.26,68.79a12,12,0,0,0-2.23,13.84c3.43,6.86,6.9,21-6.28,40.65L54.08,100.53c21.09-14.59,39.53-6.64,41-6a11.67,11.67,0,0,0,13.81-2.29l54.43-54.61,55,55Z"/></svg>`;
     document.addEventListener('keydown', (e) => {
@@ -168,7 +168,7 @@
             const chromeH = panel.clientHeight - list.clientHeight;
             window.extPanel.setHeight(Math.ceil(chromeH + list.scrollHeight));
         }
-        catch (e) { window.inkLog?.debug('panel', 'syncHeight: ' + e); }
+        catch (e) { window.northstarLog?.debug('panel', 'syncHeight: ' + e); }
     }
     // render() clears the list, so the devtools section is always appended after
     // it — never on its own.
@@ -176,14 +176,14 @@
         try {
             renderDevtools(await window.extPanel.devtoolsPanels());
         }
-        catch (e) { window.inkLog?.debug('panel', 'appendDevtools: ' + e); }
+        catch (e) { window.northstarLog?.debug('panel', 'appendDevtools: ' + e); }
         syncHeight();
     }
     async function refresh() {
         try {
             render(await window.extPanel.list());
         }
-        catch (e) { window.inkLog?.debug('panel', 'refresh: ' + e); }
+        catch (e) { window.northstarLog?.debug('panel', 'refresh: ' + e); }
         await appendDevtools();
     }
     window.extPanel.onData((items) => { render(items); appendDevtools(); });
@@ -195,7 +195,7 @@
     });
     // Rows here are not activatable — the controls inside them are — so Tab
     // walks the controls and only Escape is wired at the panel level.
-    window.Ink?.keys?.rows(document, { selector: '.dt-row, #store-link', typeahead: false });
+    window.Northstar?.keys?.rows(document, { selector: '.dt-row, #store-link', typeahead: false });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape')
         window.extPanel.close(); });
     refresh();

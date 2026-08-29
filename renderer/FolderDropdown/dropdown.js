@@ -328,7 +328,7 @@
         updateSize();
         // Same keyboard as every other menu in the browser: the list is one
         // tab stop, arrows move inside it, Escape closes.
-        window.Ink?.keys?.rows(container, {
+        window.Northstar?.keys?.rows(container, {
             selector: '.item, .back-btn:not(.hidden)',
             onEscape: () => window.folderDropdown?.close?.(),
         });
@@ -528,7 +528,7 @@
                 if (d) img.src = d; else img.remove();
             }).catch(() => img.remove());
         }
-        catch (e) { window.inkLog?.debug('dropdown', 'buildBookmarkItem: ' + e); }
+        catch (e) { window.northstarLog?.debug('dropdown', 'buildBookmarkItem: ' + e); }
         const lbl = document.createElement('span');
         lbl.className = 'item-label';
         try {

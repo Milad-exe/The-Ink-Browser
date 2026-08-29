@@ -15,7 +15,7 @@ const { encrypt, decrypt, isEncrypted } = require('./encryption');
  * lost). Privacy-motivated deletions (remove / clear) flush immediately.
  */
 // Retention. The old 1000-entry cap was days of browsing, not months: the page
-// you half-remember from last week was routinely already gone. Chrome keeps 90
+// you half-remember from last week was routinely already gone. Most browsers keep 90
 // days; match that, with a generous entry ceiling so the file can't grow without
 // bound on a heavy day. Both are settings (see DEFAULTS in persistence.js) —
 // this module reads them through setRetention(), because History is constructed

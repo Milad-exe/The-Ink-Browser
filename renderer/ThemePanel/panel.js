@@ -8,7 +8,7 @@
    null there means "follow the global setting", which is what Reset writes. */
 (() => {
     const api = window.northstarThemes;
-    if (!api || !window.Ink?.themeEditor)
+    if (!api || !window.Northstar?.themeEditor)
         return;
 
     const close = () => window.overlayThemePanel?.close();
@@ -43,7 +43,7 @@
         if (reset)
             reset.hidden = !space;
 
-        const editor = window.Ink.themeEditor.mount({
+        const editor = window.Northstar.themeEditor.mount({
             picker: document.getElementById('theme-picker'),
             editor: document.getElementById('theme-editor'),
             api,

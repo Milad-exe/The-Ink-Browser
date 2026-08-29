@@ -5,7 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // (only the chrome window sets sandbox:false), and a sandboxed preload can
 // require 'electron' and nothing else.
 try {
-    contextBridge.exposeInMainWorld('inkI18n', {
+    contextBridge.exposeInMainWorld('northstarI18n', {
         getSync: () => { try { return ipcRenderer.sendSync('i18n-sync') || {}; } catch { return {}; } },
     });
 }

@@ -102,8 +102,8 @@
   </main>
 
   <script>
-    try { window.Ink.i18n.init((window.northstarSettings?.getSync() || {}).i18n || {}); window.Ink.i18n.apply(document); } catch {}
-    const T = (k, v) => { try { return window.Ink.i18n.t(k, v); } catch { return k; } };
+    try { window.Northstar.i18n.init((window.northstarSettings?.getSync() || {}).i18n || {}); window.Northstar.i18n.apply(document); } catch {}
+    const T = (k, v) => { try { return window.Northstar.i18n.t(k, v); } catch { return k; } };
     const p = new URLSearchParams(location.search);
     const failedUrl = p.get('url') || '';
     const host = p.get('host') || '';
@@ -116,7 +116,7 @@
     document.getElementById('code').textContent = p.get('error') || '';
     document.title = (p.get('title') || 'Connection is not private');
 
-    const fmt = (iso) => { if (!iso) return '—'; try { return window.Ink.i18n.dateTime(iso); } catch { return iso; } };
+    const fmt = (iso) => { if (!iso) return '—'; try { return window.Northstar.i18n.dateTime(iso); } catch { return iso; } };
     const rows = [
       [T('cert.issuedTo'), p.get('subject')],
       [T('cert.issuedBy'), p.get('issuer')],

@@ -696,12 +696,12 @@ function register(ipcMain, { wm }) {
         catch (e) { log.debug('extensions', 'extensions-open-store', e); }
         return true;
     });
-    // Chrome clicks / page clicks dismiss an open action popup (Firefox behavior).
+    // Chrome clicks / page clicks dismiss an open action popup.
     ipcMain.handle('extensions-close-action-popup', () => {
         extensions.closePopups();
         return true;
     });
-    // Firefox-style pinning: missing key = pinned (extensions land in the
+    // standard pinning: missing key = pinned (extensions land in the
     // toolbar on install; unpinning moves them into the puzzle panel only).
     const pinnedMap = () => wm.persistence.get('extPinned') || {};
     const listWithPinned = () => {
@@ -726,7 +726,7 @@ function register(ipcMain, { wm }) {
         return true;
     });
     // Panel row click — activate the extension's action in the chrome page
-    // (opens its popup / fires its onClicked), exactly like Firefox's panel.
+    // (opens its popup / fires its onClicked), exactly's panel.
     ipcMain.handle('extensions-activate', (_e, id) => {
         let wd = wm.getWindowByWebContents(_e.sender);
         if (!wd) {

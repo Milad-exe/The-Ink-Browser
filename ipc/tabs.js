@@ -99,7 +99,7 @@ async function fetchFaviconDataUrl(url) {
     _faviconCache.set(url, result);
     return result;
 }
-// Compact label for a per-tab history entry ("host/path…" like Firefox's list)
+// Compact label for a per-tab history entry ("host/path…"'s list)
 function navEntryLabel(url) {
     if (!url || url === 'newtab')
         return 'New Tab';
@@ -243,7 +243,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     // renderer is told via 'sidebar-resize-ended' since its pointerup never fires).
     // Drag below RAIL_SNAP collapses to an icon-only rail (RAIL_W); otherwise the
     // width is clamped to a comfortable [MIN_W, MAX_W]. The 56..180 band never
-    // persists, so the divider snaps between rail and expanded (Arc-style).
+    // persists, so the divider snaps between rail and expanded (flat).
     // Measured off the reference: the sidebar spans ~9.5% of the window at its
     // minimum and ~29.6% at its maximum, so the clamps scale with the window
     // rather than sitting at fixed pixels. Absolute floors keep it usable on a
@@ -466,7 +466,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const ok = profiles.addEssential(wm.profileOf(_e.sender), { url, title: label, profile: profile || null });
         if (ok) {
             // The tab it was made from BECOMES the tile's tab, the way dragging
-            // a tab up into Arc's Favourites does. Otherwise you were left with
+            // a tab up into a global favourite does. Otherwise you were left with
             // the tab you promoted still in the strip and a tile that opened a
             // second copy of it on the first click.
             try { wm.getWindowByWebContents(_e.sender)?.tabs?.adoptEssentialTab(essentialKey(url, profile), url); }
@@ -757,7 +757,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (!h || !Array.isArray(h.entries) || h.entries.length < 2)
             return false;
         const template = [...h.entries].reverse().map(entry => ({
-            // Prefer the page title (Firefox shows titles in this list); fall
+            // Prefer the page title (some browsers show titles in this list); fall
             // back to a compact host/path label when the title isn't known yet.
             label: entry.title || navEntryLabel(entry.data),
             type: 'checkbox',
@@ -950,7 +950,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const wd = wm.getWindowByWebContents(_e.sender);
         return wd ? wd.id : null;
     });
-    // ── Tab drag (Firefox model: nothing moves until RELEASE) ────────────────
+    // ── Tab drag (nothing moves until RELEASE) ────────────────
     // While a tab is dragged outside its strip, the main process only tracks
     // the cursor: it raises the window under the pointer (so the user can see
     // the drop target) and highlights that window's strip. The actual move /
@@ -1107,7 +1107,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                 : (target && p.y <= target.window.getBounds().y + MERGE_STRIP_H);
             if (target && target.id !== src.id && onStrip) {
                 // Ask the target chrome where the cursor lands in its strip so
-                // the tab is inserted AT the drop position (Firefox behaviour).
+                // the tab is inserted AT the drop position.
                 let insertAfter = null;
                 try {
                     const tb = target.window.getBounds();
@@ -1235,7 +1235,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
                 dst.tabs.loadUrl(idx, sanitizeUrl(url));
             src.tabs.removeTab(tabIndex);
             // The tab now lives in the destination window — focus follows it
-            // (Chrome does the same), otherwise the move looks like nothing
+            // (most browsers do the same), otherwise the move looks like nothing
             // happened when the destination sits behind the source.
             try {
                 dst.window.focus();

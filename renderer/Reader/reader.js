@@ -5,7 +5,7 @@
     (function () {
         'use strict';
         const root = document.documentElement;
-        const PREFS_KEY = 'ink-reader-prefs';
+        const PREFS_KEY = 'northstar-reader-prefs';
         const FONT_SIZES = [16, 18, 20, 22, 24, 28, 32];
         const WIDTHS = { narrow: '34rem', medium: '42rem', wide: '52rem' };
         const prefs = Object.assign({ fontIndex: 2, face: 'sans', width: 'medium', theme: 'light' }, loadPrefs());
@@ -21,7 +21,7 @@
             try {
                 localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
             }
-            catch (e) { window.inkLog?.debug('reader', 'savePrefs: ' + e); }
+            catch (e) { window.northstarLog?.debug('reader', 'savePrefs: ' + e); }
         }
         function applyPrefs() {
             root.style.setProperty('--rd-font', FONT_SIZES[prefs.fontIndex] + 'px');

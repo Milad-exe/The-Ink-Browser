@@ -2,7 +2,7 @@
  * Browser chrome — the bookmark bar.
  *
  * Split out of renderer/renderer.js, which had grown to 4.4k lines in one
- * closure. Classic script, no bundler: it registers a factory on `window.Ink`
+ * closure. Classic script, no bundler: it registers a factory on `window.Northstar`
  * that renderer.js calls with the handful of things it needs from the chrome's
  * shared state. Everything else — the bar's own DOM, its overflow dropdown, the
  * folder sub-panels and all the drag-and-drop — lives here.
@@ -17,8 +17,8 @@
  */
 (function (root) {
     'use strict';
-    root.Ink = root.Ink || {};
-    root.Ink.createBookmarkBar = function createBookmarkBar(ctx) {
+    root.Northstar = root.Northstar || {};
+    root.Northstar.createBookmarkBar = function createBookmarkBar(ctx) {
         const bookmarkBar = ctx.bar;
         const bookmarkBarItems = ctx.items;
         const bookmarkBtn = ctx.button;
@@ -108,7 +108,7 @@
                 arrow.className = 'bookmark-overflow-submenu-arrow';
                 arrow.textContent = '▶';
                 item.appendChild(arrow);
-                // Hover to open (Firefox-style)
+                // Hover to open
                 item.addEventListener('mouseenter', () => {
                     clearTimeout(overflowCloseTimer);
                     clearTimeout(overflowHoverTimer);
@@ -175,7 +175,7 @@
             try {
                 await window.electronAPI.openFolderDropdown({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, entry);
             }
-            catch (e) { window.inkLog?.debug('bookmark-bar', 'openFolderPanel: ' + e); }
+            catch (e) { window.northstarLog?.debug('bookmark-bar', 'openFolderPanel: ' + e); }
         }
         /**
          * Fill a panel div with the items of a folder entry.
@@ -487,7 +487,7 @@
                                 try {
                                     await window.electronAPI.openFolderDropdown({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, item);
                                 }
-                                catch (e) { window.inkLog?.debug('bookmark-bar', 'makeDraggable: ' + e); }
+                                catch (e) { window.northstarLog?.debug('bookmark-bar', 'makeDraggable: ' + e); }
                             }, 500);
                         }
                     }
@@ -772,7 +772,7 @@
             try {
                 bookmarks = await window.browserBookmarks.getAll();
             }
-            catch (e) { window.inkLog?.debug('bookmark-bar', 'refreshBookmarkBar: ' + e); }
+            catch (e) { window.northstarLog?.debug('bookmark-bar', 'refreshBookmarkBar: ' + e); }
             if (seq !== refreshSeq)
                 return; // stale — a newer refresh started
             hasBookmarks = bookmarks.length > 0;
@@ -855,7 +855,7 @@
                 const has = await window.browserBookmarks.has(url);
                 bookmarkBtn.classList.toggle('bookmarked', has);
             }
-            catch (e) { window.inkLog?.debug('bookmark-bar', 'updateBookmarkBtn: ' + e); }
+            catch (e) { window.northstarLog?.debug('bookmark-bar', 'updateBookmarkBtn: ' + e); }
         }
         bookmarkBtn.addEventListener('click', async () => {
             if (!ctx.currentUrl() || ctx.currentUrl() === 'newtab' || ctx.currentUrl().startsWith('file://'))
@@ -871,7 +871,7 @@
                     bkmkId = existing.id;
                 }
             }
-            catch (e) { window.inkLog?.debug('bookmark-bar', 'updateBookmarkBtn: ' + e); }
+            catch (e) { window.northstarLog?.debug('bookmark-bar', 'updateBookmarkBtn: ' + e); }
             await window.electronAPI.openBookmarkPrompt({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, ctx.currentUrl(), bkmkTitle, hasObj, bkmkId);
         });
         // ── Bookmark bar event wiring ─────────────────────────────────────────────

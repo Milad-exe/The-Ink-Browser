@@ -5,7 +5,7 @@
  * site you always read at 125% needed re-zooming every single visit, and a tab
  * restored from the last session came back at 100%.
  *
- * Chrome and Firefox both remember the level per ORIGIN, so that is the key
+ * browsers remember the level per ORIGIN, so that is the key
  * here. Levels are Chromium's logarithmic scale (0 = 100%, ±0.5 steps), stored
  * as-is; only non-default levels are kept, so the file stays small and clearing
  * a site's zoom really removes it.

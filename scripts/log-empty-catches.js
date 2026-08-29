@@ -105,7 +105,7 @@ for (const rel of INCLUDE.flatMap(t => walk(t))) {
         const name = contextName(src, offset) || scope;
         const bind = binding || 'e';
         const call = isRenderer
-            ? `window.inkLog?.debug('${scope}', '${name}: ' + ${bind})`
+            ? `window.northstarLog?.debug('${scope}', '${name}: ' + ${bind})`
             : `log.debug('${scope}', '${name}', ${bind})`;
         return `catch (${bind}) { ${call}; }`;
     });
@@ -146,7 +146,7 @@ let suspect = 0;
 for (const rel of INCLUDE.flatMap(t => walk(t))) {
     const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
     src.split('\n').forEach((line, i) => {
-        const at = line.indexOf('log.debug(') >= 0 ? line.indexOf('log.debug(') : line.indexOf('inkLog?.debug(');
+        const at = line.indexOf('log.debug(') >= 0 ? line.indexOf('log.debug(') : line.indexOf('northstarLog?.debug(');
         if (at < 0)
             return;
         const before = line.slice(0, at);

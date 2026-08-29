@@ -201,7 +201,7 @@ function register(ipcMain, { wm }) {
         }
         // Revoking camera/mic/location that a page may be actively using only
         // takes effect on reload (an open stream keeps running) — reload the
-        // origin's tabs, like Firefox stopping the device when you block it.
+        // origin's tabs stopping the device when you block it.
         if (value !== 'allow' && wasUsable && permissionPrompt.liveUse(name)) {
             reloadOriginTabs(wm, info.origin, { privateSession: info.private ? wd.siteInfoSession : null });
         }
@@ -234,7 +234,7 @@ function register(ipcMain, { wm }) {
         }
     });
     // Per-site protections shield: persist, close the panel, reload the page so
-    // the change takes effect immediately (Firefox does the same).
+    // the change takes effect immediately (most browsers do the same).
     ipcMain.handle('site-protection-set', (e, off) => {
         const wd = wm.getWindowByWebContents(e.sender);
         const info = wd && wd.siteInfoInfo;

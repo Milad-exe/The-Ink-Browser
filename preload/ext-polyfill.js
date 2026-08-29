@@ -244,8 +244,8 @@ function mainWorldScript() {
              * browser-level account here, so it cannot succeed — the question
              * is only how to fail, and every non-Chrome browser answers the
              * same way: don't provide it, and let extensions use
-             * launchWebAuthFlow. Firefox ships identity WITHOUT getAuthToken
-             * for exactly this reason; Brave, which does inherit Chromium's
+             * launchWebAuthFlow. some browsers ship identity WITHOUT getAuthToken
+             * for exactly this reason; others, which do inherit Chromium's
              * implementation, still fails here whenever Google sign-in is off.
              *
              * So we reject — but with Chrome's OWN error string rather than a
@@ -346,7 +346,7 @@ function mainWorldScript() {
                 openResource: noop,
             },
             network: {
-                getHAR: dual(() => ({ log: { version: '1.2', creator: { name: 'ink', version: '1' }, entries: [] } })),
+                getHAR: dual(() => ({ log: { version: '1.2', creator: { name: 'northstar', version: '1' }, entries: [] } })),
                 onRequestFinished: makeEvent('ext:devtools.requestFinished'),
                 onNavigated: makeEvent('ext:devtools.navigated'),
             },
@@ -476,10 +476,10 @@ try {
         if ('executeInMainWorld' in contextBridge)
             contextBridge.executeInMainWorld({ func: mainWorldScript });
         else
-            console.warn('[ink] executeInMainWorld unavailable — extension gap APIs not installed');
+            console.warn('[northstar] executeInMainWorld unavailable — extension gap APIs not installed');
     }
 }
 catch (e) {
-    try { console.warn('[ink] extension polyfill failed:', e && e.message); }
+    try { console.warn('[northstar] extension polyfill failed:', e && e.message); }
     catch { }
 }

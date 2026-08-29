@@ -3,14 +3,14 @@
 // top-level names out of the shared global scope.
 (() => {
     const T = (key, fallback) => {
-        try { const v = window.Ink?.i18n?.t(key); return (v && v !== key) ? v : fallback; }
+        try { const v = window.Northstar?.i18n?.t(key); return (v && v !== key) ? v : fallback; }
         catch (e) { return fallback; }
     };
     try {
-        window.Ink.i18n.init(window.inkI18n?.getSync() || {});
-        window.Ink.i18n.apply(document);
+        window.Northstar.i18n.init(window.northstarI18n?.getSync() || {});
+        window.Northstar.i18n.apply(document);
     }
-    catch (e) { window.inkLog?.debug('siteinfo', 'i18n: ' + e); }
+    catch (e) { window.northstarLog?.debug('siteinfo', 'i18n: ' + e); }
     const api = window.siteInfoApi;
     const LOCK = '<svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208,76H180V56A52,52,0,0,0,76,56V76H48A20,20,0,0,0,28,96V208a20,20,0,0,0,20,20H208a20,20,0,0,0,20-20V96A20,20,0,0,0,208,76ZM100,56a28,28,0,0,1,56,0V76H100ZM204,204H52V100H204Z"/></svg>';
     const WARN = '<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M240.26,186.1,152.81,34.23h0a28.74,28.74,0,0,0-49.62,0L15.74,186.1a27.45,27.45,0,0,0,0,27.71A28.31,28.31,0,0,0,40.55,228h174.9a28.31,28.31,0,0,0,24.79-14.19A27.45,27.45,0,0,0,240.26,186.1Zm-20.8,15.7a4.46,4.46,0,0,1-4,2.2H40.55a4.46,4.46,0,0,1-4-2.2,3.56,3.56,0,0,1,0-3.73L124,46.2a4.77,4.77,0,0,1,8,0l87.44,151.87A3.56,3.56,0,0,1,219.46,201.8ZM116,136V104a12,12,0,0,1,24,0v32a12,12,0,0,1-24,0Zm28,40a16,16,0,1,1-16-16A16,16,0,0,1,144,176Z"/></svg>';
@@ -54,7 +54,7 @@
         try {
             info = await api.getInfo();
         }
-        catch (e) { window.inkLog?.debug('siteinfo', 'render: ' + e); }
+        catch (e) { window.northstarLog?.debug('siteinfo', 'render: ' + e); }
         const conn = document.getElementById('conn');
         conn.className = 'conn ' + (info.secure ? 'secure' : 'insecure');
         conn.innerHTML =
@@ -90,7 +90,7 @@
             try {
                 await api.clearData();
             }
-            catch (e) { window.inkLog?.debug('siteinfo', 'render: ' + e); }
+            catch (e) { window.northstarLog?.debug('siteinfo', 'render: ' + e); }
             btn.textContent = T('site.cleared', 'Cleared');
             setTimeout(() => api.close(), 700);
         });

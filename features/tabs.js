@@ -392,7 +392,7 @@ class Tabs {
         this.tabUrls.set(tabIndex, url || 'newtab');
         this.tabLastActive.set(tabIndex, Date.now());
         // Placement: user "open in new tab" actions drop the tab right after the
-        // current one (Chrome/Firefox style); everything else (session restore,
+        // current one (Chrome/the standard style); everything else (session restore,
         // etc.) appends to the end so restored order is preserved.
         const afterIdx = (insertAfterActive && this.tabOrder.includes(this.activeTabIndex))
             ? this.activeTabIndex : null;
@@ -1156,7 +1156,7 @@ class Tabs {
      * The last tab in the window just closed.
      *
      * In the TOP STRIP the window *is* the tab strip, so it goes with the last
-     * tab — what Chrome and Safari do. In SIDEBAR mode the window is a
+     * tab — what most browsers do. In SIDEBAR mode the window is a
      * workspace that happens to hold tabs, so it stays: closing your last tab
      * should not throw away the window, its size, its space or its session.
      * It stays EMPTY — no blank tab, and no palette until you ask for one.
@@ -1393,7 +1393,7 @@ class Tabs {
     }
     // The tab to activate after `index` is closed: the visually-adjacent tab in
     // tab-bar order (right neighbour, else left). Call BEFORE removing `index`.
-    // Chrome/Firefox behaviour; keyed off tabOrder so it respects drag-reorder.
+    // the common behaviour; keyed off tabOrder so it respects drag-reorder.
     _neighborInOrder(index) {
         const order = this.tabOrder;
         const pos = order.indexOf(index);
@@ -1658,8 +1658,8 @@ class Tabs {
             /* An Essential comes back at its OWN page, not three links deep
                into wherever it was left last night — a pin that reverts to the
                url it was pinned at is the behaviour of both browsers this
-               follows (Arc resets Favourites and Pinned Tabs to their original
-               link; Zen has the same for its pins and Essentials). Its
+               follows (they reset their pins to the original link they were
+               pinned at). Its
                back/forward tree and reading position go with it, since they
                describe a session that has ended. */
             const essentialHome = this._essentialHomeOfTab(idx);

@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Firefox-style permission doorhanger.
+ * standard permission doorhanger.
  *
  * Instead of a native modal dialog (which greys out and blocks the whole tab),
  * permission prompts render as a small panel anchored just below the address-bar
@@ -98,7 +98,7 @@ async function showNext(wd) {
             return;
         // Dismiss (deny THIS request, record nothing — the site may re-ask)
         // when the panel or window loses focus — clicking the page or chrome
-        // cancels the request, like Firefox.
+        // cancels the request.
         const onBlur = () => {
             if (Date.now() - (wd.permShownAt || 0) < 250)
                 return; // ignore focus churn at open
@@ -146,7 +146,7 @@ function hide(wd) {
     }
 }
 // dismissed=true → the doorhanger was clicked away / Esc'd: the request is
-// denied but nothing is recorded, so the site may ask again (Firefox-style).
+// denied but nothing is recorded, so the site may ask again.
 function decide(id, allowed, remember, dismissed) {
     const entry = pending.get(id);
     if (!entry)

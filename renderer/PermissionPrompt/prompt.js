@@ -41,7 +41,7 @@
                 try {
                     window.permissionUI.resize(h);
                 }
-                catch (e) { window.inkLog?.debug('prompt', 'reportHeight: ' + e); }
+                catch (e) { window.northstarLog?.debug('prompt', 'reportHeight: ' + e); }
             });
         }
         function render(data) {
@@ -74,7 +74,7 @@
             try {
                 window.permissionUI.decide(id, allowed, remember, dismissed);
             }
-            catch (e) { window.inkLog?.debug('prompt', 'decide: ' + e); }
+            catch (e) { window.northstarLog?.debug('prompt', 'decide: ' + e); }
         }
         allowBtn.addEventListener('click', () => decide(true));
         blockBtn.addEventListener('click', () => decide(false));

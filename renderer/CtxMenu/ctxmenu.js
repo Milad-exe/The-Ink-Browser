@@ -176,7 +176,7 @@
     // every open because the rows are rebuilt each time.
     const armKeys = () => {
         const top = chain[chain.length - 1];
-        window.Ink?.keys?.rows(top || document, { selector: '.ctx-menu-item', onEscape: dismiss, focusFirst: true });
+        window.Northstar?.keys?.rows(top || document, { selector: '.ctx-menu-item', onEscape: dismiss, focusFirst: true });
     };
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') dismiss();

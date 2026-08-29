@@ -7,7 +7,7 @@
  * only opens one if it has none. Clicking the one you are already in is the
  * "take me back" gesture, which returns it to its `home`.
  *
- * The tile is GLOBAL (the same one in every space, like Arc's Favourites); the
+ * The tile is GLOBAL (the same one in every space, like a global favourite); the
  * TAB it owns is not, so the binding is keyed by space. What each rule is
  * modelled on is written down in features/tabs/essential-rules.js.
  *
@@ -240,7 +240,8 @@ module.exports = {
     },
     /**
      * Should this navigation be shown as a glance over the Essential instead of
-     * taking it off its site? (Arc calls the preview a Peek, Zen a Glance.)
+     * taking it off its site? The preview floats over the pin instead of
+     * replacing it.
      */
     _essentialPeek(index, target) {
         if (!this.essentialTabs || !this.essentialTabs.size)

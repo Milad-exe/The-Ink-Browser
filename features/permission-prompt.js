@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Permission prompts — Firefox-style ask-before-use for device/resource access.
+ * Permission prompts — standard ask-before-use for device/resource access.
  *
  * Every session (default + each private tab session) routes permission requests
  * through attach(). High-risk resources are NEVER auto-granted; only genuinely
@@ -28,7 +28,7 @@
  *      permissions without ever touching disk.
  *   2. Stored per-origin decision (site-permissions.js) — persistent sessions
  *      only. Any explicit 'block' vetoes the whole request, even a combined
- *      camera+microphone one (Firefox/Chrome behave the same way).
+ *      camera+microphone one (browsers behave the same way).
  *   3. Temporary decision — a doorhanger Allow/Block without "Remember".
  *      Scoped to the requesting page, cleared on navigation / tab close AND
  *      whenever the user changes that origin's permission in the panel, so a
@@ -36,7 +36,7 @@
  *   4. Prompt the user.
  *
  * Dismissing the doorhanger (click-away / Esc) denies the request but records
- * NOTHING — the site may re-ask, exactly like dismissing Firefox's doorhanger.
+ * NOTHING — the site may re-ask, exactly like dismissing a doorhanger.
  * Only the explicit Block button records a (temp or remembered) deny.
  */
 const log = require('./log');
@@ -282,7 +282,7 @@ function attach(sess, { persist = true } = {}) {
                 };
                 // Explicit decisions (panel override / stored) come FIRST — before
                 // any temporary grant. One blocked part vetoes a combined request
-                // (camera+mic when camera is blocked fails, as in Firefox/Chrome).
+                // (camera+mic when camera is blocked fails/Chrome).
                 const states = names.map(n => stateOf(rec, origin, n));
                 if (states.some(s => s === 'block'))
                     return callback(false);

@@ -56,7 +56,7 @@
                half is transparent so the suggestion lines up with the input's
                own glyphs; Tab (or clicking the row) accepts it. -->
           <div id="omni-ghost" aria-hidden="true"><span class="typed"></span><span class="rest"></span></div>
-          <!-- Firefox-style resting URL: host bright, scheme/path dimmed.
+          <!-- standard resting URL: host bright, scheme/path dimmed.
                Painted over the (text-transparent) input while it's unfocused. -->
           <div id="url-display" aria-hidden="true"></div>
         </div>
@@ -261,7 +261,7 @@
 
   <script src="../../node_modules/dompurify/dist/purify.min.js"></script>
   <!-- Chrome modules (classic scripts, no bundler): each registers a factory on
-       window.Ink, which renderer.js wires up. Order matters — these must run
+       window.Northstar, which renderer.js wires up. Order matters — these must run
        before renderer.js. -->
   <script src="../lib/i18n.js"></script>
   <script src="../lib/keys.js"></script>

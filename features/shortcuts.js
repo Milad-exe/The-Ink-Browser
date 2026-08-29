@@ -37,16 +37,16 @@ class Shortcuts {
         this.setupTabListener(tab);
     }
     registerWebContents(wc) {
-        if (wc.inkShortcutHandler)
+        if (wc.northstarShortcutHandler)
             return;
         const handler = (event, input) => this.handleInput(event, input);
-        wc.inkShortcutHandler = handler;
+        wc.northstarShortcutHandler = handler;
         wc.on('before-input-event', handler);
     }
     unregisterWebContents(wc) {
-        if (wc.inkShortcutHandler) {
-            wc.removeListener('before-input-event', wc.inkShortcutHandler);
-            wc.inkShortcutHandler = null;
+        if (wc.northstarShortcutHandler) {
+            wc.removeListener('before-input-event', wc.northstarShortcutHandler);
+            wc.northstarShortcutHandler = null;
         }
     }
     // Callbacks may return false to suppress preventDefault (lets the event reach the page).
@@ -132,7 +132,7 @@ class Shortcuts {
                 this.windowManager.createWindow();
         });
         // New private window — Cmd/Ctrl+Shift+N (Chrome) and Cmd/Ctrl+Shift+P
-        // (Firefox) both open one. Every tab inside is private, each with its
+        // both open one. Every tab inside is private, each with its
         // own isolated session (see Features/private-session.js).
         const openPrivateWindow = () => {
             if (this.windowManager)
@@ -264,7 +264,7 @@ class Shortcuts {
         };
         this.registerShortcut('CmdOrCtrl+K', focusBar);
         this.registerShortcut('CmdOrCtrl+L', focusBar);
-        // F6 moves between the page and the chrome, as it does in Firefox: from
+        // F6 moves between the page and the chrome,: from
         // the page it lands in the address bar (Tab then walks the toolbar and
         // the tab strip), and from the chrome it hands focus back to the page.
         this.registerShortcut('F6', () => {
@@ -403,7 +403,7 @@ class Shortcuts {
             if (wd)
                 focusMode.toggle(wd);
         });
-        // Reader view — Cmd/Ctrl+Alt+R (Firefox convention)
+        // Reader view — Cmd/Ctrl+Alt+R (a common convention)
         this.registerShortcut('CmdOrCtrl+Alt+R', () => {
             if (this.tabManager)
                 this.tabManager.toggleReader(this.tabManager.activeTabIndex);

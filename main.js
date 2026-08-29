@@ -304,7 +304,7 @@ class Northstar {
             // createTabSession) — each private tab gets its own in-memory
             // partition with the full hardening stack, so no cookies/cache/
             // storage ever carry over between tabs, private or not.
-            // Download manager — Firefox-style auto-save to the Downloads folder
+            // Download manager — standard auto-save to the Downloads folder
             // with progress in the toolbar panel. Private tab sessions attach
             // their own handler at creation; all sessions share one list.
             downloadManager.attach(session.defaultSession);
@@ -322,7 +322,7 @@ class Northstar {
                 id: 'ad-block-cosmetic',
                 filePath: path.join(__dirname, 'preload/ad-block-cosmetic.js'),
             });
-            // Permissions: Firefox-style — device/resource access (camera, mic,
+            // Permissions: standard — device/resource access (camera, mic,
             // location, notifications) is blocked by default and pops a prompt;
             // "Remember this decision" persists per-origin and shows in the
             // lock-icon site-info panel. Sensitive unprompted permissions
