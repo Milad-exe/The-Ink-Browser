@@ -43,6 +43,21 @@ async function ensureMenu(wd) {
     catch (e) { log.debug('ctxmenu', 'ensureMenu bounds', e); }
     wd.ctxMenu = view;
     wd.window.contentView.addChildView(view);
+    // Close the menu when its WINDOW goes inactive — an app switch, or a system
+    // notification (macOS "Software Update", …) stealing focus. The menu is a
+    // separate overlay view that cannot take first-mouse while its window is not
+    // key, so a menu left open across a deactivation just sat there looking
+    // frozen: the click that should pick a row instead spent itself reactivating
+    // the window. Hooked once, here, when the view is first created. Guarded by
+    // the same 250ms the renderer's own blur guard uses, so the focus churn as
+    // the menu opens (which briefly blurs the window) can't self-close it.
+    if (!wd._ctxBlurHooked) {
+        wd._ctxBlurHooked = true;
+        wd.window.on('blur', () => {
+            if (wd.ctxMenuOpen && Date.now() - (wd.ctxMenuShownAt || 0) > 250)
+                hideMenu(wd);
+        });
+    }
     view.webContents.loadFile(resolveAppFile('renderer/CtxMenu/index.html'));
     wd.ctxMenuReady = new Promise(res => view.webContents.once('did-finish-load', () => res()));
     await wd.ctxMenuReady;
@@ -92,6 +107,7 @@ function register(ipcMain, { wm }) {
             catch (e) { log.debug('ctxmenu', 'ctxmenu:open', e); }
             view.setVisible(true);
             wd.ctxMenuOpen = true;
+            wd.ctxMenuShownAt = Date.now();
             /* Push as well: an already-loaded view is not going to pull again. */
             view.webContents.send('ctxmenu:data', data);
             try { view.webContents.focus(); }
