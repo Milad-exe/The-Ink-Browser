@@ -169,6 +169,31 @@ module.exports = {
         this.broadcastFolders();
         this.saveStateDebounced?.();
     },
+    // Nest one folder under another (drag-into-folder). `parent` null un-nests to
+    // the root. Refuses to make a folder its own descendant (a cycle), to cross
+    // workspaces, or to nest past the depth cap — in any of those cases the folder
+    // is left where it was.
+    reparentFolder(id, parent) {
+        const f = this.folders.find(x => x.id === id);
+        if (!f) return;
+        const pid = parent ? String(parent) : null;
+        if (pid === id) return;
+        if (!pid) {
+            if (f.parent) { delete f.parent; this.broadcastFolders(); this.saveStateDebounced?.(); }
+            return;
+        }
+        const p = this.folders.find(x => x.id === pid);
+        if (!p || String(p.workspace) !== String(f.workspace)) return;
+        // Walk up from the intended parent: hitting `id` would make a loop.
+        for (let cur = p, d = 0; cur && d < 20; d++) {
+            if (cur.id === id) return;
+            cur = cur.parent ? this.folders.find(x => x.id === cur.parent) : null;
+        }
+        if (this._folderDepth(pid) >= 4) return;
+        f.parent = pid;
+        this.broadcastFolders();
+        this.saveStateDebounced?.();
+    },
     // Move a folder to another workspace. Its tabs go with it, otherwise they'd
     // be stranded in a workspace whose folder list no longer names them.
     moveFolderToWorkspace(id, workspace) {

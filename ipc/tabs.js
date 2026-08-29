@@ -99,7 +99,7 @@ async function fetchFaviconDataUrl(url) {
     _faviconCache.set(url, result);
     return result;
 }
-// Compact label for a per-tab history entry ("host/path…"'s list)
+// Compact label for a per-tab history entry ("host/path…")
 function navEntryLabel(url) {
     if (!url || url === 'newtab')
         return 'New Tab';
@@ -203,7 +203,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         else
             wd.tabs.openIsolatedInstance(safe);
     });
-    // ── Profiles (Chrome-style browsing selves; windows belong to one) ─────────
+    // ── Profiles (browsing selves; windows belong to one) ─────────
     const profiles = require('../features/profiles');
     const broadcastProfiles = () => {
         try {
@@ -643,6 +643,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     });
     ipcMain.handle('folders:reorder', (_e, ids) => { wm.getWindowByWebContents(_e.sender)?.tabs?.reorderFolders(ids); });
     ipcMain.handle('folders:move', (_e, id, workspace) => { wm.getWindowByWebContents(_e.sender)?.tabs?.moveFolderToWorkspace(id, workspace); });
+    ipcMain.handle('folders:reparent', (_e, id, parent) => { wm.getWindowByWebContents(_e.sender)?.tabs?.reparentFolder(id, parent); });
     // ── Containers as Space Profiles ───────────────────────────────────────────
     ipcMain.handle('containers:listNamed', (_e) => {
         const containers = require('../features/containers');

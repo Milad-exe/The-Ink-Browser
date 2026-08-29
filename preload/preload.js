@@ -259,12 +259,13 @@ exposeInternal('folders', {
     icon: (id, icon) => ipcRenderer.invoke('folders:icon', id, icon),
     assign: (index, folderId) => ipcRenderer.invoke('folders:assign', index, folderId),
     move: (id, workspace) => ipcRenderer.invoke('folders:move', id, workspace),
+    reparent: (id, parent) => ipcRenderer.invoke('folders:reparent', id, parent),
     reorder: (ids) => ipcRenderer.invoke('folders:reorder', ids),
     list: () => ipcRenderer.invoke('folders:list'),
     onChanged: (cb) => ipcRenderer.on('folders-changed', (_e, data) => cb(data)),
     onTabsMoved: (cb) => ipcRenderer.on('tabs-workspace-changed', (_e, data) => cb(data)),
 });
-// Profiles — Chrome-style browsing selves; each window belongs to one.
+// Profiles — browsing selves; each window belongs to one.
 exposeInternal('profiles', {
     current: () => ipcRenderer.invoke('profiles:current'),
     list: () => ipcRenderer.invoke('profiles:list'),

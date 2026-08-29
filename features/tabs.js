@@ -1096,7 +1096,7 @@ class Tabs {
         }
     }
     // ── Tab sleeping ──────────────────────────────────────────────────────────
-    // Free the renderer process of long-inactive background tabs (like Chrome's
+    // Free the renderer process of long-inactive background tabs (a
     // memory saver). The WebContentsView and its navigation history survive;
     // showTab()/loadUrl() transparently revive the tab with a reload. Never
     // sleeps: the active tab, pinned tabs, tabs playing audio/media, internal
@@ -1526,7 +1526,7 @@ class Tabs {
      * every background view on each resize tick makes dragging a window edge
      * crawl. The cost landed on tab SWITCHING instead: an incoming tab was laid
      * out at the old size, so it relayed out and repainted as it appeared —
-     * which is the jank that makes switching feel unlike Chrome, where every
+     * which is the jank that makes switching feel unlike some browsers, where every
      * tab is already the right size.
      *
      * Doing it once, after the drag stops, gets both.

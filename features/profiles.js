@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Profiles — Chrome-style separate browsing selves.
+ * Profiles — separate browsing selves.
  *
  * A profile is WHO you are: its own cookies/logins, its own history, its own
  * bookmarks + Essentials, its own containers, and its own THEME — a window

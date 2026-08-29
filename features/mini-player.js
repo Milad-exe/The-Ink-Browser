@@ -1,7 +1,7 @@
 'use strict';
 /**
  * Mini media player — floating overlay shown when media is playing in a tab
- * the user is not looking at (like Chrome's global media controls). Rendered
+ * the user is not looking at (like a browser's global media controls). Rendered
  * as a WebContentsView so it draws above the page; controls the source tab via
  * executeJavaScript (play/pause, position) and audioMuted (mute).
  *

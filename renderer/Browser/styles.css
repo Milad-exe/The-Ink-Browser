@@ -183,7 +183,7 @@ html.tab-dragging * { user-select: none !important; -webkit-user-select: none !i
    In the sidebar these sit ABOVE the tabs. In the top strip they move to the
    LEFT of them, the way other browsers place the same things: the space
    switcher first (like other browsers' workspace buttons), then Essentials as
-   compact favicon tiles (like Chrome's pinned tabs — which is what an Essential
+   compact favicon tiles (like pinned tabs — which is what an Essential
    is). The sidebar foot's Settings / Downloads / new-workspace all have other
    homes in this mode (the ☰ menu, the page-actions panel, and the space
    switcher's own menu), so the foot itself stays hidden.

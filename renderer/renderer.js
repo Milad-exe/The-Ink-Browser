@@ -2980,39 +2980,72 @@
             // threshold, so a plain click still toggles the folder.
             h.addEventListener('pointerdown', (e) => {
                 if (e.button !== 0 || h.classList.contains('renaming') || e.target.closest('.folder-del')) return;
-                const startY = e.clientY;
+                const startY = e.clientY, startX = e.clientX;
                 const original = folderState.folders.map(x => x.id);
                 let dragging = false;
+                // Drop a folder ONTO another and hold to nest it inside; drop between
+                // folders to reorder. Reorder commits on RELEASE (no live shuffle), so a
+                // folder never slides out from under the cursor mid-dwell. The nest
+                // target is tracked by id so any re-render can't reset the dwell.
+                let nestId = null, nestTimer = null, nestOverId = null;
+                let lastX = e.clientX, lastY = e.clientY;
+                const vertical = sideTabs();
+                const clearNest = () => {
+                    nestId = null; nestOverId = null;
+                    clearTimeout(nestTimer); nestTimer = null;
+                    tabsContainer.querySelectorAll('.folder-header.drop-target').forEach(x => x.classList.remove('drop-target'));
+                };
                 const onMove = (ev) => {
+                    lastX = ev.clientX; lastY = ev.clientY;
                     if (!dragging) {
-                        if (Math.abs(ev.clientY - startY) < 4) return;
+                        // Distance, not just Y, so a horizontal drag in the top strip
+                        // arms the same as a vertical one in the sidebar.
+                        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
                         dragging = true;
                         h.classList.add('folder-dragging');
                         document.documentElement.classList.add('tab-dragging');
                     }
                     const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('.folder-header');
-                    if (!over || over === h) return;
-                    const ids = folderState.folders.map(x => x.id);
-                    const from = ids.indexOf(f.id), to = ids.indexOf(over.dataset.folder);
-                    if (from < 0 || to < 0 || from === to) return;
-                    const moved = folderState.folders.splice(from, 1)[0];
-                    folderState.folders.splice(to, 0, moved);
-                    layoutFolders();
-                    document.querySelector(`.folder-header[data-folder="${CSS.escape(f.id)}"]`)?.classList.add('folder-dragging');
+                    const overId = (over && over.dataset.folder !== f.id) ? over.dataset.folder : null;
+                    if (overId) {
+                        if (overId !== nestOverId) {
+                            clearNest();
+                            nestOverId = overId;
+                            nestTimer = setTimeout(() => {
+                                nestId = overId;
+                                document.querySelector(`.folder-header[data-folder="${CSS.escape(overId)}"]`)?.classList.add('drop-target');
+                            }, 400);
+                        }
+                    }
+                    else clearNest();
                 };
                 const finish = (commit) => {
                     document.removeEventListener('pointermove', onMove);
                     document.removeEventListener('pointerup', onUp);
                     document.removeEventListener('keydown', onKey, true);
                     document.documentElement.classList.remove('tab-dragging');
-                    document.querySelectorAll('.folder-header.folder-dragging').forEach(x => x.classList.remove('folder-dragging'));
-                    if (!dragging) return;
-                    const ids = folderState.folders.map(x => x.id);
-                    if (commit && ids.join() !== original.join()) window.folders.reorder(ids);
-                    else if (!commit) {
-                        const byId = new Map(folderState.folders.map(x => [x.id, x]));
-                        folderState.folders = original.map(id => byId.get(id)).filter(Boolean);
-                        layoutFolders();
+                    h.classList.remove('folder-dragging');
+                    const nestTarget = (commit && dragging && nestId && nestId !== f.id) ? nestId : null;
+                    clearNest();
+                    if (!dragging) return; // a plain click still toggles the folder
+                    if (commit && nestTarget) {
+                        try { window.folders.reparent(f.id, nestTarget); }
+                        catch (e) { window.northstarLog?.debug('renderer', 'reparent: ' + e); }
+                    }
+                    else if (commit) {
+                        // Reorder to where the cursor was released: order the visible
+                        // siblings by position and drop the dragged folder in.
+                        const sibs = [...tabsContainer.querySelectorAll('.folder-header')]
+                            .filter(el => el.dataset.folder !== f.id);
+                        let beforeId = null;
+                        for (const el of sibs) {
+                            const r = el.getBoundingClientRect();
+                            const mid = vertical ? r.top + r.height / 2 : r.left + r.width / 2;
+                            if ((vertical ? lastY : lastX) < mid) { beforeId = el.dataset.folder; break; }
+                        }
+                        const ids = folderState.folders.map(x => x.id).filter(id => id !== f.id);
+                        ids.splice(beforeId ? ids.indexOf(beforeId) : ids.length, 0, f.id);
+                        if (ids.join() !== original.join()) window.folders.reorder(ids);
                     }
                     // Suppress the click that follows a real drag.
                     h.dataset.suppressClick = '1';
