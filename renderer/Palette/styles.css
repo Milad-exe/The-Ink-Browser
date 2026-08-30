@@ -83,7 +83,7 @@ html, body {
 
 .row {
   display: flex; align-items: center; gap: var(--sp-4); width: 100%;
-  min-height: var(--row-h); padding: 0 var(--sp-4);
+  min-height: var(--menu-row-h); padding: 0 var(--sp-4);
   border: none; border-radius: var(--r-md); background: transparent;
   color: var(--text); font-family: var(--font); font-size: var(--fs-body);
   font-weight: 500; letter-spacing: var(--tracking);

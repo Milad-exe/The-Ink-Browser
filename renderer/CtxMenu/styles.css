@@ -21,7 +21,7 @@ html, body {
 }
 .ctx-menu-item {
   display: block; width: 100%; text-align: left; border: none; background: transparent;
-  padding: 0 var(--sp-3); min-height: var(--row-h); border-radius: var(--r-md); color: var(--text);
+  padding: 0 var(--sp-3); min-height: var(--menu-row-h); border-radius: var(--r-md); color: var(--text);
   font-family: var(--font); font-size: var(--fs-body); font-weight: 500;
   letter-spacing: var(--tracking); cursor: pointer; white-space: nowrap;
 }
