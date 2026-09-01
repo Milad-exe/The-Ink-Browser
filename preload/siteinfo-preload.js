@@ -10,17 +10,27 @@ try {
     });
 }
 catch { }
-// Match the browser's active theme so the panel doesn't look out of place.
+/* The theme, same bootstrap the other overlay preloads carry. Read synchronously
+   so the first paint is already right, then FOLLOW 'theme-changed' — that message
+   carries this window's SPACE theme. Reading only the global setting (as before)
+   left the panel in the stock palette while the chrome wore the space's theme. */
 try {
-    const s = ipcRenderer.sendSync('settings-get-sync');
-    const theme = (s && s.theme) || 'default';
-    const apply = () => document.documentElement.setAttribute('data-theme', theme);
-    if (document.readyState === 'loading')
-        document.addEventListener('DOMContentLoaded', apply);
-    else
-        apply();
+    const settings = ipcRenderer.sendSync('settings-get-sync');
+    if (settings && settings.theme && settings.theme !== 'default') {
+        const applyTheme = () => document.documentElement.setAttribute('data-theme', settings.theme);
+        if (document.documentElement)
+            applyTheme();
+        else
+            document.addEventListener('DOMContentLoaded', applyTheme);
+    }
 }
-catch { }
+catch (e) { /* no settings yet: the default palette is the right fallback */ }
+ipcRenderer.on('theme-changed', (_e, theme) => {
+    if (theme && theme !== 'default')
+        document.documentElement.setAttribute('data-theme', theme);
+    else
+        document.documentElement.removeAttribute('data-theme');
+});
 contextBridge.exposeInMainWorld('siteInfoApi', {
     getInfo: () => ipcRenderer.invoke('site-info-current'),
     setPermission: (name, value) => ipcRenderer.invoke('site-permission-set', name, value),

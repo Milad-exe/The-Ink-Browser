@@ -64,6 +64,7 @@ module.exports = {
             // Keep the view backing in sync: frosted (transparent) for internal
             // pages, opaque for web content so vibrancy doesn't bleed through.
             this._applyTabBackground(tab, url);
+            this._applyColorScheme(tab);
             // Restore the zoom this site was last read at. Chromium resets the
             // level per navigation, so this has to run on every one.
             zoom.apply(tab.webContents, url);

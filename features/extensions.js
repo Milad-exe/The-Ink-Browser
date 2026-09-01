@@ -16,8 +16,29 @@ const log = require('./log');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { execFileSync } = require('child_process');
+const AdmZip = require('adm-zip');
 const { app } = require('electron');
+
+// A .crx file is a ZIP archive with a Chrome signing header prepended. Return
+// the byte offset where the real ZIP payload begins so we can slice the header
+// off before extracting. Handles CRX2 and CRX3; returns 0 for a bare ZIP. Doing
+// this in pure JS (vs. shelling out to `unzip`) keeps .crx install working on
+// Windows, which has no `unzip` binary.
+function crxZipOffset(buf) {
+    if (buf.length >= 16 && buf.toString('latin1', 0, 4) === 'Cr24') {
+        const version = buf.readUInt32LE(4);
+        if (version === 2) {
+            const pubKeyLen = buf.readUInt32LE(8);
+            const sigLen = buf.readUInt32LE(12);
+            return 16 + pubKeyLen + sigLen;
+        }
+        if (version === 3) {
+            const headerLen = buf.readUInt32LE(8);
+            return 12 + headerLen;
+        }
+    }
+    return 0;
+}
 // Loaded lazily in setup(): these two libraries are the heaviest requires in
 // the main process, and setup() only runs AFTER the first window exists — as
 // top-level imports they would sit on the startup critical path for nothing.
@@ -453,11 +474,12 @@ class Extensions {
         const dest = path.join(app.getPath('userData'), 'extensions-unpacked', crypto.randomUUID());
         fs.mkdirSync(dest, { recursive: true });
         try {
-            execFileSync('unzip', ['-o', '-qq', crxPath, '-d', dest], { stdio: 'ignore' });
+            const buf = fs.readFileSync(crxPath);
+            new AdmZip(buf.subarray(crxZipOffset(buf))).extractAllTo(dest, true);
         }
-        catch {
-            if (!fs.existsSync(path.join(dest, 'manifest.json')))
-                throw new Error('Could not unpack .crx (needs the `unzip` tool).');
+        catch (e) {
+            fs.rmSync(dest, { recursive: true, force: true });
+            throw new Error('Could not unpack .crx: ' + (e && e.message ? e.message : e));
         }
         const root = fs.existsSync(path.join(dest, 'manifest.json')) ? dest : this._findManifestRoot(dest);
         if (!root) {

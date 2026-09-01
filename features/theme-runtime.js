@@ -185,6 +185,8 @@ function repaintAll(wm) {
         for (const wd of (wm?.getAllWindows?.() || [])) {
             try { wd.tabs?.repaintTabBackgrounds?.(); }
             catch (e) { log.debug('theme-runtime', 'tab backgrounds', e); }
+            try { wd.tabs?.applyColorSchemeAll?.(); }
+            catch (e) { log.debug('theme-runtime', 'tab colour scheme', e); }
         }
     }
     catch (e) { log.debug('theme-runtime', 'repaintAll tabs', e); }

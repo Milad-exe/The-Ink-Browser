@@ -1675,6 +1675,11 @@
             initSidebarResizer();
             try { window.tabsUI.onCloseMenus(() => { _closeCtxMenu?.(); }); }
             catch (e) { window.northstarLog?.debug('renderer', 'initTabBarSide: ' + e); }
+            // While an overlay menu is open, drop the window-drag regions so a click
+            // on the tab strip / sidebar reaches the overlay and dismisses it (on
+            // Windows a drag region otherwise eats the click as a caption press).
+            try { window.tabsUI.onMenuCapture((on) => document.documentElement.classList.toggle('menu-capturing', on)); }
+            catch (e) { window.northstarLog?.debug('renderer', 'initTabBarSide: ' + e); }
             try { window.tabsUI.onSidebarWidth((w) => applySidebarWidth(w)); }
             catch (e) { window.northstarLog?.debug('renderer', 'initTabBarSide: ' + e); }
             try {

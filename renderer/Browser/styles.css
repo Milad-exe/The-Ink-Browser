@@ -361,19 +361,30 @@ html[data-tabbar="side"] #tab-bar {
 }
 /* Right-edge drag handle to resize the sidebar (side mode only). */
 .sidebar-resizer { display: none; }
+/* Sit the whole hit area INSIDE the sidebar (chrome), flush to its right edge —
+   never past it. The page is a native view layered above the chrome, so any part
+   of the handle that overhangs the seam is covered by that view and stops
+   receiving mouse events (this broke sidebar resizing on Windows entirely). */
 html[data-tabbar="side"]:not([data-compact="on"]) .sidebar-resizer {
-  display: block; position: absolute; top: 0; bottom: 0; right: -3px;
-  width: 7px; z-index: 30; cursor: col-resize; -webkit-app-region: no-drag;
+  display: block; position: absolute; top: 0; bottom: 0; right: 0;
+  width: 10px; z-index: 30; cursor: col-resize; -webkit-app-region: no-drag;
 }
-/* The drag target stays full-height, but the visible indicator is a short
-   centred grip — a full-height rule read as a border, not a handle. */
+/* The drag target stays full-height, but the visible indicator is a short grip
+   pinned to the seam — a full-height rule read as a border, not a handle. */
 .sidebar-resizer::after {
-  content: ''; position: absolute; left: 2px; width: 3px;
+  content: ''; position: absolute; right: 2px; width: 3px;
   top: 50%; height: 48px; transform: translateY(-50%); border-radius: 3px;
-  background: transparent; transition: background 0.12s;
+  /* Faintly visible at rest so the handle is discoverable (a 48px grip, not a
+     full-height line, so it reads as a handle rather than a border). */
+  background: var(--border-2); transition: background 0.12s;
 }
 .sidebar-resizer:hover::after,
 html.sidebar-resizing .sidebar-resizer::after { background: var(--accent); }
+/* An overlay menu is up: nothing in the chrome is a window-drag region, so a
+   press on the (formerly draggable) tab strip / sidebar / omnibox reaches the
+   full-window menu overlay and dismisses it, instead of the OS swallowing it as
+   a title-bar caption click and leaving the menu stuck open (Windows). */
+html.menu-capturing * { -webkit-app-region: no-drag !important; }
 html.sidebar-resizing { cursor: col-resize; }
 html.sidebar-resizing * { pointer-events: none; user-select: none; }
 html.sidebar-resizing .sidebar-resizer { pointer-events: auto; }
