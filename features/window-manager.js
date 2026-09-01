@@ -269,6 +269,14 @@ class WindowManager {
             if (cmd === 'browser-backward') { e.preventDefault?.(); navigate(true); }
             else if (cmd === 'browser-forward') { e.preventDefault?.(); navigate(false); }
         });
+        // Windows: right-clicking a window-drag region (the top strip beside the
+        // controls, the utility bar / omnibox) is treated by the OS as a caption
+        // right-click and pops the native window system menu (Restore/Move/Size/
+        // Close). We provide our own context menus, so suppress the OS one — this
+        // event is Windows-only and never fires elsewhere.
+        window.on('system-context-menu', (event) => {
+            event.preventDefault();
+        });
         window.on('maximize', () => {
             try {
                 window.webContents.send('window-maximize-changed', true);
@@ -430,6 +438,10 @@ class WindowManager {
                 state = saved[0] || null;
                 this._pendingWindowStates = saved.slice(1);
             }
+            // Drop any blank new-tab pages an earlier session persisted — an empty
+            // "New tab" must never come back on load, even from an existing state file.
+            if (state && Array.isArray(state.tabs))
+                state.tabs = state.tabs.filter(t => t && t.url && t.url !== 'newtab');
             if (state && state.tabs && state.tabs.length > 0 && String(state.profile || '1') === profileId) {
                 try {
                     // Rebuild every workspace's tabs (each tagged with its own

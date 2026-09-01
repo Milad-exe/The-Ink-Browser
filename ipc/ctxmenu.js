@@ -71,6 +71,9 @@ function hideMenu(wd) {
         wd.ctxMenu.setVisible(false);
         wd.ctxMenuOpen = false;
         wd.ctxMenuPending = null;
+        // Restore the window-drag regions the open() call neutralised.
+        try { wd.window.webContents.send('menu-capture', false); }
+        catch (e) { log.debug('ctxmenu', 'menu-capture off', e); }
         // The overlay took keyboard focus when it opened; hand it back or the
         // window is left with nothing focused and the next accelerator beeps.
         try { wd.window.webContents.focus(); }
@@ -108,6 +111,13 @@ function register(ipcMain, { wm }) {
             view.setVisible(true);
             wd.ctxMenuOpen = true;
             wd.ctxMenuShownAt = Date.now();
+            // Tell the chrome to drop its window-drag regions while the menu is up.
+            // On Windows a drag region is hit-tested by the OS as the title-bar
+            // caption even with this overlay on top, so a click there never reaches
+            // the overlay's dismiss handler — the menu got stuck open. no-drag makes
+            // the click land on the overlay, which closes it.
+            try { wd.window.webContents.send('menu-capture', true); }
+            catch (e) { log.debug('ctxmenu', 'menu-capture on', e); }
             /* Push as well: an already-loaded view is not going to pull again. */
             view.webContents.send('ctxmenu:data', data);
             try { view.webContents.focus(); }

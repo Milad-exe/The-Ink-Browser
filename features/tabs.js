@@ -18,6 +18,11 @@ const FindDialogManager = require('./find-dialog');
 const focusMode = require('./focus-mode');
 const { READERABLE_JS, EXTRACT_JS, PIP_JS } = require('./reader');
 const extensions = require('./extensions');
+// The SAME window-relative sidebar clamp the renderer uses for --sidebar-w. Main
+// positions the page view's left edge at this.sidebarWidth, so if the two clamps
+// disagree the page view covers (or leaves a gap beside) the sidebar's resize
+// handle — the "sidebar is behind the tab view" bug on wide/maximized windows.
+const { clampSidebarWidth } = require('../renderer/lib/util');
 const miniPlayer = require('./mini-player');
 const privateSessions = require('./private-session');
 const YOUTUBE_SPACE_FIX_JS = `
@@ -212,10 +217,12 @@ class Tabs {
         this.tabContainers = new Map(); // tabIndex → container id
         this.nextContainerId = 1;
         this.isPrivateWindow = options?.private ?? false;
-        // Live sidebar width (px) — drag-resizable, persisted. 56 = collapsed
-        // icon rail; otherwise clamped to [180, 460] (see clampW in ipc/tabs.js).
-        const _sw = Math.round(Number(this.persistence?.get('sidebarWidth')) || Tabs.SIDEBAR_W);
-        this.sidebarWidth = _sw < 132 ? 56 : Math.max(180, Math.min(460, _sw));
+        // Live sidebar width (px) — drag-resizable, persisted. Clamped with the
+        // renderer's window-relative rule (clampSidebarWidth) so the page view's
+        // left edge always lines up with the rendered sidebar. Recomputed on
+        // window resize (below), since the limits scale with the window and the
+        // window may still maximize after this constructor runs.
+        this.sidebarWidth = this._computeSidebarWidth();
         this.sidePanelWidth = 0; // set while an extension side panel is docked
         // Which workspace/profile this window is currently browsing as ('1' =
         // default session + legacy stores). Containers scope within it. Tabs are
@@ -247,6 +254,18 @@ class Tabs {
         this.readerArticles = new Map(); // tabIndex → extracted article (served to the reader page)
         this.readerOriginal = new Map(); // tabIndex → original URL to restore on exit
         this.mainWindow.on('resize', () => {
+            // The sidebar's allowed width scales with the window, so a resize
+            // (crucially, the maximize that fires AFTER this constructor) can move
+            // the clamp. Recompute with the same rule the renderer uses and, if it
+            // moved, push the new width so the rendered sidebar and the page view's
+            // left edge stay aligned — otherwise the page view creeps over the
+            // resize handle and it can't be grabbed.
+            const w = this._computeSidebarWidth();
+            if (w !== this.sidebarWidth) {
+                this.sidebarWidth = w;
+                try { this.mainWindow.webContents.send('sidebar-width-changed', w); }
+                catch (e) { log.debug('tabs', 'resize sidebar-width', e); }
+            }
             this.resizeAllTabs();
         });
         this.mainWindow.on('enter-full-screen', () => {
@@ -950,6 +969,18 @@ class Tabs {
         return fs ? 0 : Tabs.PAGE_RADIUS;
     }
 
+    // The rendered sidebar width for THIS window, using the renderer's own
+    // window-relative clamp so the page view lines up with it exactly. Reads the
+    // persisted raw width each time so it re-expands/contracts as the window grows
+    // or shrinks (the limits scale with the window).
+    _computeSidebarWidth() {
+        const raw = Math.round(Number(this.persistence?.get('sidebarWidth')) || Tabs.SIDEBAR_W);
+        let winW = 0;
+        try { winW = this.mainWindow.getContentBounds().width; }
+        catch (e) { log.debug('tabs', '_computeSidebarWidth', e); }
+        return clampSidebarWidth(raw, winW);
+    }
+
     getTabBounds() {
         const contentBounds = this.mainWindow.getContentBounds();
         if (this.mainWindow && (this.isHtmlFullScreen || this.mainWindow.isSimpleFullScreen())) {
@@ -1650,9 +1681,15 @@ class Tabs {
     buildSerializableState() {
         const includeAll = !!(this.persistence && this.persistence.getPersistMode());
         const order = this.tabOrder.length ? this.tabOrder : Array.from(this.tabMap.keys());
-        const selected = includeAll
+        // A blank new-tab page (url token 'newtab', no navigation, not an
+        // essential's saved home) carries nothing worth restoring — persisting it
+        // just means an empty "New tab" reappears on the next launch. Never save one.
+        const isBlankNewTab = (idx) =>
+            !this._essentialHomeOfTab(idx) && (this.tabUrls.get(idx) || 'newtab') === 'newtab';
+        const selected = (includeAll
             ? order.filter(idx => !this.privateTabs.has(idx))
-            : order.filter(idx => this.pinnedTabs.has(idx) && !this.privateTabs.has(idx));
+            : order.filter(idx => this.pinnedTabs.has(idx) && !this.privateTabs.has(idx)))
+            .filter(idx => !isBlankNewTab(idx));
         const keepHistory = this.persistence?.get('restoreTabHistory') !== false;
         const tabs = selected.map((idx) => {
             /* An Essential comes back at its OWN page, not three links deep

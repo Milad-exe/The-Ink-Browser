@@ -24,10 +24,16 @@ const MARK = '#ffffff';
 
 let cached = null;
 
+// Windows ships its own mark (logo-win.png — padded for the taskbar's square
+// slot); macOS/Linux use logo.png. window-manager creates the window with the
+// same per-platform file, so both entry points agree and editing the Windows
+// logo actually changes the Windows icon.
+const ICON_FILE = process.platform === 'win32' ? 'logo-win.png' : 'logo.png';
+
 /** The one icon, loaded once. */
 function icon() {
     if (cached === null) {
-        const img = nativeImage.createFromPath(resolveAppFile('logo.png'));
+        const img = nativeImage.createFromPath(resolveAppFile(ICON_FILE));
         cached = img.isEmpty() ? false : img;
     }
     return cached || null;
@@ -60,7 +66,7 @@ function setEverywhere(img, wm) {
 function apply(_theme, wm) {
     const img = icon();
     if (!img) {
-        log.warn('app-icon', 'logo.png missing or unreadable');
+        log.warn('app-icon', `${ICON_FILE} missing or unreadable`);
         return false;
     }
     setEverywhere(img, wm);

@@ -341,6 +341,11 @@ exposeInternal('tabsUI', {
     menuOpened: () => ipcRenderer.send('chrome-menu-open'),
     menuClosed: () => ipcRenderer.send('chrome-menu-close'),
     onCloseMenus: (handler) => ipcRenderer.on('close-chrome-menus', () => handler()),
+    // While an overlay menu is up, the chrome neutralises its window-drag regions
+    // so a click on them reaches the full-window overlay (which dismisses) instead
+    // of being eaten by the OS as a title-bar caption press — the Windows bug where
+    // right/left-clicking the tab strip or sidebar left the menu stuck open.
+    onMenuCapture: (handler) => ipcRenderer.on('menu-capture', (_e, on) => handler(!!on)),
     startSidebarResize: () => ipcRenderer.invoke('sidebar:resize-start'),
     resizeSidebar: (w) => ipcRenderer.invoke('sidebar:resize', w),
     commitSidebarWidth: (w) => ipcRenderer.invoke('sidebar:resize-commit', w),
