@@ -40,15 +40,23 @@ function hidePalette(wd) {
         wd.paletteOpen = false;
         // The overlay took keyboard focus when it opened; hand it back or the
         // window is left with nothing focused and the next accelerator beeps.
-        // On a blank tab there is no page to type into, so the address bar
-        // takes the caret — dismissing the palette should leave you somewhere
-        // you can start typing, not nowhere.
+        // On a blank new-tab page there is nothing to type into, so the address
+        // bar takes the caret. On any real page (or internal page) the focus
+        // goes back to the TAB VIEW — otherwise dismissing the palette leaves the
+        // page without keyboard focus, i.e. "the window loses context".
         try {
-            wd.window.webContents.focus();
             const t = wd.tabs;
-            const blank = t && !/^https?:/i.test(String(t.tabUrls.get(t.activeTabIndex) || ''));
-            if (blank)
-                wd.window.webContents.send('focus-address-bar');
+            const url = t ? String(t.tabUrls.get(t.activeTabIndex) || '') : '';
+            const isNewtab = !url || url === 'newtab';
+            const tab = t?.tabMap?.get(t.activeTabIndex);
+            if (!isNewtab && tab && tab.webContents && !tab.webContents.isDestroyed()) {
+                tab.webContents.focus();
+            }
+            else {
+                wd.window.webContents.focus();
+                if (isNewtab)
+                    wd.window.webContents.send('focus-address-bar');
+            }
         }
         catch (e) { log.debug('palette', 'hidePalette', e); }
     }

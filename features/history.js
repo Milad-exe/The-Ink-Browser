@@ -184,6 +184,33 @@ class History {
         this._scheduleWrite();
     }
     /**
+     * Bulk-add history imported from another browser. Each entry is
+     * { url, title, lastVisit (ms epoch) }. Deduped by url+profile against what is
+     * already stored; original visit times are preserved. Returns the count added.
+     */
+    async importEntries(entries, profile = null) {
+        const p = profile || null;
+        const history = await this.load();
+        const seen = new Set(history.map(e => e.url + '|' + (e.profile || '')));
+        let added = 0;
+        for (const e of entries || []) {
+            if (!e || !e.url || isSearchResultUrl(e.url))
+                continue;
+            const key = e.url + '|' + (p || '');
+            if (seen.has(key))
+                continue;
+            seen.add(key);
+            const title = isPlaceholderTitle(e.title, e.url) ? '' : String(e.title || '').trim();
+            const ts = e.lastVisit ? new Date(e.lastVisit).toISOString() : new Date().toISOString();
+            history.push({ url: e.url, title, timestamp: ts, ...(p ? { profile: p, profileName: null } : {}) });
+            added++;
+        }
+        history.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1)); // newest first
+        this._prune(history);
+        this._scheduleWrite();
+        return added;
+    }
+    /**
      * Fill in the title once the page actually has one.
      *
      * Called from the tab's page-title-updated handler. Only ever upgrades: a

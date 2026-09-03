@@ -335,6 +335,23 @@ class Northstar {
             try { startProfile = String(this.windowManager.persistence.loadState()?.profile || '1'); }
             catch (e) { log.debug('main', 'cycle', e); }
             this.windowManager.createWindow(800, 600, { profile: startProfile });
+            // First launch: offer the import wizard once, the way other browsers
+            // do — but only if there is actually another browser to import from.
+            setTimeout(() => {
+                try {
+                    const p = this.windowManager.persistence;
+                    if (p.get('importPrompted'))
+                        return;
+                    const importer = require('./features/import');
+                    if (importer.listSources().length) {
+                        const wd = this.windowManager.getPrimaryWindow();
+                        if (wd?.window && !wd.window.isDestroyed())
+                            require('./ipc/import-wizard').open(wd.window, wd.profileId || startProfile);
+                    }
+                    p.set('importPrompted', true);
+                }
+                catch (e) { log.debug('main', 'import prompt', e); }
+            }, 1400);
             // Captive-portal check on startup: public Wi-Fi that needs a sign-in
             // is caught before the user tries to browse, and its login page opens
             // automatically. (Also re-checked whenever a page load fails — see

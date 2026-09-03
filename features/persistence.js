@@ -36,6 +36,8 @@ const DEFAULTS = {
     dismissedNotices: [],
     // The first-run card shows once, on a profile that has never had a tab.
     seenWelcome: false,
+    // The "import from another browser" wizard is offered once, on first launch.
+    importPrompted: false,
     settingsPage: 'general',
     windowBounds: null,
     windowState: null,

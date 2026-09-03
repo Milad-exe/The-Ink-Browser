@@ -407,9 +407,19 @@ html[data-tabbar="side"] #tab-drag-spacer { -webkit-app-region: no-drag; }
 /* Needs to outrank the `#tab-bar #window-controls` no-drag above (two IDs). */
 html[data-tabbar="side"] #tab-bar #window-controls { -webkit-app-region: drag; }
 html[data-tabbar="side"] #tab-bar #window-controls .wc-btn { -webkit-app-region: no-drag; }
-/* macOS traffic lights overlay the sidebar's top-left — reserve a spacer row
-   (JS sets width:72px for the top strip; height matters here instead). */
-html[data-tabbar="side"] #window-controls { display: none; }
+/* macOS draws its own traffic lights, so our controls stay hidden in side mode
+   there. On Windows/Linux there is no OS caption in side mode, so JS moves our
+   own min/max/close into the top utility bar instead (see placeWindowControls). */
+html[data-platform="darwin"][data-tabbar="side"] #window-controls { display: none; }
+/* Windows/Linux side mode: the controls sit flush in the top-right of the top
+   bar. .wc-win already carries order:999 + margin-left:auto to pin them right. */
+#utility-bar > #window-controls.wc-win { align-self: stretch; }
+html[data-platform="win32"][data-tabbar="side"] #utility-bar,
+html[data-platform="linux"][data-tabbar="side"] #utility-bar { padding-right: 0; }
+/* Keep the hamburger (last of the trailing icons) clear of the min/max/close
+   cluster, so it isn't crammed against the minimize button. */
+html[data-platform="win32"][data-tabbar="side"] #utility-bar .trailing-icons,
+html[data-platform="linux"][data-tabbar="side"] #utility-bar .trailing-icons { margin-right: 10px; }
 html[data-tabbar="side"] #tabs-container {
   padding-inline: 0;
   /* One column: pinned tabs are rows like the rest (the tile grid belonged to

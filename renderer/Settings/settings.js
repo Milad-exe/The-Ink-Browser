@@ -632,6 +632,12 @@
         document.getElementById('export-history')?.addEventListener('click', async () => {
             report(await window.userData.exportHistory(), 'export', 'history entry');
         });
+        // ── Import from another browser ───────────────────────────────────────
+        // Opens the dedicated wizard (source + profile + data-type picker).
+        document.getElementById('open-import')?.addEventListener('click', () => {
+            try { window.northstarImport?.openWizard(); }
+            catch (e) { window.northstarLog?.debug('settings', 'open import: ' + e); }
+        });
         // How the saved-password key is protected — stated, not assumed.
         (async () => {
             const el = document.getElementById('key-protection');

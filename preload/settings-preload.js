@@ -93,6 +93,11 @@ contextBridge.exposeInMainWorld('userData', {
     logTail: () => ipcRenderer.invoke('app:log-tail'),
     versions: () => ipcRenderer.invoke('app:version'),
 });
+// Import from another browser is a dedicated wizard (see ipc/import-wizard.js);
+// Settings just opens it.
+contextBridge.exposeInMainWorld('northstarImport', {
+    openWizard: () => ipcRenderer.invoke('import-wizard:open'),
+});
 contextBridge.exposeInMainWorld('northstarPasswords', {
     list: () => ipcRenderer.invoke('passwords-list'),
     reveal: (id) => ipcRenderer.invoke('passwords-reveal', id),

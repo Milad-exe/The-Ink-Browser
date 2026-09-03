@@ -32,6 +32,9 @@ function register(ipcMain, { wm, webContents }) {
     ipcMain.handle('bookmarks-get', async (_e) => {
         return bmFor(_e).getAll();
     });
+    // Importing from other browsers is handled by the import wizard — see
+    // ipc/import-wizard.js (it writes bookmarks/history/engines straight into the
+    // active profile's stores and broadcasts the same change events).
     // The star acts on the ACTIVE tab's page, so its profile (if any) tags the
     // favourite — a page starred in a profile is that profile's favourite.
     const activeProfileTag = (senderWc) => {

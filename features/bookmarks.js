@@ -110,6 +110,46 @@ class Bookmarks {
         }
         return false;
     }
+    /**
+     * Bulk-insert an imported bookmark tree under one new top-level folder.
+     * `tree` is [{ type:'bookmark'|'folder', title, url?, children? }]. Fresh ids
+     * are assigned; urls already bookmarked anywhere are skipped. Returns the
+     * number of bookmarks actually added.
+     */
+    async importTree(folderTitle, tree) {
+        const bookmarks = await this.load();
+        const existing = new Set();
+        const collect = (arr) => {
+            for (const b of arr || []) {
+                if (b.type === 'bookmark' && b.url) existing.add(b.url);
+                if (b.type === 'folder' && Array.isArray(b.children)) collect(b.children);
+            }
+        };
+        collect(bookmarks);
+        let count = 0;
+        const build = (nodes) => {
+            const out = [];
+            for (const n of nodes || []) {
+                if (n.type === 'folder') {
+                    const kids = build(n.children || []);
+                    if (kids.length)
+                        out.push({ type: 'folder', id: this.genId(), title: String(n.title || 'Folder').slice(0, 200), children: kids });
+                }
+                else if (n.url && !existing.has(n.url)) {
+                    existing.add(n.url);
+                    out.push({ type: 'bookmark', id: this.genId(), url: n.url, title: String(n.title || n.url).slice(0, 300), addedAt: Date.now() });
+                    count++;
+                }
+            }
+            return out;
+        };
+        const built = build(tree);
+        if (built.length) {
+            bookmarks.push({ type: 'folder', id: this.genId(), title: folderTitle || 'Imported', children: built });
+            await this.save();
+        }
+        return count;
+    }
     async addFolder(title) {
         const bookmarks = await this.load();
         const id = this.genId();

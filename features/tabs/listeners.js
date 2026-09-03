@@ -24,6 +24,7 @@ const i18n = require('../i18n');
 const log = require('../log');
 const miniPlayer = require('../mini-player');
 const zoom = require('../zoom');
+const { internalTokenFor } = require('./internal-page');
 
 module.exports = {
     setupTabListeners(tabIndex, tab) {

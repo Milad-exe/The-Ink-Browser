@@ -105,50 +105,9 @@ const YOUTUBE_SPACE_FIX_JS = `
     };
 })();
 `;
-// Internal pages addressable via the northstar:// scheme, e.g. northstar://settings
-// or northstar://settings/appearance. Shown in the omnibox and typeable to navigate.
-const INTERNAL_PAGES = {
-    settings: { file: 'renderer/Settings/index.html', title: 'Settings' },
-    history: { file: 'renderer/History/index.html', title: 'History' },
-    bookmarks: { file: 'renderer/Bookmarks/index.html', title: 'Bookmarks' },
-};
-const SETTINGS_SECTIONS = ['general', 'appearance', 'focus', 'privacy', 'passwords', 'extensions', 'data', 'about'];
-// Parse a northstar:// URL → { type, section } (section only for settings), or null.
-function parseNorthstarUrl(raw) {
-    const m = /^northstar:\/\/([a-z]+)(?:\/([a-z]+))?\/?$/i.exec((raw || '').trim());
-    if (!m)
-        return null;
-    const type = m[1].toLowerCase();
-    if (!INTERNAL_PAGES[type])
-        return null;
-    let section = m[2] ? m[2].toLowerCase() : null;
-    if (!(type === 'settings' && section && SETTINGS_SECTIONS.includes(section)))
-        section = null;
-    return { type, section };
-}
-// The stored/display "url token" for an internal tab: 'settings', 'settings/appearance', …
-function internalTokenFor(fileUrl) {
-    let type = null;
-    if (fileUrl.includes('/Settings/index.html'))
-        type = 'settings';
-    else if (fileUrl.includes('/Bookmarks/index.html'))
-        type = 'bookmarks';
-    else if (fileUrl.includes('/History/index.html'))
-        type = 'history';
-    if (!type)
-        return null;
-    let section = '';
-    if (type === 'settings') {
-        try {
-            section = new URL(fileUrl).hash.replace(/^#/, '').toLowerCase();
-        }
-        catch (e) { log.debug('tabs', 'if', e); }
-        // 'general' is the default section — it stays the bare northstar://settings.
-        if (!SETTINGS_SECTIONS.includes(section) || section === 'general')
-            section = '';
-    }
-    return section ? `${type}/${section}` : type;
-}
+// Internal-page helpers (northstar:// scheme, section list, URL↔token) live in a
+// shared leaf module so the listeners mixin can use internalTokenFor too.
+const { INTERNAL_PAGES, SETTINGS_SECTIONS, parseNorthstarUrl, internalTokenFor } = require('./tabs/internal-page');
 class Tabs {
     // ── Wiring ────────────────────────────────────────────────────────────
     mainWindow;
@@ -555,6 +514,16 @@ class Tabs {
             }
             catch (e) { log.debug('tabs', 'raiseFloatingViews', e); }
         }
+        // Re-adding a view drops its keyboard focus. If the palette is up, a
+        // raise triggered by anything else (a tab finishing load, a background
+        // tab opening, media state) would silently pull the caret out of it
+        // mid-type — the intermittent "window loses context on ⌘T". Hand focus
+        // back to the palette so it keeps the caret while it is open.
+        try {
+            if (wd.paletteOpen && wd.palette && !wd.palette.webContents.isDestroyed())
+                wd.palette.webContents.focus();
+        }
+        catch (e) { log.debug('tabs', 'raiseFloatingViews focus', e); }
     }
     setShortcuts(shortcuts) {
         this.shortcuts = shortcuts;

@@ -351,16 +351,29 @@
         // ─────────────────────────────────────────────────────────────────────────
         // Window controls
         // ─────────────────────────────────────────────────────────────────────────
+        // Windows/Linux draw their own min/max/close. In TOP mode they live in the
+        // tab strip (the topmost row); in SIDE mode that row is the sidebar, so they
+        // move into the top utility bar instead — otherwise there are no controls at
+        // all on Windows in side mode. macOS uses native traffic lights, untouched.
+        function placeWindowControls() {
+            const wc = document.getElementById('window-controls');
+            if (!wc || !window.windowControls || window.windowControls.platform === 'darwin')
+                return;
+            const side = document.documentElement.dataset.tabbar !== 'top';
+            const host = document.getElementById(side ? 'utility-bar' : 'tab-bar');
+            if (host && wc.parentElement !== host)
+                host.appendChild(wc);
+        }
         function initWindowControls() {
             const container = document.getElementById('window-controls');
             if (!container || !window.windowControls)
                 return;
+            // Marks the root so layout can key off the platform (mac reserves room
+            // for the native traffic lights; win/linux pin our controls top-right).
+            document.documentElement.dataset.platform = window.windowControls.platform;
             if (window.windowControls.platform === 'darwin') {
                 container.style.width = '72px'; // space for native traffic lights
                 container.classList.add('wc-mac');
-                // Marks the root so layout can reserve room for the NATIVE traffic
-                // lights (compact mode drops the sidebar to zero width).
-                document.documentElement.dataset.platform = 'darwin';
                 return;
             }
             // Windows / Linux: render our own controls on the right side
@@ -387,6 +400,7 @@
                     ? `<svg viewBox="0 0 10 10" fill="none"><rect x="2" y="0" width="8" height="8" stroke="currentColor"/><rect x="0" y="2" width="8" height="8" stroke="currentColor" fill="var(--surface-container-lowest)"/></svg>`
                     : `<svg viewBox="0 0 10 10" fill="none"><rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor"/></svg>`;
             });
+            placeWindowControls();
         }
         // ─────────────────────────────────────────────────────────────────────────
         // Navigation buttons (back / forward / reload)
@@ -1709,6 +1723,7 @@
             }
             catch (e) { window.northstarLog?.debug('renderer', 'initTabBarSide: ' + e); }
             document.documentElement.dataset.tabbar = mode === 'top' ? 'top' : 'side';
+            placeWindowControls();
             applySidebarWidth(width);
             initSidebarResizer();
             try { window.tabsUI.onCloseMenus(() => { _closeCtxMenu?.(); }); }
@@ -1723,6 +1738,7 @@
             try {
                 window.tabsUI.onTabBarSide((v) => {
                     document.documentElement.dataset.tabbar = v === 'top' ? 'top' : 'side';
+                    placeWindowControls();
                     updateTabWidths(tabs.size);
                     updateScrollShadows();
                 });
