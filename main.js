@@ -119,8 +119,9 @@ class Northstar {
         this.registerIpc();
         this.initApp();
         // Test seam — exposes internals to the Playwright harness only when
-        // NORTHSTAR_TEST=1. No-op (and not even referenced) in normal runs.
-        if (process.env.NORTHSTAR_TEST === '1') {
+        // NORTHSTAR_TEST=1. Gated on an UNPACKAGED build too, so a shipped binary
+        // can never expose internals even if the env var is set.
+        if (process.env.NORTHSTAR_TEST === '1' && !app.isPackaged) {
             global.__northstarTest = {
                 wm: this.windowManager, focusMode, privacy, adBlocker,
                 containers: require('./features/containers'),
@@ -333,21 +334,7 @@ class Northstar {
             let startProfile = '1';
             try { startProfile = String(this.windowManager.persistence.loadState()?.profile || '1'); }
             catch (e) { log.debug('main', 'cycle', e); }
-            /* First launch gets an intro. The browser is built at the SAME time,
-               hidden, so the animation overlaps startup instead of adding to it
-               — and it is revealed the moment the splash is done, or on the
-               splash's own backstop timeout if the animation never reports in.
-               On every later launch maybeShow resolves immediately and this is
-               an ordinary createWindow with one extra tick. */
-            const splash = require('./features/splash');
-            splash.register(ipcMain);
-            const firstRun = !this.windowManager.persistence.get('seenWelcome');
-            const wd = this.windowManager.createWindow(800, 600, { profile: startProfile, deferShow: firstRun });
-            if (firstRun) {
-                splash.maybeShow(this.windowManager.persistence)
-                    .then(() => { try { this.windowManager.reveal(wd); } catch (e) { log.debug('main', 'reveal', e); } })
-                    .catch(() => { try { this.windowManager.reveal(wd); } catch (e) { log.debug('main', 'reveal', e); } });
-            }
+            this.windowManager.createWindow(800, 600, { profile: startProfile });
             // Captive-portal check on startup: public Wi-Fi that needs a sign-in
             // is caught before the user tries to browse, and its login page opens
             // automatically. (Also re-checked whenever a page load fails — see

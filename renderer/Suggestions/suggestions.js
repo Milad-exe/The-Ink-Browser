@@ -13,6 +13,8 @@
         const SVG_TAB = `data:image/svg+xml;utf8,<svg viewBox="0 0 256 256" fill="${G}" xmlns="http://www.w3.org/2000/svg"><path d="M220,32H76A20,20,0,0,0,56,52V72H36A20,20,0,0,0,16,92V204a20,20,0,0,0,20,20H180a20,20,0,0,0,20-20V184h20a20,20,0,0,0,20-20V52A20,20,0,0,0,220,32ZM176,96v16H40V96Zm0,104H40V136H176Zm40-40H200V92a20,20,0,0,0-20-20H80V56H216Z"></path></svg>`;
         const ENGINE_NAME = { google: 'Google', duckduckgo: 'DuckDuckGo', bing: 'Bing' };
         const isSearchType = (t) => t === 'action' || t === 'google' || t === 'duckduckgo' || t === 'bing';
+        // Show a readable URL, as Chrome/Firefox do: no scheme, no trailing slash.
+        const cleanUrl = (u) => String(u || '').replace(/^https?:\/\//i, '').replace(/\/+$/, '');
         /**
          * standard emphasis: the part of the text matching what the user typed is
          * de-emphasized (thin), and the rest — the completion — is bold. Makes it
@@ -87,7 +89,15 @@
                         const host = hostOf(item);
                         if (host && window.overlaySuggestions.cachedFavicon) {
                             window.overlaySuggestions.cachedFavicon(host)
-                                .then(d => { if (d) icon.src = d; })
+                                .then(d => {
+                                    if (d) { icon.src = d; return; }
+                                    // Not visited before — pull the domain's favicon from the
+                                    // engine's service (Chrome/Firefox-style), if allowed.
+                                    if (window.overlaySuggestions.remoteFavicon)
+                                        window.overlaySuggestions.remoteFavicon(host)
+                                            .then(rd => { if (rd) icon.src = rd; })
+                                            .catch(() => { });
+                                })
                                 .catch(() => { });
                         }
                     }
@@ -130,10 +140,19 @@
                     if (item.type === 'switch-tab')
                         addSecondary('Switch to Tab');
                     else if (item.url)
-                        addSecondary(item.url, { url: true });
+                        addSecondary(cleanUrl(item.url), { url: true });
                     el.title = item.url || '';
                 }
                 el.appendChild(main);
+                // Hover moves the ONE selection to this row (accent), so mouse and
+                // keyboard never show two highlights, and Enter after hovering goes
+                // where the pointer is — matching Chrome/Firefox.
+                el.addEventListener('mouseenter', () => {
+                    for (const c of listEl.children)
+                        c.classList.toggle('active', c === el);
+                    try { window.overlaySuggestions.hover && window.overlaySuggestions.hover(idx); }
+                    catch (e) { window.northstarLog?.debug('suggestions', 'hover: ' + e); }
+                });
                 el.addEventListener('mousedown', (e) => {
                     e.preventDefault();
                     try {

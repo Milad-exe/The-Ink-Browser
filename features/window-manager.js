@@ -376,6 +376,10 @@ class WindowManager {
         // Track focus order: most recently focused is considered primary for persistence
         window.on('focus', () => {
             this.lastFocusedWindowId = windowId;
+            // Native widgets + the page's default colour scheme follow the focused
+            // window's space theme mode.
+            try { require('./theme-runtime').syncNativeTheme(this); }
+            catch (e) { log.debug('window-manager', 'focus theme', e); }
         });
         // Each window belongs to one profile: its tabs browse on that profile's
         // session and record into that profile's history/bookmarks.
@@ -523,6 +527,12 @@ class WindowManager {
             // not re-run the restore and clone another window's tabs.
             this.restored = true;
             shortcuts.registerAllShortcuts();
+            // The window has now resolved its final space, so re-assert the theme:
+            // syncs nativeTheme to the space's mode, repaints every surface (so an
+            // overlay created earlier isn't left in the stock palette) and pushes
+            // the colour scheme onto restored tabs.
+            try { require('./theme-runtime').repaintAll(this); }
+            catch (e) { log.debug('window-manager', 'startup theme', e); }
         });
         window.on('closed', () => {
             if (shortcuts) {

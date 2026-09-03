@@ -257,6 +257,18 @@
                 return;
             picker.dataset.overflowBound = '1';
             picker.addEventListener('scroll', syncPickerOverflow, { passive: true });
+            // A vertical wheel scrolls the row sideways, so a mouse can reach the
+            // themes an overflowing row hides (a trackpad's sideways swipe already
+            // can). Without this the row looked stuck once it outgrew its width.
+            picker.addEventListener('wheel', (e) => {
+                if (picker.scrollWidth - picker.clientWidth <= 1)
+                    return;
+                const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+                if (!d)
+                    return;
+                e.preventDefault();
+                picker.scrollLeft += d;
+            }, { passive: false });
             try { new ResizeObserver(syncPickerOverflow).observe(picker); }
             catch (e) { /* the scroll listener alone still covers the common case */ }
         }

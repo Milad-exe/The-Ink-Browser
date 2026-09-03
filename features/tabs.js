@@ -948,7 +948,7 @@ class Tabs {
         catch (e) { log.debug('tabs', '_colorSchemeMode', e); return 'dark'; }
     }
 
-    _applyColorScheme(tab) {
+    _emulateColorScheme(tab, mode) {
         const wc = tab && tab.webContents;
         if (!wc || wc.isDestroyed())
             return;
@@ -956,18 +956,37 @@ class Tabs {
             if (!wc.debugger.isAttached())
                 wc.debugger.attach('1.3');
         }
-        catch (e) {
-            log.debug('tabs', '_applyColorScheme attach', e);
-            return;
-        }
+        catch (e) { log.debug('tabs', 'colour scheme attach', e); return; }
         wc.debugger.sendCommand('Emulation.setEmulatedMedia', {
-            features: [{ name: 'prefers-color-scheme', value: this._colorSchemeMode() }],
-        }).catch((e) => log.debug('tabs', '_applyColorScheme send', e));
+            features: [{ name: 'prefers-color-scheme', value: mode }],
+        }).catch((e) => log.debug('tabs', 'colour scheme send', e));
     }
 
+    // did-navigate: the page has (re)rendered under the current mode.
+    _markColorSchemeRendered(tab) {
+        const mode = this._colorSchemeMode();
+        if (tab) tab._renderedMode = mode;
+        this._emulateColorScheme(tab, mode);
+    }
+
+    // Theme changed: emulate on every tab (CSS-based dark mode restyles live from
+    // this), and reload the ACTIVE tab if its page rendered under the other mode
+    // and won't restyle on its own — JS-driven sites like YouTube/Google read the
+    // scheme once at load, which is why they needed a manual refresh.
     applyColorSchemeAll() {
-        for (const [, tab] of this.tabMap)
-            this._applyColorScheme(tab);
+        const mode = this._colorSchemeMode();
+        for (const [idx, tab] of this.tabMap) {
+            this._emulateColorScheme(tab, mode);
+            if (idx !== this.activeTabIndex)
+                continue;
+            const wc = tab.webContents;
+            const url = (wc && !wc.isDestroyed() && wc.getURL()) || '';
+            if (/^https?:/i.test(url) && tab._renderedMode !== undefined && tab._renderedMode !== mode) {
+                tab._renderedMode = mode;   // set first so did-navigate doesn't re-trigger
+                try { wc.reload(); }
+                catch (e) { log.debug('tabs', 'colour scheme reload', e); }
+            }
+        }
     }
     // Shell margin around the floating page card (matches the shell padding in
     // Browser/styles.css). The page floats in a rounded card on a tinted shell
@@ -1259,6 +1278,7 @@ class Tabs {
             tab.setBounds(this.getTabBounds());
             try { tab.setBorderRadius(this._pageRadius()); } catch (e) { log.debug('tabs', 'showTab', e); }
             tab.setVisible(true);
+            this._emulateColorScheme(tab, this._colorSchemeMode());
             // Sleep bookkeeping: the outgoing tab starts ageing now; the incoming
             // tab is fresh. Wake it if the sleep scan discarded its renderer.
             this.tabLastActive.set(this.activeTabIndex, Date.now());

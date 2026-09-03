@@ -73,6 +73,54 @@ function getForHost(host) {
     const key = keyFor(host);
     return (key && store.get(key)) || '';
 }
+
+// Domain-favicon services, keyed by search engine so the party that sees your
+// typed domains is the same one you already send your queries to. Chrome uses
+// Google's; DuckDuckGo's is the privacy-leaning default for anything else.
+const FAVICON_SERVICE = {
+    google: (d) => `https://www.google.com/s2/favicons?domain=${encodeURIComponent(d)}&sz=64`,
+    duckduckgo: (d) => `https://icons.duckduckgo.com/ip3/${encodeURIComponent(d)}.ico`,
+    bing: (d) => `https://www.google.com/s2/favicons?domain=${encodeURIComponent(d)}&sz=64`,
+};
+// Hosts whose remote lookup returned nothing this session — so typing doesn't
+// re-request them on every keystroke. Not persisted (a site may gain an icon).
+const remoteMisses = new Set();
+
+/**
+ * Cached favicon, else fetch it from the engine's favicon service (for domains
+ * you haven't visited — omnibox suggestions). The result is cached like any
+ * other. Caller decides when this is allowed (never for private windows).
+ */
+async function getForHostRemote(host, engine = 'duckduckgo') {
+    load();
+    const key = keyFor(host);
+    if (!key)
+        return '';
+    const cached = store.get(key);
+    if (cached)
+        return cached;
+    if (remoteMisses.has(key) || inflight.has(key))
+        return '';
+    inflight.add(key);
+    try {
+        const build = FAVICON_SERVICE[engine] || FAVICON_SERVICE.duckduckgo;
+        const data = await fetchDataUrl(build(key));
+        if (data) {
+            store.set(key, data);
+            while (store.size > MAX_HOSTS) {
+                const oldest = store.keys().next().value;
+                store.delete(oldest);
+            }
+            save();
+            return data;
+        }
+        remoteMisses.add(key);
+        return '';
+    }
+    finally {
+        inflight.delete(key);
+    }
+}
 /** Fetch one URL over Electron's net stack → data: URL (or '' on any failure). */
 function fetchDataUrl(url) {
     return new Promise((resolve) => {
@@ -157,4 +205,4 @@ async function remember(pageUrl, faviconUrl) {
     }
 }
 
-module.exports = { getForHost, remember };
+module.exports = { getForHost, getForHostRemote, remember };

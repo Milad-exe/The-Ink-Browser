@@ -67,8 +67,16 @@
             close();
         });
 
-        // Reopened for a different space without the page reloading.
-        window.overlayThemePanel?.onScope?.(() => { location.reload(); });
+        // Reopened for a DIFFERENT space without the page reloading. The scope is
+        // ALSO pushed on the initial open (matching what context() already
+        // returned), so reload only when it actually changes — otherwise the panel
+        // reloaded itself right after opening, flashing the editor away.
+        window.overlayThemePanel?.onScope?.((next) => {
+            if ((next || null) === scope)
+                return;
+            scope = next || null;
+            location.reload();
+        });
     })();
 
     document.getElementById('tp-close')?.addEventListener('click', close);

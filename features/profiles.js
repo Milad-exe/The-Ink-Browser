@@ -263,27 +263,37 @@ function _essentials() {
     }
     return reg.essentials;
 }
-const _same = (a, url, profile, jar) =>
-    a.url === url && (a.profile || null) === (profile || null) && a.jar === jar;
-
-function essentials(id) {
-    const jar = jarOf(id);
-    // `home` is what "go back to its page" uses; unset means the Essential's
-    // own url, so old entries keep working without a migration.
-    return _essentials().filter(e => e.jar === jar).map(e => ({ ...e, home: e.home || e.url }));
+// Essentials are GLOBAL: one set shown in every space, whatever the space's
+// cookie jar. Matched by identity (url + profile); the stored `jar` field is
+// kept for back-compat but ignored on read, so tiles the old per-jar scoping
+// duplicated collapse to one.
+const _identity = (a, url, profile) =>
+    a.url === url && (a.profile || null) === (profile || null);
+function _uniqueCount() {
+    return new Set(_essentials().map(e => `${e.url}|${e.profile || ''}`)).size;
 }
-function addEssential(id, e) {
+function essentials(/* id */) {
+    const seen = new Set();
+    const out = [];
+    for (const e of _essentials()) {
+        const key = `${e.url}|${e.profile || ''}`;
+        if (seen.has(key))
+            continue;
+        seen.add(key);
+        // `home` unset means the Essential's own url — old entries keep working.
+        out.push({ ...e, home: e.home || e.url });
+    }
+    return out;
+}
+function addEssential(_id, e) {
     if (!e || !e.url)
         return false;
-    const jar = jarOf(id);
     const list = _essentials();
-    if (list.some(x => _same(x, e.url, e.profile, jar)))
+    if (list.some(x => _identity(x, e.url, e.profile)))
         return false;
-    // The cap is per jar: twelve tiles is what the rail holds, and a work space
-    // filling up should not stop a personal one from having any.
-    if (list.filter(x => x.jar === jar).length >= ESSENTIALS_MAX)
+    if (_uniqueCount() >= ESSENTIALS_MAX)
         return false;
-    list.push({ url: e.url, title: e.title || e.url, profile: e.profile || null, jar });
+    list.push({ url: e.url, title: e.title || e.url, profile: e.profile || null, jar: 'global' });
     save();
     return true;
 }
@@ -296,15 +306,15 @@ function addEssential(id, e) {
  * front page instead, or vice versa. It defaults to the url the Essential was
  * created from, which stays its identity key.
  */
-function setEssentialHome(id, url, profile, home) {
-    const jar = jarOf(id);
-    const e = _essentials().find(x => _same(x, url, profile, jar));
-    if (!e)
+function setEssentialHome(_id, url, profile, home) {
+    const matches = _essentials().filter(x => _identity(x, url, profile));
+    if (!matches.length)
         return false;
     const next = String(home || '').trim();
     if (next && !/^https?:\/\//i.test(next))
         return false;
-    e.home = next || null;   // null → falls back to the Essential's own url
+    for (const e of matches)
+        e.home = next || null;   // null → falls back to the Essential's own url
     save();
     return true;
 }
@@ -314,36 +324,36 @@ function setEssentialHome(id, url, profile, home) {
  * reason a tile can be called "Mail" rather than the title the site happens to
  * be serving today.
  */
-function renameEssential(id, url, profile, title) {
-    const jar = jarOf(id);
-    const e = _essentials().find(x => _same(x, url, profile, jar));
-    if (!e)
+function renameEssential(_id, url, profile, title) {
+    const matches = _essentials().filter(x => _identity(x, url, profile));
+    if (!matches.length)
         return false;
-    const next = String(title || '').trim().slice(0, 60);
     // Empty falls back to the url, the same default addEssential uses — a tile
     // with no label at all is unclickable-looking.
-    e.title = next || url;
+    const next = String(title || '').trim().slice(0, 60) || url;
+    for (const e of matches)
+        e.title = next;
     save();
     return true;
 }
 // A static icon pinned to an Essential, overriding the live favicon (upstream
 // behaviour: an Essential's icon does not change when the site's does).
-function setEssentialIcon(id, url, profile, icon) {
-    const jar = jarOf(id);
-    const e = _essentials().find(x => _same(x, url, profile, jar));
-    if (!e)
+function setEssentialIcon(_id, url, profile, icon) {
+    const matches = _essentials().filter(x => _identity(x, url, profile));
+    if (!matches.length)
         return false;
-    e.icon = (icon || '').trim().slice(0, 8) || null;
+    const val = (icon || '').trim().slice(0, 8) || null;
+    for (const e of matches)
+        e.icon = val;
     save();
     return true;
 }
-function removeEssential(id, url, profile = null) {
-    const jar = jarOf(id);
+function removeEssential(_id, url, profile = null) {
     const list = _essentials();
-    const i = list.findIndex(x => _same(x, url, profile, jar));
-    if (i === -1)
+    const keep = list.filter(x => !_identity(x, url, profile));
+    if (keep.length === list.length)
         return false;
-    list.splice(i, 1);
+    load().essentials = keep;
     save();
     return true;
 }

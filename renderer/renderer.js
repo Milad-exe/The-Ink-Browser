@@ -582,6 +582,13 @@
                 overlayPointerDown = true;
                 setTimeout(() => { overlayPointerDown = false; }, 350);
             });
+            // Hovering a row in the overlay moves the keyboard selection to match,
+            // so Enter goes to the hovered row. The overlay already repainted the
+            // highlight, so this only updates the index (no re-render).
+            window.suggestions.onHover?.((index) => {
+                if (typeof index === 'number' && index >= 0 && index < currentSuggestions.length)
+                    activeSuggestionIndex = index;
+            });
             if (window.contentInteraction) {
                 window.contentInteraction.onClicked(() => { hideSuggestions(); searchBar.blur(); });
             }
@@ -602,6 +609,19 @@
             window.addEventListener('resize', positionSuggestions);
             window.addEventListener('scroll', positionSuggestions, true);
         }
+        // Alt-tab return: a native tab view doesn't regain focus on window
+        // activation on its own, so the page you were reading came back unfocused
+        // (no scrolling/typing until a click). Hand focus back to the active page —
+        // unless it was in a chrome field (the address bar, a rename box), which
+        // keeps its DOM focus across the switch and should stay put.
+        window.addEventListener('focus', () => {
+            const ae = document.activeElement;
+            const inField = !!(ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable));
+            if (!inField) {
+                try { window.tabsUI.focusPage(); }
+                catch (e) { window.northstarLog?.debug('renderer', 'refocus page: ' + e); }
+            }
+        });
         // ── Suggestion state ──────────────────────────────────────────────────────
         let currentSuggestions = [];
         let activeSuggestionIndex = -1;
@@ -876,6 +896,24 @@
                     e.preventDefault();
                     hideSuggestions();
                     return;
+                }
+                // Shift+Delete forgets a history suggestion, as in Chrome/Firefox.
+                // Only history (bookmarks/open tabs/search aren't "history").
+                if (e.key === 'Delete' && e.shiftKey && activeSuggestionIndex >= 0) {
+                    const item = currentSuggestions[activeSuggestionIndex];
+                    if (item && item.type === 'history' && item.url) {
+                        e.preventDefault();
+                        try { window.browserHistory.remove(item.url); }
+                        catch (err) { window.northstarLog?.debug('renderer', 'forget suggestion: ' + err); }
+                        currentSuggestions.splice(activeSuggestionIndex, 1);
+                        if (activeSuggestionIndex >= currentSuggestions.length)
+                            activeSuggestionIndex = currentSuggestions.length - 1;
+                        if (currentSuggestions.length)
+                            window.suggestions.update(getSuggestionsBounds(), currentSuggestions, activeSuggestionIndex, currentQuery, getSearchEngine());
+                        else
+                            hideSuggestions();
+                        return;
+                    }
                 }
                 if (e.key === 'Enter' && activeSuggestionIndex >= 0) {
                     e.preventDefault();
@@ -2850,9 +2888,13 @@
             else if (afterBtn) {
                 tabsContainer.insertBefore(btn, afterBtn.nextSibling);
             }
+            else if (document.documentElement.dataset.tabbar === 'top') {
+                // Top strip (Chrome-like): a new tab appends at the END of the row.
+                tabsContainer.appendChild(btn);
+            }
             else {
-                // New tabs land at the TOP of the loose-tab section — after the
-                // pinned block and any folders, before the existing tabs.
+                // Sidebar: new tabs land at the TOP of the loose-tab section — after
+                // the pinned block and any folders, before the existing tabs.
                 const firstLoose = [...tabsContainer.querySelectorAll('.tab-button')]
                     .find(b => b !== btn && !b.classList.contains('pinned') && !b.classList.contains('in-folder'));
                 if (firstLoose)
@@ -3422,10 +3464,13 @@
             // Recording outranks audio: you must always see that a tab has your mic.
             // A muted tab keeps its (crossed) speaker while media plays, so there's
             // always something to click to unmute.
+            // Keep the speaker while media is PLAYING, not only while it's audible
+            // this instant — otherwise a quiet passage (between songs, a pause in
+            // dialogue) drops the icon and it flickers back when sound returns.
             const kind = d.capture === 'camera' ? 'camera'
                 : d.capture === 'mic' ? 'mic'
                     : d.muted && d.playing ? 'muted'
-                        : d.audible ? 'audio'
+                        : (d.audible || d.playing) ? 'audio'
                             : null;
             if (!kind) {
                 el?.remove();

@@ -105,7 +105,19 @@ class Persistence {
         fs.writeFileSync(filePath, encrypt(JSON.stringify(data, null, 2)));
     }
     // ── Settings ──────────────────────────────────────────────────────────────
+    /**
+     * Load settings from disk. Distinguishes THREE cases:
+     *  - no file (fresh profile): defaults, and it's safe to write them.
+     *  - file present + decrypts: the real settings.
+     *  - file present but UNREADABLE (the OS secure store is briefly unavailable
+     *    at startup, so the key can't be unwrapped): defaults IN MEMORY, but
+     *    `_loadFailed` is set so we never overwrite the good file with them. A
+     *    later read/write retries the decrypt once the store is up (_reloadIfFailed).
+     * The last case is why the window position (and other settings) used to reset:
+     * defaults were written straight over the real file on the next save.
+     */
     loadSettings() {
+        this._loadFailed = false;
         try {
             if (fs.existsSync(this.settingsPath)) {
                 const plaintext = this.readEncrypted(this.settingsPath);
@@ -113,26 +125,60 @@ class Persistence {
                 return { ...DEFAULTS, ...obj };
             }
         }
-        catch (e) { log.warn('persistence', 'settings file unreadable — starting from defaults', e); }
+        catch (e) {
+            // The file exists but could not be read/decrypted — do NOT let defaults
+            // be persisted over it.
+            this._loadFailed = true;
+            log.warn('persistence', 'settings unreadable (secure store not ready?) — keeping the file, retrying later', e);
+        }
         return { ...DEFAULTS };
     }
+    /** Retry a failed decrypt (the secure store may be available now). Returns
+     *  true once the real settings are in hand. */
+    _reloadIfFailed() {
+        if (!this._loadFailed)
+            return true;
+        try {
+            if (fs.existsSync(this.settingsPath)) {
+                const obj = JSON.parse(this.readEncrypted(this.settingsPath));
+                this.settings = { ...DEFAULTS, ...obj };
+                this._loadFailed = false;
+                return true;
+            }
+            // File vanished — treat as fresh.
+            this._loadFailed = false;
+            return true;
+        }
+        catch (e) {
+            log.debug('persistence', '_reloadIfFailed still failing', e);
+            return false;
+        }
+    }
     save() {
+        // Never overwrite a settings file we could not read: that is exactly how a
+        // transient decrypt failure at startup turned into permanent data loss
+        // (defaults written over the real settings). Skip until the reload works.
+        if (this._loadFailed && !this._reloadIfFailed())
+            return;
         try {
             this.writeEncrypted(this.settingsPath, this.settings);
         }
         catch (e) { log.error('persistence', 'settings could not be written — changes will be lost on restart', e); }
     }
-    getAll() { return { ...this.settings }; }
-    get(key) { return this.settings[key] ?? DEFAULTS[key]; }
+    getAll() { this._reloadIfFailed(); return { ...this.settings }; }
+    get(key) { this._reloadIfFailed(); return this.settings[key] ?? DEFAULTS[key]; }
     set(key, value) {
         if (!(key in DEFAULTS))
             return;
+        // Adopt the real settings first (if a startup decrypt failed) so this write
+        // lands on top of them rather than on defaults.
+        this._reloadIfFailed();
         this.settings[key] = value;
         this.save();
     }
     // Legacy API
-    getPersistMode() { return !!this.settings.persistAllTabs; }
-    setPersistMode(enabled) { this.settings.persistAllTabs = !!enabled; this.save(); }
+    getPersistMode() { this._reloadIfFailed(); return !!this.settings.persistAllTabs; }
+    setPersistMode(enabled) { this._reloadIfFailed(); this.settings.persistAllTabs = !!enabled; this.save(); }
     // ── Tab State ─────────────────────────────────────────────────────────────
     hasState() {
         try {

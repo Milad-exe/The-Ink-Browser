@@ -157,19 +157,28 @@ function apply(id, wm) {
  * space's own theme does — a space switch does not move any window, it changes
  * which theme the windows in that space resolve to.
  */
-function repaintAll(wm) {
-    /* nativeTheme is one global switch and windows can now disagree, so it
-       follows the FOCUSED window: it drives native widgets (scrollbars,
-       pickers, the colour of a native menu), and the window you are looking at
-       is the one those belong to. */
+/* nativeTheme is one global switch and windows can now disagree, so it follows
+   the FOCUSED window: it drives native widgets (scrollbars, pickers, form
+   controls, the page's default colour scheme). Must be re-run on focus changes
+   and after a restore resolves a window into its space — not only on a theme
+   change — or a window opened into a light space keeps the global dark scheme. */
+function syncNativeTheme(wm) {
     let lead = currentId;
     try {
         const focused = wm?.getAllWindows?.().find(w => w.window?.isFocused?.());
         if (focused && readProfileTheme)
             lead = readProfileTheme(focused.profileId) || currentId;
     }
-    catch (e) { log.debug('theme-runtime', 'focused window', e); }
-    nativeTheme.themeSource = themes.resolve(lead).mode === 'light' ? 'light' : 'dark';
+    catch (e) { log.debug('theme-runtime', 'syncNativeTheme', e); }
+    const next = themes.resolve(lead).mode === 'light' ? 'light' : 'dark';
+    // Only write on a real change — re-setting the same value still churns native
+    // widgets, which flashed the UI on every window focus.
+    if (nativeTheme.themeSource !== next)
+        nativeTheme.themeSource = next;
+}
+
+function repaintAll(wm) {
+    syncNativeTheme(wm);
 
     for (const wc of webContents.getAllWebContents()) {
         const id = themeFor(wc);
@@ -273,4 +282,4 @@ function surfacesOf(wm, wd) {
 
 const current = () => currentId;
 
-module.exports = { apply, attach, current, bind, repaintAll, themeFor, previewLive, clearPreview };
+module.exports = { apply, attach, current, bind, repaintAll, syncNativeTheme, themeFor, previewLive, clearPreview };

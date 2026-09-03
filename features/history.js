@@ -205,7 +205,9 @@ class History {
     async removeFromHistory(url, timestamp) {
         try {
             const history = await this.load();
-            this.cache = history.filter(e => !(e.url === url && e.timestamp === timestamp));
+            // With a timestamp, drop that one visit (the History page); without
+            // one, forget every visit to the url (Shift+Delete on a suggestion).
+            this.cache = history.filter(e => !(e.url === url && (timestamp == null || e.timestamp === timestamp)));
             await this._flush(); // deletion is a privacy action — persist now
             return true;
         }

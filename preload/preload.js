@@ -447,7 +447,8 @@ exposeInternal('suggestions', {
     close: () => ipcRenderer.invoke('suggestions-close'),
     onSelected: (handler) => ipcRenderer.on('suggestion-selected', (_e, item) => handler(item)),
     onPointerDown: (handler) => ipcRenderer.on('suggestions-pointer-down', () => handler()),
-    onCreated: (handler) => ipcRenderer.on('suggestions-created', () => handler())
+    onCreated: (handler) => ipcRenderer.on('suggestions-created', () => handler()),
+    onHover: (handler) => ipcRenderer.on('suggestion-hover', (_e, index) => handler(index))
 });
 exposeInternal("electronAPI", {
     windowClick: (pos) => ipcRenderer.send("window-click", pos),

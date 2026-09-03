@@ -149,6 +149,22 @@ function register(ipcMain, { wm }) {
             return false;
         return hideView(wd);
     });
+    // Domain favicon for an omnibox suggestion whose site we haven't visited —
+    // fetched from the search engine's favicon service (Chrome/Firefox do this),
+    // cached like the rest. NEVER for a private window/tab: it would leak the
+    // typed domain, same rule as network search suggestions.
+    ipcMain.handle('favicon-remote', (_e, host) => {
+        const faviconStore = require('../features/favicon-store');
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (!wd)
+            return '';
+        const t = wd.tabs;
+        const active = t && t.tabMap.get(t.activeTabIndex);
+        if (t?.isPrivateWindow || (active && active.isPrivate))
+            return '';
+        const engine = wm.persistence.get('searchEngine') || 'duckduckgo';
+        return faviconStore.getForHostRemote(host, engine);
+    });
     ipcMain.handle('suggestions-select', (_e, item) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd)
@@ -172,6 +188,18 @@ function register(ipcMain, { wm }) {
                     w.window.webContents.send('suggestions-pointer-down');
                 }
                 catch (e) { log.debug('suggestions', 'suggestions-pointer-down', e); }
+                break;
+            }
+        }
+        return true;
+    });
+    // Pointer moved onto a row: tell the chrome so its keyboard selection follows
+    // the mouse (Enter after hovering then goes where the pointer is).
+    ipcMain.handle('suggestions-hover', (_e, index) => {
+        for (const w of wm.getAllWindows()) {
+            if (w.suggestions?.webContents === _e.sender) {
+                try { w.window.webContents.send('suggestion-hover', index); }
+                catch (e) { log.debug('suggestions', 'suggestions-hover', e); }
                 break;
             }
         }

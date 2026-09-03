@@ -32,7 +32,12 @@ ipcRenderer.on('theme-changed', (_e, theme) => {
 contextBridge.exposeInMainWorld('overlaySuggestions', {
     onData: (callback) => ipcRenderer.on('suggestions-data', (_e, payload) => callback(payload)),
     cachedFavicon: (host) => ipcRenderer.invoke('favicon-cached', host),
+    // Fetch a domain favicon from the engine's service when it's not cached
+    // (main refuses this for private windows).
+    remoteFavicon: (host) => ipcRenderer.invoke('favicon-remote', host),
     close: () => ipcRenderer.invoke('suggestions-close'),
     select: (item) => ipcRenderer.invoke('suggestions-select', item),
-    pointerDown: () => ipcRenderer.invoke('suggestions-pointer-down')
+    pointerDown: () => ipcRenderer.invoke('suggestions-pointer-down'),
+    // Pointer moved onto a row — keep the chrome's keyboard selection in sync.
+    hover: (index) => ipcRenderer.invoke('suggestions-hover', index)
 });
