@@ -522,7 +522,7 @@ class Dnr {
             this._invalidate();
             const count = this._rules().filter(r => r.extensionId === ext.id).length;
             if (count)
-                console.log(`[dnr] ${ext.name || ext.id}: ${count} rules active`);
+                log.debug('dnr', `${ext.name || ext.id}: ${count} rules active`);
         }
         catch (e) {
             console.error('[dnr] registerExtension:', e.message);

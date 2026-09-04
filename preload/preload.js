@@ -442,6 +442,10 @@ exposeInternal('faviconCache', {
 // Suggestions overlay controls from the main renderer
 exposeInternal('suggestions', {
     warm: () => ipcRenderer.invoke('suggestions-warm'),
+    // Pre-warm DNS+TCP+TLS to the highlighted suggestion's origin so pressing
+    // Enter starts on a hot connection. Origin-only (never a path or query), and
+    // main preconnects on the ACTIVE tab's session and skips private tabs.
+    preconnect: (origin) => ipcRenderer.send('omnibox-preconnect', origin),
     open: (bounds, items, activeIndex, query, engine) => ipcRenderer.invoke('suggestions-open', { bounds, items, activeIndex, query, engine }),
     update: (bounds, items, activeIndex, query, engine) => ipcRenderer.invoke('suggestions-update', { bounds, items, activeIndex, query, engine }),
     close: () => ipcRenderer.invoke('suggestions-close'),

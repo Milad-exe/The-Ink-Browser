@@ -17,10 +17,19 @@ const defaultBrowser = require('../features/default-browser');
 const { keyProtection } = require('../features/encryption');
 const passwordStore = require('../features/password-store');
 const { broadcastBookmarksChanged } = require('./utils');
-const { sanitizeUrl } = require('../features/url-security');
+const { sanitizeUrl, isSafeExternal } = require('../features/url-security');
+const { isTrustedInternalSender } = require('../features/ipc-guard');
 
 function register(ipcMain, { wm, webContents, app }) {
     const windowOf = (e) => wm.getWindowByWebContents(e.sender)?.window || null;
+    // Credential import/export and cert-exception clearing answer only the app's
+    // own internal pages — never web content or a local file:// page.
+    const trusted = (e, channel) => {
+        if (isTrustedInternalSender(e.sender))
+            return true;
+        log.warn('user-data', `blocked ${channel} from untrusted sender`);
+        return false;
+    };
     const bmFor = (e) => wm.bookmarksFor(wm.profileOf(e.sender));
     const historyFor = (e) => wm.historyFor(wm.profileOf(e.sender));
 
@@ -86,6 +95,7 @@ function register(ipcMain, { wm, webContents, app }) {
 
     // ── Passwords ────────────────────────────────────────────────────────────
     ipcMain.handle('data:import-passwords', async (e) => {
+        if (!trusted(e, 'data:import-passwords')) return { ok: false };
         const win = windowOf(e);
         const { canceled, filePaths } = await dialog.showOpenDialog(win, {
             title: 'Import passwords',
@@ -114,6 +124,7 @@ function register(ipcMain, { wm, webContents, app }) {
     });
 
     ipcMain.handle('data:export-passwords', async (e) => {
+        if (!trusted(e, 'data:export-passwords')) return { ok: false };
         const win = windowOf(e);
         // Exporting passwords writes them in the clear. That is what the format
         // is, so say it plainly and make the user choose it twice.
@@ -187,7 +198,8 @@ function register(ipcMain, { wm, webContents, app }) {
         if (target)
             try { e.sender.loadURL(target); } catch (err) { log.error('cert', 'reload after accept failed', err); }
     });
-    ipcMain.handle('cert:clear-exceptions', () => {
+    ipcMain.handle('cert:clear-exceptions', (e) => {
+        if (!trusted(e, 'cert:clear-exceptions')) return false;
         certErrors.clear();
         return true;
     });
@@ -195,9 +207,10 @@ function register(ipcMain, { wm, webContents, app }) {
     // ── Updates / diagnostics / default browser ──────────────────────────────
     ipcMain.handle('app:check-update', (_e, force) => updates.check({ force: !!force }));
     ipcMain.handle('app:open-release', async (_e, url) => {
-        const safe = sanitizeUrl(url);
-        if (safe)
-            await shell.openExternal(safe);
+        // openExternal hands the URL to the OS, so only http/https — not the
+        // file:/about:/view-source: that sanitizeUrl would let through.
+        if (isSafeExternal(url))
+            await shell.openExternal(url.trim());
     });
     ipcMain.on('notice-dismissed', (_e, id) => {
         const key = String(id || '').slice(0, 40);

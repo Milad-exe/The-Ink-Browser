@@ -12,6 +12,38 @@
     Tabs instance and nothing here requires Tabs back. */
 const log = require('../log');
 
+/* When the custom history tree and Chromium's own session history agree on the
+   adjacent entry, move through it with the NATIVE navigation — that restores the
+   page from the back/forward cache instantly (no refetch, scroll and form state
+   preserved) instead of a full reload. The custom tree stays the source of truth:
+   it has already advanced by one step (goBack/goForward mutated it), so we only
+   take the fast path when the native entry at that offset is exactly the same
+   URL. Any mismatch — a tree that outlived a view replacement (reader/split), a
+   restored tab whose native history holds a single entry, a divergent
+   forward-truncation — falls through to loadURL, i.e. the previous behaviour.
+   So the fast path can only ever make a correct navigation faster, never change
+   where it lands. */
+function nativeHistoryHas(tab, url, dir) {
+    try {
+        const nav = tab.webContents.navigationHistory;
+        if (!nav)
+            return false;
+        if (dir < 0 && !nav.canGoBack())
+            return false;
+        if (dir > 0 && !nav.canGoForward())
+            return false;
+        const target = nav.getActiveIndex() + dir;
+        const len = typeof nav.length === 'function' ? nav.length() : nav.length;
+        if (target < 0 || target >= len)
+            return false;
+        const entry = nav.getEntryAtIndex(target);
+        return !!entry && entry.url === url;
+    }
+    catch {
+        return false;
+    }
+}
+
 module.exports = {
     goBack(index) {
         if (this.tabMap.has(index)) {
@@ -20,7 +52,10 @@ module.exports = {
             const isPriv = this.privateTabs.has(index);
             if (previousUrl && previousUrl !== 'newtab') {
                 tab.setNavigatingProgrammatically(true);
-                tab.webContents.loadURL(previousUrl);
+                if (nativeHistoryHas(tab, previousUrl, -1))
+                    tab.webContents.navigationHistory.goBack();
+                else
+                    tab.webContents.loadURL(previousUrl);
                 this.tabUrls.set(index, previousUrl);
             }
             else if (previousUrl === 'newtab') {
@@ -42,7 +77,10 @@ module.exports = {
             const isPriv = this.privateTabs.has(index);
             if (nextUrl && nextUrl !== 'newtab') {
                 tab.setNavigatingProgrammatically(true);
-                tab.webContents.loadURL(nextUrl);
+                if (nativeHistoryHas(tab, nextUrl, 1))
+                    tab.webContents.navigationHistory.goForward();
+                else
+                    tab.webContents.loadURL(nextUrl);
                 this.tabUrls.set(index, nextUrl);
             }
             else if (nextUrl === 'newtab') {

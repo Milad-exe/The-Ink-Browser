@@ -766,6 +766,26 @@
             currentSuggestions = [];
             activeSuggestionIndex = -1;
         }
+        // Pre-warm the connection to a highlighted suggestion's origin so Enter
+        // starts hot. Only real http(s) URL suggestions (history/bookmark/direct)
+        // — never a search query, a tab switch, or a non-web scheme — and only the
+        // origin, so no path or query string leaves the machine before the user
+        // commits. Deduped per origin; main skips private tabs.
+        let lastPreconnected = '';
+        function preconnectSuggestion(item) {
+            try {
+                if (!item || !item.url || item.type === 'switch-tab' || item.profile)
+                    return;
+                const u = new URL(item.url);
+                if (u.protocol !== 'http:' && u.protocol !== 'https:')
+                    return;
+                if (u.origin === lastPreconnected)
+                    return;
+                lastPreconnected = u.origin;
+                window.suggestions.preconnect?.(u.origin);
+            }
+            catch (e) { window.northstarLog?.debug('renderer', 'preconnectSuggestion: ' + e); }
+        }
         function renderSuggestions(list) {
             if (!userTyping)
                 return;
@@ -775,6 +795,7 @@
                 hideSuggestions();
                 return;
             }
+            preconnectSuggestion(list[0]);
             window.suggestions.open(getSuggestionsBounds(), currentSuggestions, activeSuggestionIndex, currentQuery, getSearchEngine()).catch(() => { });
         }
         function setActiveSuggestion(newIndex) {
@@ -789,6 +810,7 @@
             if (item) {
                 clearGhost();
                 searchBar.value = item.url || item.query || '';
+                preconnectSuggestion(item);
             }
             window.suggestions.update(getSuggestionsBounds(), currentSuggestions, activeSuggestionIndex, currentQuery, getSearchEngine());
         }

@@ -16,6 +16,7 @@ const appIcon = require('../features/app-icon');
 const themes = require('../features/themes');
 const themeRuntime = require('../features/theme-runtime');
 const themeDerive = require('../features/theme-derive');
+const { isTrustedInternalSender } = require('../features/ipc-guard');
 // Privacy / tracking-protection settings routed through the privacy orchestrator.
 const PRIVACY_KEYS = [
     'adBlockEnabled', 'blockThirdPartyCookies', 'httpsUpgrade',
@@ -25,6 +26,13 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
     focusMode.setShortformEnabled(wm, !!wm.persistence.get('blockShortform'));
     // Seed every privacy layer from persisted settings (defaults are maximal).
     PRIVACY_KEYS.forEach(k => privacy.setConfig(k, wm.persistence.get(k)));
+    // Configuration-mutating handlers answer only the app's own internal pages.
+    const trusted = (e, channel) => {
+        if (isTrustedInternalSender(e.sender))
+            return true;
+        log.warn('settings', `blocked ${channel} from untrusted sender`);
+        return false;
+    };
     // ── Settings ──────────────────────────────────────────────────────────────
     // The renderer resolves typed text to a URL synchronously, so it needs the
     // engine list in the settings payload — built-ins included, so there is one
@@ -55,6 +63,7 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
     // ── Language ──────────────────────────────────────────────────────────────
     ipcMain.handle('i18n:locales', () => i18n.locales());
     ipcMain.handle('i18n:set', (_e, id) => {
+        if (!trusted(_e, 'i18n:set')) return i18n.currentLocale();
         const resolved = i18n.setLanguage(id);
         // Every window re-reads its labels; the pages that own their own markup
         // localise on load.
@@ -67,6 +76,7 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
     // ── Per-site zoom ─────────────────────────────────────────────────────────
     ipcMain.handle('zoom:list', () => zoom.all());
     ipcMain.handle('zoom:clear', (_e, origin) => {
+        if (!trusted(_e, 'zoom:clear')) return false;
         zoom.clear(origin || null);
         // Apply immediately to anything currently showing that origin.
         wm.getAllWindows().forEach(w => {
@@ -81,6 +91,7 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
     // ── Search engines ────────────────────────────────────────────────────────
     ipcMain.handle('engines:list', () => searchEngines.all());
     ipcMain.handle('engines:save', (_e, engine) => {
+        if (!trusted(_e, 'engines:save')) return { ok: false };
         try {
             const saved = searchEngines.upsert(engine);
             broadcastEngines();
@@ -91,6 +102,7 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
         }
     });
     ipcMain.handle('engines:remove', (_e, id) => {
+        if (!trusted(_e, 'engines:remove')) return false;
         const removed = searchEngines.remove(id);
         if (removed)
             broadcastEngines();
@@ -104,6 +116,13 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
         });
     }
     ipcMain.handle('settings-set', (_e, key, value) => {
+        // Mutating persisted settings (search engine, privacy toggles, …) is a
+        // trusted-surface action; a web page must not be able to reconfigure the
+        // browser even if it somehow acquired the bridge.
+        if (!isTrustedInternalSender(_e.sender)) {
+            log.warn('settings', 'blocked settings-set from untrusted sender');
+            return false;
+        }
         wm.persistence.set(key, value);
         if (key === 'theme') {
             // One call does the lot: nativeTheme, the dock icon, the
@@ -181,6 +200,10 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
     // cookies/cache/site-data to a time range, so those clear entirely when
     // selected; the range applies to history and download list.
     ipcMain.handle('clear-browsing-data', async (_e, payload) => {
+        if (!isTrustedInternalSender(_e.sender)) {
+            log.warn('settings', 'blocked clear-browsing-data from untrusted sender');
+            return { ok: false };
+        }
         const { session } = require('electron');
         const downloadManager = require('../features/download-manager');
         const { range = 'all', types = {} } = payload || {};
@@ -271,6 +294,7 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
     });
 
     ipcMain.handle('theme-save', (_e, input) => {
+        if (!trusted(_e, 'theme-save')) return { ok: false };
         const list = [...(wm.persistence.get('customThemes') || [])];
         const existing = input?.id ? list.find(t => t.id === input.id) : null;
         const prepared = themes.prepareCustom(input, existing?.id || null);
@@ -293,6 +317,7 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
         return { ok: true, theme: prepared.theme, contrast: prepared.contrast };
     });
     ipcMain.handle('theme-delete', (_e, id) => {
+        if (!trusted(_e, 'theme-delete')) return { ok: false };
         const list = (wm.persistence.get('customThemes') || []).filter(t => t.id !== id);
         wm.persistence.set('customThemes', list);
         // Deleting the theme in use would otherwise leave every window wearing
@@ -306,6 +331,7 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
     });
 
     ipcMain.handle('google-login', async (_e, clientId, clientSecret) => {
+        if (!trusted(_e, 'google-login')) return { success: false, error: 'blocked' };
         try {
             const data = await loginWithGoogle(clientId, clientSecret);
             return { success: true, data };

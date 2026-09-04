@@ -297,6 +297,11 @@ module.exports = {
             if (windowData)
                 focusMode.applyToTab(windowData, tab.webContents, url);
             this.applyYouTubeSpaceFix(tab, url);
+            // Clear the programmatic-nav guard here too (did-navigate already
+            // does): a native back/forward that resolves as a same-document
+            // history navigation (SPA hash/pushState routes) fires only this
+            // event, and a stuck flag would suppress the NEXT real entry.
+            isNavigatingProgrammatically = false;
         });
         tab.isNavigatingProgrammatically = () => isNavigatingProgrammatically;
         tab.setNavigatingProgrammatically = (value) => { isNavigatingProgrammatically = value; };

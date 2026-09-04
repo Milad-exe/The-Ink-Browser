@@ -87,16 +87,22 @@ class TabSleeper {
      * Revive a slept tab: the renderer process is gone, so the page has to be
      * reloaded.
      *
-     * KNOWN GAP vs Chrome: its memory saver restores the scroll position, we
-     * land at the top. Capturing the position needs an async read of the page
-     * before the renderer is discarded, and deferring the discard behind that
-     * read risks a page that never answers keeping its renderer alive — which
-     * would defeat the point.
+     * Scroll position is restored on wake via the SAME path session-restore uses:
+     * the last scrollY the page reported while it was active is still held in
+     * Tabs.tabScroll (a background tab fires no scroll events, so it never
+     * changed), and the tab's did-finish-load listener scrolls there when
+     * `_restoreScroll` is armed. We re-arm it here — to a non-`false` value so the
+     * did-navigate handler does NOT drop the stored position before the reload
+     * finishes — so a woken tab lands where the user left it, not at the top.
+     * (No async read of the dying renderer is needed, so the discard stays
+     * unconditional and a hung page can't keep its process alive.)
      */
     wake(tab) {
         if (!tab)
             return;
         tab.slept = false;
+        // Arm the did-finish-load scroll restore (no-op if nothing was saved).
+        tab._restoreScroll = 'wake';
         try { tab.webContents.reload(); }
         catch (e) { log.debug('tab-sleep', 'wake', e); }
     }

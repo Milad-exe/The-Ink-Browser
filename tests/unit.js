@@ -17,6 +17,7 @@ const Module = require('module');
 const electronStub = {
     app: {
         getPath: () => require('os').tmpdir(),
+        getAppPath: () => path.join(__dirname, '..'),
         getVersion: () => '1.0.0',
         setAsDefaultProtocolClient: () => true,
         isDefaultProtocolClient: () => false,
@@ -206,6 +207,96 @@ test('only http(s) may be handed to the OS', () => {
     assert.strictEqual(isSafeExternal('https://example.com'), true);
     assert.strictEqual(isSafeExternal('file:///etc/passwd'), false);
     assert.strictEqual(isSafeExternal('javascript:alert(1)'), false);
+});
+
+// ── IPC sender trust (privileged handlers) ────────────────────────────────────
+const { isTrustedInternalUrl } = require(path.join(root, 'features/ipc-guard'));
+const { pathToFileURL } = require('url');
+test('a file:// page inside the app root is a trusted internal sender', () => {
+    const url = pathToFileURL(path.join(root, 'renderer/Settings/index.html')).href;
+    assert.strictEqual(isTrustedInternalUrl(url), true);
+    const chrome = pathToFileURL(path.join(root, 'renderer/Browser/index.html')).href;
+    assert.strictEqual(isTrustedInternalUrl(chrome), true);
+});
+test('web content is never a trusted internal sender', () => {
+    assert.strictEqual(isTrustedInternalUrl('https://evil.com/Settings/x'), false);
+    assert.strictEqual(isTrustedInternalUrl('http://localhost/Settings/'), false);
+    assert.strictEqual(isTrustedInternalUrl('chrome-extension://abc/page.html'), false);
+});
+test('a local file outside the app root is not a trusted internal sender', () => {
+    const outside = pathToFileURL(path.join(require('os').tmpdir(), 'evil', 'renderer', 'Settings', 'index.html')).href;
+    assert.strictEqual(isTrustedInternalUrl(outside), false);
+});
+
+// ── Preload selection (privileged Settings preload) ──────────────────────────
+const preloadForPage = require(path.join(root, 'features/tabs/preload-for-page'));
+test('only the internal Settings page gets the privileged preload', () => {
+    assert.ok(preloadForPage('settings').endsWith('settings-preload.js'));
+    const settingsFile = pathToFileURL(path.join(root, 'renderer/Settings/index.html')).href;
+    assert.ok(preloadForPage(settingsFile).endsWith('settings-preload.js'));
+});
+test('a remote /Settings/ url never gets the privileged preload', () => {
+    assert.ok(preloadForPage('https://evil.com/Settings/').endsWith('preload.js'));
+    assert.ok(!preloadForPage('https://evil.com/Settings/').endsWith('settings-preload.js'));
+    assert.ok(preloadForPage('https://example.com/').endsWith('preload.js'));
+    assert.ok(preloadForPage('newtab').endsWith('preload.js'));
+});
+
+// ── Back/forward: native bfcache fast-path vs loadURL fallback ────────────────
+const navMixin = require(path.join(root, 'features/tabs/navigation'));
+function navStub(nativeEntries, nativeActive) {
+    // A tab whose webContents records whether native history or loadURL was used.
+    const calls = { loadURL: null, nativeBack: 0, nativeForward: 0 };
+    let active = nativeActive;
+    const nav = {
+        getActiveIndex: () => active,
+        length: () => nativeEntries.length,
+        getEntryAtIndex: (i) => nativeEntries[i] ? { url: nativeEntries[i] } : undefined,
+        canGoBack: () => active > 0,
+        canGoForward: () => active < nativeEntries.length - 1,
+        goBack: () => { calls.nativeBack++; active--; },
+        goForward: () => { calls.nativeForward++; active++; },
+    };
+    const tab = {
+        setNavigatingProgrammatically: () => { },
+        webContents: { navigationHistory: nav, loadURL: (u) => { calls.loadURL = u; } },
+    };
+    const history = new NavigationHistory();
+    history.initializeTab(1, 'https://a.example/');
+    history.addEntry(1, 'https://b.example/');
+    history.addEntry(1, 'https://c.example/'); // tree now at C
+    const tabs = {
+        tabMap: new Map([[1, tab]]),
+        privateTabs: new Set(),
+        tabUrls: new Map(),
+        navigationHistory: history,
+        _loadBlank: () => { },
+        sendNavigationUpdate: () => { },
+    };
+    return { tabs, tab, calls };
+}
+test('back restores from the native cache when histories agree', () => {
+    // Native history mirrors the tree [A,B,C], active at C.
+    const { tabs, calls } = navStub(['https://a.example/', 'https://b.example/', 'https://c.example/'], 2);
+    navMixin.goBack.call(tabs, 1);
+    assert.strictEqual(calls.nativeBack, 1, 'used native goBack');
+    assert.strictEqual(calls.loadURL, null, 'did not reload');
+    assert.strictEqual(tabs.tabUrls.get(1), 'https://b.example/', 'landed on the right url');
+});
+test('back falls back to loadURL when native history diverges', () => {
+    // Restored-tab shape: native history holds only the current entry.
+    const { tabs, calls } = navStub(['https://c.example/'], 0);
+    navMixin.goBack.call(tabs, 1);
+    assert.strictEqual(calls.nativeBack, 0, 'did not use native goBack');
+    assert.strictEqual(calls.loadURL, 'https://b.example/', 'reloaded the correct url');
+    assert.strictEqual(tabs.tabUrls.get(1), 'https://b.example/', 'landed on the right url');
+});
+test('forward restores from the native cache when histories agree', () => {
+    const { tabs, calls } = navStub(['https://a.example/', 'https://b.example/', 'https://c.example/'], 2);
+    navMixin.goBack.call(tabs, 1); // → B (native)
+    navMixin.goForward.call(tabs, 1); // → C (native)
+    assert.strictEqual(calls.nativeForward, 1, 'used native goForward');
+    assert.strictEqual(tabs.tabUrls.get(1), 'https://c.example/', 'landed on the right url');
 });
 
 // ── Update version comparison ────────────────────────────────────────────────

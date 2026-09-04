@@ -89,7 +89,7 @@ function registerPanel(extensionId, panel) {
         extensionId,
     };
     rec.panels.push(entry);
-    console.log(`[devtools] ${rec.name || extensionId} registered panel "${entry.title}"`);
+    log.debug('devtools-ext', `${rec.name || extensionId} registered panel "${entry.title}"`);
     return entry;
 }
 

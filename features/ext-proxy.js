@@ -77,7 +77,7 @@ async function set(extensionId, session, value = {}) {
     const electronConfig = electronConfigFor(config);
     await session.setProxy(electronConfig);
     applied.set(extensionId, { session, config });
-    console.log(`[proxy] ${extensionId} set mode=${config.mode || 'system'}`);
+    log.debug('ext-proxy', `${extensionId} set mode=${config.mode || 'system'}`);
     return true;
 }
 

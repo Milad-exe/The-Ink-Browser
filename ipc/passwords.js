@@ -11,6 +11,7 @@ const path = require('path');
 const { resolveAppFile } = require('../app-paths');
 const { WebContentsView } = require('electron');
 const store = require('../features/password-store');
+const { isTrustedInternalSender } = require('../features/ipc-guard');
 const { panelBounds, PANEL_RADIUS, W_MD } = require('../features/overlay-bounds');
 const PROMPT_W = W_MD;
 const PROMPT_H = 150;
@@ -95,9 +96,21 @@ function register(ipcMain, { wm }) {
         return { origin, username };
     });
     // ── Management (settings page) ────────────────────────────────────────────
-    ipcMain.handle('passwords-list', () => store.list());
-    ipcMain.handle('passwords-reveal', (_e, id) => store.getPassword(id));
-    ipcMain.handle('passwords-delete', (_e, id) => store.delete(id));
+    // These reveal/mutate stored credentials, so they answer ONLY the app's own
+    // trusted internal pages — never web content, never a local file:// page.
+    const deny = (channel) => log.warn('passwords', `blocked ${channel} from untrusted sender`);
+    ipcMain.handle('passwords-list', (_e) => {
+        if (!isTrustedInternalSender(_e.sender)) { deny('passwords-list'); return []; }
+        return store.list();
+    });
+    ipcMain.handle('passwords-reveal', (_e, id) => {
+        if (!isTrustedInternalSender(_e.sender)) { deny('passwords-reveal'); return null; }
+        return store.getPassword(id);
+    });
+    ipcMain.handle('passwords-delete', (_e, id) => {
+        if (!isTrustedInternalSender(_e.sender)) { deny('passwords-delete'); return false; }
+        return store.delete(id);
+    });
     // ── Prompt overlay helpers ────────────────────────────────────────────────
     function ownerWindow(sender) {
         return wm.getWindowByWebContents(sender)

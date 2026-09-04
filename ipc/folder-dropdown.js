@@ -50,7 +50,7 @@ function register(ipcMain, { wm, screen, webContents }) {
             wd.window.contentView.addChildView(view);
             view.webContents.on('console-message', (_e, level, msg, line) => {
                 const tag = ['', 'warn', 'error', 'debug'][level] || '';
-                console.log(`[dropdown${tag ? ':' + tag : ''}:${line}] ${msg}`);
+                log.debug('folder-dropdown', `[${tag || 'log'}:${line}] ${msg}`);
             });
             view.webContents.send('folder-dropdown-init', {
                 children: folderData.children || [],

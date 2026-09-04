@@ -6,6 +6,7 @@
  *         and session persistence mode.
  */
 const log = require('../features/log');
+const { isTrustedInternalSender } = require('../features/ipc-guard');
 const overlayMenu = require('../features/overlay-menu');
 const { Menu, net } = require('electron');
 const { sanitizeUrl } = require('../features/url-security');
@@ -223,6 +224,10 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         return p;
     });
     ipcMain.handle('profiles:update', (_e, id, patch) => {
+        if (!isTrustedInternalSender(_e.sender)) {
+            log.warn('tabs', 'blocked profiles:update from untrusted sender');
+            return null;
+        }
         const p = profiles.update(id, patch);
         broadcastProfiles();
         // A space's theme is worn by every window in that space, so changing it
@@ -930,6 +935,35 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
             e.sender.session.preconnect({ url: origin, numSockets: 1 });
         }
         catch (e) { log.debug('tabs', 'n', e); }
+    });
+    // ── Omnibox preconnect ─────────────────────────────────────────────────────
+    // The chrome reports the highlighted URL suggestion's origin; warm it on the
+    // ACTIVE tab's session (where the navigation will land) so Enter starts hot.
+    // Skips private tabs so browsing intent for a private tab never touches the
+    // network before the user commits. Origin-only — no path or query string.
+    const omniboxPreconnectCounts = new Map(); // chrome wc.id → count
+    ipcMain.on('omnibox-preconnect', (e, origin) => {
+        try {
+            if (typeof origin !== 'string' || !/^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(origin))
+                return;
+            const wd = wm.getWindowByWebContents(e.sender);
+            if (!wd?.tabs)
+                return;
+            const idx = wd.tabs.activeTabIndex;
+            // Never pre-warm from a private tab, or a whole private window.
+            if (wd.tabs.isPrivateWindow || wd.tabs.privateTabs?.has?.(idx))
+                return;
+            const n = (omniboxPreconnectCounts.get(e.sender.id) || 0) + 1;
+            if (n > 120)
+                return; // per chrome-window lifetime budget
+            if (n === 1)
+                e.sender.once('destroyed', () => omniboxPreconnectCounts.delete(e.sender.id));
+            omniboxPreconnectCounts.set(e.sender.id, n);
+            const active = wd.tabs.tabMap.get(idx);
+            const sess = active?.webContents?.session || e.sender.session;
+            sess.preconnect({ url: origin, numSockets: 1 });
+        }
+        catch (err) { log.debug('tabs', 'omnibox-preconnect', err); }
     });
     // ── Persistence mode ─────────────────────────────────────────────────────
     ipcMain.handle('getPersistMode', () => {

@@ -12,6 +12,7 @@ const extensions = require('../features/extensions');
 const WEB_STORE_URL = 'https://chromewebstore.google.com/';
 // ── Toolbar panel (puzzle icon) — same overlay pattern as the downloads panel ──
 const { panelBounds, PANEL_RADIUS, W_MD } = require('../features/overlay-bounds');
+const { isTrustedInternalSender } = require('../features/ipc-guard');
 const PANEL_WIDTH = W_MD;
 // Mirrors renderer/ExtensionsPanel/styles.css + the shared panel anatomy: a
 // --bar-h head, a --row-h foot over its divider, two-line rows, and an empty
@@ -630,12 +631,21 @@ function register(ipcMain, { wm }) {
             return { ok: false, error: err.message };
         }
     });
+    // Installing/removing/toggling extensions is a trusted-surface action:
+    // answer only the app's own internal pages, never web or local-file content.
+    const extTrusted = (e, channel) => {
+        if (isTrustedInternalSender(e.sender))
+            return true;
+        log.warn('extensions', `blocked ${channel} from untrusted sender`);
+        return false;
+    };
     ipcMain.handle('extensions-list', () => listWithPinned());
-    ipcMain.handle('extensions-remove', (_e, id) => extensions.remove(id));
-    ipcMain.handle('extensions-set-enabled', (_e, id, enabled) => extensions.setEnabled(id, enabled));
-    ipcMain.handle('extensions-open-options', (_e, id) => extensions.openOptions(id));
+    ipcMain.handle('extensions-remove', (_e, id) => extTrusted(_e, 'extensions-remove') ? extensions.remove(id) : false);
+    ipcMain.handle('extensions-set-enabled', (_e, id, enabled) => extTrusted(_e, 'extensions-set-enabled') ? extensions.setEnabled(id, enabled) : false);
+    ipcMain.handle('extensions-open-options', (_e, id) => extTrusted(_e, 'extensions-open-options') ? extensions.openOptions(id) : false);
     // Install by Chrome Web Store ID or URL.
     ipcMain.handle('extensions-install-id', async (_e, idOrUrl) => {
+        if (!extTrusted(_e, 'extensions-install-id')) return { ok: false, error: 'blocked' };
         try {
             const info = await extensions.installById(idOrUrl);
             return { ok: true, ...info };
@@ -646,6 +656,7 @@ function register(ipcMain, { wm }) {
     });
     // mode: 'unpacked' (folder) | 'crx' (file)
     ipcMain.handle('extensions-add', async (_e, mode) => {
+        if (!extTrusted(_e, 'extensions-add')) return { canceled: true };
         const wd = wm.getWindowByWebContents(_e.sender);
         const parent = wd?.window;
         const opts = mode === 'crx'

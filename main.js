@@ -75,6 +75,11 @@ for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
     catch (e) { log.debug('main', 'signal handler', e); }
 }
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
+// HTTP/3 (QUIC): opt every connection into the h3 handshake race. It is TLS 1.3
+// underneath — no security trade-off — and Chromium already falls back to TCP
+// where UDP/443 is blocked, so this only ever speeds up h3-capable CDNs. On by
+// default in Chromium; asserted here so it stays on across Electron upgrades.
+app.commandLine.appendSwitch('enable-quic');
 // Use Chromium's built-in (mock) storage for its cookie/password encryption key
 // instead of the OS keychain. This is a macOS concern ONLY: there, the keychain
 // path pops a "wants to use your confidential information in <app> Safe Storage"
@@ -217,15 +222,27 @@ class Northstar {
             // gets its tokens injected as it loads (features/theme-runtime.js).
             app.on('web-contents-created', (_ev, wc) => themeRuntime.attach(wc));
             // Widevine CDM (castlabs Electron build) — required to decrypt DRM
-            // video such as Crunchyroll / Netflix / Spotify. Must finish loading
-            // before any window is created. No-op on a vanilla Electron binary.
+            // video such as Crunchyroll / Netflix / Spotify. No-op on a vanilla
+            // Electron binary.
+            //
+            // PERF: this is loaded IN PARALLEL, not awaited, so the CDM (which can
+            // take several hundred ms to a second) no longer blocks the first
+            // window from painting. The CDM only has to be ready before DRM
+            // *playback* begins — which is long after startup, once a user visits
+            // a streaming site and hits play — not before a window exists. The
+            // session's security setup below (privacy, permissions, preloads)
+            // still runs before any window is created; only this DRM load moved
+            // off the critical path.
             try {
                 const { components } = require('electron');
-                if (components && components.whenReady)
-                    await components.whenReady();
+                if (components && components.whenReady) {
+                    components.whenReady()
+                        .then(() => log.debug('main', 'Widevine components ready'))
+                        .catch((e) => log.warn('main', 'Widevine components load failed', e));
+                }
             }
             catch (e) {
-                console.error('Widevine components load failed:', e && e.message);
+                log.warn('main', 'Widevine components load failed', e);
             }
             // macOS delivers standard keyboard shortcuts through the application
             // menu's key-equivalents. With no menu (setApplicationMenu(null)) it
