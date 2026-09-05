@@ -1674,6 +1674,10 @@
                 // a submenu that only ever held one child.)
                 if (document.documentElement.dataset.tabbar !== 'top')
                     rows.push(['Toggle compact mode', () => window.tabsUI.toggleCompact()]);
+                // Switch the tab strip between the left sidebar and the top bar.
+                const sideNow = document.documentElement.dataset.tabbar !== 'top';
+                rows.push([sideNow ? 'Tabs on top' : 'Tabs on side',
+                    () => window.northstarSettings.set('tabBarSide', sideNow ? 'top' : 'side')]);
                 rows.push(
                     [T('chrome.newTab', 'New tab'), () => window.palette.open()],
                     ['New folder', newFolderInline],
