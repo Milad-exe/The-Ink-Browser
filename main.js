@@ -53,6 +53,15 @@ if (process.platform === 'win32') {
 // independently (used by the e2e harness). Must run before app.whenReady().
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
+    // Another Northstar already owns this profile. In dev this is almost always
+    // the INSTALLED app still open — say so plainly, because otherwise the dev
+    // build just vanishes ("npm run dev did nothing").
+    if (process.argv.includes('--dev')) {
+        // eslint-disable-next-line no-console
+        console.error('\n[dev] Northstar is already running (probably the installed app).\n' +
+            '      Close it, then run `npm run dev` again — the dev build shares your\n' +
+            '      real profile and can only run as the single instance.\n');
+    }
     app.quit();
 }
 /* A signal is a QUIT, not a kill. Node ends the process on SIGTERM/SIGINT

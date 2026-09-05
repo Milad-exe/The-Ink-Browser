@@ -131,7 +131,17 @@ class Persistence {
             // The file exists but could not be read/decrypted — do NOT let defaults
             // be persisted over it.
             this._loadFailed = true;
-            log.warn('persistence', 'settings unreadable (secure store not ready?) — keeping the file, retrying later', e);
+            // Before app 'ready' the OS secure store isn't up yet, so a failure
+            // here is EXPECTED and self-heals on the first post-ready access
+            // (_reloadIfFailed) — settings load a moment later and are never
+            // clobbered. Only make noise if it is STILL failing after ready, which
+            // would be a real "secure store unavailable" situation.
+            let ready = false;
+            try { ready = app.isReady(); } catch (e2) { /* app not ready */ }
+            if (ready)
+                log.warn('persistence', 'settings unreadable (secure store unavailable) — keeping the file, retrying later', e);
+            else
+                log.debug('persistence', 'settings not yet readable (secure store not up pre-launch); will retry after ready', e);
         }
         return { ...DEFAULTS };
     }

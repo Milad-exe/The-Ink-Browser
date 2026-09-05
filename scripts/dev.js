@@ -25,24 +25,22 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const log = (msg) => console.log(`[dev] ${msg}`);
 
-// Run against a SEPARATE profile from the installed app. Both share the appId
-// com.northstar.browser, so without this the dev launch hits the installed app's
-// single-instance lock (main.js), forwards its argv to it and quits — the dev
-// build never actually runs, and you keep looking at the installed app ("I ran
-// npm run dev but nothing changed"). Its own profile locks independently.
-const DEV_PROFILE = path.join(ROOT, '.dev-profile');
+// The dev build runs on your REAL profile (your tabs/history/settings), so what
+// you see matches the installed app. That profile has a single-instance lock, so
+// the INSTALLED app must be closed first — main.js's --dev lock-failure branch
+// prints a clear message if it is still open, instead of silently quitting.
 
 let electron = null;
 let restarting = false;
 
 function start() {
-    electron = spawn('npx', ['electron', '.', '--dev', `--user-data-dir=${DEV_PROFILE}`], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+    electron = spawn('npx', ['electron', '.', '--dev'], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
     electron.on('exit', (code) => {
         if (restarting) { restarting = false; start(); return; }
         log(`electron exited (${code})`);
         process.exit(code ?? 0);
     });
-    log(`electron started (profile: ${DEV_PROFILE})`);
+    log('electron started (real profile — close the installed app if a window does not appear)');
 }
 
 let timer = null;
