@@ -64,7 +64,12 @@ body::after {
   mask-image: var(--grain-tile);
   -webkit-mask-size: 160px 160px;
   mask-size: 160px 160px;
-  opacity: calc(var(--grain, 0) * 0.4);
+  /* soft-light adds texture that varies the ground both ways instead of just
+     laying bright speckle over it — turning Grain up used to visibly lighten the
+     whole shell, which read as "the colour changed" rather than "grain". Capped
+     low so a full slider is still texture, not a wash. */
+  mix-blend-mode: soft-light;
+  opacity: calc(var(--grain, 0) * 0.22);
 }
 /* The bright hairline along the window's top edge. It was body::after until the
    grain layer needed that slot; it is its own element-free layer on html now so
