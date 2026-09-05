@@ -104,15 +104,14 @@
         };
 
         const paintSwatch = (node, sw) => {
+            // The card is a tiny browser in the theme: a sidebar band (shell), a
+            // page (page/bg), an accent dot and a couple of text bars — so you can
+            // SEE what a theme looks like instead of guessing from one colour.
             node.style.setProperty('--tp-shell', sw.shell);
+            node.style.setProperty('--tp-page', sw.page || sw.bg || sw.shell);
             node.style.setProperty('--tp-accent', sw.accent);
+            node.style.setProperty('--tp-text', sw.text || inkOn(sw.shell));
             node.style.setProperty('--tp-ink', inkOn(sw.shell));
-            /* The accent badge is only drawn for a theme that HAS an accent of
-               its own. Every built-in but Blocks wears the house accent, so
-               badging them all put six identical red discs in a row — which
-               says nothing, and reads as six error markers rather than as a
-               colour. */
-            node.classList.toggle('has-accent', !!sw.ownAccent);
         };
 
         const optionFor = (t) => {
@@ -129,14 +128,17 @@
             const sw = document.createElement('span');
             sw.className = 'theme-swatch';
             paintSwatch(sw, t.swatch);
-            /* The tick lives in the swatch and is revealed by [aria-checked].
-               It used to be an EDIT button here instead — a <button> nested
-               inside a <button role="radio">, which is invalid markup, is not
-               reachable in the tab order, and gave the radio a second action.
-               Editing moved to the caption row below, where it is a control in
-               its own right. */
+            // A miniature of the browser wearing this theme: sidebar + accent
+            // dot on the left, page with text bars on the right, tick when chosen.
+            sw.innerHTML =
+                '<span class="tsw-side"><span class="tsw-dot"></span></span>' +
+                '<span class="tsw-page"><span class="tsw-line"></span><span class="tsw-line short"></span></span>';
             sw.appendChild(svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'));
             b.appendChild(sw);
+            const nm = document.createElement('span');
+            nm.className = 'theme-name';
+            nm.textContent = t.name;
+            b.appendChild(nm);
             b.addEventListener('click', () => choose(t.id));
             // Hover to preview: paint the whole UI in this theme live (no save),
             // so switching is a look, not a leap. Leaving the row (below) drops
@@ -167,9 +169,16 @@
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
         addBtn.className = 'theme-add';
+        addBtn.title = 'New theme';
+        addBtn.setAttribute('aria-label', 'New theme');
         addBtn.appendChild(svg('<path d="M12 5.5v13M5.5 12h13"/>'));
+        const addName = document.createElement('span');
+        addName.className = 'theme-name';
+        addName.textContent = 'New';
+        addBtn.appendChild(addName);
         addBtn.addEventListener('click', () => newTheme());
-        row.appendChild(addBtn);
+        // Sits as the last card in the grid, not adrift at the end of a row.
+        picker.appendChild(addBtn);
 
         const caption = document.createElement('div');
         caption.className = 'theme-current';
@@ -366,6 +375,8 @@
                 picker.textContent = '';
                 for (const t of list)
                     picker.appendChild(optionFor(t));
+                // Keep the "New" card as the last cell (a refresh clears the grid).
+                picker.appendChild(addBtn);
             }
             paint(current);
         }

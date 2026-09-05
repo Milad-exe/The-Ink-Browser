@@ -18,104 +18,82 @@
 
    ONE name is on screen, though — the selected theme's, in the caption below
    the row. See the selection block further down for why. */
-.theme-row {
-  display: flex; align-items: center; gap: var(--sp-4);
-  margin-top: var(--sp-5);
-}
+.theme-row { margin-top: var(--sp-5); }
+/* A browsable GRID of theme cards, not a cramped scroll row of colour discs.
+   Each card is a miniature of the browser in that theme, with its name under it,
+   so you can tell the themes apart and see what each looks like at a glance. */
 .theme-picker {
-  display: flex; align-items: center; gap: var(--sp-5);
-  /* Shrink-to-fit, not grow: `flex: 1` pushed "+" to the far end of a wide
-     Settings column, a lone dashed circle 700px from the swatches it belongs
-     to. It still shrinks and scrolls when the themes outgrow the row. */
-  flex: 0 1 auto; min-width: 0;
-  padding: var(--sp-4) 3px;
-  overflow-x: auto; scrollbar-width: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--sp-4);
+  padding: var(--sp-3) 2px;
+  max-width: 540px;
 }
-.theme-picker::-webkit-scrollbar { display: none; }
-/* The row scrolls with its scrollbar hidden, so the end that still has themes
-   behind it fades — otherwise the last swatch is simply cut in half by the card
-   edge and reads as a rendering fault rather than as "there are more". */
-.theme-picker.overflowing { mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%); }
-.theme-picker.overflowing.at-start { mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%); }
-.theme-picker.overflowing.at-end { mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 100%); }
-
 .theme-option {
-  position: relative; flex-shrink: 0;
-  width: 38px; height: 38px; padding: 0; border: none; cursor: pointer;
-  border-radius: 50%; background: transparent;
-  transition: transform var(--dur-1) var(--ease);
+  position: relative;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 0; border: none; background: none; cursor: pointer;
+  border-radius: 12px;
 }
-.theme-option:hover { transform: scale(1.06); }
-
-/* The swatch is the theme's ground, plain. Two earlier attempts put the accent
-   in the disc itself — a conic wedge, then a diagonal split — and both read as
-   a SHAPE drawn on the swatch rather than as the colour of a theme. The accent
-   is a small badge on the shoulder instead: present when you look for it, and
-   not competing with the ground for what the swatch is. */
+/* The mini-preview: a sidebar band (shell) with an accent dot, and a page
+   (page/bg) with text bars — the theme, shown as itself. */
 .theme-swatch {
   position: relative;
-  display: block; width: 100%; height: 100%; border-radius: 50%;
-  background: var(--tp-shell);
-  box-shadow: inset 0 0 0 0.5px var(--border-2);
+  display: flex; height: 56px; width: 100%;
+  border-radius: 10px; overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--border-2);
+  transition: box-shadow var(--dur-1) var(--ease);
 }
-.theme-swatch.has-accent::after {
-  content: ''; position: absolute; right: 0; bottom: 0;
-  width: 11px; height: 11px; border-radius: 50%;
-  background: var(--tp-accent);
-  box-shadow: 0 0 0 2px var(--surface);
+.tsw-side {
+  flex: 0 0 34%; background: var(--tp-shell);
+  display: flex; align-items: flex-start; padding: 7px 0 0 6px;
+}
+.tsw-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--tp-accent); }
+.tsw-page {
+  flex: 1 1 auto; background: var(--tp-page);
+  display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 0 9px;
+}
+.tsw-line { height: 4px; border-radius: 2px; background: var(--tp-text); opacity: 0.5; }
+.tsw-line.short { width: 58%; opacity: 0.3; }
+
+.theme-name {
+  font-size: var(--fs-micro, 12px); color: var(--text-2);
+  text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* ── Selected ───────────────────────────────────────────────────────────────
-   Three signals, none of them a colour, because a swatch row is the one place
-   where colour cannot carry state — every disc is already a different colour,
-   and the previous treatment (a hairline ring inset in the disc, plus a 6%
-   scale) was invisible on the black swatch, invisible on the light ones, and
-   nowhere near a size change anyone reads.
-
-     1. a TICK in the disc. Apple's HIG puts status in shape plus colour, not
-        colour alone, and a checkmark is what marks the chosen value in a menu;
-        Chrome's Customize panel, iOS's wallpaper and tint pickers and Google
-        Photos all badge the picked swatch the same way. --tp-ink is black or
-        white, chosen per swatch against its own ground in JS, so it reads on
-        Slate and on Clay alike.
-     2. a ring OUTSIDE the disc with a gap, in --text. The old one was drawn in
-        the swatch's own colour and vanished into whatever it was ringing;
-        --text is the one ink guaranteed to clear both --surface and any
-        ground, since the ramp solves it to 4.5:1.
-     3. the caption below the row, which NAMES it.
-
-   This also satisfies WCAG 2.2 SC 1.4.1 — colour is no longer the only visual
-   means of telling the selected swatch from the rest. */
+/* Selected: a tick on the card + an accent ring + the name in full ink. Hover
+   gets a soft ring so the whole card reads as the target. */
 .theme-option .theme-swatch svg {
-  position: absolute; inset: 0; margin: auto;
-  width: 20px; height: 20px;
-  color: var(--tp-ink);
-  opacity: 0; transform: scale(0.6);
+  position: absolute; right: 5px; top: 5px; width: 16px; height: 16px;
+  color: var(--tp-ink); opacity: 0; transform: scale(0.6);
   transition: opacity var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
-  /* A hairline of the ground under the tick, so it survives on a swatch whose
-     accent badge happens to sit behind one of its arms. */
-  filter: drop-shadow(0 0 1px var(--tp-shell));
+  filter: drop-shadow(0 0 1.5px var(--tp-page));
 }
 .theme-option[aria-checked="true"] .theme-swatch svg { opacity: 1; transform: none; }
-.theme-option[aria-checked="true"] {
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--text);
+.theme-option[aria-checked="true"] .theme-swatch {
+  box-shadow: inset 0 0 0 1px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent);
+}
+.theme-option[aria-checked="true"] .theme-name { color: var(--text); font-weight: 550; }
+.theme-option:hover .theme-swatch {
+  box-shadow: inset 0 0 0 1px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 3px var(--text-3);
 }
 .theme-option:focus-visible { outline: none; }
 .theme-option:focus-visible .theme-swatch {
-  box-shadow: inset 0 0 0 0.5px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+  box-shadow: inset 0 0 0 1px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent);
 }
 
-/* "New theme" — outside the radiogroup and outside the scroller, because it is
-   not a theme and because with six themes in a 340px popup it was being pushed
-   off the end of the row it was the only creation affordance in. */
+/* "New theme" — the last card in the grid: a dashed frame with a + and "New". */
 .theme-add {
-  flex: none; width: 32px; height: 32px; padding: 0; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  border: 1px dashed var(--border-2); border-radius: 50%;
-  background: none; color: var(--text-3);
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 0; border: none; background: none; cursor: pointer; color: var(--text-3);
+  border-radius: 12px;
 }
-.theme-add svg { width: 15px; height: 15px; }
-.theme-add:hover { color: var(--text); border-color: var(--text-3); background: var(--hover); }
+.theme-add > svg {
+  width: 100%; height: 56px; box-sizing: border-box; padding: 17px;
+  border: 1.5px dashed var(--border-2); border-radius: 10px;
+}
+.theme-add:hover > svg { border-color: var(--text-3); color: var(--text); background: var(--hover); }
+.theme-add .theme-name { color: var(--text-3); }
 
 /* The caption. Name, what kind of theme it is, and the way into editing it —
    which is also where the edit affordance had to go: it used to be a <button>
