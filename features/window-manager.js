@@ -281,12 +281,11 @@ class WindowManager {
                 navigate(false);
         });
         // Mouse thumb buttons.
+        // Fires when the mouse thumb buttons reach the WINDOW — the case where the
+        // cursor is over the chrome. Over a PAGE the page view swallows
+        // WM_APPCOMMAND before it gets here, so the tab preload also forwards the
+        // buttons (ipc 'nav:mouse'); both routes call the same navigate().
         window.on('app-command', (e, cmd) => {
-            // Diagnostic (file only): confirms the mouse thumb buttons reach the
-            // window. If mouse back/forward does nothing AND this never logs, the
-            // page view is swallowing WM_APPCOMMAND before it reaches us.
-            if (cmd === 'browser-backward' || cmd === 'browser-forward')
-                log.info('window-manager', 'app-command: ' + cmd);
             if (cmd === 'browser-backward') { e.preventDefault?.(); navigate(true); }
             else if (cmd === 'browser-forward') { e.preventDefault?.(); navigate(false); }
         });

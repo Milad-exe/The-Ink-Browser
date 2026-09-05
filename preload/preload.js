@@ -160,6 +160,16 @@ const onLinkRightMouseDown = (event) => {
 };
 document.addEventListener('pointerdown', onLinkRightMouseDown, true);
 document.addEventListener('mousedown', onLinkRightMouseDown, true);
+// Mouse thumb buttons: back = button 3, forward = button 4. Over a page these
+// never reach the window's app-command handler (the page's native view consumes
+// WM_APPCOMMAND), so forward them to the app's own tab navigation. isTrusted
+// stops a web page from faking them.
+document.addEventListener('mousedown', (event) => {
+    if (!event || !event.isTrusted)
+        return;
+    if (event.button === 3) { event.preventDefault(); try { ipcRenderer.send('nav:mouse', 'back'); } catch (e) { } }
+    else if (event.button === 4) { event.preventDefault(); try { ipcRenderer.send('nav:mouse', 'forward'); } catch (e) { } }
+}, true);
 document.addEventListener('selectstart', (event) => {
     if (!suppressLinkSelection)
         return;

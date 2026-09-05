@@ -276,11 +276,17 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const t = wd?.tabs;
         if (!t || !t._sidebarResizing) return;
         t._sidebarResizing = false;
+        if (t._sidebarPoll) { clearInterval(t._sidebarPoll); t._sidebarPoll = null; }
+        if (t._sidebarPollSafety) { clearTimeout(t._sidebarPollSafety); t._sidebarPollSafety = null; }
         if (t._sidebarInput) {
             try { t._sidebarInput.wc.removeListener('input-event', t._sidebarInput.onInput); } catch (e) { log.debug('tabs', 'endResize', e); }
             t._sidebarInput = null;
         }
-        const final = clampW(width, wd);
+        // Trust the LIVE width the cursor poll kept in t.sidebarWidth, not the
+        // `width` a caller passes: the renderer's commit sends its own `pending`,
+        // which is stale because its pointermove never fired over the page view —
+        // using it would snap the sidebar back to where the drag started.
+        const final = clampW(t.sidebarWidth, wd);
         try { wm.persistence.set('sidebarWidth', final); } catch (e) { log.debug('tabs', 'endResize', e); }
         // Width is a global setting — apply to every window so they stay in sync.
         for (const w of wm.windows.values()) {
@@ -299,31 +305,40 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const wd = wm.getWindowByWebContents(_e.sender);
         const t = wd?.tabs;
         if (!t) return;
-        // Diagnostic (file only): confirms the resize handle actually received a
-        // pointer-down. If dragging the sidebar edge does nothing AND this line
-        // never appears in the log, the OS is not delivering the press to the
-        // handle (native page view / non-client area covering it).
-        log.info('tabs', 'sidebar:resize-start (handle received pointer-down)');
         t._sidebarResizing = true;
-        t._diagMoveLogged = false; t._diagRendererLogged = false; // one-shot diagnostics below
-        const wc = t.tabMap.get(t.activeTabIndex)?.webContents;
-        // No active tab (an emptied space) means no page view to steal the
-        // pointer, so the renderer's own pointermove/up drive the drag and there
-        // is nothing to attach to here.
-        if (!wc) return;
-        // input.x is relative to the view's left edge, which sits at the current
-        // sidebar width — so the cursor's window-x is sidebarWidth + input.x.
-        const onInput = (_ev, input) => {
+        // The chrome and the page are separate native views. Once the cursor
+        // crosses the sidebar↔page seam mid-drag, NEITHER the renderer's
+        // pointermove NOR the page view's input-event is delivered to us (the OS
+        // routes the moves to whichever native view is under the cursor, or to
+        // neither) — which is why the drag silently did nothing. So drive the
+        // resize from the OS cursor directly: view-agnostic and always correct.
+        // The new width is simply the cursor's x within the window content.
+        if (t._sidebarPoll) clearInterval(t._sidebarPoll);
+        const tick = () => {
             if (!t._sidebarResizing) return;
-            if (input.type === 'mouseMove') {
-                if (!t._diagMoveLogged) { t._diagMoveLogged = true; log.info('tabs', 'resize: page-view input path firing (input.x=' + input.x + ')'); }
-                applyWidthLive(wd, clampW(t.sidebarWidth + input.x, wd));
+            try {
+                const pt = screen.getCursorScreenPoint();
+                const cb = wd.window.getContentBounds();
+                applyWidthLive(wd, clampW(pt.x - cb.x, wd));
             }
-            else if (input.type === 'mouseUp' || input.type === 'mouseLeave')
-                endResize(wd, t.sidebarWidth);
+            catch (e) { log.debug('tabs', 'resize poll', e); }
         };
-        t._sidebarInput = { wc, onInput };
-        try { wc.on('input-event', onInput); } catch (e) { log.debug('tabs', 'onInput', e); }
+        t._sidebarPoll = setInterval(tick, 16);
+        // Safety net: if every "drag ended" signal is missed (release over a
+        // native view), never let the poll run forever.
+        t._sidebarPollSafety = setTimeout(() => { if (t._sidebarResizing) endResize(wd, t.sidebarWidth); }, 30000);
+        // End on the page view's mouseUp if it does reach us (belt-and-braces;
+        // the renderer's window-level pointerup ends it in the common case).
+        const wc = t.tabMap.get(t.activeTabIndex)?.webContents;
+        if (wc) {
+            const onInput = (_ev, input) => {
+                if (!t._sidebarResizing) return;
+                if (input.type === 'mouseUp' || input.type === 'mouseLeave')
+                    endResize(wd, t.sidebarWidth);
+            };
+            t._sidebarInput = { wc, onInput };
+            try { wc.on('input-event', onInput); } catch (e) { log.debug('tabs', 'onInput', e); }
+        }
     });
     // Chrome context menus are chrome DOM, but the page is a native view painted
     // over it — a click on the page never reaches the chrome, so the menu would
@@ -339,6 +354,17 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     // …and the inverse. Clicking a toolbar button leaves focus on that button,
     // so after Reload the keyboard was aimed at the chrome rather than at the
     // page — the next keystroke went nowhere. Every browser hands focus back.
+    // Mouse thumb buttons forwarded from a page (see preload.js) — the page view
+    // eats WM_APPCOMMAND, so this is how back/forward reach the tab over a page.
+    ipcMain.on('nav:mouse', (_e, dir) => {
+        try {
+            const t = wm.getWindowByWebContents(_e.sender)?.tabs;
+            if (!t) return;
+            if (dir === 'back') t.goBack(t.activeTabIndex);
+            else if (dir === 'forward') t.goForward(t.activeTabIndex);
+        }
+        catch (e) { log.debug('tabs', 'nav:mouse', e); }
+    });
     ipcMain.on('page:focus', (_e) => {
         try {
             const t = wm.getWindowByWebContents(_e.sender)?.tabs;
@@ -372,11 +398,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     });
     ipcMain.handle('sidebar:resize', (_e, w) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        const t = wd?.tabs;
-        if (t?._sidebarResizing) {
-            if (!t._diagRendererLogged) { t._diagRendererLogged = true; log.info('tabs', 'resize: renderer pointermove path firing (w=' + w + ')'); }
-            applyWidthLive(wd, clampW(w, wd));
-        }
+        if (wd?.tabs?._sidebarResizing) applyWidthLive(wd, clampW(w, wd));
     });
     ipcMain.handle('sidebar:resize-commit', (_e, w) => {
         endResize(wm.getWindowByWebContents(_e.sender), w);
