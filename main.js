@@ -351,6 +351,10 @@ class Northstar {
             let startProfile = '1';
             try { startProfile = String(this.windowManager.persistence.loadState()?.profile || '1'); }
             catch (e) { log.debug('main', 'cycle', e); }
+            // Print which build this is, right up front — so a stale `npm start`
+            // or the packaged-vs-source mix-up is obvious in the terminal.
+            try { log.info('main', require('./features/build-info').label()); }
+            catch (e) { log.debug('main', 'build-info', e); }
             this.windowManager.createWindow(800, 600, { profile: startProfile });
             // First launch: offer the import wizard once, the way other browsers
             // do — but only if there is actually another browser to import from.

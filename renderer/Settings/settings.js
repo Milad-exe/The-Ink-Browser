@@ -738,6 +738,14 @@
                 return;
             try {
                 const v = await window.userData.versions();
+                // Front-and-centre: which build this actually is.
+                const av = document.getElementById('about-version');
+                if (av && (v.commit || v.mode)) {
+                    const bits = ['Version ' + (v.app || settings._version || '')];
+                    if (v.commit && v.commit !== 'unknown') bits.push(v.commit);
+                    if (v.mode) bits.push(v.mode);
+                    av.textContent = bits.join(' · ');
+                }
                 for (const [k, val] of Object.entries(v)) {
                     const key = document.createElement('span');
                     key.className = 'k';

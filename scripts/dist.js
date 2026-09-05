@@ -28,11 +28,32 @@
 'use strict';
 
 const { execFileSync, spawnSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 const builder = require('electron-builder');
 const { Platform, Arch } = builder;
 
 const HOST = process.platform; // 'darwin' | 'win32' | 'linux'
+const ROOT = path.join(__dirname, '..');
+const STAMP = path.join(ROOT, 'build-stamp.json');
+
+// Stamp the commit + build time into the pack so the shipped app can report
+// exactly which build it is (see features/build-info.js). Packed because it sits
+// at the project root; removed again after the build.
+function writeBuildStamp() {
+    let commit = 'unknown';
+    try { commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ROOT }).toString().trim(); }
+    catch (e) { /* not a checkout */ }
+    try {
+        if (execFileSync('git', ['status', '--porcelain'], { cwd: ROOT }).toString().trim()) commit += '+';
+    }
+    catch (e) { /* ignore */ }
+    fs.writeFileSync(STAMP, JSON.stringify({ commit, builtAt: new Date().toISOString() }, null, 2));
+    console.log(`build stamp: ${commit} @ ${new Date().toISOString()}`);
+}
+function clearBuildStamp() {
+    try { fs.unlinkSync(STAMP); } catch (e) { /* already gone */ }
+}
 
 // Default archs target what castlabs publishes and what users run: macOS is
 // Apple Silicon only (arm64 — we don't ship Intel), Windows/Linux ship x64.
@@ -115,6 +136,7 @@ async function main() {
     if (!build.length) { console.error('\n✗ No requested platform is buildable on this host.'); process.exit(1); }
 
     assertSigningReady();
+    writeBuildStamp();
 
     const results = [];
     for (const key of build) {
@@ -145,7 +167,8 @@ async function main() {
     console.log('');
 
     const bad = results.some(r => !r.ok || (r.vmp && process.env.SKIP_VMP !== '1' && r.warned));
+    clearBuildStamp();
     process.exit(bad ? 1 : 0);
 }
 
-main().catch(err => { console.error(err); process.exit(1); });
+main().catch(err => { clearBuildStamp(); console.error(err); process.exit(1); });

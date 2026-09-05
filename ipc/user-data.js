@@ -251,13 +251,19 @@ function register(ipcMain, { wm, webContents, app }) {
         const lvl = ['debug', 'warn', 'error'].includes(level) ? level : 'debug';
         log[lvl](String(scope || 'renderer').slice(0, 40), String(message || '').slice(0, 200));
     });
-    ipcMain.handle('app:version', () => ({
-        app: app.getVersion(),
-        electron: process.versions.electron,
-        chrome: process.versions.chrome,
-        node: process.versions.node,
-        platform: `${process.platform} ${process.arch}`,
-    }));
+    ipcMain.handle('app:version', () => {
+        const build = require('../features/build-info').get();
+        return {
+            app: app.getVersion(),
+            commit: build.commit,
+            builtAt: build.builtAt,
+            mode: build.mode,
+            electron: process.versions.electron,
+            chrome: process.versions.chrome,
+            node: process.versions.node,
+            platform: `${process.platform} ${process.arch}`,
+        };
+    });
 }
 
 module.exports = { register };
