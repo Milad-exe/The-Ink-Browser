@@ -138,6 +138,14 @@
             sw.appendChild(svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'));
             b.appendChild(sw);
             b.addEventListener('click', () => choose(t.id));
+            // Hover to preview: paint the whole UI in this theme live (no save),
+            // so switching is a look, not a leap. Leaving the row (below) drops
+            // the preview back to the committed theme. Skip the one already on and
+            // any theme with no wheel seed (the plain built-ins apply on click).
+            b.addEventListener('mouseenter', () => {
+                if (t.id === current || !t.seed) return;
+                try { T.live?.(t.seed); } catch (e) { }
+            });
             return b;
         };
 
@@ -152,6 +160,10 @@
         row.className = 'theme-row';
         picker.parentNode.insertBefore(row, picker);
         row.appendChild(picker);
+        // Leaving the swatch row drops any hover preview back to the committed
+        // theme. (Clicking a swatch commits before the pointer leaves, so the
+        // choice sticks; this only undoes an un-chosen hover.)
+        row.addEventListener('mouseleave', () => { try { T.live?.(null); } catch (e) { } });
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
         addBtn.className = 'theme-add';
