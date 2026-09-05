@@ -282,6 +282,11 @@ class WindowManager {
         });
         // Mouse thumb buttons.
         window.on('app-command', (e, cmd) => {
+            // Diagnostic (file only): confirms the mouse thumb buttons reach the
+            // window. If mouse back/forward does nothing AND this never logs, the
+            // page view is swallowing WM_APPCOMMAND before it reaches us.
+            if (cmd === 'browser-backward' || cmd === 'browser-forward')
+                log.info('window-manager', 'app-command: ' + cmd);
             if (cmd === 'browser-backward') { e.preventDefault?.(); navigate(true); }
             else if (cmd === 'browser-forward') { e.preventDefault?.(); navigate(false); }
         });

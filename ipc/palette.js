@@ -118,6 +118,14 @@ async function openFor(wd) {
         }
         try { view.webContents.focus(); }
         catch (e) { log.debug('palette', 'openFor', e); }
+        // Re-assert focus a beat later. Opening ⌘T right after a new tab was
+        // created leaves the just-loaded page holding focus; the page (or the
+        // view's own show) can win the focus race, so the palette opened without
+        // the caret. A second focus once everything has settled keeps it.
+        setTimeout(() => {
+            try { if (wd.paletteOpen && wd.palette && !wd.palette.webContents.isDestroyed()) wd.palette.webContents.focus(); }
+            catch (e) { log.debug('palette', 'openFor refocus', e); }
+        }, 60);
         return true;
     }
     catch (err) {

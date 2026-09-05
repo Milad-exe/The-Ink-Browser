@@ -49,7 +49,10 @@ module.exports = {
         if (this.tabMap.has(index)) {
             const tab = this.tabMap.get(index);
             const previousUrl = this.navigationHistory.goBack(index);
-            const isPriv = this.privateTabs.has(index);
+            // Only navigate to a REAL previous page. The new-tab page is the
+            // history root, not a destination — going "back" to a blank tab is
+            // never what the user wants (and canGoBack already refuses it), so a
+            // null/'newtab' result is a no-op rather than blanking the tab.
             if (previousUrl && previousUrl !== 'newtab') {
                 tab.setNavigatingProgrammatically(true);
                 if (nativeHistoryHas(tab, previousUrl, -1))
@@ -57,17 +60,8 @@ module.exports = {
                 else
                     tab.webContents.loadURL(previousUrl);
                 this.tabUrls.set(index, previousUrl);
+                this.sendNavigationUpdate(index);
             }
-            else if (previousUrl === 'newtab') {
-                tab.setNavigatingProgrammatically(true);
-                this._loadBlank(tab);
-                this.tabUrls.set(index, 'newtab');
-            }
-            else {
-                this._loadBlank(tab);
-                this.tabUrls.set(index, 'newtab');
-            }
-            this.sendNavigationUpdate(index);
         }
     },
     goForward(index) {

@@ -305,6 +305,7 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         // handle (native page view / non-client area covering it).
         log.info('tabs', 'sidebar:resize-start (handle received pointer-down)');
         t._sidebarResizing = true;
+        t._diagMoveLogged = false; t._diagRendererLogged = false; // one-shot diagnostics below
         const wc = t.tabMap.get(t.activeTabIndex)?.webContents;
         // No active tab (an emptied space) means no page view to steal the
         // pointer, so the renderer's own pointermove/up drive the drag and there
@@ -314,8 +315,10 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         // sidebar width — so the cursor's window-x is sidebarWidth + input.x.
         const onInput = (_ev, input) => {
             if (!t._sidebarResizing) return;
-            if (input.type === 'mouseMove')
+            if (input.type === 'mouseMove') {
+                if (!t._diagMoveLogged) { t._diagMoveLogged = true; log.info('tabs', 'resize: page-view input path firing (input.x=' + input.x + ')'); }
                 applyWidthLive(wd, clampW(t.sidebarWidth + input.x, wd));
+            }
             else if (input.type === 'mouseUp' || input.type === 'mouseLeave')
                 endResize(wd, t.sidebarWidth);
         };
@@ -369,7 +372,11 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
     });
     ipcMain.handle('sidebar:resize', (_e, w) => {
         const wd = wm.getWindowByWebContents(_e.sender);
-        if (wd?.tabs?._sidebarResizing) applyWidthLive(wd, clampW(w, wd));
+        const t = wd?.tabs;
+        if (t?._sidebarResizing) {
+            if (!t._diagRendererLogged) { t._diagRendererLogged = true; log.info('tabs', 'resize: renderer pointermove path firing (w=' + w + ')'); }
+            applyWidthLive(wd, clampW(w, wd));
+        }
     });
     ipcMain.handle('sidebar:resize-commit', (_e, w) => {
         endResize(wm.getWindowByWebContents(_e.sender), w);

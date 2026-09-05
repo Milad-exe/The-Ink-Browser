@@ -23,6 +23,7 @@
 const { app, nativeTheme, webContents } = require('electron');
 const themes = require('./themes');
 const log = require('./log');
+const { frameAlive } = require('./wc-ready');
 
 /* wc.id → the insertCSS key currently applied, so a switch removes the old
    palette instead of stacking a new one on top of it. */
@@ -92,7 +93,7 @@ function isAppSurface(wc) {
 }
 
 async function applyCssTo(wc, id) {
-    if (!isAppSurface(wc))
+    if (!isAppSurface(wc) || !frameAlive(wc))
         return;
     const css = themes.themeCss(id);
     const prev = applied.get(wc.id);
@@ -129,6 +130,8 @@ function attach(wc) {
     // Resolved per surface, not once globally: two windows can be in two
     // spaces wearing two different themes.
     const paint = () => {
+        if (!frameAlive(wc))
+            return;
         const id = themeFor(wc);
         try { wc.send('theme-changed', id); }
         catch (e) { log.debug('theme-runtime', 'attach send', e); }
@@ -181,6 +184,12 @@ function repaintAll(wm) {
     syncNativeTheme(wm);
 
     for (const wc of webContents.getAllWebContents()) {
+        // Skip a surface whose frame is being torn down (navigation / reload /
+        // dev hot-reload). Sending to it throws "Render frame was disposed" and
+        // could otherwise leave the paint half-done; its own dom-ready handler
+        // (see attach) re-paints it the moment it is back.
+        if (!frameAlive(wc))
+            continue;
         const id = themeFor(wc);
         try { wc.send('theme-changed', id); }
         catch (e) { log.debug('theme-runtime', 'broadcast', e); }

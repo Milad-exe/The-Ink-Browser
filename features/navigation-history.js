@@ -123,7 +123,13 @@ class NavigationHistory {
             return false;
         }
         const predecessor = tabHistory.tree.findPredecessor(currentNode);
-        return predecessor !== null;
+        if (!predecessor)
+            return false;
+        // The new-tab page is the tree's root placeholder, not a real place — there
+        // is nothing meaningful to go "back" to, so don't offer it.
+        if (predecessor.data === 'newtab')
+            return false;
+        return true;
     }
     canGoForward(tabIndex) {
         if (!this.tabHistories.has(tabIndex)) {

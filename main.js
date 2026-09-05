@@ -420,7 +420,10 @@ class Northstar {
                     fs.watch(path.join(__dirname, 'renderer'), { recursive: true }, () => {
                         clearTimeout(reloadTimer);
                         reloadTimer = setTimeout(() => {
+                            const { frameAlive } = require('./features/wc-ready');
                             for (const wc of webContents.getAllWebContents()) {
+                                if (!frameAlive(wc))
+                                    continue;
                                 const url = wc.getURL();
                                 if (!url.startsWith('file://'))
                                     continue;
