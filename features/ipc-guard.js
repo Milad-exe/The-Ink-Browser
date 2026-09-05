@@ -49,14 +49,19 @@ function isTrustedInternalUrl(url) {
         return false;
     let filePath;
     try {
-        filePath = path.normalize(decodeURIComponent(parsed.pathname));
+        filePath = decodeURIComponent(parsed.pathname);
     }
     catch {
         return false;
     }
-    // On Windows a file URL path is "/C:/…"; strip the leading slash before a drive.
+    // On Windows a file URL path is "/C:/…"; strip the leading slash before the
+    // drive letter. This MUST happen before path.normalize — normalize rewrites
+    // the leading "/" as "\", after which this test no longer matches and every
+    // trusted page (the chrome and every internal page) was wrongly rejected as
+    // untrusted, silently blocking all privileged IPC on Windows.
     if (process.platform === 'win32' && /^\/[a-zA-Z]:/.test(filePath))
         filePath = filePath.slice(1);
+    filePath = path.normalize(filePath);
     const rel = path.relative(root, filePath);
     // Inside the root, and not escaping it via "..".
     return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel);
