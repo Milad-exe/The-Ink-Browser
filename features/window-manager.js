@@ -130,6 +130,22 @@ class WindowManager {
         try { wd.tabs.broadcastFolders(); }
         catch (e) { log.debug('window-manager', 'switchWorkspace', e); }
     }
+    // Sidebar ⇄ top-strip, in one place so the Settings toggle, the ⌘⇧S shortcut
+    // and the context-menu item all reflow identically: persist the choice, then
+    // every window re-lays its chrome (renderer) and re-fits its page views.
+    setTabBarSide(value) {
+        const v = value === 'top' ? 'top' : 'side';
+        try { this.persistence.set('tabBarSide', v); }
+        catch (e) { log.debug('window-manager', 'setTabBarSide', e); }
+        for (const w of this.windows.values()) {
+            try {
+                w.window.webContents.send('tabbar-side-changed', v);
+                w.tabs.resizeAllTabs();
+            }
+            catch (e) { log.debug('window-manager', 'setTabBarSide reflow', e); }
+        }
+        return v;
+    }
     _clampBoundsToDisplays(bounds) {
         try {
             const displays = screen.getAllDisplays();

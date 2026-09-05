@@ -189,6 +189,18 @@ class WindowContextMenu {
             label: i18n.t('chrome.newTab'),
             click: () => { require('./palette-bridge').openFor(windowData); },
         });
+        // Tab-strip placement — the same choice as Settings and ⌘⇧S, here where
+        // the strip itself is.
+        const wm = this.windowManager;
+        let mode = 'side';
+        try { mode = wm.persistence.get('tabBarSide') ?? 'side'; }
+        catch (e) { log.debug('window-context-menu', 'tabBarSide', e); }
+        this.sep();
+        this.contextTemplate.push(
+            { label: 'Tabs on Side', type: 'radio', checked: mode !== 'top', click: () => wm.setTabBarSide('side') },
+            { label: 'Tabs on Top', type: 'radio', checked: mode === 'top', click: () => wm.setTabBarSide('top') },
+        );
+        this.sep();
         const closed = windowData.tabs.closedTabHistory;
         if (closed && closed.length > 0) {
             this.contextTemplate.push({

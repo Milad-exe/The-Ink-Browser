@@ -18,6 +18,21 @@ const { WebContentsView } = require('electron');
 // One full-width bar, floating over the page. The margin is the shell's own
 // gutter doubled (--sp-6), not a number of its own.
 const BAR_MAXW = 760, BAR_H = 84, MARGIN = 16;
+// executeJavaScript on a tab whose render frame is mid-navigation (being
+// disposed) throws "Render frame was disposed before WebFrameMain could be
+// accessed" — Electron logs it to the console even when the promise rejection is
+// caught. Only run script when the main frame is actually reachable.
+function canRunJs(wc) {
+    try {
+        if (!wc || wc.isDestroyed() || wc.isCrashed())
+            return false;
+        const f = wc.mainFrame;
+        // Touching a property of a disposed WebFrameMain throws; a live frame has
+        // a numeric routingId.
+        return !!f && typeof f.routingId === 'number';
+    }
+    catch (e) { return false; }
+}
 // Reads playback state from the page. Prefers MediaSession metadata (YouTube,
 // Spotify, SoundCloud all set it) and falls back to the document title.
 const READ_STATE_JS = `(() => {
@@ -172,10 +187,12 @@ async function pushState(wd) {
         return;
     }
     let s = null;
-    try {
-        s = await tab.webContents.executeJavaScript(READ_STATE_JS, true);
+    if (canRunJs(tab.webContents)) {
+        try {
+            s = await tab.webContents.executeJavaScript(READ_STATE_JS, true);
+        }
+        catch (e) { log.debug('mini-player', 'pushState', e); }
     }
-    catch (e) { log.debug('mini-player', 'pushState', e); }
     if (!s) {
         // No media element or session left on the bound tab (it navigated away,
         // or the media ended and was removed) and nothing is audible — the panel
@@ -242,10 +259,12 @@ async function action(wd, act, value) {
     if (!tab)
         return;
     if (act === 'toggle') {
-        try {
-            await tab.webContents.executeJavaScript(TOGGLE_JS, true);
+        if (canRunJs(tab.webContents)) {
+            try {
+                await tab.webContents.executeJavaScript(TOGGLE_JS, true);
+            }
+            catch (e) { log.debug('mini-player', 'if', e); }
         }
-        catch (e) { log.debug('mini-player', 'if', e); }
         pushState(wd);
     }
     else if (act === 'mute') {
@@ -257,18 +276,22 @@ async function action(wd, act, value) {
     }
     else if (act === 'seek') {
         const frac = Math.max(0, Math.min(1, Number(value) || 0));
-        try {
-            await tab.webContents.executeJavaScript(SEEK_JS(frac), true);
+        if (canRunJs(tab.webContents)) {
+            try {
+                await tab.webContents.executeJavaScript(SEEK_JS(frac), true);
+            }
+            catch (e) { log.debug('mini-player', 'if', e); }
         }
-        catch (e) { log.debug('mini-player', 'if', e); }
         pushState(wd);
     }
     else if (act === 'volume') {
         const vol = Math.max(0, Math.min(1, Number(value) || 0));
-        try {
-            await tab.webContents.executeJavaScript(VOLUME_JS(vol), true);
+        if (canRunJs(tab.webContents)) {
+            try {
+                await tab.webContents.executeJavaScript(VOLUME_JS(vol), true);
+            }
+            catch (e) { log.debug('mini-player', 'if', e); }
         }
-        catch (e) { log.debug('mini-player', 'if', e); }
         pushState(wd);
     }
     else if (act === 'goto') {

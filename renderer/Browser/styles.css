@@ -367,12 +367,15 @@ html[data-tabbar="side"] #tab-bar {
    receiving mouse events (this broke sidebar resizing on Windows entirely). */
 html[data-tabbar="side"]:not([data-compact="on"]) .sidebar-resizer {
   display: block; position: absolute; top: 0; bottom: 0; right: 0;
-  width: 10px; z-index: 30; cursor: col-resize; -webkit-app-region: no-drag;
+  /* A wider grab band that reaches further INTO the sidebar (never past its right
+     edge), so the pointer lands on chrome rather than on the native page view's
+     first column at the seam — where clicks were being swallowed. */
+  width: 16px; z-index: 30; cursor: col-resize; -webkit-app-region: no-drag !important;
 }
 /* The drag target stays full-height, but the visible indicator is a short grip
    pinned to the seam — a full-height rule read as a border, not a handle. */
 .sidebar-resizer::after {
-  content: ''; position: absolute; right: 2px; width: 3px;
+  content: ''; position: absolute; right: 4px; width: 3px;
   top: 50%; height: 48px; transform: translateY(-50%); border-radius: 3px;
   /* Faintly visible at rest so the handle is discoverable (a 48px grip, not a
      full-height line, so it reads as a handle rather than a border). */

@@ -132,16 +132,11 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
             themeRuntime.apply(value, wm);
         }
         if (key === 'tabBarSide') {
-            // Switching sidebar ⇄ top strip: every window reflows its chrome and
-            // resizes its page view. Centralised here so the Settings toggle and
-            // the CmdOrCtrl+Shift+S shortcut share one path.
-            wm.getAllWindows().forEach(w => {
-                try {
-                    w.window.webContents.send('tabbar-side-changed', value);
-                    w.tabs.resizeAllTabs();
-                }
-                catch (e) { log.debug('settings', 'tabBarSide', e); }
-            });
+            // Switching sidebar ⇄ top strip reflows every window. One shared path
+            // for the Settings toggle, the ⌘⇧S shortcut and the context menu.
+            // (persistence was already set above; setTabBarSide re-sets the same
+            // value harmlessly and does the reflow.)
+            wm.setTabBarSide(value);
         }
         if (key === 'utilityBar') {
             // Chrome windows re-apply toolbar visibility live.

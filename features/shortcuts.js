@@ -55,6 +55,16 @@ class Shortcuts {
             return;
         for (const [accelerator, callback] of this.shortcuts) {
             if (this.matchesAccelerator(input, accelerator)) {
+                // A shortcut firing while the command palette is up dismisses it
+                // first — the omnibox should go away when another shortcut takes
+                // over, not sit on top of the state the shortcut just changed.
+                // Done before the callback so re-opening it (⌘T) still wins.
+                try {
+                    const wd = this.getWindowData();
+                    if (wd?.paletteOpen)
+                        require('./palette-bridge').hidePalette(wd, { committed: false });
+                }
+                catch (e) { log.debug('shortcuts', 'handleInput palette', e); }
                 const result = callback();
                 if (result !== false)
                     event.preventDefault();
@@ -381,21 +391,11 @@ class Shortcuts {
         // Applies to every window: chrome reflows + page bounds resize.
         this.registerShortcut('CmdOrCtrl+Shift+S', () => {
             const p = this.tabManager?.persistence;
-            if (!p)
+            if (!p || !this.windowManager)
                 return;
             const next = (p.get('tabBarSide') ?? 'side') === 'top' ? 'side' : 'top';
-            // The reflow (broadcast + resize) lives in ipc/settings.js's
-            // settings-set handler now, so setting the key is enough — but the
-            // shortcut writes persistence directly, so do the broadcast here too.
-            p.set('tabBarSide', next);
-            const all = this.windowManager ? this.windowManager.getAllWindows() : [];
-            for (const wd of all) {
-                try {
-                    wd.window.webContents.send('tabbar-side-changed', next);
-                    wd.tabs.resizeAllTabs();
-                }
-                catch (e) { log.debug('shortcuts', 'next', e); }
-            }
+            // One shared path (persist + reflow every window) — see setTabBarSide.
+            this.windowManager.setTabBarSide(next);
         });
         // Toggle focus mode
         this.registerShortcut('CmdOrCtrl+Shift+F', () => {

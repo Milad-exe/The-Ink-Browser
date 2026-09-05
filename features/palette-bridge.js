@@ -22,8 +22,8 @@ function openFor(wd) {
     try { return impl && impl.openFor ? impl.openFor(wd) : false; }
     catch { return false; }
 }
-function hidePalette(wd) {
-    try { return impl && impl.hidePalette ? impl.hidePalette(wd) : false; }
+function hidePalette(wd, opts) {
+    try { return impl && impl.hidePalette ? impl.hidePalette(wd, opts) : false; }
     catch { return false; }
 }
 

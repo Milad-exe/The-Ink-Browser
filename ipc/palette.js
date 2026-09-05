@@ -27,29 +27,37 @@ async function ensurePalette(wd) {
     view.setVisible(false);
     wd.palette = view;
     wd.window.contentView.addChildView(view);
+    // Route app shortcuts (⌘T, ⌘⇧S, …) through the window's handler even while the
+    // palette holds keyboard focus — so those keys still fire, and the palette is
+    // dismissed by them (see Shortcuts.handleInput) instead of swallowing them.
+    try { wd.shortcuts?.registerWebContents(view.webContents); }
+    catch (e) { log.debug('palette', 'registerWebContents', e); }
     view.webContents.loadFile(resolveAppFile('renderer/Palette/index.html'));
     wd.paletteReady = new Promise(res => view.webContents.once('did-finish-load', () => res()));
     await wd.paletteReady;
     return view;
 }
 
-function hidePalette(wd) {
+function hidePalette(wd, opts = {}) {
     if (!wd?.palette) return;
     try {
         wd.palette.setVisible(false);
         wd.paletteOpen = false;
         // The overlay took keyboard focus when it opened; hand it back or the
-        // window is left with nothing focused and the next accelerator beeps.
-        // On a blank new-tab page there is nothing to type into, so the address
-        // bar takes the caret. On any real page (or internal page) the focus
-        // goes back to the TAB VIEW — otherwise dismissing the palette leaves the
-        // page without keyboard focus, i.e. "the window loses context".
+        // window is left with nothing focused and the next accelerator does
+        // nothing until the user clicks the page ("⌘T stops working"). Where the
+        // focus goes:
+        //   • committed (a page was opened) → the active tab's view, so keys reach
+        //     the page immediately;
+        //   • a real/internal page is already active → that tab's view;
+        //   • otherwise a blank new-tab → the chrome, caret in the address bar.
         try {
             const t = wd.tabs;
+            const tab = t?.tabMap?.get(t.activeTabIndex);
             const url = t ? String(t.tabUrls.get(t.activeTabIndex) || '') : '';
             const isNewtab = !url || url === 'newtab';
-            const tab = t?.tabMap?.get(t.activeTabIndex);
-            if (!isNewtab && tab && tab.webContents && !tab.webContents.isDestroyed()) {
+            const tabAlive = tab && tab.webContents && !tab.webContents.isDestroyed();
+            if ((opts.committed || !isNewtab) && tabAlive) {
                 tab.webContents.focus();
             }
             else {
@@ -153,11 +161,11 @@ function register(ipcMain, { wm }) {
             return false;
         }
     });
-    // 'done' closes after the palette opened something; 'dismiss' closes with
-    // nothing created. Both just hide the view.
-    for (const ch of ['palette:done', 'palette:dismiss']) {
-        ipcMain.on(ch, (_e) => hidePalette(wm.getWindowByWebContents(_e.sender)));
-    }
+    // 'done' closes after the palette opened something (focus goes to that page);
+    // 'dismiss' closes with nothing created (focus falls back to the address bar
+    // on a blank tab).
+    ipcMain.on('palette:done', (_e) => hidePalette(wm.getWindowByWebContents(_e.sender), { committed: true }));
+    ipcMain.on('palette:dismiss', (_e) => hidePalette(wm.getWindowByWebContents(_e.sender), { committed: false }));
 }
 
 /* features/ reaches the palette through features/palette-bridge, never by
