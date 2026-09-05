@@ -25,6 +25,15 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const log = (msg) => console.log(`[dev] ${msg}`);
 
+// Spawn the electron BINARY directly, not `npx electron` through a shell. With
+// shell:true on Windows the child is cmd.exe and kill() only terminates that
+// wrapper, orphaning the real electron.exe — which keeps holding the profile's
+// single-instance lock, so every restart leaked a process and the next launch
+// lost the lock. `require('electron')` from Node returns the executable path, so
+// kill() now hits electron.exe itself (a graceful quit that also ends its
+// helpers and releases the lock).
+const ELECTRON = require('electron');
+
 // The dev build runs on your REAL profile (your tabs/history/settings), so what
 // you see matches the installed app. That profile has a single-instance lock, so
 // the INSTALLED app must be closed first — main.js's --dev lock-failure branch
@@ -37,7 +46,7 @@ let startedAt = 0;
 let lockRetries = 0;
 function start() {
     startedAt = Date.now();
-    electron = spawn('npx', ['electron', '.', '--dev'], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+    electron = spawn(ELECTRON, ['.', '--dev'], { cwd: ROOT, stdio: 'inherit' });
     electron.on('exit', (code) => {
         if (restarting) {
             restarting = false;
