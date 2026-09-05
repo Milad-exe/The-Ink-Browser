@@ -33,13 +33,37 @@ const log = (msg) => console.log(`[dev] ${msg}`);
 let electron = null;
 let restarting = false;
 
+let startedAt = 0;
+let lockRetries = 0;
 function start() {
+    startedAt = Date.now();
     electron = spawn('npx', ['electron', '.', '--dev'], { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
     electron.on('exit', (code) => {
-        if (restarting) { restarting = false; start(); return; }
-        log(`electron exited (${code})`);
+        if (restarting) {
+            restarting = false;
+            // Wait for the OLD instance to release the single-instance lock before
+            // the new one asks for it — otherwise the restart loses the race, the
+            // fresh instance sees the lock held and quits, and dev dies.
+            setTimeout(start, 700);
+            return;
+        }
+        // A brand-new instance that exits almost immediately did not lose to a
+        // watcher restart — it lost the single-instance lock to a still-dying
+        // sibling. Retry a few times instead of tearing the whole dev loop down
+        // (this is what made `npm run dev` "just stop" on a fast re-save).
+        if (Date.now() - startedAt < 2500 && lockRetries < 5) {
+            lockRetries++;
+            log(`electron exited early (lock contention) — retrying (${lockRetries}/5)`);
+            setTimeout(start, 900);
+            return;
+        }
+        if (lockRetries >= 5)
+            log('gave up: another Northstar is holding the profile lock. Close the installed app, then re-run `npm run dev`.');
+        else
+            log(`electron exited (${code})`);
         process.exit(code ?? 0);
     });
+    electron.on('spawn', () => { setTimeout(() => { if (electron && electron.exitCode === null) lockRetries = 0; }, 3000); });
     log('electron started (real profile — close the installed app if a window does not appear)');
 }
 
