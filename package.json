@@ -50,6 +50,7 @@
       "renderer/**/*",
       "locales/**/*",
       "package.json",
+      "build-stamp.json",
       "logo.png",
       "logo-win.png",
       "node_modules/**/*",
