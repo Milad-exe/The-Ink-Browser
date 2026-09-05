@@ -140,3 +140,8 @@ vite.config.ts.timestamp-*
 ink.code-workspace
 .DS_Store
 
+
+# Dev-mode profile (npm run dev) — isolated from the installed app's profile
+.dev-profile/
+# Transient build stamp (written by scripts/dist.js during a build)
+build-stamp.json
