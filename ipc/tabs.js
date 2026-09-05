@@ -299,6 +299,11 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         const wd = wm.getWindowByWebContents(_e.sender);
         const t = wd?.tabs;
         if (!t) return;
+        // Diagnostic (file only): confirms the resize handle actually received a
+        // pointer-down. If dragging the sidebar edge does nothing AND this line
+        // never appears in the log, the OS is not delivering the press to the
+        // handle (native page view / non-client area covering it).
+        log.info('tabs', 'sidebar:resize-start (handle received pointer-down)');
         t._sidebarResizing = true;
         const wc = t.tabMap.get(t.activeTabIndex)?.webContents;
         // No active tab (an emptied space) means no page view to steal the
