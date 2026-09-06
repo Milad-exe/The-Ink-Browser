@@ -48,6 +48,10 @@
             editor: document.getElementById('theme-editor'),
             api,
             currentTheme: current,
+            /* The one slot this scope edits in place. A space keeps its own
+               gradient (custom:sp<id>); the global setting keeps custom:global.
+               Every edit overwrites THIS slot — nothing accumulates. */
+            slotId: space ? `custom:sp${space.id}` : 'custom:global',
             setTheme: (id) => (space
                 ? window.northstarProfiles.update(space.id, { theme: id })
                 : window.northstarSettings.set('theme', id)),

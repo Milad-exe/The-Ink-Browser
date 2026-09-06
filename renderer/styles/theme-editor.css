@@ -10,132 +10,51 @@
  */
 @layer components {
 
-/* ── Theme picker ──────────────────────────────────────────────────────────
-   The themes are a ROW OF SWATCHES, not a grid of labelled cards. A theme is
-   its colour; a name under every one of them was a caption for something
-   already showing you what it is, and eight captions in a grid read as a
-   settings table rather than as a palette.
-
-   ONE name is on screen, though — the selected theme's, in the caption below
-   the row. See the selection block further down for why. */
-.theme-row { margin-top: var(--sp-5); }
-/* A compact, SCROLLABLE grid of small theme tiles — no names (the tile shows the
-   theme and hovering previews it live). Capped height so a long list scrolls
-   instead of pushing the rest of the page down. */
+/* ── Theme presets ───────────────────────────────────────────────────────────
+   The circles ARE the themes. A horizontal, scrollable row of round swatches —
+   the built-in grounds and the gradient presets. Tapping one applies it; the
+   gradient editor below then edits THIS scope's own theme in place. There is no
+   library, no names, no "+": a theme is a property of the space, edited directly
+   (the Zen/Arc model), so the old swatch grid and its caption are gone. */
 .theme-picker {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
-  gap: var(--sp-3);
-  padding: var(--sp-2) 4px var(--sp-2) 2px;
-  max-width: 380px;
-  max-height: 156px;
-  overflow-y: auto;
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-2) 2px var(--sp-3);
+  overflow-x: auto;
   scrollbar-width: thin;
 }
-.theme-option {
-  position: relative;
-  padding: 0; border: none; background: none; cursor: pointer;
-  border-radius: 9px;
+.theme-preset {
+  position: relative; flex: 0 0 auto;
+  width: 34px; height: 34px; padding: 0;
+  border: none; background: none; cursor: pointer; border-radius: 50%;
 }
-/* The mini-preview: a sidebar band (shell) with an accent dot, and a page
-   (page/bg) with text bars — the theme, shown as itself, small. */
-.theme-swatch {
-  position: relative;
-  display: flex; height: 34px; width: 100%;
-  border-radius: 8px; overflow: hidden;
-  box-shadow: inset 0 0 0 1px var(--border-2);
+.theme-preset-sw {
+  display: block; width: 100%; height: 100%; border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28), var(--ring-2);
   transition: box-shadow var(--dur-1) var(--ease);
 }
-.tsw-side {
-  flex: 0 0 34%; background: var(--tp-shell);
-  display: flex; align-items: flex-start; padding: 5px 0 0 4px;
+/* Selected: a ring in the accent, gapped by the surface so it reads on any
+   circle. Hover/focus: a softer ring. Colour is never the only signal — the
+   tick is a shape. */
+.theme-preset.on .theme-preset-sw {
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28), 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent);
 }
-.tsw-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tp-accent); }
-.tsw-page {
-  flex: 1 1 auto; background: var(--tp-page);
-  display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 5px;
+.theme-preset:hover .theme-preset-sw {
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28), 0 0 0 2px var(--surface), 0 0 0 2.5px var(--text-3);
 }
-.tsw-line { height: 3px; border-radius: 2px; background: var(--tp-text); opacity: 0.5; }
-.tsw-line.short { width: 55%; opacity: 0.3; }
-
-/* Selected: a tick + accent ring. Hover: a soft ring on the whole tile. */
-.theme-option .theme-swatch svg {
-  position: absolute; right: 3px; top: 3px; width: 12px; height: 12px;
-  color: var(--tp-ink); opacity: 0; transform: scale(0.6);
+.theme-preset:focus-visible { outline: none; }
+.theme-preset:focus-visible .theme-preset-sw {
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28), 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent);
+}
+/* A tick marks the chosen circle — shape plus colour, so it survives a circle
+   whose own colour matches the ring. Hidden until selected. */
+.theme-preset svg {
+  position: absolute; inset: 0; margin: auto; width: 15px; height: 15px;
+  color: #fff; opacity: 0; transform: scale(0.6);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
   transition: opacity var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
-  filter: drop-shadow(0 0 1.5px var(--tp-page));
+  pointer-events: none;
 }
-.theme-option[aria-checked="true"] .theme-swatch svg { opacity: 1; transform: none; }
-.theme-option[aria-checked="true"] .theme-swatch {
-  box-shadow: inset 0 0 0 1px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 3px var(--accent);
-}
-.theme-option:hover .theme-swatch {
-  box-shadow: inset 0 0 0 1px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 2.5px var(--text-3);
-}
-.theme-option:focus-visible { outline: none; }
-.theme-option:focus-visible .theme-swatch {
-  box-shadow: inset 0 0 0 1px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 3px var(--accent);
-}
-
-/* "New theme" — a small dashed tile matching the others. */
-.theme-add {
-  padding: 0; border: none; background: none; cursor: pointer; color: var(--text-3);
-  border-radius: 9px;
-}
-.theme-add > svg {
-  width: 100%; height: 34px; box-sizing: border-box; padding: 9px;
-  border: 1.5px dashed var(--border-2); border-radius: 8px;
-}
-.theme-add:hover > svg { border-color: var(--text-3); color: var(--text); background: var(--hover); }
-
-/* The caption. Name, what kind of theme it is, and the way into editing it —
-   which is also where the edit affordance had to go: it used to be a <button>
-   nested inside the swatch's <button role="radio">, invalid markup that no
-   keyboard could reach. */
-.theme-current {
-  display: flex; align-items: center; gap: var(--sp-4);
-  min-height: var(--control-h);
-}
-/* The rule between the picker and the editor belongs HERE, on the full-width
-   caption — not on the editor, which is a 340px column centred in whatever
-   card it is in, so a border-top on it drew a short line floating in the
-   middle. The class is set by the script when the editor opens, because the
-   rule divides two things and should not be there when only one of them is. */
-.theme-current.with-editor {
-  border-bottom: 1px solid var(--border);
-  padding-bottom: var(--sp-5);
-}
-.theme-current-name {
-  font-size: var(--fs-body); font-weight: 550; color: var(--text);
-  letter-spacing: var(--tracking);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  /* It is a <button> so a custom theme's name can be renamed in place, but it
-     must still read as the heading it is — no chrome until you are over it. */
-  background: none; border: 0; padding: 2px 4px; margin-left: -4px;
-  font-family: inherit; text-align: left; border-radius: var(--r-sm, 6px);
-  cursor: default;
-}
-.theme-current-name.is-editable { cursor: text; }
-.theme-current-name.is-editable:hover { background: var(--hover); }
-.theme-current-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.theme-current-name-input {
-  font-size: var(--fs-body); font-weight: 550; color: var(--text);
-  letter-spacing: var(--tracking); font-family: inherit;
-  background: var(--surface); border: 1px solid var(--accent);
-  border-radius: var(--r-sm, 6px); padding: 2px 4px; margin-left: -4px;
-  min-width: 0; max-width: 180px; outline: none;
-}
-.theme-current-kind {
-  flex: 1 1 auto; min-width: 0;
-  font-size: var(--fs-small); color: var(--text-3);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.theme-current-edit { flex: none; }
-/* The popup parks the mode toggle at the caption's trailing end (see
-   theme-editor.js). margin-left:auto is what pushes it there whether or not
-   "Customise" is present beside it. */
-.theme-current .te-modes { margin-left: auto; flex: none; }
-.theme-current-edit[hidden] { display: none; }
+.theme-preset.on svg { opacity: 1; transform: none; }
 
 /* ── Theme editor ───────────────────────────────────────────────────────────
    ONE column, and everything shares its width. The stage used to be a 320px

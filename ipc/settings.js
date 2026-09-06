@@ -292,7 +292,13 @@ function register(ipcMain, { wm, webContents, nativeTheme, app, focusMode }) {
         if (!trusted(_e, 'theme-save')) return { ok: false };
         const list = [...(wm.persistence.get('customThemes') || [])];
         const existing = input?.id ? list.find(t => t.id === input.id) : null;
-        const prepared = themes.prepareCustom(input, existing?.id || null);
+        /* Honour the id the editor passes even on the FIRST save. Each scope
+           (the global setting, or one space) edits a single deterministic slot —
+           `custom:global`, `custom:sp<id>` — and every edit overwrites THAT slot
+           in place. Without preserving the id, prepareCustom minted a fresh
+           random one each time, which is exactly the accumulating "Blue 2, Blue
+           3" list we are replacing with edit-in-place. */
+        const prepared = themes.prepareCustom(input, input?.id || existing?.id || null);
         if (!prepared.ok)
             return { ok: false, errors: prepared.errors };
         if (existing) {

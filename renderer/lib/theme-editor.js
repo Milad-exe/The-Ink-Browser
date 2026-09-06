@@ -52,7 +52,6 @@
         const T = ctx.api;
         let current = ctx.currentTheme || 'default';
         let list = [];
-        let editing = null; // the custom theme being edited, or null for a new one
 
         const svg = (paths, w = 24) => {
             const s = `<svg viewBox="0 0 ${w} ${w}" fill="none" stroke="currentColor"
@@ -62,325 +61,116 @@
             return t.content.firstChild;
         };
 
-        /* ── The picker ──────────────────────────────────────────────────────
+        /* ── The presets ─────────────────────────────────────────────────────
          *
-         * WHAT WAS WRONG. A selected swatch was a hairline ring inset in the
-         * disc plus a 6% scale-up. Both fail for the same reason: they are
-         * differences of DEGREE on a row whose whole job is to show differences
-         * of colour. On the black swatch in a dark card the ring is invisible;
-         * on a light theme it disappears into the disc; and 6% is not a size
-         * change anyone reads as state. Nothing anywhere named the theme you
-         * were actually wearing, so the row answered "what colours exist" and
-         * never "which one is on".
+         * The circles ARE the themes. Zen and Arc do not keep a growing library
+         * of saved themes you pick from — a theme is a property of the space,
+         * edited IN PLACE. So there is no swatch grid, no "+", no naming, no
+         * "Blue 2, Blue 3". There is a row of PRESET circles (the built-ins and
+         * a handful of gradients) you tap to start from, and below it the
+         * gradient editor, which edits THIS scope's own theme directly.
          *
-         * WHAT COMPARABLE PRODUCTS DO.
-         *   · Apple's HIG says to indicate status with SHAPE PLUS COLOUR — a
-         *     checkmark, not a tint — and a menu marks its selected value with
-         *     a checkmark rather than by drawing it differently.
-         *   · macOS System Settings → Appearance shows three previews and names
-         *     the selected one underneath it, in words.
-         *   · Chrome's Customize panel, iOS's wallpaper and icon-tint pickers
-         *     and Google Photos all badge the chosen swatch with a tick.
-         *   · VS Code's theme picker is a NAMED list: you never wonder which
-         *     theme is on, because it says so.
-         *   · WCAG 2.2 SC 1.4.1 makes the ring version a real defect, not a
-         *     taste one — colour must not be the only visual means of
-         *     distinguishing an element, and a ring whose visibility depends on
-         *     the swatch's own colour is exactly that.
-         *
-         * SO: three signals, none of which is a colour.
-         *   1. a TICK inside the selected disc, drawn in black or white chosen
-         *      against that swatch's own ground, so it is legible on Slate and
-         *      on Clay alike;
-         *   2. a ring OUTSIDE the disc with a gap, drawn in --text — never in
-         *      the theme's own colour, which is what made the old one vanish;
-         *   3. a caption under the row NAMING the selected theme and saying
-         *      whether it is built-in or yours. That is the half of the answer
-         *      a row of discs cannot give, and it is where "Customise" lives.
-         */
+         * Every edit writes to one deterministic slot for this scope
+         * (ctx.slotId — `custom:global` or `custom:sp<id>`), overwriting it, so
+         * the space keeps exactly one editable gradient however much you tweak
+         * it. Tapping a preset re-bases the space on that preset; the next edit
+         * forks from there. */
 
-        /* Black or white, whichever can be seen on this swatch. Relative
-           luminance, so it is the same test the contrast floors use. */
-        const inkOn = (hex) => {
-            const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
-            if (!m)
-                return '#ffffff';
-            const v = parseInt(m[1], 16);
-            const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
-            const L = 0.2126 * lin((v >> 16) & 255) + 0.7152 * lin((v >> 8) & 255) + 0.0722 * lin(v & 255);
-            return L > 0.34 ? '#000000' : '#ffffff';
-        };
+        const slotId = ctx.slotId || null;
+        let presets = [];
 
-        const paintSwatch = (node, sw) => {
-            // The card is a tiny browser in the theme: a sidebar band (shell), a
-            // page (page/bg), an accent dot and a couple of text bars — so you can
-            // SEE what a theme looks like instead of guessing from one colour.
-            node.style.setProperty('--tp-shell', sw.shell);
-            node.style.setProperty('--tp-page', sw.page || sw.bg || sw.shell);
-            node.style.setProperty('--tp-accent', sw.accent);
-            node.style.setProperty('--tp-text', sw.text || inkOn(sw.shell));
-            node.style.setProperty('--tp-ink', inkOn(sw.shell));
-        };
+        /* The circle's face: a gradient theme shows its colours blended; a plain
+           ground shows its shell. That split is the whole legend — vivid circles
+           are gradients, muted ones are solid grounds. */
+        function circleBg(t) {
+            const cols = (t.seed && Array.isArray(t.seed.colors) && t.seed.colors.length >= 2) ? t.seed.colors : null;
+            if (cols)
+                return `linear-gradient(135deg, ${cols.join(', ')})`;
+            return (t.swatch && t.swatch.shell) || 'var(--surface-2)';
+        }
 
-        const optionFor = (t) => {
+        function circleFor(t) {
             const b = document.createElement('button');
-            b.className = 'theme-option';
             b.type = 'button';
-            b.setAttribute('role', 'radio');
+            b.className = 'theme-preset';
             b.dataset.themeValue = t.id;
+            b.setAttribute('role', 'radio');
             b.setAttribute('aria-checked', String(t.id === current));
             b.tabIndex = t.id === current ? 0 : -1;
-            // The swatch shows the colours, so the name is the accessible name.
             b.setAttribute('aria-label', t.name);
             b.title = t.name;
             const sw = document.createElement('span');
-            sw.className = 'theme-swatch';
-            paintSwatch(sw, t.swatch);
-            // A miniature of the browser wearing this theme: sidebar + accent
-            // dot on the left, page with text bars on the right, tick when chosen.
-            sw.innerHTML =
-                '<span class="tsw-side"><span class="tsw-dot"></span></span>' +
-                '<span class="tsw-page"><span class="tsw-line"></span><span class="tsw-line short"></span></span>';
-            sw.appendChild(svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'));
+            sw.className = 'theme-preset-sw';
+            sw.style.background = circleBg(t);
             b.appendChild(sw);
-            // No name label — the preview shows the theme and hover previews it
-            // live; the name is the button's accessible name and its tooltip.
-            b.addEventListener('click', () => choose(t.id));
-            // Hover to preview: paint the whole UI in this theme live (no save),
-            // so switching is a look, not a leap. Leaving the row (below) drops
-            // the preview back to the committed theme. Skip the one already on and
-            // any theme with no wheel seed (the plain built-ins apply on click).
+            // A tick marks the one that is on (chosen in --accent-ink against its
+            // own face so it reads on a light and a dark circle alike).
+            b.appendChild(svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'));
+            b.addEventListener('click', () => choosePreset(t));
+            // Hover previews the whole browser in this preset, live (no save).
             b.addEventListener('mouseenter', () => {
-                if (t.id === current || !t.seed) return;
-                try { T.live?.(t.seed); } catch (e) { }
+                if (t.id === current) return;
+                const s = t.seed || t.wheelSeed;
+                if (s) { try { T.live?.(s); } catch (e) { } }
             });
             return b;
-        };
-
-        const options = () => [...picker.querySelectorAll('.theme-option')];
-
-        /* Built once, at mount. The "+" is NOT a theme, so it sits outside the
-           radiogroup rather than being the last radio in it — and outside the
-           scroller, so it cannot be pushed off the end by the themes the way it
-           was (with six themes in a 340px popup it was already half cut off,
-           which is a poor home for the only way to make a new one). */
-        const row = document.createElement('div');
-        row.className = 'theme-row';
-        picker.parentNode.insertBefore(row, picker);
-        row.appendChild(picker);
-        // Leaving the swatch row drops any hover preview back to the committed
-        // theme. (Clicking a swatch commits before the pointer leaves, so the
-        // choice sticks; this only undoes an un-chosen hover.)
-        row.addEventListener('mouseleave', () => { try { T.live?.(null); } catch (e) { } });
-        const addBtn = document.createElement('button');
-        addBtn.type = 'button';
-        addBtn.className = 'theme-add';
-        addBtn.title = 'New theme';
-        addBtn.setAttribute('aria-label', 'New theme');
-        addBtn.appendChild(svg('<path d="M12 5.5v13M5.5 12h13"/>'));
-        addBtn.addEventListener('click', () => newTheme());
-        // Sits as the last card in the grid, not adrift at the end of a row.
-        picker.appendChild(addBtn);
-
-        const caption = document.createElement('div');
-        caption.className = 'theme-current';
-        /* The name is a BUTTON when the theme is yours. Custom themes are named
-           from their hue, so three blue ones came out "Blue", "Blue 2",
-           "Blue 3" and nothing told them apart — and there was no way to change
-           that. Clicking the name renames it in place, which is where a name
-           is. Built-ins stay a plain label: their names are not yours to edit. */
-        const capName = document.createElement('button');
-        capName.type = 'button';
-        capName.className = 'theme-current-name';
-        const capKind = document.createElement('span');
-        capKind.className = 'theme-current-kind';
-        const capEdit = document.createElement('button');
-        capEdit.type = 'button';
-        capEdit.className = 'btn btn-ghost btn-sm theme-current-edit';
-        capEdit.textContent = 'Customise';
-        /* In the popup the editor is always up, so there is nothing to open. */
-        capEdit.hidden = !!ctx.alwaysOpen;
-        capEdit.addEventListener('click', () => {
-            const t = list.find(x => x.id === current);
-            openEditor(t && t.kind === 'custom' ? t : null, t || null);
-            editor.scrollIntoView({ block: 'nearest' });
-        });
-        /* Rename in place: the label becomes a field, Enter commits, Escape
-           puts it back. The save carries the theme's existing seed — a rename
-           must not re-derive the palette from whatever the wheel happens to be
-           showing. */
-        let renaming = false;
-        const commitRename = async (t, value, field) => {
-            const next = String(value || '').trim().slice(0, 40);
-            renaming = false;
-            field.remove();
-            capName.hidden = false;
-            if (!next || next === t.name) {
-                paint(current);
-                return;
-            }
-            try {
-                const r = await T.save({ id: t.id, name: next, seed: t.seed });
-                if (!r || r.ok === false)
-                    warn('That name could not be saved.');
-            }
-            catch (e) {
-                warn('That name could not be saved.');
-                window.northstarLog?.debug('theme-editor', 'rename: ' + e);
-            }
-            refresh();
-        };
-        capName.addEventListener('click', () => {
-            const t = list.find(x => x.id === current);
-            if (!t || t.kind !== 'custom' || renaming)
-                return;
-            renaming = true;
-            const field = document.createElement('input');
-            field.type = 'text';
-            field.className = 'theme-current-name-input';
-            field.value = t.name;
-            field.maxLength = 40;
-            field.setAttribute('aria-label', 'Theme name');
-            capName.hidden = true;
-            capName.parentNode.insertBefore(field, capName);
-            field.focus();
-            field.select();
-            field.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') { e.preventDefault(); commitRename(t, field.value, field); }
-                else if (e.key === 'Escape') { e.preventDefault(); commitRename(t, t.name, field); }
-            });
-            field.addEventListener('blur', () => { if (renaming) commitRename(t, field.value, field); });
-        });
-        caption.append(capName, capKind, capEdit);
-        row.parentNode.insertBefore(caption, row.nextSibling);
-        /* In the popup the editor is always open, so the caption's right side is
-           empty — there is nothing to "Customise". The mode toggle moves into
-           it: dark/light is a property of the theme whose name is right there,
-           and above the wheel it was an unlabelled pair of glyphs floating in
-           their own 36px band, which is exactly the height that pushed the Grain
-           slider under the foot. The Settings column keeps it inside the editor,
-           where the editor is a block you open rather than the whole panel. */
-        if (ctx.alwaysOpen) {
-            const modes = document.getElementById('te-mode-seg');
-            if (modes)
-                caption.appendChild(modes);
         }
 
-        /* Which end of the swatch row still has themes behind it. Set from the
-           scroll position so a row scrolled to its start does not pretend there
-           is something to its left. */
-        function syncPickerOverflow() {
-            if (!picker)
-                return;
-            const over = picker.scrollWidth - picker.clientWidth > 1;
-            picker.classList.toggle('overflowing', over);
-            picker.classList.toggle('at-start', !over || picker.scrollLeft <= 1);
-            picker.classList.toggle('at-end', !over || picker.scrollLeft >= picker.scrollWidth - picker.clientWidth - 1);
-            if (picker.dataset.overflowBound)
-                return;
-            picker.dataset.overflowBound = '1';
-            picker.addEventListener('scroll', syncPickerOverflow, { passive: true });
-            // A vertical wheel scrolls the row sideways, so a mouse can reach the
-            // themes an overflowing row hides (a trackpad's sideways swipe already
-            // can). Without this the row looked stuck once it outgrew its width.
-            picker.addEventListener('wheel', (e) => {
-                if (picker.scrollWidth - picker.clientWidth <= 1)
-                    return;
-                const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-                if (!d)
-                    return;
-                e.preventDefault();
-                picker.scrollLeft += d;
-            }, { passive: false });
-            try { new ResizeObserver(syncPickerOverflow).observe(picker); }
-            catch (e) { /* the scroll listener alone still covers the common case */ }
+        // Leaving the row drops any hover preview back to the committed theme.
+        picker.addEventListener('mouseleave', () => { try { T.live?.(null); } catch (e) { } });
+
+        function markCurrent() {
+            let anyOn = false;
+            for (const b of picker.querySelectorAll('.theme-preset')) {
+                const on = b.dataset.themeValue === current;
+                if (on) anyOn = true;
+                b.classList.toggle('on', on);
+                b.setAttribute('aria-checked', String(on));
+                b.tabIndex = on ? 0 : -1;
+            }
+            // Wearing your own edited gradient means no preset is selected — keep
+            // one reachable by keyboard anyway.
+            if (!anyOn) {
+                const first = picker.querySelector('.theme-preset');
+                if (first) first.tabIndex = 0;
+            }
         }
 
-        const paint = (value) => {
-            for (const o of options()) {
-                const on = o.dataset.themeValue === value;
-                o.setAttribute('aria-checked', String(on));
-                o.tabIndex = on ? 0 : -1;
-                /* Keep the selected swatch in view. The row scrolls sideways, so
-                   a theme created at the end of it — which is where a new one
-                   always lands — was selected off-screen. */
-                if (on)
-                    o.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-            }
-            syncPickerOverflow();
-            const t = list.find(x => x.id === value);
-            capName.textContent = t ? t.name : '';
-            const mine = !!t && t.kind === 'custom';
-            capName.classList.toggle('is-editable', mine);
-            capName.disabled = !mine;
-            capName.title = mine ? 'Rename this theme' : '';
-            capKind.textContent = t ? (t.kind === 'custom' ? 'Your theme' : 'Built-in') : '';
-            /* Say what "+" will copy. "New theme" alone left the one thing
-               people asked for — that it starts from what they are wearing —
-               invisible until they pressed it. */
-            const from = t ? `New theme, from ${t.name}` : 'New theme';
-            addBtn.title = from;
-            addBtn.setAttribute('aria-label', from);
-            capEdit.textContent = t && t.kind === 'custom' ? 'Customise' : 'Customise a copy';
-        };
-
-        const choose = async (value) => {
-            if (value === current)
-                return;
-            current = value;
-            paint(value);
-            /* Drop the live preview FIRST. A preview is inline custom properties
-               on documentElement, which beat the injected stylesheet by
-               specificity — so picking a theme applied it underneath colours
-               that were still painted on top, and the chrome kept whatever the
-               wheel had last been dragged to. */
+        /* Tap a preset: the scope wears it now, and the editor re-bases on its
+           seed so the next edit forks FROM this preset rather than from whatever
+           was last on the canvas. */
+        async function choosePreset(t) {
+            current = t.id;
+            markCurrent();
             try { await T.live?.(null); }
-            catch (e) { /* the repaint below is still authoritative */ }
-            await ctx.setTheme(value);
-            /* Load the chosen theme's OWN seed into the editor. Without this the
-               editor kept whatever was on the wheel, so the next drag wrote one
-               theme's colours onto another — edits appeared to carry across
-               themes because they literally did. */
-            if (ctx.alwaysOpen) {
-                const t = list.find(x => x.id === value);
-                openEditor(t && t.kind === 'custom' ? t : null, t || null);
-            }
+            catch (e) { /* the repaint below is authoritative */ }
+            await ctx.setTheme(t.id);
+            openEditor(t.seed || t.wheelSeed || null);
             ctx.toast('Theme updated');
-        };
+        }
 
-        /* The HOST owns which theme is current — it is the one that knows whether
-           this editor is looking at a space or at the global setting. `themes-list`
-           reports the global one, and taking it here overwrote the space's on
-           every refresh: the picker showed Slate while the space wore Clay, and
-           the next click compared against the wrong value. */
+        /* The HOST owns which theme is current — it knows whether this editor is
+           looking at a space or the global setting. */
         const hostOwnsCurrent = ctx.currentTheme != null;
 
-        /* Rebuilding the row is only worth it when the row has CHANGED. Saving
-           broadcasts `themes-changed`, and a save lands every 260ms while you
-           drag — so the swatches were being torn down and recreated four times
-           a second, under a pointer that was busy elsewhere. */
-        let signature = null;
-        const signatureOf = ts => ts.map(t => `${t.id}~${t.name}~${t.swatch.shell}~${t.swatch.accent}`).join('|');
-
+        /* Rebuild the circles only when the preset SET changes (it never does
+           mid-session, but a save broadcasts `themes-changed`, which fires this).
+           The selection mark is cheap and always re-applied. */
+        let presetSig = null;
         async function refresh() {
             const res = await T.list();
             list = res?.themes || [];
             if (!hostOwnsCurrent)
                 current = res?.current || current;
-            // A theme that no longer exists (deleted while Settings was open)
-            // must not leave the picker with nothing checked.
-            if (!list.some(t => t.id === current))
-                current = 'default';
-            const sig = signatureOf(list);
-            if (sig !== signature) {
-                signature = sig;
+            presets = list.filter(t => t.kind === 'builtin');
+            const sig = presets.map(t => `${t.id}~${t.swatch?.shell}`).join('|');
+            if (sig !== presetSig) {
+                presetSig = sig;
                 picker.textContent = '';
-                for (const t of list)
-                    picker.appendChild(optionFor(t));
-                // Keep the "New" card as the last cell (a refresh clears the grid).
-                picker.appendChild(addBtn);
+                for (const t of presets)
+                    picker.appendChild(circleFor(t));
             }
-            paint(current);
+            markCurrent();
         }
 
         // ── Editor ────────────────────────────────────────────────────────
@@ -965,25 +755,16 @@
             warn('');
             committing = true;
             try {
-                /* The name is RE-DERIVED on every save, not fixed at creation.
-                   A theme is named for its hue, and the name is now on screen
-                   under the row — so a theme created in pink and dragged to
-                   green sat there labelled "Pink", which is worse than no
-                   caption at all. */
-                const saved = await T.save({
-                    id: editing?.id || null,
-                    name: nameFor(seed, editing?.id),
-                    seed,
-                });
+                /* Every edit writes to THIS scope's one slot, in place. No new
+                   theme is minted and nothing accumulates — the space keeps a
+                   single editable gradient (Zen/Arc's model). The name is
+                   internal (never shown), derived once from the first colour. */
+                const saved = await T.save({ id: slotId, name: nameFor(seed), seed });
                 if (!saved?.ok)
                     return;
-                const isNew = !editing;
-                editing = { id: saved.theme.id, name: saved.theme.name, seed: saved.theme.seed, kind: 'custom' };
-                el('te-delete').hidden = false;
-                await refresh();
-                if (isNew || current !== saved.theme.id) {
+                if (current !== saved.theme.id) {
                     current = saved.theme.id;
-                    paint(current);
+                    markCurrent();
                     await ctx.setTheme(current);
                 }
             }
@@ -992,65 +773,28 @@
             }
         }
 
-        /* Themes are not named by hand — the swatch is the name. But a theme
-           still needs one for the caption, its tooltip and its accessible
-           label, so it takes the colour family of its first dot. Hue names, not
-           "Custom 3": "Teal" tells you which swatch you are on, a number does
-           not. Now that the name is ON SCREEN under the row, a second Teal has
-           to be distinguishable from the first, so a clash takes a number. */
+        /* The slot needs a name for storage, but it is never shown — there is no
+           library and no caption any more. Name it for the first colour's hue so
+           the stored record is legible if ever inspected. */
         const HUES = [
             [15, 'Red'], [45, 'Amber'], [75, 'Olive'], [110, 'Green'], [160, 'Teal'],
             [200, 'Cyan'], [240, 'Blue'], [280, 'Indigo'], [320, 'Violet'], [350, 'Pink'], [361, 'Red'],
         ];
-        function nameFor(s, selfId = null) {
+        function nameFor(s) {
             const first = (s.colors || [])[0];
             const { C, h } = rgbToOklch(first || '#888888');
-            const base = C < 0.02
+            return C < 0.02
                 ? (s.mode === 'light' ? 'Paper' : 'Graphite')
                 : (HUES.find(([max]) => h < max) || HUES[HUES.length - 1])[1];
-            // A theme does not clash with itself: without this, re-saving
-            // "Green" while still green renamed it "Green 2", then "Green 3".
-            const taken = new Set(list.filter(t => t.id !== selfId).map(t => t.name));
-            if (!taken.has(base))
-                return base;
-            for (let n = 2; n < 99; n++) {
-                if (!taken.has(`${base} ${n}`))
-                    return `${base} ${n}`;
-            }
-            return base;
         }
 
-        /* A built-in has no wheel seed of its own, so the registry solves one
-           backwards for it (features/themes.js, wheelSeedFor) and reports it as
-           `wheelSeed`. This is the fallback for anything that arrives without
-           one — the swatch's two colours, which is a rough copy rather than a
-           faithful one. */
-        function seedFromTheme(t) {
-            if (!t?.swatch)
-                return null;
-            const colors = [t.swatch.shell];
-            if (t.swatch.accent && t.swatch.accent !== t.swatch.shell)
-                colors.push(t.swatch.accent);
-            return { mode: t.mode || 'dark', colors, positions: [], intensity: 0.7, grain: 0 };
-        }
-
-        /**
-         * `theme` is the CUSTOM theme being edited, or null for none.
-         * `from` is what to start the wheel on when there is nothing to edit —
-         * the theme you are about to fork. Selecting a built-in leaves you
-         * looking at its colours, and the first drag turns that into a theme of
-         * your own rather than refusing to move.
-         */
-        function openEditor(theme, from = null) {
-            editing = theme;
-            /* `wheelSeed` comes from the registry (features/themes.js) and is
-               SOLVED backwards so the wheel draws what the browser is already
-               wearing. Prefer it over the local swatch guess, which re-derived
-               a ground from the dot's own lightness and landed a fork two
-               elevation steps off the theme it was copying. */
-            const src = theme?.seed || from?.wheelSeed || seedFromTheme(from);
+        /* Load a SEED into the editor. The scope's theme is edited in place, so
+           there is no "which custom theme" to track — just the working seed, and
+           every commit writes it to this scope's slot. A null seed (a scope never
+           themed, or a preset with no dots) starts from a sensible default. */
+        function openEditor(src) {
             const colors = (src?.colors || ['#3a6ea5']).slice(0, 3);
-            seed = src
+            seed = src && Array.isArray(src.colors) && src.colors.length
                 ? { mode: src.mode || 'dark',
                     colors,
                     positions: (Array.isArray(src.positions) ? src.positions : []).slice(0, colors.length),
@@ -1061,116 +805,56 @@
             ensurePositions();
             activeDot = 0;
             warn('');
-            resetDelete();
             paintMode();
-            el('te-delete').hidden = !theme;
             editor.hidden = false;
-            caption.classList.add('with-editor');
             renderDots();
             paintCanvas();
             paintControls();
-            /* Focus the field itself, not a control below it: focusing
-               something further down scrolled the canvas — the thing you opened
-               this for — off the top of a panel. */
+            /* Focus the field itself, not a control below it. */
             el('te-dots')?.firstElementChild?.focus({ preventScroll: true });
-            /* NO commit, and no live paint. Opening the editor is not a change:
-               committing on open meant merely SELECTING a built-in forked it
-               into a copy of your own, and painting on open meant opening the
-               popup recoloured the whole browser before you had touched
-               anything. The browser is already wearing what the canvas shows. */
+            /* NO commit and no live paint on open: opening the editor is not an
+               edit, and the browser is already wearing what the canvas shows. */
         }
 
-        /* In the Settings page the editor is a section you open; in the popup it
-           IS the panel, so hiding it left a card containing nothing but a row
-           of swatches. `alwaysOpen` keeps it up and hands Done to the host —
-           there, the thing to dismiss is the panel, not the editor inside it. */
+        /* In the Settings page the editor is a section; in the popup it IS the
+           panel, so Done is handed to the host to dismiss the panel. */
         const closeEditor = () => {
             if (ctx.alwaysOpen) {
                 ctx.onCancel?.();
                 return;
             }
             editor.hidden = true;
-            caption.classList.remove('with-editor');
-            editing = null;
         };
-        el('te-cancel').addEventListener('click', closeEditor);
+        el('te-cancel')?.addEventListener('click', closeEditor);
 
-        /* "New theme" COPIES the theme you are wearing and hands you that to
-           edit — starting from a hardcoded blue threw away the thing you had
-           just chosen. It is not saved until you actually change something:
-           opening an editor is not an edit, and committing here would create a
-           theme every time the button was pressed. */
-        function newTheme() {
-            openEditor(null, list.find(t => t.id === current) || null);
-            editor.scrollIntoView({ block: 'nearest' });
-        }
-
-        /* Delete asks once. It sits a few pixels from Done, it is the only
-           control here that destroys something, and everything else in this
-           editor is undoable by dragging back. Two clicks, and the button says
-           what the second one will do. */
-        let deleteArmed = 0;
-        function resetDelete() {
-            const b = el('te-delete');
-            if (!b)
-                return;
-            deleteArmed = 0;
-            b.textContent = 'Delete';
-            b.classList.remove('armed');
-        }
-        el('te-delete').addEventListener('blur', resetDelete);
-        el('te-delete').addEventListener('click', async () => {
-            if (!editing)
-                return;
-            const b = el('te-delete');
-            if (Date.now() > deleteArmed) {
-                deleteArmed = Date.now() + 5000;
-                b.textContent = 'Delete for good?';
-                b.classList.add('armed');
-                return;
-            }
-            resetDelete();
-            const name = editing.name;
-            await T.remove(editing.id);
-            await refresh();
-            if (ctx.alwaysOpen)
-                openEditor(null, list.find(t => t.id === current) || null);
-            else
-                closeEditor();
-            ctx.toast(`${name} deleted`);
-        });
-
-        // A radiogroup is one tab stop; arrows move within it.
+        // A radiogroup is one tab stop; arrows move within the preset circles.
         picker.addEventListener('keydown', (e) => {
             const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
             if (!step)
                 return;
-            const opts = options();
+            const opts = [...picker.querySelectorAll('.theme-preset')];
             if (!opts.length)
                 return;
             e.preventDefault();
-            /* Move from what has FOCUS, not from what is checked. They are the
-               same until you arrow onto something without committing to it, and
-               then every further press jumped back to the checked swatch. */
             const from = opts.indexOf(active());
             const i = from >= 0 ? from : opts.findIndex(o => o.getAttribute('aria-checked') === 'true');
             const next = opts[(i + step + opts.length) % opts.length];
             next.focus();
-            choose(next.dataset.themeValue);
+            const t = presets.find(p => p.id === next.dataset.themeValue);
+            if (t) choosePreset(t);
         });
 
         T.onChanged?.(() => refresh());
         refresh().then(() => {
-            if (!ctx.alwaysOpen)
-                return;
-            /* The popup opens straight into the editor, on the theme you are
-               wearing: yours to edit in place, or a built-in ready to be forked
-               by the first drag. It used to seed the wheel from that theme's
-               ACCENT and paint it live, so opening the panel while wearing
-               Slate turned the whole browser red-brown before anything had been
-               touched. */
-            const t = list.find(x => x.id === current);
-            openEditor(t && t.kind === 'custom' ? t : null, t || null);
+            /* Open straight into the editor on THIS scope's current theme: its
+               own edited gradient if it has one (the slot), else the preset it is
+               wearing, ready for the first edit to fork from. */
+            const slot = list.find(x => x.id === slotId);
+            const cur = list.find(x => x.id === current);
+            const startSeed = (current === slotId && slot)
+                ? slot.seed
+                : (cur?.seed || cur?.wheelSeed || slot?.seed || null);
+            openEditor(startSeed);
         });
         return { refresh, openEditor };
     }

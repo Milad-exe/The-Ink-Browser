@@ -260,28 +260,21 @@
         // This page supplies the container and the bridge; everything else is
         // the same code in both places.
         if (window.Northstar?.themeEditor && window.northstarThemes) {
-            /* A theme belongs to a SPACE. Settings runs in a tab, that tab is in
-               a window, and that window is in one space — so the picker here
-               sets this space's theme, exactly as the sidebar's popup does.
-               Writing the global setting instead is what made per-space theming
-               look broken: you chose a theme here, and a space that already had
-               one of its own quite correctly ignored it. The global setting
-               stays as what a space with no theme of its own inherits. */
-            (async () => {
-                let space = null;
-                try { space = await window.northstarProfiles?.current?.(); }
-                catch (e) { window.northstarLog?.debug('settings', 'current space: ' + e); }
-                window.Northstar.themeEditor.mount({
-                    picker: document.getElementById('theme-picker'),
-                    editor: document.getElementById('theme-editor'),
-                    api: window.northstarThemes,
-                    setTheme: (id) => (space
-                        ? window.northstarProfiles.update(space.id, { theme: id })
-                        : save('theme', id)),
-                    toast: showToast,
-                    currentTheme: (space && space.theme) || settings.theme || 'default',
-                });
-            })();
+            /* Settings edits the GLOBAL theme — the default a space with no theme
+               of its own inherits. Per-SPACE themes are set from the sidebar's
+               own theme popup (renderer/ThemePanel), which edits that space's
+               slot. Keeping the two apart is what makes the split legible: this
+               is "the browser's default look", the popup is "this space's look".
+               The global scope edits one slot in place, exactly like a space. */
+            window.Northstar.themeEditor.mount({
+                picker: document.getElementById('theme-picker'),
+                editor: document.getElementById('theme-editor'),
+                api: window.northstarThemes,
+                slotId: 'custom:global',
+                setTheme: (id) => save('theme', id),
+                toast: showToast,
+                currentTheme: settings.theme || 'default',
+            });
         }
         // ── Appearance: Bookmark bar ───────────────────────────────────────────
         // Toolbar customization — one persisted object; every key defaults to true.

@@ -79,6 +79,16 @@ const DERIVED = [
        holds the contrast line, so it is loud, not unreadable. Ground and accent
        are the real moulded colours, not approximations of them. */
     { id: 'blocks',  name: 'Blocks',  seed: { mode: 'dark', base: '#0055bf', accent: '#f2cd37', vivid: true } },
+    /* Gradient presets — the Zen model, as starting points. Each is a set of
+       COLOURS the chrome pools into a gradient (positions default to the spread
+       in theme-derive.js). Tapping one in the editor applies it; the first edit
+       forks it into the space's own editable gradient. They validate the same
+       way every theme does, so they are vivid, not unreadable. */
+    { id: 'aurora',  name: 'Aurora',  seed: { mode: 'dark',  colors: ['#12a594', '#0091ff', '#6e56cf'], intensity: 0.85, grain: 0.12 } },
+    { id: 'sunset',  name: 'Sunset',  seed: { mode: 'dark',  colors: ['#f76808', '#d6409f', '#6e56cf'], intensity: 0.85, grain: 0.12 } },
+    { id: 'ember',   name: 'Ember',   seed: { mode: 'dark',  colors: ['#e5484d', '#f76808', '#f2cd37'], intensity: 0.85, grain: 0.12 } },
+    { id: 'meadow',  name: 'Meadow',  seed: { mode: 'light', colors: ['#46a758', '#12a594', '#f2cd37'], intensity: 0.8,  grain: 0.10 } },
+    { id: 'orchid',  name: 'Orchid',  seed: { mode: 'light', colors: ['#8e4ec6', '#d6409f', '#0091ff'], intensity: 0.8,  grain: 0.10 } },
 ];
 
 const CUSTOM_PREFIX = 'custom:';
