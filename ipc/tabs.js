@@ -279,7 +279,9 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         if (t._sidebarPoll) { clearInterval(t._sidebarPoll); t._sidebarPoll = null; }
         if (t._sidebarPollSafety) { clearTimeout(t._sidebarPollSafety); t._sidebarPollSafety = null; }
         if (t._sidebarInput) {
-            try { t._sidebarInput.wc.removeListener('input-event', t._sidebarInput.onInput); } catch (e) { log.debug('tabs', 'endResize', e); }
+            const { wc, chromeWc, onInput } = t._sidebarInput;
+            try { if (wc && !wc.isDestroyed()) wc.removeListener('input-event', onInput); } catch (e) { log.debug('tabs', 'endResize', e); }
+            try { if (chromeWc && !chromeWc.isDestroyed()) chromeWc.removeListener('input-event', onInput); } catch (e) { log.debug('tabs', 'endResize', e); }
             t._sidebarInput = null;
         }
         // Trust the LIVE width the cursor poll kept in t.sidebarWidth, not the
@@ -314,31 +316,42 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         // resize from the OS cursor directly: view-agnostic and always correct.
         // The new width is simply the cursor's x within the window content.
         if (t._sidebarPoll) clearInterval(t._sidebarPoll);
+        // ENDING the drag is the hard part. The release can land on the page's
+        // native view, so NEITHER the renderer's pointerup NOR the page view's
+        // mouseUp is guaranteed to reach us (same reason the moves don't). The
+        // reliable signal is the cursor itself going still: once the drag has
+        // moved, half a second of no movement means the button is up and the
+        // event was missed. That, plus the fast-path events below, ends it.
+        let lastX = null, lastMoveAt = Date.now(), movedOnce = false;
+        const IDLE_MS = 480;
         const tick = () => {
             if (!t._sidebarResizing) return;
             try {
                 const pt = screen.getCursorScreenPoint();
                 const cb = wd.window.getContentBounds();
+                if (lastX === null || pt.x !== lastX) { lastX = pt.x; lastMoveAt = Date.now(); movedOnce = true; }
+                else if (movedOnce && Date.now() - lastMoveAt > IDLE_MS) { endResize(wd, t.sidebarWidth); return; }
                 applyWidthLive(wd, clampW(pt.x - cb.x, wd));
             }
             catch (e) { log.debug('tabs', 'resize poll', e); }
         };
         t._sidebarPoll = setInterval(tick, 16);
-        // Safety net: if every "drag ended" signal is missed (release over a
-        // native view), never let the poll run forever.
-        t._sidebarPollSafety = setTimeout(() => { if (t._sidebarResizing) endResize(wd, t.sidebarWidth); }, 30000);
-        // End on the page view's mouseUp if it does reach us (belt-and-braces;
-        // the renderer's window-level pointerup ends it in the common case).
+        // Hard safety net: only reached if the drag never moved at all (a
+        // press-and-hold with no motion), since any motion arms the idle-end.
+        t._sidebarPollSafety = setTimeout(() => { if (t._sidebarResizing) endResize(wd, t.sidebarWidth); }, 8000);
+        // Fast-path ends: the page view's mouseUp AND the chrome window's own
+        // input-event (the drag began on the chrome, so with mouse capture the
+        // release may come back to it) — whichever reaches us first wins; the
+        // idle-detector above is the backstop when neither does.
+        const endOnUp = (_ev, input) => {
+            if (!t._sidebarResizing) return;
+            if (input.type === 'mouseUp' || input.type === 'mouseLeave') endResize(wd, t.sidebarWidth);
+        };
         const wc = t.tabMap.get(t.activeTabIndex)?.webContents;
-        if (wc) {
-            const onInput = (_ev, input) => {
-                if (!t._sidebarResizing) return;
-                if (input.type === 'mouseUp' || input.type === 'mouseLeave')
-                    endResize(wd, t.sidebarWidth);
-            };
-            t._sidebarInput = { wc, onInput };
-            try { wc.on('input-event', onInput); } catch (e) { log.debug('tabs', 'onInput', e); }
-        }
+        const chromeWc = wd.window.webContents;
+        t._sidebarInput = { wc: wc || null, chromeWc, onInput: endOnUp };
+        try { if (wc) wc.on('input-event', endOnUp); } catch (e) { log.debug('tabs', 'onInput', e); }
+        try { chromeWc.on('input-event', endOnUp); } catch (e) { log.debug('tabs', 'onInput chrome', e); }
     });
     // Chrome context menus are chrome DOM, but the page is a native view painted
     // over it — a click on the page never reaches the chrome, so the menu would
