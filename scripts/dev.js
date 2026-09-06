@@ -91,11 +91,28 @@ function scheduleRestart(reason) {
     }, 300);
 }
 
+/* Only restart on a REAL edit. On Windows fs.watch fires 'change' for file-access
+   and attribute touches too — and electron reads all its preload/feature files at
+   launch — so a bare event count restarted forever ("app keeps closing and
+   reopening"). Gate on two things: a settle window right after a (re)start, and
+   the file's mtime actually being newer than when this instance started. */
+const SETTLE_MS = 1800;
+function maybeRestart(reason, fullPath) {
+    if (Date.now() - startedAt < SETTLE_MS)
+        return; // startup read-noise, not an edit
+    let mtime = 0;
+    try { mtime = fs.statSync(fullPath).mtimeMs; }
+    catch { return; } // vanished/temp file — ignore
+    if (mtime < startedAt)
+        return; // touched but not modified since we launched → spurious
+    scheduleRestart(reason);
+}
+
 // Main-process code — none of it can hot-reload.
 for (const dir of ['features', 'ipc', 'preload']) {
-    try { fs.watch(path.join(ROOT, dir), { recursive: true }, (_e, rel) => rel && scheduleRestart(`${dir}/${rel}`)); } catch {}
+    try { fs.watch(path.join(ROOT, dir), { recursive: true }, (_e, rel) => rel && maybeRestart(`${dir}/${rel}`, path.join(ROOT, dir, rel))); } catch {}
 }
-try { fs.watch(ROOT, (_e, rel) => { if (rel === 'main.js' || rel === 'app-paths.js') scheduleRestart(rel); }); } catch {}
+try { fs.watch(ROOT, (_e, rel) => { if (rel === 'main.js' || rel === 'app-paths.js') maybeRestart(rel, path.join(ROOT, rel)); }); } catch {}
 
 /* The files the CHROME window loads (see renderer/Browser/index.html's script
    tags). Everything else under renderer/ — panels, internal pages — is reloaded
@@ -110,7 +127,7 @@ try {
         const p = rel.split(path.sep).join('/');
         if (p.endsWith('.css') || !CHROME_SOURCES.test(p))
             return;
-        scheduleRestart(`renderer/${p}`);
+        maybeRestart(`renderer/${p}`, path.join(ROOT, 'renderer', rel));
     });
 }
 catch {}
