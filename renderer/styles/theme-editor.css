@@ -19,81 +19,74 @@
    ONE name is on screen, though — the selected theme's, in the caption below
    the row. See the selection block further down for why. */
 .theme-row { margin-top: var(--sp-5); }
-/* A browsable GRID of theme cards, not a cramped scroll row of colour discs.
-   Each card is a miniature of the browser in that theme, with its name under it,
-   so you can tell the themes apart and see what each looks like at a glance. */
+/* A compact, SCROLLABLE grid of small theme tiles — no names (the tile shows the
+   theme and hovering previews it live). Capped height so a long list scrolls
+   instead of pushing the rest of the page down. */
 .theme-picker {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-  gap: var(--sp-4);
-  padding: var(--sp-3) 2px;
-  max-width: 540px;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: var(--sp-3);
+  padding: var(--sp-2) 4px var(--sp-2) 2px;
+  max-width: 380px;
+  max-height: 156px;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 .theme-option {
   position: relative;
-  display: flex; flex-direction: column; gap: 6px;
   padding: 0; border: none; background: none; cursor: pointer;
-  border-radius: 12px;
+  border-radius: 9px;
 }
 /* The mini-preview: a sidebar band (shell) with an accent dot, and a page
-   (page/bg) with text bars — the theme, shown as itself. */
+   (page/bg) with text bars — the theme, shown as itself, small. */
 .theme-swatch {
   position: relative;
-  display: flex; height: 56px; width: 100%;
-  border-radius: 10px; overflow: hidden;
+  display: flex; height: 34px; width: 100%;
+  border-radius: 8px; overflow: hidden;
   box-shadow: inset 0 0 0 1px var(--border-2);
   transition: box-shadow var(--dur-1) var(--ease);
 }
 .tsw-side {
   flex: 0 0 34%; background: var(--tp-shell);
-  display: flex; align-items: flex-start; padding: 7px 0 0 6px;
+  display: flex; align-items: flex-start; padding: 5px 0 0 4px;
 }
-.tsw-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--tp-accent); }
+.tsw-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tp-accent); }
 .tsw-page {
   flex: 1 1 auto; background: var(--tp-page);
-  display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 0 9px;
+  display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 5px;
 }
-.tsw-line { height: 4px; border-radius: 2px; background: var(--tp-text); opacity: 0.5; }
-.tsw-line.short { width: 58%; opacity: 0.3; }
+.tsw-line { height: 3px; border-radius: 2px; background: var(--tp-text); opacity: 0.5; }
+.tsw-line.short { width: 55%; opacity: 0.3; }
 
-.theme-name {
-  font-size: var(--fs-micro, 12px); color: var(--text-2);
-  text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-
-/* Selected: a tick on the card + an accent ring + the name in full ink. Hover
-   gets a soft ring so the whole card reads as the target. */
+/* Selected: a tick + accent ring. Hover: a soft ring on the whole tile. */
 .theme-option .theme-swatch svg {
-  position: absolute; right: 5px; top: 5px; width: 16px; height: 16px;
+  position: absolute; right: 3px; top: 3px; width: 12px; height: 12px;
   color: var(--tp-ink); opacity: 0; transform: scale(0.6);
   transition: opacity var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
   filter: drop-shadow(0 0 1.5px var(--tp-page));
 }
 .theme-option[aria-checked="true"] .theme-swatch svg { opacity: 1; transform: none; }
 .theme-option[aria-checked="true"] .theme-swatch {
-  box-shadow: inset 0 0 0 1px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent);
+  box-shadow: inset 0 0 0 1px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 3px var(--accent);
 }
-.theme-option[aria-checked="true"] .theme-name { color: var(--text); font-weight: 550; }
 .theme-option:hover .theme-swatch {
-  box-shadow: inset 0 0 0 1px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 3px var(--text-3);
+  box-shadow: inset 0 0 0 1px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 2.5px var(--text-3);
 }
 .theme-option:focus-visible { outline: none; }
 .theme-option:focus-visible .theme-swatch {
-  box-shadow: inset 0 0 0 1px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent);
+  box-shadow: inset 0 0 0 1px var(--border-2), 0 0 0 2px var(--surface), 0 0 0 3px var(--accent);
 }
 
-/* "New theme" — the last card in the grid: a dashed frame with a + and "New". */
+/* "New theme" — a small dashed tile matching the others. */
 .theme-add {
-  display: flex; flex-direction: column; gap: 6px;
   padding: 0; border: none; background: none; cursor: pointer; color: var(--text-3);
-  border-radius: 12px;
+  border-radius: 9px;
 }
 .theme-add > svg {
-  width: 100%; height: 56px; box-sizing: border-box; padding: 17px;
-  border: 1.5px dashed var(--border-2); border-radius: 10px;
+  width: 100%; height: 34px; box-sizing: border-box; padding: 9px;
+  border: 1.5px dashed var(--border-2); border-radius: 8px;
 }
 .theme-add:hover > svg { border-color: var(--text-3); color: var(--text); background: var(--hover); }
-.theme-add .theme-name { color: var(--text-3); }
 
 /* The caption. Name, what kind of theme it is, and the way into editing it —
    which is also where the edit affordance had to go: it used to be a <button>

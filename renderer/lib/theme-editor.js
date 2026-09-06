@@ -135,10 +135,8 @@
                 '<span class="tsw-page"><span class="tsw-line"></span><span class="tsw-line short"></span></span>';
             sw.appendChild(svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'));
             b.appendChild(sw);
-            const nm = document.createElement('span');
-            nm.className = 'theme-name';
-            nm.textContent = t.name;
-            b.appendChild(nm);
+            // No name label — the preview shows the theme and hover previews it
+            // live; the name is the button's accessible name and its tooltip.
             b.addEventListener('click', () => choose(t.id));
             // Hover to preview: paint the whole UI in this theme live (no save),
             // so switching is a look, not a leap. Leaving the row (below) drops
@@ -172,10 +170,6 @@
         addBtn.title = 'New theme';
         addBtn.setAttribute('aria-label', 'New theme');
         addBtn.appendChild(svg('<path d="M12 5.5v13M5.5 12h13"/>'));
-        const addName = document.createElement('span');
-        addName.className = 'theme-name';
-        addName.textContent = 'New';
-        addBtn.appendChild(addName);
         addBtn.addEventListener('click', () => newTheme());
         // Sits as the last card in the grid, not adrift at the end of a row.
         picker.appendChild(addBtn);
