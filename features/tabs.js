@@ -13,6 +13,7 @@ const profiles = require('./profiles');
 const permissionUI = require('./permission-ui');
 const captivePortal = require('./captive-portal');
 const contextMenu = require('./tab-context-menu');
+const faviconStore = require('./favicon-store');
 const NavigationHistory = require('./navigation-history');
 const FindDialogManager = require('./find-dialog');
 const focusMode = require('./focus-mode');
@@ -1119,11 +1120,16 @@ class Tabs {
             resolvedFavicon = null;
         }
         else if (!resolvedFavicon && url && url.startsWith('http')) {
-            // The site's OWN favicon — not Google's aggregator (which would leak
-            // every domain to Google). The real declared icon arrives shortly via
-            // page-favicon-updated and replaces this.
+            // Prefer the icon we already REMEMBERED for this host from an earlier
+            // visit — otherwise a plain sendTabUpdate (a did-navigate, a title
+            // change, a same-tab sub-navigation that fires no page-favicon-updated)
+            // fell back to <origin>/favicon.ico, which 404s on the many sites that
+            // declare their icon at another path, and the tab "lost" its favicon.
+            // Falls back to /favicon.ico only when nothing is cached; the real
+            // declared icon still arrives via page-favicon-updated and replaces it.
             try {
-                resolvedFavicon = `${new URL(url).origin}/favicon.ico`;
+                const origin = new URL(url).origin;
+                resolvedFavicon = faviconStore.getForHost(new URL(url).hostname) || `${origin}/favicon.ico`;
             }
             catch (e) { log.debug('tabs', 'base', e); }
         }
