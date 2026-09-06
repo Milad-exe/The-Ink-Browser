@@ -49,23 +49,19 @@ body {
      tree, and ::before/::after are siblings — neither can read the other's.
      Declared on the pseudo-element it was invisible to the layer that uses it,
      so `var(--grain-tile)` resolved to nothing and grain never rendered at all. */
-  /* GREYSCALE noise (feColorMatrix saturate 0), used as-is. Earlier it was a
-     mask over var(--text): that only ever ADDED one colour (white speckle on a
-     dark or vivid ground), so turning Grain up visibly lightened/shifted the
-     ground — most obvious on Blocks. Grain must be zero-mean: equal light and
-     dark specks that average back to the ground, i.e. texture, not a tint. */
-  --grain-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* TRUE zero-mean grain. Greyscale turbulence, luminance copied to alpha, then:
+     discrete RGB makes each speck pure black or pure white, and a V-shaped alpha
+     makes mid-grey transparent and the extremes opaque. Normal-blended this lays
+     down EQUAL amounts of black and white, so the average is the untouched ground
+     — texture on any theme (including vivid Blocks) with no hue/lightness shift.
+     Earlier soft-light/masked versions only pushed one way and lightened it. */
+  --grain-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 1 0 0 0 0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='discrete' tableValues='0 1'/%3E%3CfeFuncG type='discrete' tableValues='0 1'/%3E%3CfeFuncB type='discrete' tableValues='0 1'/%3E%3CfeFuncA type='table' tableValues='1 0 1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23g)'/%3E%3C/svg%3E");
 }
 body::after {
   content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  /* The grey noise itself, blended with soft-light: mid-grey leaves the ground
-     unchanged, lighter/darker specks nudge it a touch each way, so the average
-     is the ground colour. That is texture with no hue or lightness shift, on any
-     theme including the vivid ones. */
   background-image: var(--grain-tile);
-  background-size: 160px 160px;
-  mix-blend-mode: soft-light;
-  opacity: calc(var(--grain, 0) * 0.55);
+  background-size: 140px 140px;
+  opacity: calc(var(--grain, 0) * 0.5);
 }
 /* The bright hairline along the window's top edge. It was body::after until the
    grain layer needed that slot; it is its own element-free layer on html now so
