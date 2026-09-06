@@ -1838,6 +1838,23 @@
             document.addEventListener('keydown', (e) => { if (e.key === 'Escape') stop(true); });
             // Main fires this when the release happened over the page view.
             try { window.tabsUI.onSidebarResizeEnded((w) => { pending = clamp(w); stop(false); }); } catch (e) { window.northstarLog?.debug('renderer', 'stop: ' + e); }
+            // THE missing half of the resize. The page is a native view layered
+            // OVER this chrome, so the instant the cursor crosses onto it the
+            // handle's pointermove stops firing and the MAIN process takes over,
+            // driving the drag from the real OS cursor (ipc/tabs.js poll) and
+            // broadcasting the width back on 'sidebar-width-changed'. Nothing here
+            // was listening, so the page view moved while the sidebar DOM stayed
+            // frozen at its start width — you dragged the divider and the sidebar
+            // didn't follow, which is exactly "resize doesn't work". Reflect
+            // main's authoritative width onto the sidebar (this also keeps other
+            // windows in step, since the width is a global setting).
+            try {
+                window.tabsUI.onSidebarWidth((w) => {
+                    const cw = clamp(w);
+                    pending = cw;
+                    applySidebarWidth(cw);
+                });
+            } catch (e) { window.northstarLog?.debug('renderer', 'onSidebarWidth: ' + e); }
         }
         // ── Essentials (pinned favourites; sidebar top, per profile) ──────────────
         function initEssentials() {
