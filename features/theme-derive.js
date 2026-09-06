@@ -159,6 +159,69 @@ function rgba(hex, alpha) {
     return `rgba(${c.map(v => Math.round(clamp01(v) * 255)).join(',')},${alpha})`;
 }
 
+/* ── The gradient the browser wears ──────────────────────────────────────────
+ *
+ * A theme's colours are placed as POOLS on a canvas — the Zen model — and the
+ * chrome wears the blend of them over --shell. Each dot is a soft radial pool
+ * at its own position; stacked, they melt into one another. Position is layout
+ * (where the colour pools), which is a separate thing from the colour itself —
+ * unlike the old wheel, where a dot's position WAS its hue.
+ *
+ * The alpha is deliberately short of opaque: the wash sits UNDER the sidebar's
+ * own text, and body text is checked on --page (the card), never on the washed
+ * shell, so a pool strong enough to drown a label would pass validate() and
+ * still be wrong. These values keep the gradient plainly visible while leaving
+ * the chrome legible; the pools also fade to nothing by 62%, so the centre —
+ * where the omnibox and toolbar sit — stays the quietest part of the field. */
+const GRAD_ALPHA = { dark: 0.50, light: 0.40 };
+/* Where the dots sit when a seed carries none (older themes, and the first
+   frame of a fork). Spread toward the corners so the centre stays calm. */
+const DEFAULT_POS = [
+    [{ x: 0.30, y: 0.28 }],
+    [{ x: 0.24, y: 0.22 }, { x: 0.80, y: 0.82 }],
+    [{ x: 0.22, y: 0.20 }, { x: 0.82, y: 0.34 }, { x: 0.48, y: 0.86 }],
+];
+function positionsFor(colors, positions) {
+    const n = Math.max(1, Math.min(3, (colors || []).length));
+    const fallback = DEFAULT_POS[n - 1] || DEFAULT_POS[0];
+    return (colors || []).map((_, i) => {
+        const p = positions && positions[i];
+        return (p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)))
+            ? { x: clamp01(Number(p.x)), y: clamp01(Number(p.y)) }
+            : (fallback[i] || fallback[fallback.length - 1] || { x: 0.5, y: 0.5 });
+    });
+}
+
+/**
+ * The CSS for a theme's gradient wash — stacked radial pools, one per colour,
+ * each at its position. Returns 'none' when there is nothing to paint.
+ *
+ *   colors     ['#hex', …]         the pool colours
+ *   positions  [{x,y}, …]          0..1 in the canvas, parallel to colors
+ *   mode       'dark' | 'light'    sets the pool alpha
+ *   intensity  0..1                lifts the pools' chroma (Zen's "vividness")
+ *
+ * Mirrored — deliberately — by localGradient() in renderer/lib/theme-editor.js,
+ * which draws the same field into the editor's canvas. Change one, change both.
+ */
+function gradientCss(colors, positions, mode, intensity) {
+    const cols = (colors || []).map(c => toLch(c)).filter(Boolean);
+    if (!cols.length)
+        return 'none';
+    const inten = clamp01(intensity == null ? 0.7 : intensity);
+    const pos = positionsFor(colors, positions);
+    const a = GRAD_ALPHA[mode === 'light' ? 'light' : 'dark'];
+    const layers = cols.map((c, i) => {
+        const p = pos[i] || { x: 0.5, y: 0.5 };
+        // Keep the pool's own lightness so a colour reads as itself; lift its
+        // chroma by intensity so a vivid theme pools vividly.
+        const hex = fromLch({ L: c.L, C: c.C * (0.55 + inten * 0.75), h: c.h });
+        const x = (p.x * 100).toFixed(1), y = (p.y * 100).toFixed(1);
+        return `radial-gradient(ellipse 85% 85% at ${x}% ${y}%, ${rgba(hex, a)} 0%, ${rgba(hex, 0)} 62%)`;
+    });
+    return layers.join(', ');
+}
+
 /**
  * Derive a complete token set.
  *
@@ -422,15 +485,19 @@ function derive(seed) {
             : '0 16px 40px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.30)',
     };
 
-    /* The chrome's wash. The dots are painted as a soft gradient OVER --shell
-       rather than replacing it, so everything that reads --shell as a flat
-       colour (the vibrancy mix, the tab-strip scroll fades) keeps working. */
-    const dots = wheel ? wheel.picked : [ground];
-    tokens['--shell-wash'] = dots.length > 1
-        ? `linear-gradient(155deg, ${dots.map((d, i) => {
-            const stop = Math.round((i / (dots.length - 1)) * 100);
-            return `${rgba(fromLch({ L: d.L, C: d.C * (wheel ? wheel.intensity : 1), h: d.h }), mode === 'dark' ? 0.38 : 0.30)} ${stop}%`;
-        }).join(', ')})`
+    /* The chrome's wash — the theme's gradient, painted OVER --shell rather than
+       replacing it, so everything that reads --shell as a flat colour (the
+       vibrancy mix, the tab-strip scroll fades) keeps working. The colours pool
+       at their positions (the Zen model); a seed with no colours[] — the four
+       role-based built-ins — has no gradient and stays a single flat ground. */
+    /* A gradient needs at least two pools. One colour already tints the whole
+       chrome through the ground (colors[0] sets the ground's hue), so a single
+       radial of the same hue would be redundant — and, crucially, it means
+       forking a flat built-in stays flat until you add a second colour, rather
+       than the browser changing the instant you open the editor. */
+    const gradColors = seed && Array.isArray(seed.colors) ? seed.colors : null;
+    tokens['--shell-wash'] = gradColors && gradColors.length >= 2
+        ? gradientCss(gradColors, seed.positions, mode, wheel ? wheel.intensity : 1)
         : 'none';
     tokens['--grain'] = String(seed && seed.grain != null ? clamp01(seed.grain) : 0);
 
@@ -496,8 +563,8 @@ function validate(seed) {
 }
 
 module.exports = {
-    derive, toCss, validate, groundLevelFor,
+    derive, toCss, validate, groundLevelFor, gradientCss, positionsFor,
     // exported for tests and for the icon renderer
     toLch, fromLch, contrast, luminance, hexToRgb, rgbToHex, RAMP, L_WINDOW, rolesFromColors,
-    WHEEL_L, GROUND_L, DEFAULT_LEVEL, GROUND_CHROMA_MAX,
+    WHEEL_L, GROUND_L, DEFAULT_LEVEL, GROUND_CHROMA_MAX, DEFAULT_POS,
 };

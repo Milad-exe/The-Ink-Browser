@@ -171,16 +171,29 @@
 .te-modes button:hover:not(.on) { color: var(--text-2); }
 .te-modes button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
 
-.te-wheel { position: relative; width: 220px; height: 220px; flex-shrink: 0; }
-.te-wheel canvas { width: 100%; height: 100%; display: block; border-radius: 50%; box-shadow: var(--ring-2); }
+/* The gradient canvas — a large rounded rectangle wearing the theme's own
+   gradient (--te-grad) over its ground (--te-ground), both set live by the
+   script. This is the Zen field: the colours pool where their dots sit, and
+   dragging a dot moves the pool rather than changing its colour. */
+.te-canvas {
+  position: relative; width: 100%; aspect-ratio: 3 / 2; flex-shrink: 0;
+  border-radius: 16px; overflow: hidden;
+  background-color: var(--te-ground, var(--bg));
+  background-image: var(--te-grad, none);
+  box-shadow: var(--ring-2), inset 0 0 0 1px rgba(255,255,255,0.04);
+  cursor: crosshair; touch-action: none;
+}
 .te-dots { position: absolute; inset: 0; }
 .te-dot {
   position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px;
   border-radius: 50%; cursor: grab; padding: 0;
-  border: 3px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.45);
+  border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,0.55);
 }
 .te-dot:active { cursor: grabbing; }
-.te-dot:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-wash), 0 1px 5px rgba(0,0,0,0.45); }
+.te-dot:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-wash), 0 1px 6px rgba(0,0,0,0.55); }
+/* The selected pool — the one the palette recolours and the arrows move — wears
+   a ring so it is clear which dot a click acts on. */
+.te-dot.on { box-shadow: 0 0 0 3px var(--accent), 0 1px 6px rgba(0,0,0,0.55); }
 /* The accent dot is marked on the field too, so the naming in the bar below
    has something to point at without a legend. */
 .te-dot[data-role="accent"]::after,
@@ -189,6 +202,32 @@
   border-radius: 50%; border: 2px solid rgba(255,255,255,0.85);
 }
 .te-dot[data-role="extra"]::after { border-style: dotted; }
+
+/* ── The palette ────────────────────────────────────────────────────────────
+   A scrollable row of colour swatches that set the SELECTED pool's colour, with
+   the native picker at the end for anything off-row. The selected pool's own
+   colour is ringed so the row and the canvas agree on what is armed. */
+.te-palette {
+  display: flex; align-items: center; gap: var(--sp-3);
+  width: 100%; overflow-x: auto; padding: 3px 2px;
+  scrollbar-width: thin;
+}
+.te-sw {
+  flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%;
+  border: none; padding: 0; cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.28);
+}
+.te-sw.on { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.28), 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent); }
+.te-sw:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+/* The custom-colour chip: a hue ring with the OS picker laid invisibly over it. */
+.te-sw-custom {
+  position: relative; overflow: hidden; display: grid; place-items: center;
+  background: conic-gradient(from 0deg, #e5484d, #f2cd37, #46a758, #0091ff, #6e56cf, #d6409f, #e5484d);
+}
+.te-sw-custom input[type="color"] {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; border: none; padding: 0; margin: 0; cursor: pointer; background: none;
+}
 
 /* ── Roles + tools ────────────────────────────────────────────────────────
    One row: what the dots ARE on the left, what you can do to them on the
@@ -209,8 +248,8 @@
   font-family: inherit; font-size: var(--fs-small); letter-spacing: var(--tracking);
 }
 .te-chip:hover { background: var(--hover); color: var(--text-2); }
-/* The active chip is the dot the wheel's bare canvas and the arrow keys act
-   on, so it has to be visibly the one that is armed. */
+/* The active chip is the dot the palette recolours and the arrow keys move, so
+   it has to be visibly the one that is armed. */
 .te-chip.on { background: var(--active-bg); color: var(--text); }
 .te-chip:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
 .te-chip-dot {
@@ -302,7 +341,8 @@
 @media (max-width: 560px) {
   .theme-editor { gap: var(--sp-5); }
   .te-stage { gap: var(--sp-4); }
-  .te-wheel { width: 150px; height: 150px; }
+  /* The canvas is width:100% with a fixed aspect ratio, so it scales itself —
+     no fixed size to shrink here. */
   .te-controls { gap: var(--sp-3); }
   .te-ctl { grid-template-columns: 54px 1fr 22px; gap: var(--sp-3); }
   .te-ctl-track { height: 20px; }

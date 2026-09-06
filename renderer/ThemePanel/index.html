@@ -39,11 +39,12 @@
             </button>
           </div>
 
-          <div class="te-wheel" id="te-wheel" role="application"
-               aria-label="Colour field — drag a dot to change its hue and saturation">
-            <canvas id="te-wheel-canvas" width="440" height="440" aria-hidden="true"></canvas>
+          <div class="te-canvas" id="te-canvas" role="application"
+               aria-label="Gradient field — drag a colour to move where it pools">
             <div class="te-dots" id="te-dots"></div>
           </div>
+
+          <div class="te-palette" id="te-palette" role="group" aria-label="Pool colour"></div>
 
           <div class="te-bar">
             <div class="te-roles" id="te-roles"></div>
@@ -54,7 +55,7 @@
               <button type="button" id="te-remove" title="Remove the last colour" aria-label="Remove the last colour">
                 <svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z"/></svg>
               </button>
-              <button type="button" id="te-scatter" title="Space the colours evenly around the wheel" aria-label="Space the colours evenly around the wheel">
+              <button type="button" id="te-scatter" title="Spread the colours out" aria-label="Spread the colours out evenly">
                 <svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M140,40V216a12,12,0,0,1-24,0V40a12,12,0,0,1,24,0ZM88,116H45l11.52-11.51a12,12,0,0,0-17-17l-32,32a12,12,0,0,0,0,17l32,32a12,12,0,0,0,17-17L45,140H88a12,12,0,0,0,0-24Zm160.49,3.51-32-32a12,12,0,0,0-17,17L211,116H168a12,12,0,0,0,0,24h43l-11.52,11.51a12,12,0,0,0,17,17l32-32A12,12,0,0,0,248.49,119.51Z"/></svg>
               </button>
             </div>

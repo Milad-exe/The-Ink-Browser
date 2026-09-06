@@ -750,6 +750,36 @@ test('…and the whole palette, where the wheel can express it', () => {
     }
 });
 
+test('the gradient wash pools each colour at its position, and needs two', () => {
+    // One colour is a flat ground — its hue already tints the chrome, so no
+    // gradient — which is also what keeps forking a flat built-in flat.
+    const one = themeDerive.derive({ mode: 'dark', colors: ['#0091ff'], intensity: 0.7 }).tokens;
+    assert.strictEqual(one['--shell-wash'], 'none', 'one colour is flat');
+
+    // Two-plus colours pool at their positions: one radial-gradient layer each,
+    // centred where the seed put it.
+    const seed = {
+        mode: 'dark',
+        colors: ['#0091ff', '#f2cd37'],
+        positions: [{ x: 0.2, y: 0.3 }, { x: 0.75, y: 0.6 }],
+        intensity: 0.8,
+    };
+    const wash = themeDerive.derive(seed).tokens['--shell-wash'];
+    assert.strictEqual((wash.match(/radial-gradient/g) || []).length, 2, 'a layer per colour');
+    assert.ok(wash.includes('at 20.0% 30.0%'), 'first pool at its position');
+    assert.ok(wash.includes('at 75.0% 60.0%'), 'second pool at its position');
+
+    // A missing position falls back to the spread defaults rather than stacking
+    // both pools at 0,0.
+    const noPos = themeDerive.derive({ mode: 'dark', colors: ['#0091ff', '#f2cd37'] }).tokens['--shell-wash'];
+    assert.ok(!/at 0\.0% 0\.0%.*at 0\.0% 0\.0%/s.test(noPos), 'defaults are spread, not stacked');
+
+    // positionsFor is always as long as colors, and clamps into the canvas.
+    const pos = themeDerive.positionsFor(['#000', '#111', '#222'], [{ x: 5, y: -2 }]);
+    assert.strictEqual(pos.length, 3, 'one entry per colour');
+    assert.deepStrictEqual(pos[0], { x: 1, y: 0 }, 'out-of-range positions clamp to 0..1');
+});
+
 test('a fork is never vivid, and says so by being quieter', () => {
     // The chroma ceiling is what stops a user theme shouting over its own
     // accent; Blocks opts out of it and a fork cannot. It keeps the hue.

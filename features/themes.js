@@ -262,12 +262,20 @@ function prepareCustom(input, existingId = null) {
         const n = Number(v);
         return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : d;
     };
+    const colors = (Array.isArray(src.colors) ? src.colors : [])
+        .filter(c => /^#[0-9a-fA-F]{6}$/.test(String(c || '').trim()))
+        .slice(0, 3)
+        .map(c => String(c).trim().toLowerCase());
     const seed = {
         mode: src.mode === 'light' ? 'light' : 'dark',
-        colors: (Array.isArray(src.colors) ? src.colors : [])
-            .filter(c => /^#[0-9a-fA-F]{6}$/.test(String(c || '').trim()))
-            .slice(0, 3)
-            .map(c => String(c).trim().toLowerCase()),
+        colors,
+        /* Where each colour POOLS in the gradient, 0..1 in the editor canvas,
+           parallel to colors. This is the Zen model: position is layout, not
+           hue. Kept only as far as there are colours, and each entry clamped —
+           a saved theme cannot carry a pool off the canvas. */
+        positions: (Array.isArray(src.positions) ? src.positions : [])
+            .slice(0, colors.length)
+            .map(p => ({ x: clamp(p && p.x, 0.5), y: clamp(p && p.y, 0.5) })),
         intensity: clamp(src.intensity, 0.7),
         grain: clamp(src.grain, 0),
         /* How dark the ground sits, 0..1 across the mode's band. Stored rather

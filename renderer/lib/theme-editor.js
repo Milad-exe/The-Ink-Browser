@@ -4,9 +4,17 @@
  *
  * It exists as a module because it is used in two frames: the Appearance
  * section of the Settings page, and the popup that opens from the sidebar's
- * context menu. The logic — the colour wheel, the dots, the harmony scatter,
- * the controls, the save path — is identical in both, and a copy in each would
- * drift the moment one of them got a fix.
+ * context menu. The logic — the gradient canvas, the draggable pools, the
+ * palette, the controls, the save path — is identical in both, and a copy in
+ * each would drift the moment one of them got a fix.
+ *
+ * The model is Zen's: a theme is a set of COLOURS, each pooled at an XY
+ * POSITION on a canvas, and the browser wears the blend of them. Position is
+ * layout (where a colour pools), which is a different thing from the colour —
+ * you drag a pool to move it and pick its colour from the palette. The ground,
+ * accent and text tokens are still DERIVED from the colours in the main process
+ * (features/theme-derive.js), so a gradient can never make the browser
+ * unreadable; positions only shape the wash it wears.
  *
  * Mount it with:
  *
@@ -381,50 +389,99 @@
         // never computes a colour it then has to keep in step.
 
         /* Mirrored from features/theme-derive.js — change one, change both.
-           The wheel is a constant-lightness slice, so how dark the ground sits
-           is its own value on the seed rather than something read off a dot. */
+           WHEEL_L is the lightness a newly-added pool colour is minted at, so a
+           second colour comes in as a real tint rather than near-black; how dark
+           the GROUND sits is its own value on the seed (`level`). */
         const WHEEL_L = 0.72;
         const GROUND_L = { dark: [0.06, 0.30], light: [0.88, 0.98] };
         const GROUND_C_MAX = 0.060;
         const DEFAULT_LEVEL = 0.5;
-        const MAX_C = 0.16;     // chroma at the rim — beyond this sRGB clips anyway
 
-        let seed = { mode: 'dark', colors: ['#3a6ea5'], intensity: 0.7, grain: 0, level: DEFAULT_LEVEL };
+        let seed = { mode: 'dark', colors: ['#3a6ea5'], positions: [], intensity: 0.7, grain: 0, level: DEFAULT_LEVEL };
         let activeDot = 0;
 
-        /* The wheel's rendered size is MEASURED, never assumed. It is 220 in a
-           wide frame and smaller in a narrow one (styles/theme-editor.css), and
-           a hardcoded constant put every dot at the wrong radius the moment the
-           panel was narrower than the Settings column — dots landed outside the
-           disc entirely. */
-        const wheelSize = () => el('te-wheel')?.clientWidth || 220;
+        /* The canvas's rendered size is MEASURED, never assumed — it is a square
+           that fills the frame, narrower in the popup than in the Settings
+           column, and a dot's position is a FRACTION of it. */
+        const canvasSize = () => {
+            const c = el('te-canvas');
+            return { w: c?.clientWidth || 260, h: c?.clientHeight || 260 };
+        };
         const clamp01 = (n) => Math.min(1, Math.max(0, Number(n) || 0));
 
-        /* Paint the field once: hue around, saturation outward. Drawn in
-           OKLCH so the wheel matches what the ramp will actually produce —
-           an HSL wheel promises saturation the derivation cannot deliver. */
-        function paintWheel() {
-            const cv = el('te-wheel-canvas');
-            const n = cv.width;
-            const c2 = cv.getContext('2d');
-            const img = c2.createImageData(n, n);
-            const r0 = n / 2;
-            for (let y = 0; y < n; y++) {
-                for (let x = 0; x < n; x++) {
-                    const dx = x - r0, dy = y - r0;
-                    const dist = Math.hypot(dx, dy);
-                    const i = (y * n + x) * 4;
-                    if (dist > r0) { img.data[i + 3] = 0; continue; }
-                    const hue = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
-                    const c = Math.min(1, dist / r0) * MAX_C;
-                    const [R, G, B] = oklchToRgb(WHEEL_L, c, hue);
-                    img.data[i] = R; img.data[i + 1] = G; img.data[i + 2] = B;
-                    // Feather the rim so the disc has no staircase edge.
-                    img.data[i + 3] = dist > r0 - 1.5 ? Math.max(0, (r0 - dist) / 1.5) * 255 : 255;
-                }
+        /* Where the dots pool when a seed carries no positions — mirrored from
+           DEFAULT_POS in features/theme-derive.js. Spread toward the corners so
+           the centre, where the toolbar and omnibox sit, stays the calm part. */
+        const DEFAULT_POS = [
+            [{ x: 0.30, y: 0.28 }],
+            [{ x: 0.24, y: 0.22 }, { x: 0.80, y: 0.82 }],
+            [{ x: 0.22, y: 0.20 }, { x: 0.82, y: 0.34 }, { x: 0.48, y: 0.86 }],
+        ];
+        const defaultPositions = (n) =>
+            (DEFAULT_POS[Math.max(1, Math.min(3, n)) - 1] || DEFAULT_POS[0]).map(p => ({ ...p }));
+
+        /* Make seed.positions as long as seed.colors, filling any gap from the
+           defaults — so an older theme (saved before positions existed) and a
+           freshly added dot both land somewhere sensible. */
+        function ensurePositions() {
+            const n = seed.colors.length;
+            const fb = defaultPositions(n);
+            const out = [];
+            for (let i = 0; i < n; i++) {
+                const p = seed.positions && seed.positions[i];
+                out.push(p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y))
+                    ? { x: clamp01(p.x), y: clamp01(p.y) }
+                    : (fb[i] || fb[fb.length - 1] || { x: 0.5, y: 0.5 }));
             }
-            c2.putImageData(img, 0, 0);
+            seed.positions = out;
+            return out;
         }
+
+        /* The gradient the canvas shows — mirrored from gradientCss() in
+           features/theme-derive.js so the editor's field is the field the
+           browser will wear. Painted locally (not read off --shell-wash) so it
+           is right from the instant the editor opens, before any live paint. */
+        function localGradient() {
+            const cols = seed.colors || [];
+            // One colour is a flat ground (its hue already tints the chrome); the
+            // gradient begins at two pools. Mirrors the ≥2 gate in theme-derive.js.
+            if (cols.length < 2)
+                return 'none';
+            const inten = clamp01(seed.intensity == null ? 0.7 : seed.intensity);
+            const pos = ensurePositions();
+            const a = seed.mode === 'light' ? 0.40 : 0.50;
+            const asRgba = (hex, al) => {
+                const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+                const v = m ? parseInt(m[1], 16) : 0;
+                return `rgba(${(v >> 16) & 255},${(v >> 8) & 255},${v & 255},${al})`;
+            };
+            return cols.map((hex, i) => {
+                const { L, C, h } = rgbToOklch(hex);
+                const lifted = toHex(oklchToRgb(L, C * (0.55 + inten * 0.75), h));
+                const p = pos[i] || { x: 0.5, y: 0.5 };
+                const x = (p.x * 100).toFixed(1), y = (p.y * 100).toFixed(1);
+                return `radial-gradient(ellipse 85% 85% at ${x}% ${y}%, ${asRgba(lifted, a)} 0%, ${asRgba(lifted, 0)} 62%)`;
+            }).join(', ');
+        }
+
+        /* Paint the canvas with the live gradient and a ground that matches what
+           the chrome will sit on, so the field reads like a small browser. */
+        function paintCanvas() {
+            const c = el('te-canvas');
+            if (!c)
+                return;
+            c.style.setProperty('--te-ground', groundAt(seed.level, seed.intensity));
+            c.style.setProperty('--te-grad', localGradient());
+        }
+
+        /* A curated palette to pick a pool's colour from — the row you click
+           instead of hunting a hue on a wheel. A spread of vivid and muted tones
+           across the circle, plus the native picker at the end for anything else. */
+        const PRESETS = [
+            '#e5484d', '#f76808', '#f2cd37', '#46a758', '#12a594', '#0091ff',
+            '#3a6ea5', '#6e56cf', '#8e4ec6', '#d6409f', '#ad7f58', '#f5c2c7',
+            '#2b2f36', '#8b95a1', '#e6e1d7', '#ffffff',
+        ];
 
         /* The same OKLab maths the main process uses, inlined: these are
            sandboxed pages and cannot require features/theme-derive.js. Only the
@@ -449,25 +506,20 @@
         }
         const toHex = ([r, g, b]) => '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
 
-        /* A dot's position IS its hue and chroma, so the two convert both
-           ways: dragging writes a colour, loading a saved theme places a dot. */
-        const posToColor = (x, y) => {
-            const r0 = wheelSize() / 2;
-            const dx = x - r0, dy = y - r0;
-            const dist = Math.min(r0, Math.hypot(dx, dy));
-            const hue = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
-            return toHex(oklchToRgb(WHEEL_L, (dist / r0) * MAX_C, hue));
+        /* In the Zen model a dot's position is WHERE its colour pools, not the
+           colour itself — so a screen point becomes a 0..1 fraction of the
+           canvas, and a stored fraction becomes a pixel offset for the dot. */
+        const posToFrac = (x, y) => {
+            const { w, h } = canvasSize();
+            return { x: clamp01(x / (w || 1)), y: clamp01(y / (h || 1)) };
         };
-        const colorToPos = (hex) => {
-            const { C, h } = rgbToOklch(hex);
-            const r0 = wheelSize() / 2;
-            const dist = Math.min(r0, (C / MAX_C) * r0);
-            const rad = h * Math.PI / 180;
-            return { x: r0 + Math.cos(rad) * dist, y: r0 + Math.sin(rad) * dist };
+        const fracToPx = (p) => {
+            const { w, h } = canvasSize();
+            return { x: (p?.x ?? 0.5) * w, y: (p?.y ?? 0.5) * h };
         };
         function rgbToOklch(hex) {
             const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
-            if (!m) return { C: 0, h: 0 };
+            if (!m) return { L: 0, C: 0, h: 0 };
             const v = parseInt(m[1], 16);
             const to = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
             const R = to((v >> 16) & 255), G = to((v >> 8) & 255), B = to(v & 255);
@@ -476,26 +528,20 @@
             const s2 = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
             const a = 1.9779984951 * l - 2.4285922050 * mm + 0.4505937099 * s2;
             const b = 0.0259040371 * l + 0.7827717662 * mm - 0.8086757660 * s2;
-            return { C: Math.hypot(a, b), h: (Math.atan2(b, a) * 180 / Math.PI + 360) % 360 };
+            return {
+                L: 0.2104542553 * l + 0.7936177850 * mm - 0.0040720468 * s2,
+                C: Math.hypot(a, b),
+                h: (Math.atan2(b, a) * 180 / Math.PI + 360) % 360,
+            };
         }
 
-        /* Scatter places the other dots from the first using the standard
-           colour relationships, so a second and third colour that fight is
-           not something you can pick. It is an ACTION, not a mode: it fires
-           once, and the dots stay draggable afterwards — a mode meant every
-           later drag of the primary yanked the others with it. Which
-           relationship you get depends on how many dots there are, because
-           that is the only sensible reading of "harmonise these three". */
-        const HARMONY = { 2: [180], 3: [120, 240] };
-        function scatter() {
-            if (seed.colors.length < 2)
-                return;
-            const { C, h } = rgbToOklch(seed.colors[0]);
-            const offsets = HARMONY[seed.colors.length] || [];
-            offsets.forEach((off, i) => {
-                seed.colors[i + 1] = toHex(oklchToRgb(WHEEL_L, C, (h + off + 360) % 360));
-            });
+        /* Arrange snaps the pools back to their spread-out default positions —
+           the "tidy this up" button for when a few drags have bunched them into
+           a corner. Colours are untouched; only where they pool changes. */
+        function arrange() {
+            seed.positions = defaultPositions(seed.colors.length);
             renderDots();
+            paintCanvas();
             schedulePreview();
         }
 
@@ -538,13 +584,15 @@
                 host.textContent = '';
                 seed.colors.forEach((_, i) => host.appendChild(dotEl(i)));
             }
+            const pos = ensurePositions();
             seed.colors.forEach((hex, i) => {
                 const d = host.children[i];
-                const p = colorToPos(hex);
+                const p = fracToPx(pos[i]);
                 const role = roleOf(i);
                 d.style.left = p.x + 'px';
                 d.style.top = p.y + 'px';
                 d.style.background = hex;
+                d.classList.toggle('on', i === activeDot);
                 d.dataset.role = role.key;
                 d.setAttribute('aria-label', `${role.name}, ${hex}`);
                 d.title = `${role.name} · ${hex}`;
@@ -552,6 +600,7 @@
             if (focusedIndex >= 0 && host.children[focusedIndex])
                 host.children[focusedIndex].focus({ preventScroll: true });
             renderRoles();
+            renderPalette();
             syncTools();
         }
 
@@ -562,20 +611,24 @@
             d.dataset.i = String(i);
             d.addEventListener('focus', () => setActiveDot(i));
             d.addEventListener('pointerdown', () => setActiveDot(i));
-            // Arrows nudge — a dot only a mouse can move is not a control.
+            // Arrows nudge the pool — a dot only a mouse can move is not a control.
             d.addEventListener('keydown', (e) => {
-                const step = { ArrowLeft: [-4, 0], ArrowRight: [4, 0], ArrowUp: [0, -4], ArrowDown: [0, 4] }[e.key];
+                const step = { ArrowLeft: [-0.02, 0], ArrowRight: [0.02, 0], ArrowUp: [0, -0.02], ArrowDown: [0, 0.02] }[e.key];
                 if (!step) return;
                 e.preventDefault();
-                const cur = colorToPos(seed.colors[i]);
-                setDot(i, posToColor(cur.x + step[0], cur.y + step[1]));
+                const p = ensurePositions()[i] || { x: 0.5, y: 0.5 };
+                setDotPos(i, { x: clamp01(p.x + step[0]), y: clamp01(p.y + step[1]) });
             });
             return d;
         }
 
         const setActiveDot = (i) => {
-            activeDot = Math.min(i, seed.colors.length - 1);
+            activeDot = Math.max(0, Math.min(i, seed.colors.length - 1));
+            const host = el('te-dots');
+            if (host)
+                [...host.children].forEach((d, j) => d.classList.toggle('on', j === activeDot));
             renderRoles();
+            renderPalette();
         };
 
         /* The roles, named, beside the tools. The wheel showed one to three
@@ -619,23 +672,44 @@
             el('te-scatter').disabled = seed.colors.length < 2;
         }
 
-        function setDot(i, hex) {
+        /* Setting a pool's COLOUR re-derives the palette (colours are what the
+           ramp reads); setting its POSITION only moves where it pools in the
+           gradient — the two are separate, which is the whole point of the
+           model. Both repaint the canvas and preview live. */
+        function setDotColor(i, hex) {
             seed.colors[i] = hex;
             setActiveDot(i);
             renderDots();
+            paintCanvas();
             paintControls();
             schedulePreview();
         }
+        function setDotPos(i, frac) {
+            ensurePositions();
+            seed.positions[i] = { x: clamp01(frac.x), y: clamp01(frac.y) };
+            // Move only the one dot — a full renderDots() rebuilds the palette
+            // and roles on every pointer frame, which is churn under the drag.
+            const d = el('te-dots')?.children[i];
+            if (d) {
+                const px = fracToPx(seed.positions[i]);
+                d.style.left = px.x + 'px';
+                d.style.top = px.y + 'px';
+            }
+            paintCanvas();
+            schedulePreview();
+        }
 
-        // Pointer drag on the wheel.
+        /* Pointer drag on the canvas MOVES a pool. Grabbing a dot drags it;
+           pressing bare canvas picks up the active pool and drops it where you
+           pressed, so a click places the selected colour. */
         (() => {
-            const wheel = el('te-wheel');
+            const canvas = el('te-canvas');
             let dragging = -1;
             const at = (e) => {
-                const r = wheel.getBoundingClientRect();
+                const r = canvas.getBoundingClientRect();
                 return { x: e.clientX - r.left, y: e.clientY - r.top };
             };
-            wheel.addEventListener('pointerdown', (e) => {
+            canvas.addEventListener('pointerdown', (e) => {
                 const dot = e.target.closest('.te-dot');
                 const p = at(e);
                 if (dot) {
@@ -643,24 +717,20 @@
                     setActiveDot(dragging);
                 }
                 else {
-                    /* Clicking bare canvas moves the dot you last touched, not
-                       always the ground: with the accent selected, "put it
-                       there" meant the accent — reaching for a colour and
-                       getting the chrome recoloured instead is the wrong
-                       answer to a click on a wheel. */
                     dragging = Math.min(activeDot, seed.colors.length - 1);
-                    setDot(dragging, posToColor(p.x, p.y));
+                    setDotPos(dragging, posToFrac(p.x, p.y));
+                    el('te-dots')?.children[dragging]?.focus({ preventScroll: true });
                 }
-                wheel.setPointerCapture(e.pointerId);
+                canvas.setPointerCapture(e.pointerId);
             });
-            wheel.addEventListener('pointermove', (e) => {
+            canvas.addEventListener('pointermove', (e) => {
                 if (dragging < 0) return;
                 const p = at(e);
-                setDot(dragging, posToColor(p.x, p.y));
+                setDotPos(dragging, posToFrac(p.x, p.y));
             });
             const stop = () => { dragging = -1; };
-            wheel.addEventListener('pointerup', stop);
-            wheel.addEventListener('pointercancel', stop);
+            canvas.addEventListener('pointerup', stop);
+            canvas.addEventListener('pointercancel', stop);
         })();
 
         // Mode. Two buttons, one on.
@@ -700,16 +770,63 @@
             if (seed.colors.length >= 3) return;
             const { C, h } = rgbToOklch(seed.colors[0]);
             seed.colors.push(toHex(oklchToRgb(WHEEL_L, Math.max(C, 0.06), (h + 140) % 360)));
+            // A new pool lands at its spread-out default slot, not on top of
+            // an existing one — so the added colour is visible straight away.
+            seed.positions = defaultPositions(seed.colors.length);
             setActiveDot(seed.colors.length - 1);
-            renderDots(); paintControls(); schedulePreview();
+            renderDots(); paintCanvas(); paintControls(); schedulePreview();
         });
         el('te-remove').addEventListener('click', () => {
             if (seed.colors.length <= 1) return;
             seed.colors.pop();
+            if (seed.positions) seed.positions.pop();
             setActiveDot(seed.colors.length - 1);
-            renderDots(); paintControls(); schedulePreview();
+            renderDots(); paintCanvas(); paintControls(); schedulePreview();
         });
-        el('te-scatter').addEventListener('click', scatter);
+        el('te-scatter').addEventListener('click', arrange);
+
+        /* ── The palette ─────────────────────────────────────────────────────
+         *
+         * A pool's colour is CHOSEN, not dragged for — the row of swatches sets
+         * the active dot's colour, and the native picker at the end covers the
+         * ones the row does not. The selected dot's own colour is marked so it
+         * is clear which pool a click will recolour. */
+        function renderPalette() {
+            const host = el('te-palette');
+            if (!host)
+                return;
+            const activeHex = (seed.colors[activeDot] || '').toLowerCase();
+            // Build the fixed swatch row once; only the selected mark changes after.
+            if (!host.dataset.built) {
+                host.dataset.built = '1';
+                for (const hex of PRESETS) {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'te-sw';
+                    b.dataset.hex = hex.toLowerCase();
+                    b.style.background = hex;
+                    b.title = hex;
+                    b.setAttribute('aria-label', `Set the selected colour to ${hex}`);
+                    b.addEventListener('click', () => setDotColor(activeDot, hex.toLowerCase()));
+                    host.appendChild(b);
+                }
+                const pick = document.createElement('label');
+                pick.className = 'te-sw te-sw-custom';
+                pick.title = 'Custom colour';
+                pick.setAttribute('aria-label', 'Custom colour');
+                const input = document.createElement('input');
+                input.type = 'color';
+                input.id = 'te-color-input';
+                input.addEventListener('input', (e) => setDotColor(activeDot, e.target.value.toLowerCase()));
+                pick.appendChild(input);
+                host.appendChild(pick);
+            }
+            for (const b of host.querySelectorAll('.te-sw'))
+                b.classList.toggle('on', b.dataset.hex === activeHex);
+            const input = el('te-color-input');
+            if (input)
+                input.value = /^#[0-9a-f]{6}$/.test(activeHex) ? activeHex : '#000000';
+        }
 
         /* ── The three amounts ───────────────────────────────────────────────
          *
@@ -778,6 +895,8 @@
             if (chroma)
                 chroma.style.background = rampCss(t => groundAt(seed.level, t));
             paintWave();
+            // Shade and Intensity both change the field, so keep it in step.
+            paintCanvas();
         }
 
         /* The wave IS the value. It used to be a fixed squiggle — flat at one
@@ -912,7 +1031,7 @@
             const colors = [t.swatch.shell];
             if (t.swatch.accent && t.swatch.accent !== t.swatch.shell)
                 colors.push(t.swatch.accent);
-            return { mode: t.mode || 'dark', colors, intensity: 0.7, grain: 0 };
+            return { mode: t.mode || 'dark', colors, positions: [], intensity: 0.7, grain: 0 };
         }
 
         /**
@@ -930,13 +1049,16 @@
                a ground from the dot's own lightness and landed a fork two
                elevation steps off the theme it was copying. */
             const src = theme?.seed || from?.wheelSeed || seedFromTheme(from);
+            const colors = (src?.colors || ['#3a6ea5']).slice(0, 3);
             seed = src
                 ? { mode: src.mode || 'dark',
-                    colors: (src.colors || ['#3a6ea5']).slice(0, 3),
+                    colors,
+                    positions: (Array.isArray(src.positions) ? src.positions : []).slice(0, colors.length),
                     intensity: src.intensity == null ? 0.7 : src.intensity,
                     grain: src.grain || 0,
                     level: src.level == null ? DEFAULT_LEVEL : src.level }
-                : { mode: 'dark', colors: ['#3a6ea5'], intensity: 0.7, grain: 0, level: DEFAULT_LEVEL };
+                : { mode: 'dark', colors: ['#3a6ea5'], positions: [], intensity: 0.7, grain: 0, level: DEFAULT_LEVEL };
+            ensurePositions();
             activeDot = 0;
             warn('');
             resetDelete();
@@ -944,18 +1066,18 @@
             el('te-delete').hidden = !theme;
             editor.hidden = false;
             caption.classList.add('with-editor');
-            paintWheel();
             renderDots();
+            paintCanvas();
             paintControls();
             /* Focus the field itself, not a control below it: focusing
-               something further down scrolled the colour wheel — the thing you
-               opened this for — off the top of a panel. */
+               something further down scrolled the canvas — the thing you opened
+               this for — off the top of a panel. */
             el('te-dots')?.firstElementChild?.focus({ preventScroll: true });
             /* NO commit, and no live paint. Opening the editor is not a change:
                committing on open meant merely SELECTING a built-in forked it
                into a copy of your own, and painting on open meant opening the
                popup recoloured the whole browser before you had touched
-               anything. The browser is already wearing what the wheel shows. */
+               anything. The browser is already wearing what the canvas shows. */
         }
 
         /* In the Settings page the editor is a section you open; in the popup it
