@@ -451,9 +451,61 @@ function detectSources() {
     return out;
 }
 
-/** Detected sources without the internal on-disk paths — safe to send to a renderer. */
-function listSources() {
-    return detectSources().map(({ _paths, ...pub }) => pub);
+/* ── Real browser icons ──────────────────────────────────────────────────────
+   Use each installed browser's ACTUAL executable icon (app.getFileIcon) rather
+   than a hand-drawn approximation — the wizard should show the real thing. Falls
+   back to a bundled glyph (renderer) when the exe can't be found or off Windows. */
+function browserExe(browser) {
+    if (PLATFORM !== 'win32') return null; // getFileIcon on the real exe is the win path; others fall back to the glyph
+    const PF = process.env.ProgramFiles || 'C:\\Program Files';
+    const PF86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+    const LA = process.env.LOCALAPPDATA || path.join(HOME, 'AppData', 'Local');
+    const rel = {
+        'Google Chrome': ['Google\\Chrome\\Application\\chrome.exe'],
+        'Chrome Beta': ['Google\\Chrome Beta\\Application\\chrome.exe'],
+        'Chrome Dev': ['Google\\Chrome Dev\\Application\\chrome.exe'],
+        'Chrome Canary': ['Google\\Chrome SxS\\Application\\chrome.exe'],
+        'Microsoft Edge': ['Microsoft\\Edge\\Application\\msedge.exe'],
+        'Edge Beta': ['Microsoft\\Edge Beta\\Application\\msedge.exe'],
+        'Edge Dev': ['Microsoft\\Edge Dev\\Application\\msedge.exe'],
+        'Brave': ['BraveSoftware\\Brave-Browser\\Application\\brave.exe'],
+        'Brave Beta': ['BraveSoftware\\Brave-Browser-Beta\\Application\\brave.exe'],
+        'Vivaldi': ['Vivaldi\\Application\\vivaldi.exe'],
+        'Chromium': ['Chromium\\Application\\chrome.exe'],
+        'Opera': ['Programs\\Opera\\opera.exe', 'Programs\\Opera\\launcher.exe'],
+        'Opera GX': ['Programs\\Opera GX\\opera.exe', 'Programs\\Opera GX\\launcher.exe'],
+        'Firefox': ['Mozilla Firefox\\firefox.exe'],
+    }[browser] || [];
+    for (const r of rel) for (const root of [PF, PF86, LA]) {
+        const p = path.join(root, r);
+        if (exists(p)) return p;
+    }
+    return null;
+}
+
+const _iconCache = new Map();
+async function browserIcon(browser) {
+    if (_iconCache.has(browser)) return _iconCache.get(browser);
+    let dataUrl = '';
+    try {
+        const exe = browserExe(browser);
+        if (exe) {
+            const { app } = require('electron');
+            const img = await app.getFileIcon(exe, { size: 'normal' });
+            if (img && !img.isEmpty()) dataUrl = img.toDataURL();
+        }
+    }
+    catch (e) { log.debug('import', 'browserIcon', e); }
+    _iconCache.set(browser, dataUrl);
+    return dataUrl;
+}
+
+/** Detected sources without the internal on-disk paths, each with the browser's
+ *  real executable icon where available — safe to send to a renderer. */
+async function listSources() {
+    const pubs = detectSources().map(({ _paths, ...pub }) => pub);
+    await Promise.all(pubs.map(async (p) => { p.icon = await browserIcon(p.browser); }));
+    return pubs;
 }
 
 function findSource(id) {

@@ -373,7 +373,7 @@ class Northstar {
                     if (p.get('importPrompted'))
                         return;
                     const importer = require('./features/import');
-                    if (importer.listSources().length) {
+                    if (importer.detectSources().length) {
                         const wd = this.windowManager.getPrimaryWindow();
                         if (wd?.window && !wd.window.isDestroyed())
                             require('./ipc/import-wizard').open(wd.window, wd.profileId || startProfile);

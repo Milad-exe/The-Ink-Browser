@@ -49,14 +49,18 @@ function renderSources() {
     const list = $('src-list');
     list.innerHTML = '';
     for (const s of sources) {
-        const logo = badge(s.browser);
+        // The browser's REAL executable icon (extracted in the main process) when
+        // we have it; the bundled glyph only as a fallback.
+        const badgeHtml = s.icon
+            ? `<img class="src-badge-img" src="${s.icon}" alt="" width="30" height="30">`
+            : `<svg viewBox="0 0 48 48" width="34" height="34" aria-hidden="true">${badge(s.browser)}</svg>`;
         const row = document.createElement('button');
         row.className = 'src-row';
         row.type = 'button';
         row.setAttribute('role', 'radio');
         row.dataset.id = s.id;
         row.innerHTML = `
-            <span class="src-badge"><svg viewBox="0 0 48 48" width="34" height="34" aria-hidden="true">${logo}</svg></span>
+            <span class="src-badge">${badgeHtml}</span>
             <span class="src-main">
                 <span class="src-name">${escapeHtml(s.browser)}<span class="src-profile"> · ${escapeHtml(s.profile)}</span></span>
                 <span class="src-meta">${escapeHtml(summaryLine(s))}</span>
