@@ -1102,15 +1102,21 @@ html[data-tabbar="side"] .sidebar-foot {
 .tab-indicator.clickable:hover { color: var(--text); }
 .tab-button.pinned .tab-indicator { display: none; }
 
-/* Loading spinner in the favicon slot. */
+/* Loading spinner in the favicon slot. Drawn on ::after, NOT ::before: the
+   no-favicon placeholder that reserves the icon column uses ::before, and an
+   element has only one — when the spinner claimed ::before the column collapsed
+   and the title slid left under the spinner ("text over the refresh icon").
+   ::after leaves the column reserved (favicon hidden-but-present, or the
+   placeholder), and the spinner sits over it. */
 .tab-button.loading .tab-favicon { visibility: hidden; }
-.tab-button.loading::before {
+.tab-button.loading::after {
   content: ''; position: absolute; left: 12px; top: 50%; margin-top: -7px;
   width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%;
   border: 1.6px solid var(--border-2); border-top-color: var(--accent);
   animation: tab-spin 0.7s linear infinite;
+  pointer-events: none;
 }
-.tab-button.pinned.loading::before { left: 50%; margin-left: -7px; }
+.tab-button.pinned.loading::after { left: 50%; margin-left: -7px; }
 @keyframes tab-spin { to { transform: rotate(360deg); } }
 
 .tab-close {

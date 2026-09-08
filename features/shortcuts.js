@@ -277,29 +277,22 @@ class Shortcuts {
     }
     // ── Navigation shortcuts ───────────────────────────────────────────────────
     registerNavigationShortcuts() {
-        // Back — Cmd/Ctrl+Left (primary) + Alt+Left + Cmd+[ (macOS)
-        this.registerShortcut('CmdOrCtrl+Left', () => {
-            this.tabManager.goBack(this.tabManager.activeTabIndex);
-        });
+        // Back / Forward — Alt+Left/Right (the Windows & Linux standard). NOT
+        // Ctrl+Left/Right: that is "move by word" in every text field, so binding
+        // it to navigation hijacked cursor movement in the address bar and page
+        // inputs. macOS additionally gets Cmd+[ / Cmd+] and Cmd+Left / Cmd+Right,
+        // where those ARE the platform's back/forward.
         this.registerShortcut('Alt+Left', () => {
             this.tabManager.goBack(this.tabManager.activeTabIndex);
-        });
-        if (process.platform === 'darwin') {
-            this.registerShortcut('Cmd+[', () => {
-                this.tabManager.goBack(this.tabManager.activeTabIndex);
-            });
-        }
-        // Forward — Cmd/Ctrl+Right (primary) + Alt+Right + Cmd+] (macOS)
-        this.registerShortcut('CmdOrCtrl+Right', () => {
-            this.tabManager.goForward(this.tabManager.activeTabIndex);
         });
         this.registerShortcut('Alt+Right', () => {
             this.tabManager.goForward(this.tabManager.activeTabIndex);
         });
         if (process.platform === 'darwin') {
-            this.registerShortcut('Cmd+]', () => {
-                this.tabManager.goForward(this.tabManager.activeTabIndex);
-            });
+            this.registerShortcut('Cmd+[', () => this.tabManager.goBack(this.tabManager.activeTabIndex));
+            this.registerShortcut('Cmd+Left', () => this.tabManager.goBack(this.tabManager.activeTabIndex));
+            this.registerShortcut('Cmd+]', () => this.tabManager.goForward(this.tabManager.activeTabIndex));
+            this.registerShortcut('Cmd+Right', () => this.tabManager.goForward(this.tabManager.activeTabIndex));
         }
         // Reload
         this.registerShortcut('CmdOrCtrl+R', () => {

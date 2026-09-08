@@ -389,6 +389,18 @@ class WindowManager {
         const _saveBounds = () => {
             clearTimeout(_saveBoundsTimer);
             _saveBoundsTimer = setTimeout(() => {
+                if (!window || window.isDestroyed())
+                    return;
+                // Maximise (Windows snap), fullscreen and minimise all fire a
+                // resize/move too. Those states are recorded by their own handlers
+                // (maximize/unmaximize/enter-full-screen/…); running here with
+                // forceNormal would stamp isMaximized:false over them, so the
+                // window reopened un-maximised. Only record NORMAL-state geometry.
+                const maxed = typeof window.isMaximized === 'function' && window.isMaximized();
+                const full = typeof window.isFullScreen === 'function' && window.isFullScreen();
+                const mini = typeof window.isMinimized === 'function' && window.isMinimized();
+                if (maxed || full || mini)
+                    return;
                 this._persistWindowBounds(window, { forceNormal: true });
             }, 400);
         };
