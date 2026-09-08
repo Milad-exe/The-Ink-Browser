@@ -1271,6 +1271,45 @@ test('sleeping is skippable by setting, and stops when the window is gone', () =
     assert.strictEqual(s.timer, null, 'a destroyed window stops the scan');
 });
 
+// ── Tab cycling stays within the active space ────────────────────────────────
+// The window keeps every space's tabs alive in one tabMap; cycling (Ctrl+Tab,
+// Ctrl+1–9) must never walk into another space's tabs — doing so switched the
+// whole window's context to a space you were not in.
+test('tab cycling never leaves the current space', () => {
+    const Shortcuts = require(path.join(root, 'features/shortcuts'));
+    // A fake tab manager with two spaces sharing one tabMap, exposing the SAME
+    // surface both the correct (tabsInWorkspace) and the old buggy
+    // (tabOrder+tabMap) code read — so a regression to the unscoped filter fails
+    // this test rather than passing silently.
+    const shown = [];
+    const tm = {
+        profileId: '1',
+        activeTabIndex: 0,
+        tabOrder: [0, 1, 2, 3],
+        tabMap: new Map([[0, {}], [1, {}], [2, {}], [3, {}]]),
+        tabProfiles: new Map([[0, '1'], [1, '1'], [2, '2'], [3, '2']]),
+        tabsInWorkspace(id) {
+            const key = String(id);
+            return this.tabOrder.filter(i => this.tabMap.has(i) && (this.tabProfiles.get(i) || '1') === key);
+        },
+        showTab(i) { shown.push(i); this.activeTabIndex = i; },
+    };
+    const sut = Object.create(Shortcuts.prototype);
+    sut.tabManager = tm;
+
+    assert.deepStrictEqual(sut._orderedTabIndexes(), [0, 1], 'only space 1 tabs cycle');
+
+    sut.switchToNextTab();                       // 0 -> 1
+    assert.strictEqual(tm.activeTabIndex, 1);
+    sut.switchToNextTab();                        // 1 -> wraps to 0, NOT into space 2
+    assert.strictEqual(tm.activeTabIndex, 0);
+    sut.switchToPreviousTab();                    // 0 -> wraps to 1
+    assert.strictEqual(tm.activeTabIndex, 1);
+
+    sut.switchToTabByNumber(3);                   // space 1 has 2 tabs → no-op
+    assert.ok(!shown.includes(2) && !shown.includes(3), 'never activates another space’s tab');
+});
+
 // ── Report ───────────────────────────────────────────────────────────────────
 if (failures.length) {
     console.error(`\n${failures.length} of ${passed + failures.length} unit tests failed:\n`);

@@ -39,10 +39,14 @@
     window.Northstar = window.Northstar || {};
 
     function mount(ctx) {
-        const picker = ctx.picker;
+        // The preset-circle row is OPTIONAL. The picker used to be the "select a
+        // theme" row; the model is now a single gradient you edit in place, so
+        // both pages drop the row and mount with no picker — the editor IS the
+        // theme. Everything that touches `picker` is guarded for its absence.
+        const picker = ctx.picker || null;
         const editor = ctx.editor;
         const root = ctx.root || document;
-        if (!picker || !editor || !ctx.api)
+        if (!editor || !ctx.api)
             return null;
 
         const el = id => root.querySelector('#' + id);
@@ -117,9 +121,11 @@
         }
 
         // Leaving the row drops any hover preview back to the committed theme.
-        picker.addEventListener('mouseleave', () => { try { T.live?.(null); } catch (e) { } });
+        picker?.addEventListener('mouseleave', () => { try { T.live?.(null); } catch (e) { } });
 
         function markCurrent() {
+            if (!picker)
+                return;
             let anyOn = false;
             for (const b of picker.querySelectorAll('.theme-preset')) {
                 const on = b.dataset.themeValue === current;
@@ -164,7 +170,7 @@
                 current = res?.current || current;
             presets = list.filter(t => t.kind === 'builtin');
             const sig = presets.map(t => `${t.id}~${t.swatch?.shell}`).join('|');
-            if (sig !== presetSig) {
+            if (picker && sig !== presetSig) {
                 presetSig = sig;
                 picker.textContent = '';
                 for (const t of presets)
@@ -186,8 +192,9 @@
         const GROUND_L = { dark: [0.06, 0.30], light: [0.88, 0.98] };
         const GROUND_C_MAX = 0.060;
         const DEFAULT_LEVEL = 0.5;
+        const DEFAULT_INTENSITY = 0.7;
 
-        let seed = { mode: 'dark', colors: ['#3a6ea5'], positions: [], intensity: 0.7, grain: 0, level: DEFAULT_LEVEL };
+        let seed = { mode: 'dark', colors: ['#3a6ea5'], positions: [], intensity: DEFAULT_INTENSITY, grain: 0, level: DEFAULT_LEVEL };
         let activeDot = 0;
 
         /* The canvas's rendered size is MEASURED, never assumed — it is a square
@@ -468,6 +475,16 @@
            model. Both repaint the canvas and preview live. */
         function setDotColor(i, hex) {
             seed.colors[i] = hex;
+            // Shade and Intensity describe the GROUND (the first colour). So
+            // repicking the ground returns them to their defaults — otherwise a
+            // ground you had darkened/muted for the old colour carries over and
+            // the new pick doesn't look like the swatch you clicked. But an accent
+            // or highlight (dots 1+) does NOT own those amounts, so recolouring
+            // one must leave the ground's Shade/Intensity alone.
+            if (i === 0) {
+                seed.level = DEFAULT_LEVEL;
+                seed.intensity = DEFAULT_INTENSITY;
+            }
             setActiveDot(i);
             renderDots();
             paintCanvas();
@@ -581,6 +598,42 @@
          * the active dot's colour, and the native picker at the end covers the
          * ones the row does not. The selected dot's own colour is marked so it
          * is clear which pool a click will recolour. */
+        /* Wrap the palette in a flex row with a chevron at each end. The row
+           still scrolls by wheel/drag/keys; the arrows are the visible way to do
+           it and the scrollbar is hidden (see theme-editor.css). Built once,
+           alongside the swatches. */
+        function buildPaletteArrows(host) {
+            if (!host.parentNode || host.parentNode.classList?.contains('te-palette-wrap'))
+                return;
+            const chevron = (d) => svg(d === -1 ? '<path d="M15 6l-6 6 6 6"/>' : '<path d="M9 6l6 6-6 6"/>');
+            const mkArrow = (d) => {
+                const a = document.createElement('button');
+                a.type = 'button';
+                a.className = 'te-pal-arrow';
+                a.setAttribute('aria-label', d < 0 ? 'Scroll colours left' : 'Scroll colours right');
+                a.title = d < 0 ? 'Scroll left' : 'Scroll right';
+                a.tabIndex = -1;  // the swatches are the tab stops; arrows are pointer aids
+                a.appendChild(chevron(d));
+                a.addEventListener('click', () => host.scrollBy({ left: d * Math.max(80, host.clientWidth * 0.8), behavior: 'smooth' }));
+                return a;
+            };
+            const wrap = document.createElement('div');
+            wrap.className = 'te-palette-wrap';
+            const prev = mkArrow(-1), next = mkArrow(1);
+            host.parentNode.insertBefore(wrap, host);
+            wrap.append(prev, host, next);
+            const update = () => {
+                const max = host.scrollWidth - host.clientWidth - 1;
+                prev.disabled = host.scrollLeft <= 0;
+                // No overflow at all → nothing to scroll; both arrows rest disabled.
+                next.disabled = max <= 0 || host.scrollLeft >= max;
+            };
+            host.addEventListener('scroll', update, { passive: true });
+            window.addEventListener('resize', update);
+            // Measured after layout so the initial disabled state is correct.
+            requestAnimationFrame(update);
+        }
+
         function renderPalette() {
             const host = el('te-palette');
             if (!host)
@@ -610,6 +663,7 @@
                 input.addEventListener('input', (e) => setDotColor(activeDot, e.target.value.toLowerCase()));
                 pick.appendChild(input);
                 host.appendChild(pick);
+                buildPaletteArrows(host);
             }
             for (const b of host.querySelectorAll('.te-sw'))
                 b.classList.toggle('on', b.dataset.hex === activeHex);
@@ -828,7 +882,7 @@
         el('te-cancel')?.addEventListener('click', closeEditor);
 
         // A radiogroup is one tab stop; arrows move within the preset circles.
-        picker.addEventListener('keydown', (e) => {
+        picker?.addEventListener('keydown', (e) => {
             const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
             if (!step)
                 return;

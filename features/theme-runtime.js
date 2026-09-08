@@ -92,34 +92,52 @@ function isAppSurface(wc) {
     }
 }
 
-async function applyCssTo(wc, id) {
+/* insertCSS is async, and applyCssTo is fired in CONCURRENT bursts — a startup
+   repaintAll racing each surface's own dom-ready, a theme save racing a focus
+   repaint. Run at the same time, every call read `applied`/`lastCss` before any
+   of them had written it back, so none removed the others' sheets and the dedup
+   never took: the surface accreted a fresh inserted stylesheet on every repaint,
+   without bound. Serialise per surface so each apply sees the one before it. */
+const inflight = new Map(); // wc.id → the tail of that surface's apply chain
+function applyCssTo(wc, id) {
+    if (!wc || wc.isDestroyed())
+        return Promise.resolve();
+    const key = wc.id;
+    const run = (inflight.get(key) || Promise.resolve())
+        .then(() => applyCssNow(wc, id))
+        .catch((e) => log.debug('theme-runtime', 'applyCssTo', e));
+    inflight.set(key, run);
+    run.finally(() => { if (inflight.get(key) === run) inflight.delete(key); });
+    return run;
+}
+
+async function applyCssNow(wc, id) {
     if (!isAppSurface(wc) || !frameAlive(wc))
         return;
     const css = themes.themeCss(id);
     const prev = applied.get(wc.id);
     if (css && lastCss.get(wc.id) === css)
-        return;  // nothing changed: live editing fires this on every drag frame
-    try {
-        /* INSERT FIRST, then remove the old sheet. Removing first left a frame
-           with neither applied, so the surface fell back to the stylesheet's
-           default palette and back again — which is the flicker you get on
-           every drag once editing is live. Both are applied for an instant
-           instead, and the later one wins by cascade order. */
-        const next = css ? await wc.insertCSS(css) : null;
-        if (prev)
-            await wc.removeInsertedCSS(prev);
-        if (next) {
-            applied.set(wc.id, next);
-            lastCss.set(wc.id, css);
-        }
-        else {
-            applied.delete(wc.id);
-            lastCss.delete(wc.id);
-        }
+        return;  // this document already wears this exact sheet (live-drag repaint)
+    /* INSERT FIRST, then remove the old sheet. Removing first left a frame
+       with neither applied, so the surface fell back to the stylesheet's
+       default palette and back again — the flicker on every drag once editing
+       is live. Both are applied for an instant instead, later one wins by
+       cascade order. */
+    const next = css ? await wc.insertCSS(css) : null;
+    if (prev) {
+        /* A stale key (the document navigated, so Chromium already dropped the
+           sheet) throws here — it must NOT abort recording the NEW sheet below,
+           or the surface would re-insert every repaint and never dedup. */
+        try { await wc.removeInsertedCSS(prev); }
+        catch (e) { log.debug('theme-runtime', 'removeInsertedCSS', e); }
     }
-    catch (e) {
-        // A view torn down mid-switch is normal, not an error worth shouting about.
-        log.debug('theme-runtime', 'applyCssTo', e);
+    if (next) {
+        applied.set(wc.id, next);
+        lastCss.set(wc.id, css);
+    }
+    else {
+        applied.delete(wc.id);
+        lastCss.delete(wc.id);
     }
 }
 
@@ -127,11 +145,26 @@ async function applyCssTo(wc, id) {
 function attach(wc) {
     if (!wc || wc.isDestroyed())
         return;
+    // `web-contents-created` is subscribed in two places (bind() here and
+    // main.js), so attach ran twice per surface — double dom-ready handlers,
+    // double applyCssTo. Bind the listeners once.
+    if (wc.__themeAttached)
+        return;
+    wc.__themeAttached = true;
     // Resolved per surface, not once globally: two windows can be in two
     // spaces wearing two different themes.
     const paint = () => {
         if (!frameAlive(wc))
             return;
+        /* dom-ready is a freshly loaded document — an initial load, a reload, or
+           an internal navigation. insertCSS does NOT survive a navigation, so any
+           sheet we recorded for this surface is already gone. Forget it before
+           re-applying: otherwise the dedup in applyCssNow early-returns on a
+           stale lastCss and the new document comes up UNSTYLED — "the tab lost
+           all its CSS" after a reload or moving between internal pages, and the
+           reason some pages stayed on the default palette. */
+        applied.delete(wc.id);
+        lastCss.delete(wc.id);
         const id = themeFor(wc);
         try { wc.send('theme-changed', id); }
         catch (e) { log.debug('theme-runtime', 'attach send', e); }

@@ -14,63 +14,126 @@ class Shortcuts {
         this.shortcuts = new Map();
         this.setupEventListeners();
     }
-    setupEventListeners() {
-        this.mainWindow.webContents.on('before-input-event', (event, input) => {
-            this.handleInput(event, input);
-        });
-        this.setupAllTabListeners();
-    }
-    setupAllTabListeners() {
-        this.tabManager.tabMap.forEach((tab) => {
-            this.setupTabListener(tab);
-        });
-    }
-    setupTabListener(tab) {
-        if (!tab.shortcutListenerSetup) {
-            tab.webContents.on('before-input-event', (event, input) => {
-                this.handleInput(event, input);
-            });
-            tab.shortcutListenerSetup = true;
-        }
-    }
-    onTabCreated(tab) {
-        this.setupTabListener(tab);
-    }
-    registerWebContents(wc) {
-        if (wc.northstarShortcutHandler)
-            return;
-        const handler = (event, input) => this.handleInput(event, input);
-        wc.northstarShortcutHandler = handler;
-        wc.on('before-input-event', handler);
-    }
-    unregisterWebContents(wc) {
-        if (wc.northstarShortcutHandler) {
-            wc.removeListener('before-input-event', wc.northstarShortcutHandler);
-            wc.northstarShortcutHandler = null;
-        }
-    }
+    // Keyboard shortcuts are delivered by a SINGLE app-level route, installed
+    // once in WindowManager (see WindowManager._routeShortcuts): every
+    // webContents — the chrome, each tab, and every overlay (hamburger menu,
+    // omnibox, panels, prompts) — forwards `before-input-event` to its window's
+    // Shortcuts.handleInput. A key event only ever reaches the ONE webContents
+    // that holds keyboard focus, so routing them ALL through one place is what
+    // makes a shortcut fire regardless of which surface is focused.
+    //
+    // This used to be wired per-webContents from here, and only the chrome and
+    // the tabs got a listener — which is exactly why a shortcut like Ctrl+H or
+    // Ctrl+, worked only while a TAB held focus: open the hamburger menu or click
+    // into the address bar and the focused overlay, having no listener, swallowed
+    // the key. These methods are kept as no-ops for their existing call sites.
+    setupEventListeners() { }
+    setupAllTabListeners() { }
+    setupTabListener(_tab) { }
+    onTabCreated(_tab) { }
+    registerWebContents(_wc) { }
+    unregisterWebContents(_wc) { }
     // Callbacks may return false to suppress preventDefault (lets the event reach the page).
     handleInput(event, input) {
+        // A bare Alt tap toggles the in-chrome menu bar (Windows only — mac has
+        // the system bar, Linux the native framed bar). Tracked across the whole
+        // keystroke, so it must run for keyUp too, before the keyDown-only gate.
+        this._trackAltTap(input);
         if (input.type !== 'keyDown')
             return;
+        // While the in-chrome menu bar is open it owns the keyboard: drive its
+        // mnemonics and arrows from HERE, before the shortcut table, because this
+        // handler sees every keystroke (via the central before-input-event route)
+        // no matter which surface holds OS focus — the bar opens over a page whose
+        // native view keeps focus, so a renderer-side key listener would never
+        // receive the letter. preventDefault keeps the key off the page.
+        if (this._routeMenuBarKey(input)) {
+            event.preventDefault();
+            return;
+        }
         for (const [accelerator, callback] of this.shortcuts) {
             if (this.matchesAccelerator(input, accelerator)) {
-                // A shortcut firing while the command palette is up dismisses it
-                // first — the omnibox should go away when another shortcut takes
-                // over, not sit on top of the state the shortcut just changed.
-                // Done before the callback so re-opening it (⌘T) still wins.
+                // A shortcut firing while a floating overlay is up dismisses it
+                // first — the omnibox or the context menu should go away when
+                // another shortcut takes over, not sit on top of the state the
+                // shortcut just changed. Done before the callback so re-opening
+                // the palette (⌘T) still wins.
                 try {
                     const wd = this.getWindowData();
                     if (wd?.paletteOpen)
                         require('./palette-bridge').hidePalette(wd, { committed: false });
+                    // The context-menu overlay took keyboard focus, so this
+                    // keystroke arrived through IT — dismiss it too, or ⌘T opened
+                    // the palette behind a menu that never closed.
+                    if (wd?.ctxMenuOpen)
+                        require('./overlay-menu').hide(wd);
                 }
-                catch (e) { log.debug('shortcuts', 'handleInput palette', e); }
+                catch (e) { log.debug('shortcuts', 'handleInput overlay', e); }
                 const result = callback();
                 if (result !== false)
                     event.preventDefault();
                 break;
             }
         }
+    }
+    // A "tap" is Alt pressed and released with nothing in between — no other key,
+    // and no other modifier held with it. Chords like Alt+D or Alt+Left must not
+    // toggle the bar, so any non-Alt keyDown while Alt is down invalidates the tap.
+    _trackAltTap(input) {
+        if (process.platform !== 'win32')
+            return; // native menu bar owns Alt on mac/Linux
+        const isAlt = input.key === 'Alt';
+        if (input.type === 'keyDown') {
+            if (isAlt && !input.control && !input.meta && !input.shift) {
+                // The START of an Alt press (ignore auto-repeat while held) arms a
+                // fresh tap — unconditionally, so a prior keystroke can't leave it
+                // stuck disarmed (the bug that made Alt need a second press).
+                if (!this._altHeld) {
+                    this._altHeld = true;
+                    this._altTapValid = true;
+                }
+            }
+            else if (this._altHeld) {
+                this._altTapValid = false; // another key while Alt is held → a chord
+            }
+        }
+        else if (input.type === 'keyUp' && isAlt) {
+            const wasTap = this._altHeld && this._altTapValid;
+            this._altHeld = false;
+            this._altTapValid = false;
+            if (wasTap) {
+                try { require('./menu-bar').toggle(this.getWindowData()); }
+                catch (e) { log.debug('shortcuts', 'alt tap', e); }
+            }
+        }
+    }
+    // Forward a keystroke to the open in-chrome menu bar. Returns true if it was
+    // consumed (the caller then preventDefaults it). Only active on Windows and
+    // only while the bar reports itself open (ipc/menu.js → wd.menuBarOpen).
+    _routeMenuBarKey(input) {
+        if (process.platform !== 'win32')
+            return false;
+        const wd = this.getWindowData();
+        // Only while the bar is open AND no dropdown is showing. Once a dropdown is
+        // up the overlay itself holds focus and owns the keyboard (its own access
+        // keys drive the submenu chain), so main must not also grab the keys.
+        if (!wd || !wd.menuBarOpen || wd.ctxMenuOpen || input.control || input.meta || input.alt)
+            return false;
+        const send = (msg) => {
+            try { if (!wd.window.isDestroyed()) wd.window.webContents.send('menubar-key', msg); }
+            catch (e) { log.debug('shortcuts', 'menubar-key', e); }
+        };
+        const k = input.key;
+        if (k === 'Escape') { send({ action: 'hide' }); return true; }
+        if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'ArrowDown' || k === 'ArrowUp' || k === 'Enter') {
+            send({ action: k });
+            return true;
+        }
+        if (k && k.length === 1) {
+            const idx = require('./menu-bar').indexForKey(k.toLowerCase());
+            if (idx >= 0) { send({ action: 'open', index: idx }); return true; }
+        }
+        return false;
     }
     registerAllShortcuts() {
         this.registerTabShortcuts();
@@ -570,9 +633,13 @@ class Shortcuts {
             this.tabManager.showTab(indexes[number - 1]);
     }
     _orderedTabIndexes() {
-        // Visual (tab-bar) order, restricted to live tabs — so cycling and
-        // number-switching follow the on-screen order, not creation order.
-        return this.tabManager.tabOrder.filter(i => this.tabManager.tabMap.has(i));
+        // Visual (tab-bar) order, restricted to the CURRENT SPACE's live tabs.
+        // The window keeps EVERY space's tabs alive in tabMap (see
+        // features/tabs/organize.js), so filtering only by tabMap let Ctrl+Tab /
+        // Ctrl+Shift+Tab and Ctrl+1–9 walk straight into another space's tabs —
+        // switching the whole window's context to a space you are not in. Cycling
+        // must stay within the active space, exactly like the sidebar shows.
+        return this.tabManager.tabsInWorkspace(this.tabManager.profileId);
     }
     // ── Zoom helpers ───────────────────────────────────────────────────────────
     // Each of these remembers the new level for the site (features/zoom.js), so

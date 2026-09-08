@@ -43,6 +43,13 @@ async function ensureMenu(wd) {
     catch (e) { log.debug('ctxmenu', 'ensureMenu bounds', e); }
     wd.ctxMenu = view;
     wd.window.contentView.addChildView(view);
+    // Route app shortcuts through the window's handler while the menu holds
+    // keyboard focus — so ⌘T/⌘W/… still fire (and dismiss the menu, see
+    // Shortcuts.handleInput) instead of doing nothing because the overlay ate
+    // the keystroke. Without this, opening the context menu made every shortcut
+    // dead until it was dismissed by hand.
+    try { wd.shortcuts?.registerWebContents(view.webContents); }
+    catch (e) { log.debug('ctxmenu', 'registerWebContents', e); }
     // Close the menu when its WINDOW goes inactive — an app switch, or a system
     // notification (macOS "Software Update", …) stealing focus. The menu is a
     // separate overlay view that cannot take first-mouse while its window is not
@@ -177,7 +184,7 @@ function register(ipcMain, { wm }) {
     require('../features/overlay-menu').provide((wd, data, onPick) => {
         wd.ctxMenuOwner = onPick;
         openMenu(wd, data);
-    });
+    }, (wd) => hideMenu(wd));
 }
 
 module.exports = { register, hideMenu };

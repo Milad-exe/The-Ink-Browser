@@ -433,9 +433,23 @@ exposeInternal("dragdrop", {
     onDragEnded: (fn) => ipcRenderer.on('tab-drag-ended', () => fn())
 });
 exposeInternal("menu", {
-    open: () => ipcRenderer.invoke('open'),
+    open: (anchor) => ipcRenderer.invoke('open', anchor),
     close: () => ipcRenderer.invoke('close-menu'),
     onClosed: (callback) => ipcRenderer.on('menu-closed', callback)
+});
+// The Firefox-style Alt menu bar (frameless Windows — see features/menu-bar.js).
+// NB: the key is `appMenuBar`, NOT `menubar` — `window.menubar` is a standard
+// read-only BarProp, and contextBridge.exposeInMainWorld throws when the key
+// already exists on window, which aborted the whole preload.
+exposeInternal("appMenuBar", {
+    labels: () => ipcRenderer.invoke('menubar:labels'),
+    open: (index, anchor) => ipcRenderer.invoke('menubar:open', index, anchor),
+    onToggle: (callback) => ipcRenderer.on('menubar-toggle', () => callback()),
+    onClosed: (callback) => ipcRenderer.on('menubar-closed', (_e, info) => callback(info || {})),
+    // Keyboard while the bar is open is driven from main (see Shortcuts) so it
+    // works even when a page holds OS focus.
+    onKey: (callback) => ipcRenderer.on('menubar-key', (_e, msg) => callback(msg || {})),
+    setOpen: (open) => ipcRenderer.send('menubar:state', !!open),
 });
 exposeInternal("browserHistory", {
     get: () => ipcRenderer.invoke('history-get'),

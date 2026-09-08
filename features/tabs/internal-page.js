@@ -35,6 +35,24 @@ function parseNorthstarUrl(raw) {
     return { type, section };
 }
 
+// Parse a bare stored TOKEN → { type, section }, or null. This is the form kept
+// in tabUrls and persisted to the session ('history', 'settings/appearance'),
+// as opposed to the typed northstar:// URL. Restore reads tokens back, so every
+// place that loads a tab must recognise them or it tries to fetch e.g. "history"
+// as a web address and gets a 404.
+function parseInternalToken(raw) {
+    const m = /^([a-z]+)(?:\/([a-z]+))?$/i.exec((raw || '').trim());
+    if (!m)
+        return null;
+    const type = m[1].toLowerCase();
+    if (!INTERNAL_PAGES[type])
+        return null;
+    let section = m[2] ? m[2].toLowerCase() : null;
+    if (!(type === 'settings' && section && SETTINGS_SECTIONS.includes(section)))
+        section = null;
+    return { type, section };
+}
+
 // The stored/display "url token" for an internal tab: 'settings', 'settings/appearance', …
 function internalTokenFor(fileUrl) {
     let type = null;
@@ -59,4 +77,4 @@ function internalTokenFor(fileUrl) {
     return section ? `${type}/${section}` : type;
 }
 
-module.exports = { INTERNAL_PAGES, SETTINGS_SECTIONS, parseNorthstarUrl, internalTokenFor };
+module.exports = { INTERNAL_PAGES, SETTINGS_SECTIONS, parseNorthstarUrl, parseInternalToken, internalTokenFor };

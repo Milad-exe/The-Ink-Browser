@@ -1,4 +1,4 @@
-const { BrowserWindow, Menu, screen } = require('electron');
+const { BrowserWindow, Menu, screen, app } = require('electron');
 const { resolveAppFile } = require('../app-paths');
 const path = require('path');
 const Tabs = require('./tabs');
@@ -31,6 +31,29 @@ class WindowManager {
         this.restored = false;
         // Track most recently focused BrowserWindow
         this.lastFocusedWindowId = null;
+        // Keyboard shortcuts, ONE routing point. Every keystroke reaches only the
+        // webContents that holds focus, and the chrome, each tab and every overlay
+        // (hamburger menu, omnibox, panels, prompts) are all separate
+        // WebContentsViews. Forwarding before-input-event for ANY of them to the
+        // owning window's Shortcuts is what makes a shortcut fire no matter which
+        // surface is focused — previously only tabs and the chrome had a listener,
+        // so Ctrl+H / Ctrl+, went dead the moment a menu or the address bar took
+        // focus. getWindowByWebContents already resolves chrome, tabs AND overlays
+        // to their window, so this one hook covers them all (and any added later).
+        try { app.on('web-contents-created', (_e, wc) => this._routeShortcuts(wc)); }
+        catch (e) { log.warn('window-manager', 'shortcut routing', e); }
+    }
+    /** Forward a webContents' keyboard input to its window's Shortcuts. Attached
+     *  once per webContents; unknown contents (devtools, extension backgrounds)
+     *  resolve to no window and are simply ignored. */
+    _routeShortcuts(wc) {
+        if (!wc || wc.__nsShortcutRouted)
+            return;
+        wc.__nsShortcutRouted = true;
+        wc.on('before-input-event', (event, input) => {
+            try { this.getWindowByWebContents(wc)?.shortcuts?.handleInput(event, input); }
+            catch (e) { log.debug('window-manager', 'route input', e); }
+        });
     }
     get history() {
         if (!this.cachedHistory) {
@@ -231,6 +254,14 @@ class WindowManager {
             icon: path.join(__dirname, process.platform === 'win32' ? '../logo-win.png' : '../logo.png'),
             frame: process.platform === 'linux' ? true : false,
             titleBarStyle: process.platform === 'win32' || process.platform === 'linux' ? 'default' : 'hiddenInset',
+            // Native auto-hide menu bar (revealed by Alt) only on LINUX, where the
+            // window is framed and Electron can actually draw it. NOT on Windows:
+            // the window is frameless so there is no bar to draw, and leaving
+            // autoHideMenuBar on there makes Chromium hijack the Alt key to toggle
+            // that invisible bar — eating the keypress and stealing focus, which is
+            // exactly what broke the in-chrome Alt bar (it needs the raw Alt via
+            // before-input-event). macOS uses the system menu bar.
+            ...(process.platform === 'linux' ? { autoHideMenuBar: true } : {}),
             // Centre on the utility bar, which spans the top: shell-top inset
             // plus half the bar height, less half a 12px light. Derived rather
             // than hardcoded so it follows the bar height.
@@ -400,6 +431,25 @@ class WindowManager {
             // window's space theme mode.
             try { require('./theme-runtime').syncNativeTheme(this); }
             catch (e) { log.debug('window-manager', 'focus theme', e); }
+            // Keyboard shortcuts (and the Alt menu bar) are delivered through
+            // before-input-event, which fires only on the webContents that holds
+            // keyboard focus. On a frameless window, coming back to it — or
+            // clicking the title-bar drag region — can leave focus on the native
+            // frame with NO webContents focused, so keys (Alt especially) go
+            // nowhere and the user has to press twice. If nothing holds focus,
+            // hand it to the active tab. Focusing the webContents (not a specific
+            // element) shows no focus ring.
+            try {
+                const { webContents } = require('electron');
+                if (!webContents.getFocusedWebContents()) {
+                    const t = tabs && tabs.tabMap.get(tabs.activeTabIndex);
+                    if (t && t.webContents && !t.webContents.isDestroyed())
+                        t.webContents.focus();
+                    else if (!window.isDestroyed())
+                        window.webContents.focus();
+                }
+            }
+            catch (e) { log.debug('window-manager', 'focus ensure', e); }
         });
         // Each window belongs to one profile: its tabs browse on that profile's
         // session and record into that profile's history/bookmarks.

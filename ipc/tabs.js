@@ -343,9 +343,15 @@ function register(ipcMain, { wm, BrowserWindow, screen }) {
         // input-event (the drag began on the chrome, so with mouse capture the
         // release may come back to it) — whichever reaches us first wins; the
         // idle-detector above is the backstop when neither does.
+        // ONLY mouseUp ends it. NOT mouseLeave: the chrome view fires mouseLeave
+        // the instant the cursor crosses the sidebar→page seam mid-drag — which
+        // is the very crossing this poll exists to survive — so ending on it
+        // killed every rightward drag on contact with the page ("dragging does
+        // nothing"). The release is fully covered without it (chrome mouseUp,
+        // page-view mouseUp, and the 480ms idle backstop).
         const endOnUp = (_ev, input) => {
             if (!t._sidebarResizing) return;
-            if (input.type === 'mouseUp' || input.type === 'mouseLeave') endResize(wd, t.sidebarWidth);
+            if (input.type === 'mouseUp') endResize(wd, t.sidebarWidth);
         };
         const wc = t.tabMap.get(t.activeTabIndex)?.webContents;
         const chromeWc = wd.window.webContents;

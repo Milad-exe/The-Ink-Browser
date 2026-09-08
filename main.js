@@ -253,50 +253,14 @@ class Northstar {
             catch (e) {
                 log.warn('main', 'Widevine components load failed', e);
             }
-            // macOS delivers standard keyboard shortcuts through the application
-            // menu's key-equivalents. With no menu (setApplicationMenu(null)) it
-            // silently drops some — notably Cmd+1-9 tab switching and Cmd+C/V/X/A
-            // in text fields. So on macOS we install a minimal menu: appMenu +
-            // editMenu roles (copy/paste/select-all fix) and a custom Tabs menu
-            // that drives the focused window's tab switching. We deliberately do
-            // NOT add File/View roles — Cmd+T/W/R/zoom stay on before-input-event
-            // so they keep acting on the active tab (not the focused webContents).
-            // Windows/Linux keep no menu (the in-window chrome is the UI and
-            // before-input-event already handles every shortcut there).
-            if (process.platform === 'darwin') {
-                const wm = this.windowManager;
-                const focusedWD = () => (wm.getMostRecentlyFocusedWindow && wm.getMostRecentlyFocusedWindow())
-                    || (wm.getPrimaryWindow && wm.getPrimaryWindow());
-                const switchTo = (n) => { const wd = focusedWD(); if (wd && wd.shortcuts) wd.shortcuts.switchToTabByNumber(n); };
-                const lastTab = () => {
-                    const wd = focusedWD();
-                    if (!wd || !wd.tabs) return;
-                    const idx = wd.tabs.tabOrder.filter(i => wd.tabs.tabMap.has(i));
-                    if (idx.length) wd.tabs.showTab(idx[idx.length - 1]);
-                };
-                const cycle = (dir) => { const wd = focusedWD(); if (wd && wd.shortcuts) (dir > 0 ? wd.shortcuts.switchToNextTab() : wd.shortcuts.switchToPreviousTab()); };
-                const tabItems = [1, 2, 3, 4, 5, 6, 7, 8].map(n => ({
-                    label: `Tab ${n}`, accelerator: `CmdOrCtrl+${n}`, click: () => switchTo(n),
-                }));
-                const template = [
-                    { role: 'appMenu' },
-                    { role: 'editMenu' },
-                    {
-                        label: 'Tabs',
-                        submenu: [
-                            ...tabItems,
-                            { label: 'Last Tab', accelerator: 'CmdOrCtrl+9', click: lastTab },
-                            { type: 'separator' },
-                            { label: 'Next Tab', accelerator: 'Ctrl+Tab', click: () => cycle(1) },
-                            { label: 'Previous Tab', accelerator: 'Ctrl+Shift+Tab', click: () => cycle(-1) },
-                        ],
-                    },
-                ];
-                Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-            }
-            else {
-                Menu.setApplicationMenu(null);
-            }
+            // The classic menu bar (File / Edit / View / History / Bookmarks /
+            // Profiles / Tools / Help), built in features/app-menu.js. On the
+            // system menu bar on macOS; on Windows/Linux it is hidden until Alt
+            // is pressed (Firefox-style — window-manager.js sets autoHideMenuBar).
+            // Its accelerators are display-only off macOS so they do not
+            // double-fire against before-input-event (see app-menu.js).
+            try { require('./features/app-menu').install(this.windowManager); }
+            catch (e) { log.warn('main', 'app-menu', e); }
             // Spellchecker — enable and set languages (OS locale + English fallback).
             // Context-menu suggestions/add-to-dictionary are wired in tab-context-menu.js.
             try {
@@ -416,8 +380,32 @@ class Northstar {
             if (process.argv.includes('--dev')) {
                 const fs = require('fs');
                 let reloadTimer = null;
+                /* Reload only on a REAL edit. On Windows fs.watch fires 'change'
+                   for file ACCESS too, and opening any panel loadFile-READS its
+                   renderer/*.html — indistinguishable from an edit by event alone.
+                   Reloading on those blanked EVERY overlay at once (a white flash
+                   across the whole UI) every time a panel opened. Gate exactly as
+                   scripts/dev.js does: past a startup settle window, the file's
+                   mtime must be newer than launch (so a read of a pre-existing
+                   file is ignored) AND newer than the last time we saw it (so a
+                   re-read of an already-edited file is ignored). */
+                const devStartedAt = Date.now();
+                const SETTLE_MS = 1800;
+                const seenMtime = new Map();
                 try {
-                    fs.watch(path.join(__dirname, 'renderer'), { recursive: true }, () => {
+                    fs.watch(path.join(__dirname, 'renderer'), { recursive: true }, (_e, rel) => {
+                        if (!rel || Date.now() - devStartedAt < SETTLE_MS)
+                            return;
+                        const p = String(rel).split(path.sep).join('/');
+                        if (!/\.(js|html|css)$/.test(p))
+                            return;
+                        let mtime = 0;
+                        try { mtime = fs.statSync(path.join(__dirname, 'renderer', rel)).mtimeMs; }
+                        catch { return; } // vanished / temp file
+                        const prev = seenMtime.get(rel) || 0;
+                        seenMtime.set(rel, mtime);
+                        if (mtime <= prev || mtime < devStartedAt)
+                            return; // a read/touch, not a write since launch → spurious
                         clearTimeout(reloadTimer);
                         reloadTimer = setTimeout(() => {
                             const { frameAlive } = require('./features/wc-ready');

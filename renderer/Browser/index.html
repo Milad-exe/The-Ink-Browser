@@ -10,6 +10,13 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- Firefox-style menu bar, hidden until Alt is tapped. Windows only: the
+       frameless window has no OS-drawn menu bar (mac uses the system bar, Linux
+       the native framed one). Rows are built and driven by renderer.js via
+       window.menubar → features/menu-bar.js. Sits at the very top and reflows
+       the page card through the shared reportChromeHeight channel. -->
+  <div id="menu-bar" class="menu-bar hidden" role="menubar" aria-label="Application menu"></div>
+
   <!-- Tab Bar (top strip — sits beside the native window controls) -->
   <div id="utility-bar">
     <!-- The sidebar column: the toggle that owns the sidebar, and nothing else.

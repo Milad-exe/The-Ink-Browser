@@ -754,6 +754,13 @@
             const notice = document.getElementById('notice-bar');
             if (notice && !notice.classList.contains('hidden'))
                 h += Math.round(notice.getBoundingClientRect().height);
+            /* The Alt menu bar shares this top strip too (frameless Windows). Like
+               the notice bar it reports through this one number, so the page card
+               moves down by its height instead of being covered — menu-bar.js in
+               renderer.js calls reportHeight() when the bar shows or hides. */
+            const menuBar = document.getElementById('menu-bar');
+            if (menuBar && !menuBar.classList.contains('hidden'))
+                h += Math.round(menuBar.getBoundingClientRect().height);
             window.electronAPI.reportChromeHeight(h);
         }
         reportChromeHeight();

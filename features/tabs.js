@@ -108,7 +108,7 @@ const YOUTUBE_SPACE_FIX_JS = `
 `;
 // Internal-page helpers (northstar:// scheme, section list, URL↔token) live in a
 // shared leaf module so the listeners mixin can use internalTokenFor too.
-const { INTERNAL_PAGES, SETTINGS_SECTIONS, parseNorthstarUrl, internalTokenFor } = require('./tabs/internal-page');
+const { INTERNAL_PAGES, SETTINGS_SECTIONS, parseNorthstarUrl, parseInternalToken, internalTokenFor } = require('./tabs/internal-page');
 class Tabs {
     // ── Wiring ────────────────────────────────────────────────────────────
     mainWindow;
@@ -1285,14 +1285,13 @@ class Tabs {
             if (tab.lazyLoaded === false) {
                 tab.lazyLoaded = true;
                 const lazyUrl = this.tabUrls.get(index);
-                if (lazyUrl === 'history') {
-                    tab.webContents.loadFile(resolveAppFile('renderer/History/index.html'));
-                }
-                else if (lazyUrl === 'bookmarks') {
-                    tab.webContents.loadFile(resolveAppFile('renderer/Bookmarks/index.html'));
-                }
-                else if (lazyUrl === 'settings') {
-                    tab.webContents.loadFile(resolveAppFile('renderer/Settings/index.html'));
+                const internal = parseInternalToken(lazyUrl);
+                if (internal) {
+                    // Any internal page token — history, bookmarks, settings, or a
+                    // settings section — loads its file:// page (never as a web URL,
+                    // which 404s). Sections restore to their section via the hash.
+                    const page = INTERNAL_PAGES[internal.type];
+                    tab.webContents.loadFile(resolveAppFile(page.file), internal.section ? { hash: internal.section } : undefined);
                 }
                 else if (lazyUrl && lazyUrl !== 'newtab' && !lazyUrl.startsWith('file://')) {
                     tab.webContents.loadURL(lazyUrl);
@@ -1366,7 +1365,10 @@ class Tabs {
         // northstar://settings destroyed the page you were reading. The one
         // exception is a blank tab, which has nothing to preserve and would
         // otherwise be left behind as an orphan.
-        const internal = parseNorthstarUrl(url);
+        // northstar:// as typed, OR a bare stored token ('history', 'settings/…')
+        // that a restore/reload can hand back — both must resolve to the internal
+        // page, never be fetched as a web address (which 404s).
+        const internal = parseNorthstarUrl(url) || parseInternalToken(url);
         if (internal) {
             this.activeTabIndex = index;
             const blank = this.tabUrls.get(index) === 'newtab';

@@ -342,6 +342,7 @@
         initNotices();
         initExtActionsGap();
         initMenu();
+        initMenuBar();
         initDownloads();
         initExtensions();
         initUtilityBarConfig();
@@ -1219,20 +1220,27 @@
         let lastCtxPoint = null;
 
         function openThemePanel(spaceId = null) {
-            /* Beside the rail, level with the click. The panel is about the
-               space you just right-clicked, so it opens next to it rather than
-               in the corner the toolbar's panels share. */
+            /* At the cursor. The panel is about the space you just clicked, so it
+               opens where the click was — not pinned to the sidebar's right edge,
+               which drifts far from the pointer once the sidebar is widened.
+               panelBounds() (align:left) puts the panel's left/top at this point
+               and clamps it on-screen, so it reads as coming from the click the
+               way the context menu it was launched from did. */
             let anchor = null;
             try {
-                const rail = document.getElementById('tab-bar')?.getBoundingClientRect();
-                const y = lastCtxPoint?.y;
-                if (rail && Number.isFinite(y)) {
-                    const edge = Math.round(rail.right);
-                    anchor = { left: edge, right: edge, top: y, bottom: y };
+                const p = lastCtxPoint;
+                if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+                    const x = Math.round(p.x), y = Math.round(p.y);
+                    anchor = { left: x, right: x, top: y, bottom: y };
                 }
-                else if (rail) {
-                    const mid = Math.round(rail.top + 40);
-                    anchor = { left: Math.round(rail.right), right: Math.round(rail.right), top: mid, bottom: mid };
+                else {
+                    // No click point (opened from a non-menu path): fall back to
+                    // beside the sidebar, level with its top.
+                    const rail = document.getElementById('tab-bar')?.getBoundingClientRect();
+                    if (rail) {
+                        const edge = Math.round(rail.right), mid = Math.round(rail.top + 40);
+                        anchor = { left: edge, right: edge, top: mid, bottom: mid };
+                    }
                 }
             }
             catch (e) { window.northstarLog?.debug('renderer', 'openThemePanel: ' + e); }
@@ -1828,13 +1836,19 @@
                     window.tabsUI.commitSidebarWidth(pending);
             };
             handle.addEventListener('pointerup', () => stop(true));
-            handle.addEventListener('pointercancel', () => stop(true));
-            // With no tabs there is no page view, so main cannot watch a tab's
-            // input stream to notice the release — and if the handle loses the
-            // pointer the drag would never end, leaving the resize cursor stuck.
-            // A release or Escape anywhere in the chrome finishes it.
+            // NOTE: no `pointercancel` or `blur` end here. When a tab is active the
+            // page is a native view layered over the chrome; the moment the drag
+            // crosses onto it the view SEIZES the captured pointer, which fires
+            // `pointercancel` on the handle (and `blur` on the window as focus
+            // follows). Ending on those killed the drag on frame one — before a
+            // single poll tick — which is exactly why resize "did nothing" WITH an
+            // active tab but worked without one (no page view to seize it). That
+            // seam-crossing is precisely what the main-process poll takes over, so
+            // the drag must SURVIVE it, not end. Main is authoritative for the end
+            // (page/chrome mouseUp via input-event, or the 480ms cursor-idle
+            // backstop) and always calls back on `sidebar-resize-ended` below.
+            // A genuine release over the chrome, and Escape, still end it here.
             window.addEventListener('pointerup', () => stop(true));
-            window.addEventListener('blur', () => stop(true));
             document.addEventListener('keydown', (e) => { if (e.key === 'Escape') stop(true); });
             // Main fires this when the release happened over the page view.
             try { window.tabsUI.onSidebarResizeEnded((w) => { pending = clamp(w); stop(false); }); } catch (e) { window.northstarLog?.debug('renderer', 'stop: ' + e); }
@@ -4228,9 +4242,159 @@
         function initMenu() {
             menuBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                window.menu.open();
+                let anchor = null;
+                try {
+                    const r = menuBtn.getBoundingClientRect();
+                    anchor = { left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom) };
+                }
+                catch (err) { window.northstarLog?.debug('renderer', 'menu anchor: ' + err); }
+                window.menu.open(anchor);
                 menuOpen = true;
             });
+        }
+        // ─────────────────────────────────────────────────────────────────────────
+        // Menu bar — the Firefox-style File/Edit/… strip that drops from the top
+        // when Alt is tapped. Windows only: mac has the system menu bar and Linux
+        // the native (framed) one, so main only ever sends 'menubar-toggle' there
+        // (features/menu-bar.js). The bar's rows come from the same eight menus as
+        // the native bar; clicking one opens its dropdown through the themed
+        // overlay menu, anchored under the label.
+        // ─────────────────────────────────────────────────────────────────────────
+        function initMenuBar() {
+            const bar = document.getElementById('menu-bar');
+            if (!bar || !window.appMenuBar)
+                return;
+            let built = false;
+            let selected = 0; // index the arrow keys act on
+            const isShown = () => !bar.classList.contains('hidden');
+            const items = () => Array.from(bar.querySelectorAll('.menu-bar-item'));
+            async function build() {
+                // Item specs come from main (menu-bar.js) — the SAME source that
+                // matches keypresses — so the underlined letter and the key that
+                // fires always agree. Each spec is { label, keyIndex, key }.
+                let specs = [];
+                try { specs = await window.appMenuBar.labels(); }
+                catch (e) { window.northstarLog?.debug('renderer', 'menubar labels: ' + e); }
+                bar.innerHTML = '';
+                specs.forEach((spec, index) => {
+                    const label = (spec && spec.label) || '';
+                    const ki = (spec && Number.isInteger(spec.keyIndex)) ? spec.keyIndex : -1;
+                    const btn = document.createElement('button');
+                    btn.className = 'menu-bar-item';
+                    btn.type = 'button';
+                    btn.setAttribute('aria-haspopup', 'menu');
+                    btn.dataset.index = String(index);
+                    if (ki >= 0) {
+                        btn.dataset.key = label[ki].toLowerCase();
+                        // The mnemonic letter, underlined — built from text nodes so
+                        // the label is never treated as markup.
+                        if (ki > 0) btn.appendChild(document.createTextNode(label.slice(0, ki)));
+                        const u = document.createElement('u');
+                        u.textContent = label[ki];
+                        btn.appendChild(u);
+                        btn.appendChild(document.createTextNode(label.slice(ki + 1)));
+                    }
+                    else {
+                        btn.textContent = label;
+                    }
+                    btn.addEventListener('click', (e) => { e.stopPropagation(); openMenu(index); });
+                    bar.appendChild(btn);
+                });
+                built = true;
+            }
+            function openMenu(index) {
+                const btn = items()[index];
+                if (!btn)
+                    return;
+                selected = index;
+                items().forEach(el => el.setAttribute('aria-expanded', el === btn ? 'true' : 'false'));
+                let anchor = null;
+                try {
+                    const r = btn.getBoundingClientRect();
+                    anchor = { left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom) };
+                }
+                catch (e) { window.northstarLog?.debug('renderer', 'menubar anchor: ' + e); }
+                try { window.appMenuBar.open(index, anchor); }
+                catch (e) { window.northstarLog?.debug('renderer', 'menubar open: ' + e); }
+            }
+            function clearExpanded() {
+                bar.querySelectorAll('.menu-bar-item[aria-expanded="true"]').forEach(el => el.setAttribute('aria-expanded', 'false'));
+            }
+            function highlight(i) {
+                const list = items();
+                if (!list.length)
+                    return;
+                selected = (i + list.length) % list.length;
+                // Selection is a class only — never DOM focus. Moving focus to bar
+                // items (or the chrome) left stray focus rings on toolbar buttons
+                // and tabs ("random stuff selected"). The keyboard is driven from
+                // main (before-input-event), so no element needs real focus here.
+                list.forEach((el, n) => el.classList.toggle('is-selected', n === selected));
+            }
+            async function show() {
+                if (!built)
+                    await build();
+                bar.classList.remove('hidden');
+                // Gate the layout change (the extra top grid row in side mode) to
+                // while the bar is actually open, so the default chrome layout is
+                // never touched — see styles.css [data-menubar].
+                document.documentElement.dataset.menubar = 'on';
+                bookmarks.reportHeight();
+                // Tell main the bar is open so it can drive the keyboard (mnemonics
+                // and arrows) from before-input-event, which reaches it regardless of
+                // which surface holds OS focus — no need to move OS focus here.
+                try { window.appMenuBar.setOpen(true); }
+                catch (e) { window.northstarLog?.debug('renderer', 'menubar setOpen: ' + e); }
+                // No pre-selection: opening the bar should not highlight an item.
+                // -1 means "nothing yet"; the first arrow lands on an end, and
+                // mnemonics don't need a selection at all.
+                selected = -1;
+            }
+            function hide() {
+                clearExpanded();
+                bar.querySelectorAll('.is-selected').forEach(el => el.classList.remove('is-selected'));
+                if (!isShown())
+                    return;
+                bar.classList.add('hidden');
+                document.documentElement.dataset.menubar = 'off';
+                bookmarks.reportHeight();
+                try { window.appMenuBar.setOpen(false); }
+                catch (e) { window.northstarLog?.debug('renderer', 'menubar setOpen: ' + e); }
+            }
+            window.appMenuBar.onToggle(() => { isShown() ? hide() : show(); });
+            // The dropdown closed: un-press its top-level item. If an item was
+            // actually chosen the whole bar goes away (the action is done); a plain
+            // dismiss keeps the bar so another menu can be opened.
+            window.appMenuBar.onClosed((info) => {
+                clearExpanded();
+                if (info && info.picked)
+                    hide();
+                else if (isShown() && info && Number.isInteger(info.index))
+                    highlight(info.index);
+            });
+            // Keyboard, driven from main (Shortcuts._routeMenuBarKey) so it works
+            // even when a page's native view holds OS focus.
+            window.appMenuBar.onKey((msg) => {
+                if (!isShown() || !msg)
+                    return;
+                switch (msg.action) {
+                    case 'hide': hide(); break;
+                    case 'open': if (Number.isInteger(msg.index)) openMenu(msg.index); break;
+                    case 'ArrowRight': highlight(selected + 1); break;
+                    case 'ArrowLeft': highlight(selected - 1); break;
+                    case 'ArrowDown': case 'ArrowUp': case 'Enter': openMenu(selected); break;
+                }
+            });
+            // Clicking a page (its native view) dismisses the bar, like any menu.
+            try { window.contentInteraction.onClicked(() => hide()); }
+            catch (e) { window.northstarLog?.debug('renderer', 'menubar onClicked: ' + e); }
+            // A press anywhere in the chrome outside the bar dismisses it too. (While
+            // a dropdown is open the full-window overlay is what receives clicks, so
+            // this only fires for the bar-shown-but-no-dropdown case.)
+            document.addEventListener('mousedown', (e) => {
+                if (isShown() && !e.target.closest('#menu-bar'))
+                    hide();
+            }, true);
         }
     });
 })();

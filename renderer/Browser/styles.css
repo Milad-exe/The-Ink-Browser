@@ -96,6 +96,47 @@ html[data-vibrancy="true"] #content-area {
 /* Settings → Appearance → Toolbar can remove items entirely. */
 .user-hidden { display: none !important; }
 
+/* ── Menu bar (Firefox-style Alt bar; frameless Windows only) ───────────────
+   A full-width strip at the very top holding the eight menus. Hidden until Alt
+   is tapped; when shown it reflows the page card down through the shared
+   reportChromeHeight channel (its measured height is added there). The empty
+   parts stay a window-drag region so the top edge is still a title bar; the
+   menu labels themselves are not. */
+.menu-bar {
+  display: flex; align-items: center; gap: 2px;
+  height: var(--menubar-h, 28px); width: 100%;
+  padding: 0 var(--sp-2); box-sizing: border-box;
+  background: var(--shell); color: var(--text);
+  -webkit-app-region: drag; user-select: none; -webkit-user-select: none;
+}
+.menu-bar.hidden { display: none; }
+/* Keep the window controls pinned to the very top-right while the Alt bar is up,
+   rather than letting them ride down with the toolbar. The bar's items are
+   left-aligned, so the controls sit over its empty right end. */
+html[data-menubar="on"][data-platform="win32"] #window-controls,
+html[data-menubar="on"][data-platform="linux"] #window-controls {
+  position: fixed; top: 0; right: 0; z-index: 50;
+  height: var(--menubar-h, 28px); -webkit-app-region: no-drag;
+}
+.menu-bar-item {
+  -webkit-app-region: no-drag;
+  height: 22px; padding: 0 var(--sp-3);
+  display: inline-flex; align-items: center;
+  border: none; border-radius: var(--r-sm, 6px); background: transparent;
+  color: var(--text); cursor: default;
+  font-family: var(--font); font-size: var(--fs-small); font-weight: 500;
+  letter-spacing: var(--tracking);
+}
+.menu-bar-item:hover,
+.menu-bar-item.is-selected,
+.menu-bar-item[aria-expanded="true"] { background: var(--hover); }
+.menu-bar-item:focus-visible { outline: none; background: var(--hover); }
+/* The mnemonic letter, underlined (Firefox-style access key). */
+.menu-bar-item u { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+/* Top-tabs: sit above the tab strip (flex column; page offset is a sum of
+   heights, so only the visual order matters here). */
+html[data-tabbar="top"] #menu-bar { order: -1; }
+
 /* ── Window Controls ─────────────────────── */
 .window-controls { display: flex; align-items: center; flex-shrink: 0; -webkit-app-region: no-drag; }
 
@@ -394,6 +435,17 @@ html[data-tabbar="side"] #content-area {
      this only has to trace them. */
   box-shadow: var(--ring);
   border-radius: var(--card-radius); grid-column: 2; grid-row: 3; }
+
+/* Menu bar shown (Alt tapped): insert a full-width row at the very top and push
+   the utility bar, sidebar, bookmark bar and page down one row. Gated on
+   data-menubar so the DEFAULT side layout above is untouched — the bar only ever
+   changes the grid while it is actually open. renderer.js sets data-menubar. */
+html[data-tabbar="side"][data-menubar="on"] body { grid-template-rows: auto auto auto minmax(0, 1fr); }
+html[data-tabbar="side"][data-menubar="on"] #menu-bar    { grid-column: 1 / -1; grid-row: 1; }
+html[data-tabbar="side"][data-menubar="on"] #utility-bar { grid-row: 2; }
+html[data-tabbar="side"][data-menubar="on"] #tab-bar     { grid-row: 3 / span 2; }
+html[data-tabbar="side"][data-menubar="on"] .bookmark-bar { grid-row: 3; }
+html[data-tabbar="side"][data-menubar="on"] #content-area { grid-row: 4; }
 /* In side mode the strip is a full-height working column, not a title bar, so
    it must NOT be a window-drag region — everything without an explicit no-drag
    (folder headers, the empty tab area, the space label) would otherwise swallow

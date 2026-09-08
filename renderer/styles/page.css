@@ -26,6 +26,16 @@
     margin: 0;
     min-height: 100vh;
     background: var(--page);
+    /* Type belongs here, NOT under the vibrancy rule below — that rule only
+       matches on macOS (where the window carries data-vibrancy), so on
+       Windows/Linux the page had no font-family at all and fell back to the UA
+       default (Times New Roman). These are the browser's own type tokens, the
+       same the chrome uses. */
+    color: var(--text);
+    font-family: var(--font);
+    font-size: var(--fs-body);
+    letter-spacing: var(--tracking);
+    -webkit-font-smoothing: antialiased;
   }
   /* macOS: the view behind an internal page is already transparent
      (Tabs._applyTabBackground) and the window carries `vibrancy:
@@ -34,11 +44,6 @@
      opaque surfaces, so nothing you have to read sits on moving wallpaper. */
   html[data-vibrancy="true"] .page {
     background: color-mix(in srgb, var(--page) 78%, transparent);
-    color: var(--text);
-    font-family: var(--font);
-    font-size: var(--fs-body);
-    letter-spacing: var(--tracking);
-    -webkit-font-smoothing: antialiased;
   }
 
   .page-column {

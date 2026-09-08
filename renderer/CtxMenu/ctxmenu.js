@@ -8,8 +8,30 @@
 (() => {
     const surface = document.getElementById('surface');
     let chain = []; // menu elements, root first
+    // The in-chrome menu bar opens its dropdowns with mnemonics on: each row gets
+    // an underlined access-key letter and the keyboard drives the whole chain
+    // (see features/menu-bar.js). Right-click menus leave this off and keep the
+    // plain roving-focus keys. Set per open().
+    let useMnemonics = false;
 
     const clear = () => { chain.forEach(m => m.remove()); chain = []; };
+
+    // Give each row in ONE menu level a unique access key: its first letter/digit
+    // not already claimed by a row above it. Mutates the rows with __ki (index of
+    // the character in the label) and __key (that character, lowercased).
+    const assignRowKeys = (rows) => {
+        const used = new Set();
+        for (const r of rows) {
+            r.__ki = -1;
+            r.__key = null;
+            if (r.sep || r.disabled || !r.label)
+                continue;
+            for (let i = 0; i < r.label.length; i++) {
+                const c = r.label[i].toLowerCase();
+                if (/[a-z0-9]/.test(c) && !used.has(c)) { used.add(c); r.__ki = i; r.__key = c; break; }
+            }
+        }
+    };
 
     const clampInto = (menu, x, y, parentRect) => {
         const w = menu.offsetWidth, h = menu.offsetHeight;
@@ -41,6 +63,8 @@
     const build = (rows, depth, path) => {
         const menu = document.createElement('div');
         menu.className = 'ctx-menu';
+        if (useMnemonics)
+            assignRowKeys(rows);
         rows.forEach((r, i) => {
             if (r.sep) {
                 const s = document.createElement('div');
@@ -58,7 +82,24 @@
                 + (r.sub ? ' has-sub' : '') + (r.checked ? ' is-checked' : '');
             if (r.disabled)
                 b.disabled = true;
-            b.appendChild(document.createTextNode(r.label));
+            if (useMnemonics && r.__ki >= 0) {
+                // Underline the access-key letter, built from text nodes so the
+                // label is never treated as markup. Wrapped in one span so a
+                // has-sub row (a flex container) keeps the label as a single unit
+                // beside its arrow, rather than scattering the fragments.
+                b.dataset.key = r.__key;
+                const lbl = document.createElement('span');
+                lbl.className = 'ctx-label';
+                if (r.__ki > 0) lbl.appendChild(document.createTextNode(r.label.slice(0, r.__ki)));
+                const u = document.createElement('u');
+                u.textContent = r.label[r.__ki];
+                lbl.appendChild(u);
+                lbl.appendChild(document.createTextNode(r.label.slice(r.__ki + 1)));
+                b.appendChild(lbl);
+            }
+            else {
+                b.appendChild(document.createTextNode(r.label));
+            }
             if (r.checked) {
                 const tick = document.createElement('span');
                 tick.className = 'ctx-check';
@@ -143,12 +184,16 @@
         if (data.seq && data.seq === shownSeq)
             return;
         shownSeq = data.seq || 0;
+        useMnemonics = !!data.mnemonics && data.kind !== 'emoji';
         clear();
         const root = data.kind === 'emoji' ? buildEmoji(data) : build(data.rows, 0, []);
         chain.push(root);
         place(root, data.x, data.y);
         shownAt = Date.now();
         armKeys();
+        // No pre-selection — opening a dropdown should not highlight a row. The
+        // arrows start from an end (ArrowDown → first) and mnemonics activate a
+        // row directly, neither of which needs an initial selection.
     };
 
     window.overlayMenu.onOpen(open);
@@ -175,12 +220,69 @@
     // activates, Escape closes, and typing jumps by first letter. Re-armed on
     // every open because the rows are rebuilt each time.
     const armKeys = () => {
+        // Menu-bar dropdowns drive their own keyboard (mnemonics + full chain nav,
+        // below), so the generic roving-focus/type-ahead helper would fight it.
+        if (useMnemonics)
+            return;
         const top = chain[chain.length - 1];
         // No focusFirst: opening a menu with the mouse should not pre-select a
         // row (right-clicking the sidebar highlighting the first item read as a
         // stray selection). Arrow keys still start from the top/bottom.
         window.Northstar?.keys?.rows(top || document, { selector: '.ctx-menu-item', onEscape: dismiss });
     };
+
+    // ── Mnemonic / keyboard navigation for menu-bar dropdowns ────────────────
+    const itemsOf = (menu) => menu ? [...menu.querySelectorAll('.ctx-menu-item')].filter(b => !b.disabled) : [];
+    function selectIn(menu, i) {
+        const its = itemsOf(menu);
+        if (!its.length)
+            return;
+        const idx = (i + its.length) % its.length;
+        // Class-only selection — no .focus(). The overlay view already holds the
+        // keyboard, and focusing individual rows left stray focus rings around.
+        its.forEach(b => b.classList.remove('kbd-sel'));
+        its[idx].classList.add('kbd-sel');
+    }
+    /** Open the submenu of `button` (reusing the same builder the mouse uses) and
+     *  select its first row. */
+    function openSubOf(button, menu) {
+        button.dispatchEvent(new MouseEvent('mouseenter'));
+        const deep = chain[chain.length - 1];
+        if (deep && deep !== menu)
+            selectIn(deep, 0);
+    }
+    document.addEventListener('keydown', (e) => {
+        if (!useMnemonics || !chain.length)
+            return;
+        const menu = chain[chain.length - 1];
+        const its = itemsOf(menu);
+        const cur = its.findIndex(b => b.classList.contains('kbd-sel'));
+        const sel = cur >= 0 ? its[cur] : null;
+        const k = e.key;
+        if (k === 'ArrowDown') { e.preventDefault(); selectIn(menu, cur === -1 ? 0 : cur + 1); return; }
+        if (k === 'ArrowUp') { e.preventDefault(); selectIn(menu, cur === -1 ? its.length - 1 : cur - 1); return; }
+        if (k === 'ArrowRight') {
+            if (sel && sel.classList.contains('has-sub')) { e.preventDefault(); openSubOf(sel, menu); }
+            return;
+        }
+        if (k === 'ArrowLeft') {
+            // Step back out of a submenu; at the root there is nowhere to go.
+            if (chain.length > 1) { e.preventDefault(); closeFrom(chain.length - 1); }
+            return;
+        }
+        if (k === 'Enter' || k === ' ') {
+            if (sel) { e.preventDefault(); sel.classList.contains('has-sub') ? openSubOf(sel, menu) : sel.click(); }
+            return;
+        }
+        // The access key: open a submenu row, or activate a leaf.
+        if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const hit = its.find(b => b.dataset.key === k.toLowerCase());
+            if (hit) {
+                e.preventDefault();
+                hit.classList.contains('has-sub') ? openSubOf(hit, menu) : hit.click();
+            }
+        }
+    });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') dismiss();
     });

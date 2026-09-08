@@ -16,12 +16,34 @@ const MENU_WIDTH = W_SM;
 // menu window is invisible but still swallows clicks below the card.
 const MENU_HEIGHT = 520; // 12 rows + the zoom row + separators, at --row-h
 // (12 rows + zoom + separators; adding a row without raising this clips the menu)
+
+// The menu CARD carries a 4px transparent margin — body padding in
+// renderer/Menu/styles.css — so its drop shadow has room inside the view.
+// overlay-bounds aligns the VIEW's outer edge to the page card's edge, but that
+// margin then pushed the visible card 4px in (and 4px down), which read as the
+// menu sitting slightly off the tab view. Re-anchoring the view by the bleed
+// lands the card itself — not the view — flush with the page card's top and
+// right edges. Keep in step with the body padding in Menu/styles.css.
+const CARD_BLEED = 4;
+const alignCard = (rect) => ({ ...rect, x: rect.x + CARD_BLEED, y: rect.y - CARD_BLEED });
+
 function register(ipcMain, { wm }) {
     // ── Open ─────────────────────────────────────────────────────────────────
-    ipcMain.handle('open', (_e) => {
+    ipcMain.handle('open', (_e, anchor) => {
         const wd = wm.getWindowByWebContents(_e.sender);
         if (!wd)
             return;
+        // Clicking the hamburger while the menu is up TOGGLES it shut. And when
+        // that click closed it via the blur path below, the very same click also
+        // arrives here as 'open' — so ignore an open that lands right after a
+        // close, or the menu would flicker shut and straight back open.
+        if (wd.menu || (Date.now() - (wd._menuClosedAt || 0) < 250)) {
+            closeWindowMenu(wd);
+            return;
+        }
+        // Anchor to the hamburger button so the panel drops from it (a toolbar
+        // anchor still aligns to the page card's right edge — overlay-bounds.js).
+        wd.menuAnchor = anchor || null;
         wd.menu = new WebContentsView({
             webPreferences: {
                 preload: path.join(__dirname, '../preload/menu-preload.js'),
@@ -33,11 +55,7 @@ function register(ipcMain, { wm }) {
         try { wd.menu.setBorderRadius(PANEL_RADIUS); } catch (e) { log.debug('menu', 'open', e); }
         wd.window.contentView.addChildView(wd.menu);
         wd.menu.webContents.loadFile(resolveAppFile('renderer/Menu/index.html'));
-        // No anchor: the menu belongs to the window, so it opens in the
-        // shell's own corner — level with the top of the page card.
-        wd.menu.setBounds(panelBounds(wd.window, { width: MENU_WIDTH, height: MENU_HEIGHT }));
-        // Close the menu the moment the user clicks outside it or the window
-        // loses OS focus. Use a one-shot flag so cleanup only fires once.
+        wd.menu.setBounds(alignCard(panelBounds(wd.window, { anchor: wd.menuAnchor, width: MENU_WIDTH, height: MENU_HEIGHT })));
         const cleanups = [];
         let fired = false;
         const closeOnce = () => {
@@ -46,10 +64,29 @@ function register(ipcMain, { wm }) {
             fired = true;
             closeWindowMenu(wd);
         };
+        // FOCUS the view once it has loaded: the keyboard (arrows / Enter /
+        // Escape, wired in the renderer) needs it, and a click anywhere else then
+        // BLURS it — the one dismiss signal that fires no matter where the click
+        // lands (a page's native view never reported clicks reliably, so the menu
+        // "wouldn't go away"). A short grace ignores the focus churn of opening.
+        const shownAt = Date.now();
+        wd.menu.webContents.once('did-finish-load', () => {
+            // Belt-and-suspenders theme: hand the menu its space's theme directly
+            // (the same id the runtime injects the sheet for), so a freshly built
+            // view is never left wearing the default palette.
+            try {
+                const tr = require('../features/theme-runtime');
+                wd.menu.webContents.send('theme-changed', tr.themeFor(wd.menu.webContents));
+            }
+            catch (e) { log.debug('menu', 'theme', e); }
+            try { wd.menu.webContents.focus(); }
+            catch (e) { log.debug('menu', 'focus', e); }
+        });
+        const onBlur = () => { if (Date.now() - shownAt >= 250) closeOnce(); };
+        wd.menu.webContents.on('blur', onBlur);
+        cleanups.push(() => { try { wd.menu?.webContents.removeListener('blur', onBlur); } catch (e) { log.debug('menu', 'cleanup', e); } });
         wd.window.once('blur', closeOnce);
         cleanups.push(() => wd.window.removeListener('blur', closeOnce));
-        wd.window.webContents.once('focus', closeOnce);
-        cleanups.push(() => wd.window.webContents.removeListener('focus', closeOnce));
         wd.menuCleanups = cleanups;
     });
     // Size the overlay to the menu card's real height so nothing is clipped into
@@ -62,7 +99,7 @@ function register(ipcMain, { wm }) {
             return;
         for (const wd of wm.getAllWindows()) {
             if (wd.menu?.webContents === _e.sender) {
-                try { wd.menu.setBounds(panelBounds(wd.window, { width: MENU_WIDTH, height })); }
+                try { wd.menu.setBounds(alignCard(panelBounds(wd.window, { anchor: wd.menuAnchor || null, width: MENU_WIDTH, height }))); }
                 catch (e) { log.debug('menu', 'report-height', e); }
                 return;
             }
@@ -112,6 +149,25 @@ function register(ipcMain, { wm }) {
         // is not the consolation prize (this browser has none).
         try { return require('./palette').openFor(wd); }
         catch { return false; }
+    });
+    // ── In-chrome menu bar (the Firefox-style Alt bar on frameless Windows) ─────
+    // The bar's labels and every dropdown come from features/menu-bar.js, which
+    // is the same eight menus the native bar uses on mac/Linux — see there.
+    ipcMain.handle('menubar:labels', (_e) => {
+        try { return require('../features/menu-bar').items(); }
+        catch { return []; }
+    });
+    ipcMain.handle('menubar:open', (_e, index, anchor) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        try { return require('../features/menu-bar').openDropdown(wd, Number(index) || 0, anchor); }
+        catch { return false; }
+    });
+    // The chrome reports when the bar opens/closes, so Shortcuts (which sees every
+    // keystroke via before-input-event, regardless of which surface holds focus)
+    // can drive the bar's mnemonics and arrows even while a page holds OS focus.
+    ipcMain.on('menubar:state', (_e, open) => {
+        const wd = wm.getWindowByWebContents(_e.sender);
+        if (wd) wd.menuBarOpen = !!open;
     });
     ipcMain.on('window-click', (_e, pos) => {
         const wd = wm.getWindowByWebContents(_e.sender);

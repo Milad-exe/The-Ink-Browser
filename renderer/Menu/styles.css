@@ -6,20 +6,26 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+html, body { height: 100%; }
 body {
   margin: 0; padding: 4px;
   font-family: var(--font);
   background: transparent;
   font-size: var(--fs-body); color: var(--text);
   -webkit-font-smoothing: antialiased;
+  /* The overlay is sized to the exact content height (see menu.js reportHeight),
+     so the menu never needs to scroll — and a stray scrollbar on a floating
+     menu reads as broken. Belt to that braces. */
+  overflow: hidden;
 }
 
 .container { display: flex; flex-direction: column; }
 
-/* Row icons sit back until the row is the one you mean. */
-.menu-row { color: var(--text-2); }
-.menu-row svg { width: var(--icon); height: var(--icon); flex-shrink: 0; opacity: 0.8; }
-.menu-row:hover { color: var(--text); }
+/* Menu labels read at full strength — a menu is a list of actions, not body
+   copy, so it should not sit at the dimmed secondary tone. Icons stay a touch
+   back and come up on hover. */
+.menu-row { color: var(--text); }
+.menu-row svg { width: var(--icon); height: var(--icon); flex-shrink: 0; opacity: 0.75; }
 .menu-row:hover svg { opacity: 1; }
 
 /* The bookmark-bar row reads as a setting: a check appears where the shortcut

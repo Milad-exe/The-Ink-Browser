@@ -147,10 +147,6 @@
         <div class="card">
           <div class="card-title" data-i18n="settings.theme">Theme</div>
           <div class="card-desc" data-i18n="settings.themeDesc">Choose a color palette for the browser</div>
-          <!-- The row of swatches, the "+" beside it and the caption naming
-               what is selected are all built by renderer/lib/theme-editor.js —
-               the picker below is only the radiogroup it fills. -->
-          <div class="theme-picker" id="theme-picker" role="radiogroup" aria-label="Theme" data-i18n-label="settings.theme"></div>
 
           <!-- Theme editor.
 
@@ -242,9 +238,9 @@
             <!-- Why a drag stopped painting anything. Hidden until it happens. -->
             <p class="te-warn" id="te-warn" role="status" hidden></p>
 
-            <div class="te-foot">
-              <button class="btn btn-ghost btn-sm" id="te-cancel" type="button">Done</button>
-            </div>
+            <!-- No "Done" here: on the Settings page the editor is a permanent
+                 section, not a popup, so there is nothing to dismiss. (The
+                 sidebar popup keeps its Done — see renderer/ThemePanel.) -->
 
           </div>
         </div>

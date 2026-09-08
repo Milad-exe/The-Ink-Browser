@@ -12,6 +12,10 @@ function closeWindowMenu(windowData) {
     }
     catch (e) { log.debug('utils', 'closeWindowMenu', e); }
     windowData.menu = null;
+    // When the close was the hamburger being clicked again, the same click then
+    // fires 'open' — this timestamp lets that handler recognise a toggle-close
+    // and NOT immediately reopen. (Harmless for every other close path.)
+    windowData._menuClosedAt = Date.now();
     try {
         windowData.window.webContents.send('menu-closed');
     }

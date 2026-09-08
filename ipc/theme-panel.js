@@ -17,10 +17,13 @@ const { WebContentsView } = require('electron');
 const { panelBounds, PANEL_RADIUS, W_MD } = require('../features/overlay-bounds');
 
 const PANEL_W = W_MD;
-/* Sized to the instrument. The swatch row, the wheel and its controls — no
-   name field, no contrast readout, no Save, because none of those exist any
-   more. */
-const PANEL_H = 430;
+/* Sized to hold the WHOLE instrument without an inner scroll: the mode toggle,
+   the gradient field (a 3:2 canvas, the tall part), the colour palette, the
+   roles+tools row, the three sliders and the foot. Measured at PANEL_W the
+   content is ~510px; 520 leaves the last control clear of the foot. The old 430
+   cut the sliders off and made the panel scroll. panelBounds() still trims and
+   slides this to fit a short window. */
+const PANEL_H = 520;
 
 async function ensurePanel(wd) {
     if (wd.themePanel) {

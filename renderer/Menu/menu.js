@@ -78,8 +78,11 @@
         // Tell main the card's real height so the overlay is sized to it and the
         // menu never scrolls. Measured after layout; re-measured if a webfont
         // reflows the rows.
-        const card = document.querySelector('.surface-card') || document.body;
-        const reportHeight = () => { try { api.reportHeight?.(Math.ceil(card.getBoundingClientRect().height)); } catch (e) { window.northstarLog?.debug('menu', 'reportHeight: ' + e); } };
+        // Report the WHOLE document height (card + the body's own padding), not
+        // just the card — sizing the overlay to only the card left the body's 4px
+        // top/bottom padding overflowing the view, which showed as a scrollbar.
+        // The menu must never scroll: it opens at its full height.
+        const reportHeight = () => { try { api.reportHeight?.(Math.ceil(document.documentElement.scrollHeight)); } catch (e) { window.northstarLog?.debug('menu', 'reportHeight: ' + e); } };
         requestAnimationFrame(reportHeight);
         try { document.fonts?.ready?.then(reportHeight); } catch (e) { window.northstarLog?.debug('menu', 'fonts: ' + e); }
         // Left/Right work the zoom row from its single stop, the way a slider
